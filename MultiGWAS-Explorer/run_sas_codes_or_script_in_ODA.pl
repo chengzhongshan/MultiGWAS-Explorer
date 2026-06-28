@@ -343,6 +343,22 @@ sub resolve_sas_oda_authinfo_path {
     return File::Spec->catfile($home, '.authinfo');
 }
 
+sub slurp_stdin_text {
+    local $/;
+    my $text = <STDIN>;
+    return defined $text ? $text : '';
+}
+
+sub normalize_cli_code_text {
+    my ($text) = @_;
+    return '' unless defined $text;
+    $text =~ s/\\r\\n/\n/g;
+    $text =~ s/\\n/\n/g;
+    $text =~ s/\\r/\r/g;
+    $text =~ s/\\t/\t/g;
+    return $text;
+}
+
 sub authinfo_entry_exists_for_key {
     my ($path, $authkey) = @_;
     return 0 unless defined $path && length $path && -f $path;
@@ -651,7 +667,12 @@ if ($help || (!$check_sas_oda_login_only && !$monitor_status_file && !$code && !
 Usage: $0 [OPTIONS]
 
 Options:
-  -c, --code, --codes <code> SAS code string to execute
+  -c, --code, --codes <code> SAS code string to execute.
+                             Pass '-' to read SAS code from STDIN, which is
+                             the most reliable way to submit raw DATALINES/CARDS
+                             blocks or other multi-line code from the shell.
+                             Literal '\n', '\r\n', and '\t' sequences in a
+                             direct --code string are expanded before submit.
   -f, --file <file>          SAS script file to execute
   -m, --macro-dir <dir>      Directory containing macro files (default: ./)
   --no-html-info             output a plain text file containing the random html filename
@@ -718,6 +739,7 @@ Examples:
   $0 --file very_long_job.sas --no-run-timeout --persistent --session-id mysession
   $0 --code 'data a;do i=1 to 1000;x=i**2;output;rc=sleep(1);end;run;proc print data=a(obs=10);run
 ;' --no-run-timeout --persistent --session-id mysession
+  $0 --code "data a;input a @@;datalines;\n10 20\n;run;proc print data=a;run;" --persistent --session-id mysession
   $0 --file script1.sas --persistent --session-id mysession
   $0 --file script2.sas --session-id mysession
   perl -S run_sas_codes_or_script_in_ODA.pl   --code "data a; set sashelp.cars; run;"   --persistent --session-id reuse_test --output-prefix reuse1
@@ -725,6 +747,16 @@ Examples:
   #Macros in ~/Macros are auto-imported only when the session is created; they are not re-imported on reuse.
   #both --persistent and --session-id must be used together to enable session reuse. The output files will have prefixes "reuse1" and "reuse2" respectively.
   perl -S run_sas_codes_or_script_in_ODA.pl   --code "proc print data=a; run;"   --persistent --session-id reuse_test --output-prefix reuse2
+  cat <<'SAS' | $0 --code - --persistent --session-id mysession
+  data a;
+  input a @;
+  datalines;
+  10 20
+  ;
+  run;
+  proc print data=a;
+  run;
+  SAS
 USAGE
     exit 0;
 }
@@ -744,6 +776,12 @@ if ($dry_run) {
 if ($monitor_status_file) {
     monitor_status_loop($monitor_status_file, $monitor_interval_seconds);
     exit 0;
+}
+
+if (defined $code && $code eq '-') {
+    $code = slurp_stdin_text();
+} elsif (defined $code) {
+    $code = normalize_cli_code_text($code);
 }
 
 bootstrap_sas_oda_credentials_if_needed();
@@ -1735,36 +1773,66 @@ sub format_sas_preflight_report {
         // 'No obvious unmatched block comments or unterminated quoted strings were detected.';
     my @lines = @{ $scan->{lines} || [] };
     my @findings = @{ $scan->{findings} || [] };
+    my @warning_findings = @{ $args{warning_findings} || [] };
     my @report;
     push @report, $heading;
     push @report, "Target: $display_path";
     push @report, "Total lines: " . scalar(@lines);
-    if (!@findings) {
+    if (!@findings && !@warning_findings) {
         push @report, $success_message;
         return join("\n", @report);
     }
 
-    push @report, "Potential compile-blocking findings:";
     my @context_lines;
-    for my $finding (@findings) {
-        push @report, "- line " . ($finding->{line} // '?') . ": " . ($finding->{message} // 'unknown issue');
-        push @context_lines, @{ $finding->{context_ref} || [] };
+    if (@findings) {
+        push @report, "Potential compile-blocking findings:";
+        for my $finding (@findings) {
+            push @report, "- line " . ($finding->{line} // '?') . ": " . ($finding->{message} // 'unknown issue');
+            push @context_lines, @{ $finding->{context_ref} || [] };
+        }
     }
-
-    my @ranges = collapse_line_ranges(\@context_lines, scalar(@lines));
-    push @report, "Context:";
-    for my $range (@ranges) {
-        my ($start, $end) = @{$range};
-        $start = 1 if $start < 1;
-        $end = scalar(@lines) if $end > scalar(@lines);
-        push @report, "-- lines $start-$end --";
-        for my $line_no ($start .. $end) {
-            my $text = $lines[$line_no - 1] // '';
-            push @report, format_line_number($line_no) . ": " . $text;
+    if (@warning_findings) {
+        push @report, "Warnings:";
+        for my $finding (@warning_findings) {
+            push @report, "- line " . ($finding->{line} // '?') . ": " . ($finding->{message} // 'unknown issue');
+            push @context_lines, @{ $finding->{context_ref} || [] };
+        }
+    }
+    if (@context_lines) {
+        my @ranges = collapse_line_ranges(\@context_lines, scalar(@lines));
+        push @report, "Context:";
+        for my $range (@ranges) {
+            my ($start, $end) = @{$range};
+            $start = 1 if $start < 1;
+            $end = scalar(@lines) if $end > scalar(@lines);
+            push @report, "-- lines $start-$end --";
+            for my $line_no ($start .. $end) {
+                my $text = $lines[$line_no - 1] // '';
+                push @report, format_line_number($line_no) . ": " . $text;
+            }
         }
     }
 
     return join("\n", @report);
+}
+
+sub scan_sas_text_for_inline_data_step_cards {
+    my ($text) = @_;
+    my @findings;
+    return \@findings unless defined $text && length $text;
+    my @lines = split /\r?\n/, $text, -1;
+    for my $idx (0 .. $#lines) {
+        my $line = $lines[$idx] // '';
+        next unless $line =~ /\b(?:datalines4?|cards4?|parmcards4?)\s*;/i;
+        next unless $line =~ /\b(?:datalines4?|cards4?|parmcards4?)\s*;\s*\S/i;
+        push @findings, {
+            type        => 'inline_cards_data',
+            line        => $idx + 1,
+            message     => "Inline DATALINES/CARDS data was detected after the statement terminator; with --code this often fails unless the data starts on following lines and ends with a standalone semicolon line. Prefer --code '-' with a heredoc or other STDIN input for raw data blocks.",
+            context_ref => [ $idx, $idx + 1, $idx + 2 ],
+        };
+    }
+    return \@findings;
 }
 
 sub run_submission_preflight {
@@ -1772,11 +1840,13 @@ sub run_submission_preflight {
     my $submitted_code = $args{submitted_code} // '';
     my $display_path = $args{display_path} // '(submitted SAS program)';
     my $scan = scan_sas_text_for_unbalanced_constructs($submitted_code);
+    my $warning_findings = scan_sas_text_for_inline_data_step_cards($submitted_code);
     my $fatal = @{ $scan->{findings} || [] } ? 1 : 0;
     my $report = format_sas_preflight_report(
         heading => '=== Submission Preflight ===',
         display_path => $display_path,
         scan => $scan,
+        warning_findings => $warning_findings,
         success_message => 'No obvious unmatched comments, unterminated quoted strings, or open-code macro-control statements were detected.',
     );
 
@@ -2028,6 +2098,33 @@ sub summarize_sas_log_text {
         @lines = (@lines[0 .. 39], '...', @lines[$#lines-179 .. $#lines]);
     }
     return join("\n", @lines);
+}
+
+sub sas_log_contains_fatal_error {
+    my ($text) = @_;
+    return 0 unless defined $text && length $text;
+    return 1 if $text =~ /WARNING:\s+Apparent invocation of macro\s+\w+\s+not resolved\./i;
+    return 1 if $text =~ /ERROR:\s+Macro\s+\w+\s+not defined/i;
+    return 1 if $text =~ /ERROR:\s+The macro\s+\w+\s+was not found/i;
+    return 1 if $text =~ /ERROR:\s+The macro\s+\w+\s+will stop executing\./i;
+    return 1 if $text =~ /ERROR:\s+A character operand was found in the %EVAL function or %IF condition where a numeric operand is required\./i;
+    return 1 if $text =~ /ERROR:\s+/i;
+    return 1 if $text =~ /^\s*ERROR\s+\d+-\d+:/mi;
+    return 0;
+}
+
+sub first_fatal_sas_log_line {
+    my ($text) = @_;
+    return '' unless defined $text && length $text;
+    for my $line (split /\r?\n/, $text) {
+        next unless defined $line;
+        if ($line =~ /WARNING:\s+Apparent invocation of macro\s+\w+\s+not resolved\./i
+            || $line =~ /ERROR:\s+/i
+            || $line =~ /^\s*ERROR\s+\d+-\d+:/i) {
+            return $line;
+        }
+    }
+    return '';
 }
 
 sub run_standalone_include_target_debug {
@@ -2554,6 +2651,16 @@ if (($execution_file || ($execution_code && $execution_code !~ /^\s*$/))
     && length($result->{error})) {
     $sas_execution_failed = 1;
     $sas_execution_error = $result->{error};
+}
+
+if (($execution_file || ($execution_code && $execution_code !~ /^\s*$/))
+    && ref($result) eq 'HASH'
+    && !length($result->{error} // '')
+    && sas_log_contains_fatal_error($result->{log} // '')) {
+    $sas_execution_failed = 1;
+    my $first_line = first_fatal_sas_log_line($result->{log} // '');
+    $sas_execution_error = 'SAS log contains fatal errors';
+    $sas_execution_error .= ": $first_line" if length $first_line;
 }
 
 if (($execution_file || ($execution_code && $execution_code !~ /^\s*$/))
