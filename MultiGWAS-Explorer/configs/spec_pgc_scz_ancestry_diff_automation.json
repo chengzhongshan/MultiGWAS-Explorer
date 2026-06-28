@@ -1,0 +1,49 @@
+{
+  "source_mode": "raw_pgc_vcf_sumstats",
+  "project_tag": "PGC_SCZ_ancestry_diff",
+  "artifact_stem": "PGC_SCZ_ancestry_diff_effects",
+  "input_dir": "/mnt/e/LongCOVID_HGI_GWAS/PGC_Large_GWASs/PGC_SCZ_Ancestry_Stratified_GWASs",
+  "output_dir": "/mnt/e/LongCOVID_HGI_GWAS/PGC_Large_GWASs/PGC_SCZ_Ancestry_Stratified_GWASs",
+  "workdir": "/mnt/g/NGS_lib/Linux_codes_SAM/Conda_and_Docker_Related_Scripts/perlMCP4Gemini_Paper",
+  "reference_build": "hg19",
+  "cygwin_bash": "/bin/bash",
+  "threshold": 0.05,
+  "keep_remote_plot_data": 1,
+  "top_hit_focus_prefix": "ASN_EUR",
+  "top_hit_signal_thrshd": "1e-6",
+  "top_hit_dist_bp": "1e6",
+  "top_hit_max_loci": 0,
+  "local_window_bp": "1e7",
+  "local_gtf_window_bp": "1e7",
+  "include_non_protein_coding_genes_in_local_gtf": 0,
+  "groups": [
+    {
+      "tag": "SCZ_W3_AFR",
+      "files": ["PGC3_SCZ_wave3.afram.autosome.public.v3.vcf.tsv.gz"]
+    },
+    {
+      "tag": "SCZ_W3_ASN",
+      "files": ["PGC3_SCZ_wave3.asian.autosome.public.v3.vcf.tsv.gz"]
+    },
+    {
+      "tag": "SCZ_W3_EUR",
+      "files": ["PGC3_SCZ_wave3.european.autosome.public.v3.vcf.tsv.gz"]
+    }
+  ],
+  "pairs": [
+    {
+      "pair_tag": "SCZ_W3_ASN_vs_EUR",
+      "group1": "SCZ_W3_ASN",
+      "group2": "SCZ_W3_EUR",
+      "prefix": "ASN_EUR",
+      "label": "ASN vs EUR"
+    },
+    {
+      "pair_tag": "SCZ_W3_AFR_vs_EUR",
+      "group1": "SCZ_W3_AFR",
+      "group2": "SCZ_W3_EUR",
+      "prefix": "AFR_EUR",
+      "label": "AFR vs EUR"
+    }
+  ]
+}

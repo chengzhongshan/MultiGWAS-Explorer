@@ -1,0 +1,80 @@
+{
+   "alias_map" : {
+      "ALL_FEMALE_P" : "ALL_GROUP1_P",
+      "ALL_MALE_P" : "ALL_GROUP2_P",
+      "ALL_STD_P" : "ALL_STD_DIFF_P",
+      "ASN_FEMALE_P" : "ASN_GROUP1_P",
+      "ASN_MALE_P" : "ASN_GROUP2_P",
+      "ASN_STD_P" : "ASN_STD_DIFF_P",
+      "EUR_FEMALE_P" : "EUR_GROUP1_P",
+      "EUR_MALE_P" : "EUR_GROUP2_P",
+      "EUR_STD_P" : "EUR_STD_DIFF_P"
+   },
+   "base_cols" : [
+      "CHR",
+      "BP",
+      "A1",
+      "A2",
+      "SNP"
+   ],
+   "char_lengths" : {
+      "A1" : 8,
+      "A2" : 8,
+      "SNP" : 40
+   },
+   "filter_fields" : [
+      "GROUP1_P",
+      "GROUP2_P",
+      "DIFF_P",
+      "STD_DIFF_P"
+   ],
+   "input" : "/mnt/e/LongCOVID_HGI_GWAS/PGC_Large_GWASs/PGC_SCZ_Sex_Stratified_GWASs/PGC_SCZ_female_vs_male_diff_effects.stdized.tsv.gz",
+   "manifest" : "/mnt/e/LongCOVID_HGI_GWAS/PGC_Large_GWASs/PGC_SCZ_Sex_Stratified_GWASs/PGC_SCZ_female_vs_male_diff_effects.stdized.wide_beta_se_p_p_lt_0p05.final.manifest.tsv",
+   "output" : "/mnt/e/LongCOVID_HGI_GWAS/PGC_Large_GWASs/PGC_SCZ_Sex_Stratified_GWASs/PGC_SCZ_female_vs_male_diff_effects.stdized.wide_beta_se_p_p_lt_0p05.final.tsv.gz",
+   "output_dir" : "/mnt/g/NGS_lib/Linux_codes_SAM/Conda_and_Docker_Related_Scripts/perlMCP4Gemini_Paper",
+   "pair_col" : "PAIR_TAG",
+   "pair_map" : {
+      "ALL_FEMALE_vs_MALE" : "ALL",
+      "ASN_FEMALE_vs_MALE" : "ASN",
+      "EUR_FEMALE_vs_MALE" : "EUR"
+   },
+   "post_alias_map" : {
+      "ALL_FEMALE_Z" : "ALL_GROUP1_Z",
+      "ALL_MALE_Z" : "ALL_GROUP2_Z",
+      "ALL_STD_Z" : "ALL_STD_DIFF_Z",
+      "ASN_FEMALE_Z" : "ASN_GROUP1_Z",
+      "ASN_MALE_Z" : "ASN_GROUP2_Z",
+      "ASN_STD_Z" : "ASN_STD_DIFF_Z",
+      "EUR_FEMALE_Z" : "EUR_GROUP1_Z",
+      "EUR_MALE_Z" : "EUR_GROUP2_Z",
+      "EUR_STD_Z" : "EUR_STD_DIFF_Z"
+   },
+   "prefix_order" : [
+      "ALL",
+      "EUR",
+      "ASN"
+   ],
+   "project_tag" : "PGC_SCZ_female_vs_male_diff_effects",
+   "threshold" : 0.05,
+   "value_fields" : [
+      "GROUP1_BETA",
+      "GROUP2_BETA",
+      "DIFF_BETA",
+      "GROUP1_SE",
+      "GROUP2_SE",
+      "DIFF_SE",
+      "GROUP1_P",
+      "GROUP2_P",
+      "DIFF_P",
+      "STD_DIFF_Z",
+      "STD_DIFF_P",
+      "GROUP1_FRQ_A",
+      "GROUP1_FRQ_U",
+      "GROUP2_FRQ_A",
+      "GROUP2_FRQ_U",
+      "GROUP1_INFO",
+      "GROUP2_INFO"
+   ],
+   "window_bp" : 10000000
+}
+

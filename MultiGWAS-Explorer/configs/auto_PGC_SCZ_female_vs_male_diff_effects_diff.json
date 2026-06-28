@@ -1,0 +1,32 @@
+{
+   "base_cols" : [
+      "CHR",
+      "BP",
+      "A1",
+      "A2",
+      "SNP"
+   ],
+   "beta_col" : "BETA",
+   "group_tag_col" : "GWAS_TAG",
+   "input" : "/mnt/e/LongCOVID_HGI_GWAS/PGC_Large_GWASs/PGC_SCZ_Sex_Stratified_GWASs/PGC_SCZ_female_vs_male_diff_effects_merged_long.sorted.coord.tsv.gz",
+   "manifest" : "/mnt/e/LongCOVID_HGI_GWAS/PGC_Large_GWASs/PGC_SCZ_Sex_Stratified_GWASs/PGC_SCZ_female_vs_male_diff_effects.manifest.tsv",
+   "output" : "/mnt/e/LongCOVID_HGI_GWAS/PGC_Large_GWASs/PGC_SCZ_Sex_Stratified_GWASs/PGC_SCZ_female_vs_male_diff_effects.tsv.gz",
+   "p_col" : "P",
+   "pairs" : {
+      "ALL_FEMALE_vs_MALE" : [
+         "ALL_FEMALE",
+         "ALL_MALE"
+      ],
+      "ASN_FEMALE_vs_MALE" : [
+         "ASN_FEMALE",
+         "ASN_MALE"
+      ],
+      "EUR_FEMALE_vs_MALE" : [
+         "EUR_FEMALE",
+         "EUR_MALE"
+      ]
+   },
+   "rho" : 0,
+   "se_col" : "SE"
+}
+

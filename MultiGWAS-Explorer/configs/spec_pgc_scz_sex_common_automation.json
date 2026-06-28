@@ -1,0 +1,77 @@
+{
+  "source_mode": "raw_pgc_vcf_sumstats",
+  "project_tag": "PGC_SCZ_sex_diff",
+  "artifact_stem": "PGC_SCZ_female_vs_male_diff_effects",
+  "input_dir": "/mnt/e/LongCOVID_HGI_GWAS/PGC_Large_GWASs/PGC_SCZ_Sex_Stratified_GWASs",
+  "output_dir": "/mnt/e/LongCOVID_HGI_GWAS/PGC_Large_GWASs/PGC_SCZ_Sex_Stratified_GWASs",
+  "workdir": "/mnt/g/NGS_lib/Linux_codes_SAM/Conda_and_Docker_Related_Scripts/perlMCP4Gemini_Paper",
+  "reference_build": "hg19",
+  "cygwin_bash": "/bin/bash",
+  "threshold": 0.05,
+  "window_bp": 10000000,
+  "top_hit_focus_prefix": "ALL",
+  "top_hit_signal_thrshd": "1e-6",
+  "top_hit_dist_bp": "1e6",
+  "top_hit_max_loci": 0,
+  "local_window_bp": "1e6",
+  "local_gtf_window_bp": "1e6",
+  "open_result": 0,
+  "clean_oda_input": 1,
+  "keep_remote_plot_data": 1,
+  "get_common_associations": 0,
+  "output_prefix": "PGC_SCZ_SAS_manhattan",
+  "html_title": "PGC schizophrenia sex differential GWAS Manhattan Plot",
+  "local_output_prefix": "PGC_SCZ_SAS_local_top_hits_manhattan_common",
+  "local_html_title": "PGC schizophrenia sex common local top hits Manhattan Plot",
+  "local_top_hits_csv_basename": "PGC_SCZ_SAS_local_top_hits_manhattan_common_top_hits.csv",
+  "output_html_basename": "PGC_SCZ_SAS_local_top_hits_with_gtf_common.html",
+  "groups": [
+    {
+      "tag": "ALL_FEMALE",
+      "files": ["daner_PGC_SCZ_w3_81_0618a_all_female.gz"]
+    },
+    {
+      "tag": "ALL_MALE",
+      "files": ["daner_PGC_SCZ_w3_81_0618a_all_male.gz"]
+    },
+    {
+      "tag": "EUR_FEMALE",
+      "files": ["daner_PGC_SCZ_w3_75_0618a_eur_female.gz", "daner_scz_w3_HRC_chrX_eur_fem_deduped_0518e.gz"]
+    },
+    {
+      "tag": "EUR_MALE",
+      "files": ["daner_PGC_SCZ_w3_75_0618a_eur_male.gz", "daner_scz_w3_HRC_chrX_eur_mal_deduped_0518e.gz"]
+    },
+    {
+      "tag": "ASN_FEMALE",
+      "files": ["daner_PGC_SCZ_w3_14_0618a_asn_female.gz", "daner_scz_w3_HRC_chrX_asn_fem_run2.gz"]
+    },
+    {
+      "tag": "ASN_MALE",
+      "files": ["daner_PGC_SCZ_w3_14_0618a_asn_male.gz", "daner_scz_w3_HRC_chrX_asn_mal_run2.gz"]
+    }
+  ],
+  "pairs": [
+    {
+      "pair_tag": "ALL_FEMALE_vs_MALE",
+      "group1": "ALL_FEMALE",
+      "group2": "ALL_MALE",
+      "prefix": "ALL",
+      "label": "All"
+    },
+    {
+      "pair_tag": "EUR_FEMALE_vs_MALE",
+      "group1": "EUR_FEMALE",
+      "group2": "EUR_MALE",
+      "prefix": "EUR",
+      "label": "EUR"
+    },
+    {
+      "pair_tag": "ASN_FEMALE_vs_MALE",
+      "group1": "ASN_FEMALE",
+      "group2": "ASN_MALE",
+      "prefix": "ASN",
+      "label": "ASN"
+    }
+  ]
+}

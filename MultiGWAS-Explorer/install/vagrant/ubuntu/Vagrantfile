@@ -1,0 +1,17 @@
+Vagrant.configure("2") do |config|
+  config.vm.box = ENV.fetch("PIPELINE_VAGRANT_BOX", "bento/ubuntu-24.04")
+  config.vm.hostname = "diffgwas-pipeline-ubuntu"
+
+  repo_root = File.expand_path("../../..", __dir__)
+  config.vm.synced_folder repo_root, "/repo"
+
+  config.vm.provider "hyperv" do |h|
+    h.vmname = "diffgwas-pipeline-ubuntu"
+  end
+
+  config.vm.provision "shell", privileged: true, inline: <<-SHELL
+    set -euo pipefail
+    cd /repo
+    bash install/install_ubuntu.sh
+  SHELL
+end

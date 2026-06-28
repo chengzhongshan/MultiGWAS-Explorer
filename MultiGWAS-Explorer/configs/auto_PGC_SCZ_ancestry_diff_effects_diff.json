@@ -1,0 +1,28 @@
+{
+   "base_cols" : [
+      "CHR",
+      "BP",
+      "A1",
+      "A2",
+      "SNP"
+   ],
+   "beta_col" : "BETA",
+   "group_tag_col" : "GWAS_TAG",
+   "input" : "/mnt/e/LongCOVID_HGI_GWAS/PGC_Large_GWASs/PGC_SCZ_Ancestry_Stratified_GWASs/PGC_SCZ_ancestry_diff_effects_merged_long.sorted.coord.tsv.gz",
+   "manifest" : "/mnt/e/LongCOVID_HGI_GWAS/PGC_Large_GWASs/PGC_SCZ_Ancestry_Stratified_GWASs/PGC_SCZ_ancestry_diff_effects.manifest.tsv",
+   "output" : "/mnt/e/LongCOVID_HGI_GWAS/PGC_Large_GWASs/PGC_SCZ_Ancestry_Stratified_GWASs/PGC_SCZ_ancestry_diff_effects.tsv.gz",
+   "p_col" : "P",
+   "pairs" : {
+      "SCZ_W3_AFR_vs_EUR" : [
+         "SCZ_W3_AFR",
+         "SCZ_W3_EUR"
+      ],
+      "SCZ_W3_ASN_vs_EUR" : [
+         "SCZ_W3_ASN",
+         "SCZ_W3_EUR"
+      ]
+   },
+   "rho" : 0,
+   "se_col" : "SE"
+}
+

@@ -1,0 +1,26 @@
+{
+   "groups" : [
+      {
+         "files" : [
+            "PGC3_SCZ_wave3.afram.autosome.public.v3.vcf.tsv.gz"
+         ],
+         "tag" : "SCZ_W3_AFR"
+      },
+      {
+         "files" : [
+            "PGC3_SCZ_wave3.asian.autosome.public.v3.vcf.tsv.gz"
+         ],
+         "tag" : "SCZ_W3_ASN"
+      },
+      {
+         "files" : [
+            "PGC3_SCZ_wave3.european.autosome.public.v3.vcf.tsv.gz"
+         ],
+         "tag" : "SCZ_W3_EUR"
+      }
+   ],
+   "input_dir" : "/mnt/e/LongCOVID_HGI_GWAS/PGC_Large_GWASs/PGC_SCZ_Ancestry_Stratified_GWASs",
+   "manifest" : "/mnt/e/LongCOVID_HGI_GWAS/PGC_Large_GWASs/PGC_SCZ_Ancestry_Stratified_GWASs/PGC_SCZ_ancestry_diff_effects_merged_long.manifest.tsv",
+   "output" : "/mnt/e/LongCOVID_HGI_GWAS/PGC_Large_GWASs/PGC_SCZ_Ancestry_Stratified_GWASs/PGC_SCZ_ancestry_diff_effects_merged_long.tsv.gz"
+}
+

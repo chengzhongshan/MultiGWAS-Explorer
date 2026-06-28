@@ -1,0 +1,48 @@
+{
+   "groups" : [
+      {
+         "files" : [
+            "daner_PGC_SCZ_w3_81_0618a_all_female.gz"
+         ],
+         "tag" : "ALL_FEMALE"
+      },
+      {
+         "files" : [
+            "daner_PGC_SCZ_w3_81_0618a_all_male.gz"
+         ],
+         "tag" : "ALL_MALE"
+      },
+      {
+         "files" : [
+            "daner_PGC_SCZ_w3_75_0618a_eur_female.gz",
+            "daner_scz_w3_HRC_chrX_eur_fem_deduped_0518e.gz"
+         ],
+         "tag" : "EUR_FEMALE"
+      },
+      {
+         "files" : [
+            "daner_PGC_SCZ_w3_75_0618a_eur_male.gz",
+            "daner_scz_w3_HRC_chrX_eur_mal_deduped_0518e.gz"
+         ],
+         "tag" : "EUR_MALE"
+      },
+      {
+         "files" : [
+            "daner_PGC_SCZ_w3_14_0618a_asn_female.gz",
+            "daner_scz_w3_HRC_chrX_asn_fem_run2.gz"
+         ],
+         "tag" : "ASN_FEMALE"
+      },
+      {
+         "files" : [
+            "daner_PGC_SCZ_w3_14_0618a_asn_male.gz",
+            "daner_scz_w3_HRC_chrX_asn_mal_run2.gz"
+         ],
+         "tag" : "ASN_MALE"
+      }
+   ],
+   "input_dir" : "/mnt/e/LongCOVID_HGI_GWAS/PGC_Large_GWASs/PGC_SCZ_Sex_Stratified_GWASs",
+   "manifest" : "/mnt/e/LongCOVID_HGI_GWAS/PGC_Large_GWASs/PGC_SCZ_Sex_Stratified_GWASs/PGC_SCZ_female_vs_male_diff_effects_merged_long.manifest.tsv",
+   "output" : "/mnt/e/LongCOVID_HGI_GWAS/PGC_Large_GWASs/PGC_SCZ_Sex_Stratified_GWASs/PGC_SCZ_female_vs_male_diff_effects_merged_long.tsv.gz"
+}
+

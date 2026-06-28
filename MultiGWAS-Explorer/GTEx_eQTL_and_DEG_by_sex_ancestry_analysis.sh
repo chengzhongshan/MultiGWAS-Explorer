@@ -1,0 +1,8 @@
+
+E:\LongCOVID_HGI_GWAS\PGC_Large_GWASs\PGC_GWAS_Analyzer_Paper\PGC_GWAS_PTSD_vs_SZC_Step6.2_GTEx_Sex_AA_DEG_Analysis.sas
+
+H:\Coorperator_projects\COVID_Papers_2023\HGI_NonHospitalizationGWASPaper\PLCL1_eQTL_GTEx
+
+E:\LongCOVID_HGI_GWAS\GTEx_Exp_SAS_Data
+
+E:\LongCOVID_HGI_GWAS\PGC_Large_GWASs\PGC_GWAS_Analyzer_Paper\PGC_GWAS_PTSD_vs_SZC_Step6.2_GTEx_Sex_AA_DEG_Analysis.sas

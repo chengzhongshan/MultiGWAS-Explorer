@@ -1,0 +1,32 @@
+Bootstrap: docker
+From: ubuntu:24.04
+
+%labels
+    Author Cheng Shan
+    Description MultiGWAS-Explorer differential GWAS plotting pipeline with SAS ODA and gnuplot backends
+
+%files
+    . /opt/MultiGWAS-Explorer
+
+%post
+    export DEBIAN_FRONTEND=noninteractive
+    export LANG=C.UTF-8
+    export LC_ALL=C.UTF-8
+    cd /opt/MultiGWAS-Explorer
+    bash install/install_ubuntu.sh
+    rm -rf /var/lib/apt/lists/*
+
+%environment
+    export PIPELINE_ROOT=/opt/MultiGWAS-Explorer
+    export OPEN_RESULT=0
+    export LANG=C.UTF-8
+    export LC_ALL=C.UTF-8
+    export PATH=/opt/MultiGWAS-Explorer/local/bin:/opt/MultiGWAS-Explorer/.venv-pipeline/bin:/opt/MultiGWAS-Explorer/local/perl5/bin:$PATH
+
+%runscript
+    cd /opt/MultiGWAS-Explorer
+    exec "$@"
+
+%test
+    cd /opt/MultiGWAS-Explorer
+    bash install/check_pipeline_install.sh
