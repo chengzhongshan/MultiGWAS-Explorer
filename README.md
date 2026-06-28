@@ -1,5 +1,7 @@
 # MultiGWAS-Explorer
 MultiGWAS-Explorer: an AI-assisted pipeline for comparative analysis and visualization of shared and differential loci across multiple GWASs
+<img width="2400" height="2510" alt="Figure1_pipeline_overview_Zhongshan" src="https://github.com/user-attachments/assets/a56b8675-2a48-41c9-ba2c-1d1e793603ee" />
+
 # MultiGWAS-Explorer Workflow
 
 This repository combines a Perl MCP server, GWAS preprocessing utilities, and
