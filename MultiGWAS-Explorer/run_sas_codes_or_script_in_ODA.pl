@@ -740,6 +740,7 @@ Examples:
   $0 --code 'data a;do i=1 to 1000;x=i**2;output;rc=sleep(1);end;run;proc print data=a(obs=10);run
 ;' --no-run-timeout --persistent --session-id mysession
   $0 --code "data a;input a @@;datalines;\n10 20\n;run;proc print data=a;run;" --persistent --session-id mysession
+  ./run_sas_codes_or_script_in_ODA.pl --code 'data a;input a @@;datalines;\n10 20\n;run;proc print;run; ' --persistent --session-id ms1
   $0 --file script1.sas --persistent --session-id mysession
   $0 --file script2.sas --session-id mysession
   perl -S run_sas_codes_or_script_in_ODA.pl   --code "data a; set sashelp.cars; run;"   --persistent --session-id reuse_test --output-prefix reuse1
