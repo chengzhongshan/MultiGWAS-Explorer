@@ -262,6 +262,8 @@ resolve_windows_java_for_saspy() {
   fi
   for cand in \
     "${SASPY_JAVA_WIN:-}" \
+    'C:\Program Files (x86)\Common Files\Oracle\Java\java8path\java.exe' \
+    'C:\Program Files\Common Files\Oracle\Java\java8path\java.exe' \
     'C:\Program Files (x86)\Common Files\Oracle\Java\javapath\java.exe' \
     'C:\Program Files\Common Files\Oracle\Java\javapath\java.exe'; do
     [ -n "$cand" ] || continue
