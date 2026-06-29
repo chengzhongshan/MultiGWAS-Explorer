@@ -3,6 +3,7 @@ BEGIN {
     require File::Basename;
     require File::Spec;
     require Config;
+    require Cwd;
     require lib;
     my $current_arch = lc($Config::Config{archname} || '');
     my $current_os = lc($^O || '');
@@ -20,7 +21,7 @@ BEGIN {
         return 1 if $current_os =~ /mswin32/ && $name =~ /MSWin32/i;
         return 0;
     };
-    my $script_dir = File::Basename::dirname(__FILE__);
+    my $script_dir = Cwd::abs_path(File::Basename::dirname(__FILE__)) || File::Basename::dirname(__FILE__);
     my $platform_tag = lc($^O || '');
     $platform_tag =~ s/[^a-z0-9]+/_/g;
     for my $root ($script_dir, File::Spec->catdir($script_dir, File::Spec->updir())) {

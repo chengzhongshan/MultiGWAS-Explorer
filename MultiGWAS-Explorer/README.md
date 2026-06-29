@@ -385,15 +385,118 @@ Why Ubuntu/Docker validation can feel slow:
 
 macOS:
 
+The macOS installer is intended to be run from the repository root on either
+Apple Silicon or Intel macOS. It creates a repo-local Python and Perl runtime,
+uses Homebrew for compiled tools, configures SASPy for SAS OnDemand for
+Academics, and runs the same dependency smoke test used by the other native
+installers.
+
+Prerequisites:
+
+- Xcode Command Line Tools:
+
+```bash
+xcode-select --install
+```
+
+- Homebrew. On Apple Silicon, the installer prefers ARM Homebrew under
+  `/opt/homebrew`; if only Intel Homebrew under `/usr/local` is available, the
+  script warns and uses that detected install.
+- A working Java runtime visible as `java` or through `SASPY_JAVA`. SASPy uses
+  Java to start the SAS ODA IOM bridge.
+- A SAS OnDemand for Academics account if you want to run the SAS-backed
+  plotting path. The local gunplot path does not need SAS ODA credentials.
+
+Run the installer:
+
 ```bash
 bash install/install_macos.sh
 ```
 
-Post-install smoke test:
+What this script does:
+
+- installs or verifies Homebrew packages:
+  - `bash`, `curl`, `cpanminus`, `gd`, `gnuplot`, `htslib`, `imagemagick`,
+    `pkg-config`, `python`, and `wget`
+- creates `.venv-pipeline/` and installs Python packages from
+  `install/requirements-pipeline.txt`
+- installs repo-local Perl modules into `local/perl5-darwin/`
+- builds and installs `Inline`, `Inline::C`, and `Inline::Python` against a
+  Python executable with matching CPU architecture and development headers
+- copies SASPy Java assets from
+  `install/saspy-java-supplement/java/` into the active repo-local SASPy
+  install before writing `saspy/sascfg_personal.py`
+- uses `bgzip` / `tabix` from Homebrew when available
+- runs `install/check_pipeline_install.sh`
+
+The bundled SASPy Java supplement is important on macOS. Some current SASPy
+installs can ship a Java asset set that starts but fails SAS ODA during the IOM
+encryption handshake with messages like:
+
+```text
+An exception was thrown during the encryption key exchange.
+SAS process has terminated unexpectedly.
+```
+
+The installer therefore refreshes the repo-local SASPy `java/` directory from
+the known-working supplement before generating the SASPy ODA classpath. If you
+need to override the supplement, set one of these before running the installer:
+
+```bash
+export PIPELINE_SASPY_REFERENCE_DIR=/path/to/site-packages/saspy
+# or
+export PIPELINE_SASPY_REFERENCE_SITEPKG=/path/to/site-packages
+```
+
+Post-install smoke test, if you want to rerun it separately:
 
 ```bash
 bash install/check_pipeline_install.sh
 ```
+
+Validate the SAS ODA connection:
+
+```bash
+perl ./run_sas_codes_or_script_in_ODA.pl --codes "proc setinit;run;"
+```
+
+On first SAS-backed use, the helper looks for an authinfo entry named `oda` in
+`~/.authinfo` or `~/_authinfo`. If no entry exists, it can prompt for your SAS
+ODA account and password and save:
+
+```text
+oda user YOUR_EMAIL password YOUR_PASSWORD
+```
+
+Keep that file private:
+
+```bash
+chmod 600 ~/.authinfo
+```
+
+For noninteractive setup, provide credentials once:
+
+```bash
+perl ./run_sas_codes_or_script_in_ODA.pl \
+  --codes "proc setinit;run;" \
+  --sas-oda-account YOUR_EMAIL \
+  --sas-oda-password YOUR_PASSWORD
+```
+
+Successful validation prints `SAS Connection established` and writes a debug
+summary under `SAS_Output_RandID*/output.html.info.txt`.
+
+Common macOS troubleshooting:
+
+- If `Inline::Python` fails, make sure the installer selected a Python with the
+  same CPU architecture as the running Perl. On Apple Silicon this is normally
+  `/opt/homebrew/bin/python3`.
+- If SAS ODA fails before producing a SAS log, rerun
+  `bash install/install_macos.sh` so the bundled SASPy Java supplement is copied
+  again and `sascfg_personal.py` is regenerated.
+- If `gnuplot`, `bgzip`, `tabix`, or ImageMagick are not found in a manually
+  opened shell, add Homebrew to `PATH` or rerun through the installer, which
+  evaluates Homebrew's shell environment.
 
 ## Container Images
 
@@ -666,6 +769,8 @@ macOS:
 
 - install with:
   - `bash install/install_macos.sh`
+- see the macOS subsection under "One-Command Installation" for Homebrew,
+  SASPy Java supplement, authinfo, and SAS ODA validation details
 - use the VS Code integrated `zsh` or `bash` terminal for both `server.pl`
   and any direct command-line validation
 

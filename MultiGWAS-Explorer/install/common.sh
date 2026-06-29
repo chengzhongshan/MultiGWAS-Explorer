@@ -23,6 +23,7 @@ PIPELINE_REQUIREMENTS_FILE="${PIPELINE_INSTALL_DIR}/requirements-pipeline.txt"
 PIPELINE_CPANFILE="${PIPELINE_ROOT}/cpanfile"
 PIPELINE_CPANM_BIN=""
 PIPELINE_PYTHON_BIN="${PIPELINE_PYTHON_BIN:-}"
+PIPELINE_INLINE_PYTHON_BIN="${PIPELINE_INLINE_PYTHON_BIN:-}"
 
 log() {
   printf '[install] %s\n' "$*"
@@ -39,6 +40,11 @@ die() {
 
 command_exists() {
   command -v "$1" >/dev/null 2>&1
+}
+
+make_project_scripts_executable() {
+  log "Ensuring project shell and Perl scripts are executable"
+  find "${PIPELINE_ROOT}" -type f \( -name '*.sh' -o -name '*.pl' \) -exec chmod a+x {} +
 }
 
 num_cpus() {
@@ -275,13 +281,22 @@ resolve_saspy_reference_dir() {
   if [ -n "${SASPY_REFERENCE_SITEPKG:-}" ]; then
     candidates+=("${SASPY_REFERENCE_SITEPKG}/saspy" "${SASPY_REFERENCE_SITEPKG}")
   fi
+  candidates+=("${PIPELINE_INSTALL_DIR}/saspy-java-supplement")
   if [ -n "${USERPROFILE:-}" ]; then
     candidates+=(
       "${USERPROFILE}\\Downloads\\cygwin-portable-20210411\\cygwin-portable\\App\\cygwin\\usr\\local\\lib\\python3.9\\site-packages\\saspy"
       "${USERPROFILE}\\Downloads\\cygwin-portable-20210411\\cygwin-portable\\App\\cygwin\\usr\\local\\lib\\python3.9\\site-packages"
     )
   fi
-  for candidate in "${candidates[@]}"; do
+  if [ -n "${HOME:-}" ]; then
+    candidates+=(
+      "/usr/local/anaconda3/lib/python3.12/site-packages/saspy"
+      "/usr/local/anaconda3/lib/python3.12/site-packages"
+      "${HOME}/Desktop/shared/SynchronizationVersions/Conda_and_Docker_Related_Scripts/perlMCP4Gemini_Paper/.venv-pipeline/Lib/site-packages/saspy"
+      "${HOME}/Desktop/shared/SynchronizationVersions/Conda_and_Docker_Related_Scripts/perlMCP4Gemini_Paper/.venv-pipeline/Lib/site-packages"
+    )
+  fi
+  for candidate in ${candidates[@]+"${candidates[@]}"}; do
     [ -n "$candidate" ] || continue
     unix_candidate="$candidate"
     if command_exists cygpath && [[ "$candidate" == [A-Za-z]:\\* ]]; then
@@ -306,7 +321,7 @@ sync_saspy_reference_java_assets() {
   ref_dir="$(resolve_saspy_reference_dir || true)"
   [ -n "$ref_dir" ] || return 0
   [ -d "${ref_dir}/java" ] || return 0
-  /usr/bin/mkdir -p "${saspy_dir}/java"
+  mkdir -p "${saspy_dir}/java"
   cp -Rf "${ref_dir}/java/." "${saspy_dir}/java/"
   log "Synced reference SASPy Java assets from ${ref_dir} into ${saspy_dir}/java"
 }
@@ -336,7 +351,7 @@ build_saspy_windows_classpath() {
 
   jar_already_listed() {
     local candidate="$1" item=""
-    for item in "${ordered_jars[@]}"; do
+    for item in ${ordered_jars[@]+"${ordered_jars[@]}"}; do
       [ "$item" = "$candidate" ] && return 0
     done
     return 1
@@ -357,7 +372,7 @@ build_saspy_windows_classpath() {
   done
 
   if command_exists cygpath; then
-    for jar in "${ordered_jars[@]}"; do
+    for jar in ${ordered_jars[@]+"${ordered_jars[@]}"}; do
       [ -f "$jar" ] || continue
       cpw_parts+=("$(cygpath -w "$jar")")
     done
@@ -386,7 +401,7 @@ ensure_authinfo_from_reference_source() {
   if [ -n "${USERPROFILE:-}" ]; then
     auth_candidates+=("${USERPROFILE}\\.authinfo" "${USERPROFILE}\\_authinfo")
   fi
-  for source_label in "${auth_candidates[@]}"; do
+  for source_label in ${auth_candidates[@]+"${auth_candidates[@]}"}; do
     [ -n "$source_label" ] || continue
     if [[ "$source_label" == [A-Za-z]:\\* ]]; then
       command_exists cygpath || continue
@@ -530,7 +545,7 @@ prepare_python_requirements() {
   local filtered_req=""
 
   if command_exists uname && uname -s | grep -qi '^CYGWIN' && python_module_available PIL; then
-    /usr/bin/mkdir -p "${PIPELINE_VENV_DIR}"
+    mkdir -p "${PIPELINE_VENV_DIR}"
     filtered_req="${PIPELINE_VENV_DIR}/requirements-cygwin.txt"
     grep -viE '^[[:space:]]*Pillow([[:space:]]*([<>=!~].*)?)?$' "${req_file}" > "${filtered_req}"
     printf '%s\n' "${filtered_req}"
@@ -545,7 +560,7 @@ prepare_perl_cpanfile() {
   local filtered_cpanfile=""
 
   if command_exists uname && uname -s | grep -qi '^CYGWIN'; then
-    /usr/bin/mkdir -p "${PIPELINE_LOCAL_DIR}"
+    mkdir -p "${PIPELINE_LOCAL_DIR}"
     filtered_cpanfile="${PIPELINE_LOCAL_DIR}/cpanfile-cygwin"
     grep -vE "requires '(File::Which|GD|JSON|JSON::MaybeXS|Mojolicious)';" "${cpanfile}" > "${filtered_cpanfile}"
     printf '%s\n' "${filtered_cpanfile}"
@@ -590,16 +605,16 @@ create_python_venv() {
 
   if command_exists uname && uname -s | grep -qi '^CYGWIN'; then
     log "Using repo-local Python site-packages under ${target_site} for portable Cygwin"
-    /usr/bin/rm -rf "${PIPELINE_VENV_DIR}"
-    /usr/bin/mkdir -p "${target_site}"
+    rm -rf "${PIPELINE_VENV_DIR}"
+    mkdir -p "${target_site}"
     printf '%s\n' "$sys_python" > "${PIPELINE_PYTHON_RECORD_FILE}"
     target_mode=1
   elif [ -z "$(resolve_venv_python || true)" ]; then
     log "Creating repo-local Python environment under ${PIPELINE_VENV_DIR}"
     if ! "$sys_python" -m venv "${PIPELINE_VENV_DIR}"; then
       warn "Python venv creation failed; falling back to repo-local site-packages under ${target_site}"
-      /usr/bin/rm -rf "${PIPELINE_VENV_DIR}"
-      /usr/bin/mkdir -p "${target_site}"
+      rm -rf "${PIPELINE_VENV_DIR}"
+      mkdir -p "${target_site}"
       printf '%s\n' "$sys_python" > "${PIPELINE_PYTHON_RECORD_FILE}"
       target_mode=1
     fi
@@ -611,8 +626,8 @@ create_python_venv() {
   req_file="$(prepare_python_requirements)"
   if [ "${target_mode}" -eq 0 ] && ! "${PIPELINE_PYTHON_BIN}" -m pip --version >/dev/null 2>&1; then
     warn "The created Python environment does not contain pip; falling back to repo-local site-packages under ${target_site}"
-    /usr/bin/rm -rf "${PIPELINE_VENV_DIR}"
-    /usr/bin/mkdir -p "${target_site}"
+    rm -rf "${PIPELINE_VENV_DIR}"
+    mkdir -p "${target_site}"
     printf '%s\n' "$sys_python" > "${PIPELINE_PYTHON_RECORD_FILE}"
     target_mode=1
     activate_python_env
@@ -625,7 +640,7 @@ create_python_venv() {
   fi
   configure_saspy_oda_profile
   if [ -n "${req_file}" ] && [ "${req_file}" != "${PIPELINE_REQUIREMENTS_FILE}" ]; then
-    /usr/bin/rm -f "${req_file}"
+    rm -f "${req_file}"
   fi
 }
 
@@ -667,7 +682,9 @@ ensure_cpanm() {
 
 install_perl_deps() {
   local cpanfile_to_use=""
+  local module_name=""
   local modules=()
+  local regular_modules=()
   activate_perl_env
   activate_python_env
   ensure_cpanm
@@ -678,14 +695,142 @@ install_perl_deps() {
     modules+=("${module_name}")
   done < <(awk -F"'" '/^[[:space:]]*requires[[:space:]]+/ { print $2 }' "${cpanfile_to_use}")
   [ "${#modules[@]}" -gt 0 ] || die "No Perl modules were parsed from ${cpanfile_to_use}"
+  for module_name in "${modules[@]}"; do
+    case "${module_name}" in
+      Inline::Python) ;;
+      *) regular_modules+=("${module_name}") ;;
+    esac
+  done
+  if [ "${#regular_modules[@]}" -gt 0 ]; then
+    perl "${PIPELINE_CPANM_BIN}" \
+      --local-lib-contained "${PIPELINE_PERL_LOCAL_DIR}" \
+      --notest \
+      "${regular_modules[@]}"
+  fi
+  install_inline_perl_deps
+  if [ -n "${cpanfile_to_use}" ] && [ "${cpanfile_to_use}" != "${PIPELINE_CPANFILE}" ]; then
+    rm -f "${cpanfile_to_use}"
+  fi
+  activate_perl_env
+}
+
+python_sysconfig_var() {
+  local python_bin="$1"
+  local key="$2"
+  "${python_bin}" - "$key" <<'PY'
+import sys
+import sysconfig
+
+value = sysconfig.get_config_var(sys.argv[1])
+print("" if value is None else value)
+PY
+}
+
+resolve_inline_python_bin() {
+  local cand=""
+  for cand in \
+    "${PIPELINE_INLINE_PYTHON_BIN:-}" \
+    "${PIPELINE_PYTHON_BIN:-}" \
+    "${PIPELINE_VENV_DIR}/bin/python" \
+    "${PIPELINE_VENV_DIR}/bin/python3" \
+    python3 \
+    python; do
+    [ -n "${cand}" ] || continue
+    if [ -x "${cand}" ]; then
+      printf '%s\n' "${cand}"
+      return 0
+    fi
+    if command_exists "${cand}"; then
+      command -v "${cand}"
+      return 0
+    fi
+  done
+  return 1
+}
+
+resolve_inline_python_include() {
+  local python_bin="$1"
+  local inc=""
+  inc="$(python_sysconfig_var "${python_bin}" INCLUDEPY)"
+  if [ -n "${inc}" ] && [ -f "${inc}/Python.h" ]; then
+    printf '%s\n' "${inc}"
+    return 0
+  fi
+  return 1
+}
+
+resolve_inline_python_library() {
+  local python_bin="$1"
+  local libpl="" libdir="" ldlib="" version="" framework_prefix="" candidate=""
+  libpl="$(python_sysconfig_var "${python_bin}" LIBPL)"
+  libdir="$(python_sysconfig_var "${python_bin}" LIBDIR)"
+  ldlib="$(python_sysconfig_var "${python_bin}" LDLIBRARY)"
+  version="$("${python_bin}" - <<'PY'
+import sys
+print(f"{sys.version_info.major}.{sys.version_info.minor}")
+PY
+)"
+  framework_prefix="$(python_sysconfig_var "${python_bin}" PYTHONFRAMEWORKPREFIX)"
+
+  for candidate in \
+    "${libpl}/libpython${version}.a" \
+    "${libpl}/libpython${version}.dylib" \
+    "${libdir}/libpython${version}.a" \
+    "${libdir}/libpython${version}.dylib" \
+    "${framework_prefix}/Python.framework/Versions/${version}/lib/python${version}/config-${version}-darwin/libpython${version}.a" \
+    "${framework_prefix}/Python.framework/Versions/${version}/lib/python${version}/config-${version}-darwin/libpython${version}.dylib" \
+    "${framework_prefix}/Python.framework/Versions/${version}/lib/libpython${version}.dylib"; do
+    [ -n "${candidate}" ] || continue
+    if [ -f "${candidate}" ]; then
+      printf '%s\n' "${candidate}"
+      return 0
+    fi
+  done
+
+  if [ -n "${ldlib}" ] && [ -f "${libpl}/${ldlib}" ]; then
+    printf '%s\n' "${libpl}/${ldlib}"
+    return 0
+  fi
+  return 1
+}
+
+install_inline_python() {
+  local python_bin="" include_dir="" python_lib="" extra_libs="" build_parent="" tarball="" build_dir=""
+  if perl -MInline::Python -e1 >/dev/null 2>&1; then
+    log "Inline::Python is already installed and loadable"
+    return 0
+  fi
+  python_bin="$(resolve_inline_python_bin || true)"
+  [ -n "${python_bin}" ] || die "Could not resolve a Python executable for Inline::Python"
+  include_dir="$(resolve_inline_python_include "${python_bin}" || true)"
+  [ -n "${include_dir}" ] || die "Could not find Python.h for ${python_bin}; install Python development headers or set PIPELINE_INLINE_PYTHON_BIN"
+  python_lib="$(resolve_inline_python_library "${python_bin}" || true)"
+  [ -n "${python_lib}" ] || die "Could not find libpython for ${python_bin}; set PIPELINE_INLINE_PYTHON_BIN to a framework/shared Python"
+  extra_libs="$(python_sysconfig_var "${python_bin}" LIBS)"
+  build_parent="${PIPELINE_LOCAL_DIR}/build"
+  tarball="${build_parent}/Inline-Python-0.58.tar.gz"
+  build_dir="${build_parent}/Inline-Python-0.58"
+  mkdir -p "${build_parent}"
+  download_url "https://cpan.metacpan.org/authors/id/N/NI/NINE/Inline-Python-0.58.tar.gz" "${tarball}"
+  rm -rf "${build_dir}"
+  /usr/bin/tar -xzf "${tarball}" -C "${build_parent}"
+  log "Installing Inline::Python against ${python_bin}"
+  (
+    cd "${build_dir}"
+    printf '%s\n%s\n%s\n' "${extra_libs}" "${python_lib}" "${include_dir}" | \
+      INLINE_PYTHON_EXECUTABLE="${python_bin}" perl Makefile.PL
+    make -j"$(num_cpus)"
+    make install
+  )
+}
+
+install_inline_perl_deps() {
+  log "Installing Inline and Inline::C before Inline::Python"
   perl "${PIPELINE_CPANM_BIN}" \
     --local-lib-contained "${PIPELINE_PERL_LOCAL_DIR}" \
     --notest \
-    "${modules[@]}"
-  if [ -n "${cpanfile_to_use}" ] && [ "${cpanfile_to_use}" != "${PIPELINE_CPANFILE}" ]; then
-    /usr/bin/rm -f "${cpanfile_to_use}"
-  fi
-  activate_perl_env
+    Inline Inline::C
+  install_inline_python
 }
 
 ensure_local_hts_tools() {
@@ -704,5 +849,5 @@ ensure_local_hts_tools() {
 }
 
 run_pipeline_check() {
-  "${PIPELINE_INSTALL_DIR}/check_pipeline_install.sh"
+  (cd "${PIPELINE_ROOT}" && "${PIPELINE_INSTALL_DIR}/check_pipeline_install.sh")
 }
