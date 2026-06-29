@@ -697,6 +697,7 @@ install_perl_deps() {
   local module_name=""
   local modules=()
   local regular_modules=()
+  local needs_pdl=0
   activate_perl_env
   activate_python_env
   ensure_cpanm
@@ -710,6 +711,7 @@ install_perl_deps() {
   for module_name in "${modules[@]}"; do
     case "${module_name}" in
       Inline::Python) ;;
+      PDL) needs_pdl=1 ;;
       *) regular_modules+=("${module_name}") ;;
     esac
   done
@@ -719,11 +721,28 @@ install_perl_deps() {
       --notest \
       "${regular_modules[@]}"
   fi
+  if [ "${needs_pdl}" -eq 1 ]; then
+    install_pdl_perl_deps
+  fi
   install_inline_perl_deps
   if [ -n "${cpanfile_to_use}" ] && [ "${cpanfile_to_use}" != "${PIPELINE_CPANFILE}" ]; then
     rm -f "${cpanfile_to_use}"
   fi
   activate_perl_env
+}
+
+install_pdl_perl_deps() {
+  if perl -MPDL -e1 >/dev/null 2>&1; then
+    log "PDL is already installed and loadable"
+    return 0
+  fi
+  log "Installing PDL with extended Cygwin-friendly build timeouts"
+  MAKEFLAGS="${MAKEFLAGS:--j$(num_cpus)}" perl "${PIPELINE_CPANM_BIN}" \
+    --local-lib-contained "${PIPELINE_PERL_LOCAL_DIR}" \
+    --notest \
+    --configure-timeout 900 \
+    --build-timeout 7200 \
+    PDL
 }
 
 python_sysconfig_var() {

@@ -51,12 +51,16 @@ if not cfg_names or 'oda' not in cfg_names:
 PY
 
 log "GD version: $(perl -MGD -e 'print $GD::VERSION')"
-perl -e "require JSON; require JSON::MaybeXS; require File::Which; require GD; require Mojolicious::Lite; require MCP::Server; 1;" >/dev/null
+log "PDL version: $(perl -MPDL -e 'print $PDL::VERSION')"
+perl -e "require JSON; require JSON::MaybeXS; require File::Which; require GD; require Mojolicious::Lite; require MCP::Server; require PDL; 1;" >/dev/null
 perl -I DiffGWASDeps -MSAS_ODA_Runner -e "print qq{SAS_ODA_Runner ok\n};"
 perl -I DiffGWASDeps -c auto_prepare_and_run_diff_gwas.pl >/dev/null
 perl -c auto_prepare_and_run_diff_gwas_with_gunplot.pl >/dev/null
 perl -I DiffGWASDeps -c server.pl >/dev/null
 perl -I DiffGWASDeps -c run_sas_codes_or_script_in_ODA.pl >/dev/null
+perl -c DiffGWASDeps/gunplot/pdl_gunplot_manhattan.pl >/dev/null
+perl -c DiffGWASDeps/gunplot/pdl_gunplot_forest.pl >/dev/null
+perl -c DiffGWASDeps/gunplot/pdl_gunplot_local_locus.pl >/dev/null
 bash -n DiffGWASDeps/run_sas_oda_manhattan4diffgwas_download_png.sh
 bash -n DiffGWASDeps/run_sas_oda_local_top_hits_manhattan_download_png.sh
 bash -n DiffGWASDeps/run_sas_oda_local_top_hits_with_gtf_download_html.sh

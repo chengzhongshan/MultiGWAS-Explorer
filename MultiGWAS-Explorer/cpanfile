@@ -6,4 +6,5 @@ requires 'IO::Uncompress::Gunzip';
 requires 'JSON';
 requires 'JSON::MaybeXS';
 requires 'Mojolicious';
+requires 'PDL';
 requires 'YAML::PP';
