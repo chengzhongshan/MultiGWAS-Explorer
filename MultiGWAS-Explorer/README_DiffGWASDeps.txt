@@ -133,6 +133,27 @@ Useful CLI patterns:
 - `perl auto_prepare_and_run_diff_gwas.pl --spec your_spec.json --step plot_local_gtf`
 - `perl auto_prepare_and_run_diff_gwas.pl --spec your_spec.json --from-step extract_wide_subset`
 - `perl auto_prepare_and_run_diff_gwas.pl --spec your_spec.json --plot-manhattan --force`
+- `TARGET_SNP=rs185665940 LOCAL_WINDOW_BP=1e6 GTF_LABEL_SNPS=rs4852780,rs185665940,rs10166057 RUNNER_CONFIG_JSON=./configs/runner_pgc_scz_sex_diff.json ./DiffGWASDeps/run_sas_oda_single_snp_with_gtf_download_html.sh`
+
+For the direct single-SNP SAS ODA local-GTF wrapper:
+
+- `TARGET_SNP` defines the centered locus and extracted window
+- `GTF_LABEL_SNPS` is optional and defaults to `TARGET_SNP`
+- when `GTF_LABEL_SNPS` contains multiple comma-separated rsIDs, all of them
+  are labeled on top of the same centered local GTF figure
+- when `GTF_LABEL_SNPS` contains three or fewer rsIDs, those top labels stay
+  horizontal in the reserved headroom by the default `auto_rotate2zero=1` path
+- the emitted single-SNP wide-subset manifest now also records whether the
+  target row survived and which prefix blocks were actually present, for
+  example `target_row_groups_present=ALL,EUR` plus
+  `target_row_groups_missing=ASN`
+- a target row is still valid for local GTF centering even when one ancestry /
+  pair block is blank in that wide row; the wrapper now validates the target
+  SNP by row presence, not by requiring every subgroup prefix to be populated
+- if SAS says the target SNP is missing from the uploaded GWAS subset but the
+  local manifest says `target_row_found_in_window=1`, treat that as an
+  upload/helper issue first and verify the remote file size or rerun with an
+  explicit `DATA_GZ`
 
 Supported named steps currently include:
 

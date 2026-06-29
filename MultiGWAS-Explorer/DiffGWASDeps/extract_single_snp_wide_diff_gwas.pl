@@ -136,6 +136,11 @@ my %stats = (
     manifest              => $manifest,
     target_lookup_mode    => $target_lookup_mode,
     region_query_mode     => 'stream',
+    target_row_found_in_window  => 0,
+    target_row_groups_present   => '',
+    target_row_groups_missing   => '',
+    target_row_group_count      => 0,
+    target_row_has_all_prefixes => 0,
 );
 
 my $in = open_window_reader($input, $raw_target_chr, $target_bp, $window_bp, \%stats);
@@ -173,6 +178,9 @@ process_bucket(\@bucket, $out, \%idx, \%pair_to_prefix, \@pair_order, \@out_cols
 close $in  or die "Failed closing input $input: $!\n";
 close $out or die "Failed closing output $output: $!\n";
 
+die "Target SNP $target_snp was found in input but was not preserved in the emitted wide subset\n"
+    unless $stats{target_row_found_in_window};
+
 open my $man, '>', $manifest or die "Cannot write $manifest: $!\n";
 print {$man} join("\t", qw(METRIC VALUE)), "\n";
 for my $metric (qw(
@@ -195,6 +203,11 @@ for my $metric (qw(
   rows_missing_pair
   duplicate_prefixes
   unknown_pair_tags
+  target_row_found_in_window
+  target_row_groups_present
+  target_row_groups_missing
+  target_row_group_count
+  target_row_has_all_prefixes
 )) {
     my $value =
         $metric eq 'input'         ? $input
@@ -220,6 +233,11 @@ print join("\n",
     "REGION_QUERY_MODE\t$stats{region_query_mode}",
     "ROWS_IN_WINDOW\t$stats{rows_in_window}",
     "GROUPS_WRITTEN\t$stats{groups_written}",
+    "TARGET_ROW_FOUND_IN_WINDOW\t$stats{target_row_found_in_window}",
+    "TARGET_ROW_GROUPS_PRESENT\t$stats{target_row_groups_present}",
+    "TARGET_ROW_GROUPS_MISSING\t$stats{target_row_groups_missing}",
+    "TARGET_ROW_GROUP_COUNT\t$stats{target_row_group_count}",
+    "TARGET_ROW_HAS_ALL_PREFIXES\t$stats{target_row_has_all_prefixes}",
 ), "\n";
 
 sub find_target {
@@ -276,6 +294,16 @@ sub process_bucket {
             my $numeric = numeric($value);
             $row{$out_col} = defined $numeric ? fmt($numeric) : '';
         }
+    }
+
+    if (($row{SNP} // '') eq $target_snp) {
+        my @present = grep { $seen_prefix{$_} } @{$pair_order};
+        my @missing = grep { !$seen_prefix{$_} } @{$pair_order};
+        $stats->{target_row_found_in_window} = 1;
+        $stats->{target_row_groups_present} = join(',', @present);
+        $stats->{target_row_groups_missing} = join(',', @missing);
+        $stats->{target_row_group_count} = scalar(@present);
+        $stats->{target_row_has_all_prefixes} = @missing ? 0 : 1;
     }
 
     print {$out} join("\t", map { defined $row{$_} ? $row{$_} : '' } @{$out_cols}), "\n";

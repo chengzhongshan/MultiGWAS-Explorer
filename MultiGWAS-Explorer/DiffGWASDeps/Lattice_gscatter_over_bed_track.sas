@@ -149,7 +149,7 @@ reflinecolor4selecteddots=gray,/*asign color for the vertical reference lines fo
 snp_line_split_ratio=0.99,/*split the vertical reference lines into two parts based on the ratio, with the 
 smaller part drawn from the end of point of the larger part to the adjusted position of each snp!*/
 text_rotate_angle=90, /*Angle to rotate text labels for these selected dots by users*/
-auto_rotate2zero=0, /*supply value 1 when less than 3 text labels, it is good to automatically set the text_rotate_angel=0*/
+auto_rotate2zero=0, /*supply value 1 when there are <=3 text labels and you want them kept horizontal in the top headroom*/
 adj_spaces_among_top_snps=1,/*Provide value 1 to adjust spaces among top SNP labels; otherwise, give value 0 to not 
 adjust top SNPs labels if these labels are rotated 90 degree, which is helpful when the space adjusted labels are not pretty*/
 Yoffset4textlabels=2.5, /*Important parameter to adjust the position of snp label in line with the headroom to the top;
@@ -1494,7 +1494,7 @@ quit;
    *Make the top SNP label offset less sensitive to the absolute y-axis range by
    *scaling it with the observed signal span per scatter track. This keeps the
    *visual gap more stable when tracks get taller or the max -log10(P) changes.;
-   %if %sysevalf(&n_marker_labels<=2) %then %do;
+   %if %sysevalf(&n_marker_labels<=3) %then %do;
       %let effective_yoffset4textlabels=%sysevalf(&effective_yoffset4textlabels*&_yoffset_scale_fc);
       %if (&text_rotate_angle=0) %then %do;
          %if %sysevalf(&effective_yoffset4textlabels<0.18) %then %let effective_yoffset4textlabels=0.18;
@@ -1576,21 +1576,21 @@ where &var4label_scatterplot_dots^="";
    %let  vars4figurename=&var4label_scatterplot_dots;
 %end;
 
-*When there is only one SNP for labeling at the top of the local Manhattan plot, reset the following rotation anger macro var to 0;
+*When there are three or fewer SNPs for labeling at the top, keep those labels horizontal in the top headroom;
 *Also reduce the top cell space represented by the macro var yoffset4max_drawmarkersontop from the default value 0.15 to 0.05;
 *Other parameters restrict the upper and lower offset are also resetted;
-%if %sysevalf(&n_marker_labels=1) and &auto_rotate2zero=1 %then %do;
+%if %sysevalf(&n_marker_labels>=1) and %sysevalf(&n_marker_labels<=3) and &auto_rotate2zero=1 %then %do;
     %let text_rotate_angle=0;
 
 /*	%let yoffset4max_drawmarkersontop=0.01;*/
 	/*Setting this as 0 does not change the figure, so this parameter is not needed to be reset!*/
-	/*Version1's simpler single-label scaling places the SNP label more reliably
-      near the middle of the reserved headroom than the newer adaptive branch. */
+	/*Use the simpler horizontal-label scaling for small label sets so <=3 SNPs
+      stay readable on one line within the reserved headroom. */
 	%let effective_yoffset4textlabels=%sysevalf(0.55*1000/&track_height);
 	%if &track_height<400 %then %let effective_yoffset4textlabels=0.55;
 	%let yaxis_offset4max=%sysevalf(0.04*500/&track_height);
 	%let yaxis_offset4min=%sysevalf(0.02*500/&track_height);/*This will reduce the lower offset of y-axis*/
-    %put NOTE: Single top-label hybrid tuning: yaxis_offset4max=&yaxis_offset4max yaxis_offset4min=&yaxis_offset4min effective_yoffset4textlabels=&effective_yoffset4textlabels track_height=&track_height.;
+    %put NOTE: Small top-label horizontal tuning: n_marker_labels=&n_marker_labels yaxis_offset4max=&yaxis_offset4max yaxis_offset4min=&yaxis_offset4min effective_yoffset4textlabels=&effective_yoffset4textlabels track_height=&track_height.;
 %end;
 %end;
 

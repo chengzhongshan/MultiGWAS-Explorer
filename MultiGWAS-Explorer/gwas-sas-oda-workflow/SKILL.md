@@ -194,6 +194,24 @@ Before running a workflow, identify:
    the final PNG path mentioned in the SAS log before declaring the rerun
    failed. If the PNG was recovered successfully, rebuild the user-facing final
    HTML around that PNG and keep the raw SAS HTML as a sidecar.
+   For the direct single-SNP SAS local-GTF wrapper, remember that
+   `TARGET_SNP` still defines the centered local window while
+   `GTF_LABEL_SNPS` can supply additional comma-separated rsIDs to label inside
+   that same locus. Prefer this path when several inquiry SNPs fall in one
+   shared window and you want one centered local-GTF figure instead of one
+   locus per target. When the label list contains three or fewer rsIDs, the
+   default `auto_rotate2zero=1` path now keeps those top labels horizontal in
+   the local-GTF headroom.
+   The single-SNP extractor manifest now also reports whether the target row
+   survived and which prefix blocks were present or missing. Use that manifest
+   before blaming a sparse locus: a target row can still be valid for local GTF
+   centering even when one ancestry / pair block is blank in the emitted wide
+   row.
+   If SAS reports that the target SNP was not found in the uploaded GWAS subset
+   but the local manifest already says `target_row_found_in_window=1`, treat
+   that first as a remote upload / helper integrity problem. In this project,
+   the wrapper now verifies remote uploaded file sizes and can keep recovering
+   the remote HTML when SAS finished but the helper failed late.
 
 10. Treat local Manhattan layout tuning as a first-class rerun option.
    If the top-hit SNP-gene labels are crowded or visually unbalanced, rerun the

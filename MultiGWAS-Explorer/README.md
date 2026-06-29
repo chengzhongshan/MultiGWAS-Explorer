@@ -1633,6 +1633,48 @@ perl auto_prepare_and_run_diff_gwas.pl \
 - the actual displayed x-axis half-window passed into the final
   `SNP_Local_Manhattan_With_GTF` call
 
+For a single centered local-GTF window, the direct SAS ODA wrapper now also
+supports labeling multiple SNPs on top of that same locus without changing the
+window center. In that mode:
+
+- `TARGET_SNP` still defines the centered window and the extracted local GWAS
+  subset
+- `GTF_LABEL_SNPS` supplies one or more comma-separated rsIDs to annotate
+  within that same plot
+- this is useful when several inquiry SNPs fall in one shared locus and you
+  want one figure centered on the lead SNP rather than one panel per target
+
+Example:
+
+```bash
+TARGET_SNP=rs185665940 \
+LOCAL_WINDOW_BP=1e6 \
+GTF_LABEL_SNPS=rs4852780,rs185665940,rs10166057 \
+RUNNER_CONFIG_JSON=./configs/auto_PGC_SCZ_female_vs_male_diff_effects_runner.json \
+./DiffGWASDeps/run_sas_oda_single_snp_with_gtf_download_html.sh
+```
+
+The higher-level automation wrapper still supports the batched local-GTF path
+through `--target-snps rs123` plus
+`--local-gtf-label-snps rs123,rs456,rs789`.
+
+When `GTF_LABEL_SNPS` contains three or fewer rsIDs, the local GTF top labels
+are now kept horizontal within the top headroom by the default
+`auto_rotate2zero=1` path. Larger label sets still fall back to the rotated
+layout to avoid crowding.
+
+The direct single-SNP extractor now also records target-row diagnostics in the
+emitted manifest, including whether the target row survived and which prefix
+blocks were actually present, for example:
+
+- `target_row_found_in_window=1`
+- `target_row_groups_present=ALL,EUR`
+- `target_row_groups_missing=ASN`
+
+That matters for sparse loci: a single-SNP local GTF rerun can still be valid
+even when one ancestry / pair block is blank in the wide row, as long as the
+target SNP itself is present and centered correctly.
+
 So if you request `--local-gtf-window-bp 1e9`, the final local GTF plot is
 expected to render approximately `+/-1e9 bp` around the selected top hit,
 rather than silently staying near the older default display distance.
@@ -1770,14 +1812,16 @@ parameters in mind:
   internally adjusted again from the number of scatter tracks before the final
   `offsetmax` is assigned to the y-axis.
 
-Important caveat:
+Important caveats:
 
-- `Yoffset4textlabels` is also auto-tuned internally, so in single-label cases
-  manual changes may appear weaker than expected.
-- if one top SNP still does not sit in the middle of the headroom, the
-  lower-level fallback is to edit the lattice macro directly near the single-
-  label branch around the `1000/&track_height` ratio and rerun the local GTF
-  script for validation.
+- `Yoffset4textlabels` is also auto-tuned internally, so in very small label
+  sets manual changes may appear weaker than expected.
+- with `auto_rotate2zero=1`, one to three top SNP labels now stay horizontal in
+  the reserved headroom; four or more labels still use the rotated layout.
+- if one to three top SNP labels still do not sit in the middle of the
+  headroom, the lower-level fallback is to edit the small-label branch inside
+  `Lattice_gscatter_over_bed_track.sas` near the `1000/&track_height` ratio
+  and rerun the local GTF script for validation.
 
 The SAS local-Manhattan shell runner is now also more informative when a step
 fails before SAS submission:

@@ -7,6 +7,7 @@ RUNNER_CONFIG_JSON="${RUNNER_CONFIG_JSON:-}"
 CALLER_TARGET_SNP="${TARGET_SNP-__UNSET__}"
 CALLER_OUTPUT_HTML_BASENAME="${OUTPUT_HTML_BASENAME-__UNSET__}"
 CALLER_LOCAL_WINDOW_BP="${LOCAL_WINDOW_BP-__UNSET__}"
+CALLER_GTF_LABEL_SNPS="${GTF_LABEL_SNPS-__UNSET__}"
 CALLER_LOCAL_GTF_INCLUDE_NON_PROTEIN_CODING_GENES="${LOCAL_GTF_INCLUDE_NON_PROTEIN_CODING_GENES-__UNSET__}"
 CALLER_OPEN_RESULT="${OPEN_RESULT-__UNSET__}"
 CALLER_DATA_GZ="${DATA_GZ-__UNSET__}"
@@ -22,6 +23,9 @@ if [[ "${CALLER_OUTPUT_HTML_BASENAME}" != "__UNSET__" ]]; then
 fi
 if [[ "${CALLER_LOCAL_WINDOW_BP}" != "__UNSET__" ]]; then
   LOCAL_WINDOW_BP="${CALLER_LOCAL_WINDOW_BP}"
+fi
+if [[ "${CALLER_GTF_LABEL_SNPS}" != "__UNSET__" ]]; then
+  GTF_LABEL_SNPS="${CALLER_GTF_LABEL_SNPS}"
 fi
 if [[ "${CALLER_LOCAL_GTF_INCLUDE_NON_PROTEIN_CODING_GENES}" != "__UNSET__" ]]; then
   LOCAL_GTF_INCLUDE_NON_PROTEIN_CODING_GENES="${CALLER_LOCAL_GTF_INCLUDE_NON_PROTEIN_CODING_GENES}"
@@ -58,6 +62,8 @@ fi
 SAFE_TARGET_SNP="$(printf '%s' "${TARGET_SNP}" | tr -c 'A-Za-z0-9._-' '_')"
 OUTPUT_HTML_BASENAME="${OUTPUT_HTML_BASENAME:-}"
 LOCAL_WINDOW_BP="${LOCAL_WINDOW_BP:-1e7}"
+GTF_LABEL_SNPS="${GTF_LABEL_SNPS:-${TARGET_SNP}}"
+GTF_LABEL_SNPS="${GTF_LABEL_SNPS//,/ }"
 
 # A single-SNP context run should not silently reuse the generic genome-wide
 # wide subset or generic local-top-hits HTML basename from the multi-hit runner
@@ -324,6 +330,101 @@ oda_delete_many() {
   shift
   run_oda_helper_with_timeout "${ODA_DELETE_TIMEOUT_SECONDS}" "${ODA_DELETE_TIMEOUT_GRACE_SECONDS}" \
     "$@" --output-prefix "${output_prefix}"
+}
+
+remote_home_file_size_bytes() {
+  local remote_basename="$1"
+  local info_output
+  info_output="$(
+    run_oda_helper \
+      --file-info "~/${remote_basename}" \
+      --output-prefix "check_remote_single_snp_home_size_${stamp}" 2>&1 || true
+  )"
+  printf '%s\n' "${info_output}" | awk -F '\t' '$1=="SIZE"{print $2}' | tail -n 1
+}
+
+remote_home_file_exists() {
+  local remote_basename="$1"
+  local info_output
+  info_output="$(
+    run_oda_helper \
+      --file-info "~/${remote_basename}" \
+      --output-prefix "check_remote_single_snp_home_exists_${stamp}" 2>&1 || true
+  )"
+  [[ "$(printf '%s\n' "${info_output}" | awk -F '\t' '$1=="EXISTS"{print $2}' | tail -n 1 | tr -d '[:space:]')" == "1" ]]
+}
+
+remote_home_file_matches_local_size() {
+  local local_path="$1"
+  local remote_basename="$2"
+  [[ -s "${local_path}" ]] || return 1
+  local local_size remote_size
+  local_size="$(wc -c < "${local_path}" | tr -d '[:space:]')"
+  remote_size="$(remote_home_file_size_bytes "${remote_basename}" | tr -d '[:space:]')"
+  [[ -n "${local_size}" && -n "${remote_size}" && "${local_size}" == "${remote_size}" ]]
+}
+
+delete_partial_remote_home_file() {
+  local remote_basename="$1"
+  run_oda_helper \
+    --delete-file "${remote_basename}" \
+    --output-prefix "delete_partial_single_snp_home_${stamp}" >/dev/null 2>&1 || true
+}
+
+extract_target_row_from_local_subset() {
+  local data_path="$1"
+  local target_snp="$2"
+  perl -MIO::Uncompress::Gunzip=gunzip,\$GunzipError -e '
+    use strict;
+    use warnings;
+    my ($path, $target) = @ARGV;
+    my $fh;
+    if ($path =~ /\.gz$/i) {
+      $fh = IO::Uncompress::Gunzip->new($path)
+        or die "Cannot open $path: $GunzipError\n";
+    } else {
+      open $fh, q{<}, $path or die "Cannot open $path: $!\n";
+    }
+    my $header = <$fh>;
+    while (my $line = <$fh>) {
+      chomp $line;
+      $line =~ s/\r$//;
+      next if $line =~ /^\s*$/;
+      my @f = split /\t/, $line, -1;
+      next unless @f >= 5;
+      next unless defined $f[4] && $f[4] eq $target;
+      print $line;
+      exit 0;
+    }
+    exit 1;
+  ' "${data_path}" "${target_snp}" 2>/dev/null
+}
+
+manifest_metric_value() {
+  local metric="$1"
+  local manifest_path="$2"
+  [[ -s "${manifest_path}" ]] || return 1
+  awk -F '\t' -v key="${metric}" '$1==key{print $2; exit}' "${manifest_path}"
+}
+
+log_local_subset_target_summary_if_available() {
+  [[ -n "${LOCAL_WIDE_MANIFEST:-}" && -s "${LOCAL_WIDE_MANIFEST}" ]] || return 0
+  local found present missing count all_prefixes
+  found="$(manifest_metric_value "target_row_found_in_window" "${LOCAL_WIDE_MANIFEST}" || true)"
+  present="$(manifest_metric_value "target_row_groups_present" "${LOCAL_WIDE_MANIFEST}" || true)"
+  missing="$(manifest_metric_value "target_row_groups_missing" "${LOCAL_WIDE_MANIFEST}" || true)"
+  count="$(manifest_metric_value "target_row_group_count" "${LOCAL_WIDE_MANIFEST}" || true)"
+  all_prefixes="$(manifest_metric_value "target_row_has_all_prefixes" "${LOCAL_WIDE_MANIFEST}" || true)"
+  [[ -n "${found}" ]] || return 0
+  echo "[prep] Local single-SNP subset manifest for ${TARGET_SNP}: target_row_found=${found} group_count=${count:-0} present_groups=${present:-none} missing_groups=${missing:-none} all_prefixes=${all_prefixes:-0}"
+  if [[ "${all_prefixes}" == "0" && -n "${missing}" ]]; then
+    echo "[prep] Note: ${TARGET_SNP} is still a valid centered target even though some subgroup prefix blocks are blank in the emitted wide row: missing=${missing}."
+  fi
+}
+
+run_log_reports_missing_target_snp() {
+  [[ -s "${RUN_LOG_FILE}" ]] || return 1
+  grep -Fq 'Target SNP &target_snp was not found in the uploaded GWAS subset.' "${RUN_LOG_FILE}"
 }
 
 resolve_magick_bin() {
@@ -598,6 +699,19 @@ else
   TARGET_BP="${TARGET_BP:-NA}"
 fi
 
+local_target_row="$(
+  extract_target_row_from_local_subset "${DATA_GZ}" "${TARGET_SNP}" || true
+)"
+if [[ -z "${local_target_row}" ]]; then
+  echo "ERROR: The local single-SNP wide subset does not contain ${TARGET_SNP}: ${DATA_GZ}" >&2
+  if [[ -n "${LOCAL_WIDE_MANIFEST:-}" && -s "${LOCAL_WIDE_MANIFEST}" ]]; then
+    echo "Manifest: ${LOCAL_WIDE_MANIFEST}" >&2
+  fi
+  exit 1
+fi
+echo "[prep] Verified that the local single-SNP wide subset contains ${TARGET_SNP}."
+log_local_subset_target_summary_if_available
+
 REMOTE_DATA_BASENAME="${REMOTE_DATA_BASENAME:-$(basename "${DATA_GZ}")}"
 
 if [[ "${TARGET_CHR}" == "NA" || "${TARGET_BP}" == "NA" || -z "${TARGET_CHR}" || -z "${TARGET_BP}" ]]; then
@@ -682,6 +796,7 @@ perl "${RENDER_SAS_HELPER}" \
   --output "${RUN_SAS_RENDERED}" \
   --replace "TARGET_SNP=${TARGET_SNP}" \
   --replace "LOCAL_WINDOW_BP=${LOCAL_WINDOW_BP}" \
+  --replace "GTF_LABEL_SNPS=${GTF_LABEL_SNPS}" \
   --replace "OUTPUT_HTML=${OUTPUT_HTML_BASENAME}" \
   --replace "GWAS_DATASET=${GWAS_DATASET}" \
   --replace "TARGET_HIT_DATASET=${TARGET_HIT_DATASET}" \
@@ -730,6 +845,28 @@ oda_upload_many \
   "upload_single_snp_with_gtf_support_${stamp}" \
   "${upload_support_args[@]}"
 
+if ! remote_home_file_matches_local_size "${DATA_GZ}" "${REMOTE_DATA_BASENAME}"; then
+  echo "[1b/6] Remote GWAS subset size check failed after bulk upload. Re-uploading ${REMOTE_DATA_BASENAME}..."
+  delete_partial_remote_home_file "${REMOTE_DATA_BASENAME}"
+  run_oda_helper --upload-file "${DATA_GZ}" --output-prefix "reupload_single_snp_gwas_subset_${stamp}"
+  if ! remote_home_file_matches_local_size "${DATA_GZ}" "${REMOTE_DATA_BASENAME}"; then
+    echo "ERROR: Remote GWAS subset size mismatch for ${REMOTE_DATA_BASENAME} after re-upload." >&2
+    exit 1
+  fi
+fi
+echo "[1b/6] Verified remote GWAS subset upload: ${REMOTE_DATA_BASENAME} ($(remote_home_file_size_bytes "${REMOTE_DATA_BASENAME}") bytes)."
+
+if ! remote_home_file_matches_local_size "${LOCAL_GTF_SUBSET_GZ}" "${REMOTE_GTF_BASENAME}"; then
+  echo "[1c/6] Remote local-GTF subset size check failed after bulk upload. Re-uploading ${REMOTE_GTF_BASENAME}..."
+  delete_partial_remote_home_file "${REMOTE_GTF_BASENAME}"
+  run_oda_helper --upload-file "${LOCAL_GTF_SUBSET_GZ}" --output-prefix "reupload_single_snp_local_gtf_subset_${stamp}"
+  if ! remote_home_file_matches_local_size "${LOCAL_GTF_SUBSET_GZ}" "${REMOTE_GTF_BASENAME}"; then
+    echo "ERROR: Remote local-GTF subset size mismatch for ${REMOTE_GTF_BASENAME} after re-upload." >&2
+    exit 1
+  fi
+fi
+echo "[1c/6] Verified remote local-GTF subset upload: ${REMOTE_GTF_BASENAME} ($(remote_home_file_size_bytes "${REMOTE_GTF_BASENAME}") bytes)."
+
 echo "[5/6] Running SAS single-SNP local Manhattan gene-track plot..."
 SINGLE_SNP_GTF_SUBMIT_MAX_ATTEMPTS="${SINGLE_SNP_GTF_SUBMIT_MAX_ATTEMPTS:-2}"
 SINGLE_SNP_GTF_SUBMIT_RETRY_SLEEP_SECONDS="${SINGLE_SNP_GTF_SUBMIT_RETRY_SLEEP_SECONDS:-10}"
@@ -745,6 +882,20 @@ while :; do
   fi
   if [[ "${single_snp_submit_rc}" -eq 0 ]] && ! single_snp_submit_needs_retry; then
     break
+  fi
+  if [[ "${single_snp_submit_rc}" -ne 0 ]] && remote_home_file_exists "${OUTPUT_HTML_BASENAME}"; then
+    echo "[recover] The SAS helper exited with status ${single_snp_submit_rc}, but the remote HTML ${OUTPUT_HTML_BASENAME} already exists. Continuing with download and local recovery."
+    break
+  fi
+  if [[ "${single_snp_submit_rc}" -ne 0 ]] && run_log_reports_missing_target_snp; then
+    if [[ -n "${local_target_row}" ]]; then
+      echo "[retry] SAS reported ${TARGET_SNP} missing from the uploaded GWAS subset, but the local subset still contains the target row. Re-uploading ${REMOTE_DATA_BASENAME} before the next retry..."
+      delete_partial_remote_home_file "${REMOTE_DATA_BASENAME}"
+      run_oda_helper --upload-file "${DATA_GZ}" --output-prefix "reupload_single_snp_missing_target_${stamp}_try${single_snp_submit_attempt}" || true
+    else
+      echo "ERROR: SAS reported ${TARGET_SNP} missing and the local subset also does not contain that target row: ${DATA_GZ}" >&2
+      exit 1
+    fi
   fi
   if [[ "${single_snp_submit_attempt}" -ge "${SINGLE_SNP_GTF_SUBMIT_MAX_ATTEMPTS}" ]]; then
     if [[ "${single_snp_submit_rc}" -ne 0 ]]; then

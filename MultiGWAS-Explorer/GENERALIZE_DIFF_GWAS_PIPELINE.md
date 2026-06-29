@@ -1489,12 +1489,14 @@ headroom-height control from the lattice macro:
 
 Practical debugging rule:
 
-- if there is only one SNP label on top and changing `Yoffset4textlabels`
-  barely moves it, inspect the single-label branch inside
+- if there are one to three SNP labels on top and changing
+  `Yoffset4textlabels` barely moves them, inspect the small-label branch inside
   `Lattice_gscatter_over_bed_track.sas`
+- with `auto_rotate2zero=1`, one to three top labels now stay horizontal in
+  the reserved headroom; four or more labels still use the rotated layout
 - the fallback manual control is the ratio around `1000/&track_height`, which
-  can be reduced or increased to move that single top label lower or higher in
-  the reserved headroom
+  can be reduced or increased to move those small-label top annotations lower
+  or higher in the reserved headroom
 
 For target-SNP extraction, the pipeline can now take advantage of a tabix index
 on the standardized long differential GWAS:
@@ -1690,6 +1692,7 @@ RUNNER_CONFIG_JSON=./configs/runner_pgc_scz_sex_diff.json ./run_sas_oda_manhatta
 RUNNER_CONFIG_JSON=./configs/runner_pgc_scz_sex_diff.json ./run_sas_oda_local_top_hits_manhattan_download_png.sh
 RUNNER_CONFIG_JSON=./configs/runner_pgc_scz_sex_diff.json ./run_sas_oda_local_top_hits_with_gtf_download_html.sh
 TARGET_SNP=rs17425819 RUNNER_CONFIG_JSON=./configs/runner_pgc_scz_sex_diff.json ./run_sas_oda_single_snp_with_gtf_download_html.sh
+TARGET_SNP=rs185665940 LOCAL_WINDOW_BP=1e6 GTF_LABEL_SNPS=rs4852780,rs185665940,rs10166057 RUNNER_CONFIG_JSON=./configs/runner_pgc_scz_sex_diff.json ./run_sas_oda_single_snp_with_gtf_download_html.sh
 ```
 
 These runner presets can set shell-facing variables such as:
@@ -1709,10 +1712,27 @@ These runner presets can set shell-facing variables such as:
 - `GTF_ASSOC_PVARS`
 - `GTF_ZSCORE_VARS`
 - `GTF_LABELS`
+- `GTF_LABEL_SNPS`
 
 For the single-SNP GTF runner, `EXTRACTOR_CONFIG_JSON` lets the shell wrapper
 call `extract_single_snp_wide_diff_gwas.pl --config ...` rather than relying on
-a project-specific hard-coded long GWAS path.
+a project-specific hard-coded long GWAS path. In that direct-wrapper mode,
+`TARGET_SNP` still defines the centered local window, while `GTF_LABEL_SNPS`
+optionally supplies one or more comma-separated rsIDs to label inside that same
+local GTF figure. When that label list contains three or fewer rsIDs, the
+default `auto_rotate2zero=1` path keeps those top labels horizontal in the
+reserved headroom.
+
+The single-SNP extractor manifest now also records whether the target row
+survived and which prefix blocks were present or missing. That is the preferred
+first check for sparse loci where one ancestry / pair row may be absent after
+thresholding. A local GTF rerun can still be valid when, for example, the
+target row has `ALL` and `EUR` populated but `ASN` blank.
+
+If SAS later says the target SNP was not found in the uploaded GWAS subset
+while the local manifest already says `target_row_found_in_window=1`, treat
+that as a remote upload / helper integrity issue before assuming the biology or
+row selection was wrong.
 
 ## Dependency layout
 
