@@ -1,6 +1,8 @@
 .venv-pipeline/
 local/
 _Inline/
+.authinfo
+_authinfo
 .vagrant/
 install/cache/
 tools/
