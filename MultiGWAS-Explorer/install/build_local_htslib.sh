@@ -6,8 +6,8 @@ SCRIPT_DIR="$(cd "$(/usr/bin/dirname "${_build_local_htslib_source}")" && pwd)"
 # shellcheck source=install/common.sh
 . "${SCRIPT_DIR}/common.sh"
 
-SRC_DIR="${PIPELINE_ROOT}/tools/htslib-1.20"
-TARBALL="${PIPELINE_ROOT}/tools/htslib-1.20.tar.bz2"
+SRC_DIR="${PIPELINE_ROOT}/tools/htslib-${PIPELINE_HTSLIB_VERSION}"
+TARBALL="${PIPELINE_ROOT}/tools/htslib-${PIPELINE_HTSLIB_VERSION}.tar.bz2"
 
 if command_exists bgzip && command_exists tabix; then
   log "System bgzip/tabix already available; skipping local htslib build"
@@ -15,7 +15,10 @@ if command_exists bgzip && command_exists tabix; then
 fi
 
 if [ ! -d "${SRC_DIR}" ]; then
-  [ -f "${TARBALL}" ] || die "Neither ${SRC_DIR} nor ${TARBALL} exists"
+  if [ ! -f "${TARBALL}" ]; then
+    log "Downloading htslib ${PIPELINE_HTSLIB_VERSION} into ${TARBALL}"
+    download_url "${PIPELINE_HTSLIB_URL}" "${TARBALL}"
+  fi
   log "Extracting ${TARBALL}"
   mkdir -p "${PIPELINE_ROOT}/tools"
   tar -xjf "${TARBALL}" -C "${PIPELINE_ROOT}/tools"

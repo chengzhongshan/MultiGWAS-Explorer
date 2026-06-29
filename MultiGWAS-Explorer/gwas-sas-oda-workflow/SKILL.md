@@ -34,6 +34,14 @@ Before running a workflow, identify:
 - Cygwin path equivalents for Windows drives, usually `/mnt/e/...` and `/mnt/g/...`.
 - Whether the user wants a fast install/render validation or a full
   genome-wide rerun. In Ubuntu Docker, those are very different time costs.
+- On Windows, whether the user is installing through the portable Cygwin
+  bootstrap or an existing Cygwin shell. The portable bootstrap defaults to
+  `%USERPROFILE%\CygwinPortablePipeline`; pass `-PortableRoot` only when a
+  different isolated root is needed.
+- Whether the local network intercepts TLS. If Cygwin `curl` fails with a
+  self-signed certificate chain during bootstrap, rerun the Windows portable
+  installer with `-AllowInsecureDownloads` so phase-2 repo-local downloads use
+  `PIPELINE_CURL_INSECURE=1`.
 - SAS ODA size limits; avoid uploading large raw GWAS files.
 
 ## Workflow
@@ -75,6 +83,21 @@ Before running a workflow, identify:
      intermediate `.plot.tsv` of about 110 MB; that single stage took about
      9 minutes, whereas the one-locus local Manhattan and local GTF panels each
      finished in about 10-12 seconds
+
+   For Windows portable Cygwin installation in this repository:
+
+   - run the PowerShell bootstrap from the repository root:
+     - `powershell -NoProfile -ExecutionPolicy Bypass -File .\install\install_windows_portable_cygwin.ps1`
+   - expect the installer to refresh Cygwin packages including the htslib build
+     headers: `libbz2-devel`, `libcurl-devel`, `liblzma-devel`,
+     `openssl-devel`, and `zlib-devel`
+   - if `bgzip` and `tabix` are absent, the installer downloads htslib 1.20
+     into `tools/` and builds repo-local tools under `local/bin/`
+   - if TLS verification fails while downloading `cpanm` or htslib, rerun with:
+     - `powershell -NoProfile -ExecutionPolicy Bypass -File .\install\install_windows_portable_cygwin.ps1 -AllowInsecureDownloads`
+   - if the installer warns that it could not resolve `java.exe`, treat the
+     dependency smoke test as valid but set `SASPY_JAVA_WIN` before launching
+     SAS ODA sessions
 
 2. Merge GWASs locally.
    Write or reuse a Perl script that streams gz files and outputs a normalized long-format table. Use stable keys such as `CHR`, `BP`, `A1`, `A2` only when those columns are explicitly available. Do not relabel A1/A2 as REF/ALT unless the source documentation says so.

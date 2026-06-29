@@ -21,6 +21,8 @@ PIPELINE_VENV_DIR="${PIPELINE_ROOT}/.venv-pipeline"
 PIPELINE_PYTHON_RECORD_FILE="${PIPELINE_VENV_DIR}/.python-bin"
 PIPELINE_REQUIREMENTS_FILE="${PIPELINE_INSTALL_DIR}/requirements-pipeline.txt"
 PIPELINE_CPANFILE="${PIPELINE_ROOT}/cpanfile"
+PIPELINE_HTSLIB_VERSION="${PIPELINE_HTSLIB_VERSION:-1.20}"
+PIPELINE_HTSLIB_URL="${PIPELINE_HTSLIB_URL:-https://github.com/samtools/htslib/releases/download/${PIPELINE_HTSLIB_VERSION}/htslib-${PIPELINE_HTSLIB_VERSION}.tar.bz2}"
 PIPELINE_CPANM_BIN=""
 PIPELINE_PYTHON_BIN="${PIPELINE_PYTHON_BIN:-}"
 PIPELINE_INLINE_PYTHON_BIN="${PIPELINE_INLINE_PYTHON_BIN:-}"
@@ -159,9 +161,17 @@ download_url() {
   local dest="$2"
   mkdir -p "$(dirname "$dest")"
   if command_exists curl; then
-    curl -LfsS "$url" -o "$dest"
+    if [ "${PIPELINE_CURL_INSECURE:-0}" = "1" ]; then
+      curl -kLfsS "$url" -o "$dest"
+    else
+      curl -LfsS "$url" -o "$dest"
+    fi
   elif command_exists wget; then
-    wget -qO "$dest" "$url"
+    if [ "${PIPELINE_CURL_INSECURE:-0}" = "1" ]; then
+      wget --no-check-certificate -qO "$dest" "$url"
+    else
+      wget -qO "$dest" "$url"
+    fi
   else
     die "Need curl or wget to download ${url}"
   fi

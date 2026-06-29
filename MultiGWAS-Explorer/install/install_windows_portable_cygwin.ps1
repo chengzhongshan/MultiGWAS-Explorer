@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
-    [string]$PortableRoot = 'H:\TMP4SAS\CygwinPortablePipeline',
-    [string]$RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path,
+    [string]$PortableRoot = '',
+    [string]$RepoRoot = '',
     [string]$PortableReleaseUrl = 'https://github.com/MachinaCore/CygwinPortable/releases/download/1.4.0.0/CygwinPortable_1.4.0.0_WithDefaultCygwin.7z',
     [string]$CygwinSetupUrl = 'https://cygwin.com/setup-x86_64.exe',
     [string]$PortableArchivePath = '',
@@ -11,7 +11,8 @@ param(
     [switch]$SkipPhase2,
     [switch]$SkipPackageRefresh,
     [switch]$ForceDownload,
-    [switch]$ForceExtract
+    [switch]$ForceExtract,
+    [switch]$AllowInsecureDownloads
 )
 
 $ErrorActionPreference = 'Stop'
@@ -174,7 +175,7 @@ function Invoke-PortablePackageRefresh {
     Reset-PortableCygwinRoot -PortableCygwinRoot $PortableCygwinRoot
 
     if ([string]::IsNullOrWhiteSpace($CygwinPackages)) {
-        $CygwinPackages = 'bash,curl,cygwin,gcc-core,gcc-g++,gnuplot-base,ImageMagick,libgd-devel,make,perl,perl-File-Which,perl-GD,perl-JSON,perl-JSON-MaybeXS,perl-Mojolicious,pkg-config,python3,python312,python312-devel,python312-imaging,python312-pip,python312-setuptools,python312-wheel,unzip,wget,which,zip'
+        $CygwinPackages = 'bash,ca-certificates,curl,cygwin,gcc-core,gcc-g++,gnuplot-base,ImageMagick,libbz2-devel,libcurl-devel,libgd-devel,liblzma-devel,make,openssl,openssl-devel,perl,perl-File-Which,perl-GD,perl-JSON,perl-JSON-MaybeXS,perl-Mojolicious,pkg-config,python3,python312,python312-devel,python312-imaging,python312-pip,python312-setuptools,python312-wheel,unzip,wget,which,zip,zlib-devel'
     }
 
     Write-InstallLog "Refreshing portable Cygwin packages under $PortableCygwinRoot"
@@ -222,6 +223,10 @@ function Invoke-Phase2Installer {
         "export CYGWIN_SETUP_EXE='$setupExeUnix'",
         "export CYGWIN_ROOT_WINDOWS='$cygwinRootWindows'"
     )
+    if ($AllowInsecureDownloads) {
+        $commonExports += "export PIPELINE_CURL_INSECURE=1"
+        $commonExports += "export PERL_CPANM_OPT='--no-verify'"
+    }
     if ($CygwinPackages) {
         $escapedPackages = $CygwinPackages.Replace("'", "'\\''")
         $commonExports += "export CYGWIN_PACKAGES='$escapedPackages'"
@@ -238,6 +243,20 @@ function Invoke-Phase2Installer {
     if ($LASTEXITCODE -ne 0) {
         Fail "Portable Cygwin repo-local bootstrap phase exited with code $LASTEXITCODE"
     }
+}
+
+if ([string]::IsNullOrWhiteSpace($PortableRoot)) {
+    $PortableRoot = Join-Path $env:USERPROFILE 'CygwinPortablePipeline'
+}
+if ([string]::IsNullOrWhiteSpace($RepoRoot)) {
+    $scriptRoot = $PSScriptRoot
+    if ([string]::IsNullOrWhiteSpace($scriptRoot) -and $MyInvocation.MyCommand.Path) {
+        $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+    }
+    if ([string]::IsNullOrWhiteSpace($scriptRoot)) {
+        Fail "Could not resolve script directory; pass -RepoRoot explicitly"
+    }
+    $RepoRoot = (Resolve-Path (Join-Path $scriptRoot '..')).Path
 }
 
 $PortableRoot = [System.IO.Path]::GetFullPath($PortableRoot)

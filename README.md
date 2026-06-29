@@ -26,13 +26,54 @@ see [MultiGWAS-Explorer/README.md](MultiGWAS-Explorer/README.md).
 Recommended for portable Cygwin:
 
 ```powershell
+cd .\MultiGWAS-Explorer
 powershell -NoProfile -ExecutionPolicy Bypass `
   -File .\install\install_windows_portable_cygwin.ps1
+```
+
+The portable bootstrap defaults to
+`%USERPROFILE%\CygwinPortablePipeline`. If Cygwin `curl` fails with a
+self-signed certificate chain while bootstrapping repo-local dependencies, rerun
+with the explicit opt-in:
+
+```powershell
+cd .\MultiGWAS-Explorer
+powershell -NoProfile -ExecutionPolicy Bypass `
+  -File .\install\install_windows_portable_cygwin.ps1 `
+  -AllowInsecureDownloads
+```
+
+The installer can download htslib 1.20 into `tools/` and build repo-local
+`bgzip` / `tabix` when those tools are not already available.
+
+After installation, open the portable shell with:
+
+```text
+C:\Users\<username>\CygwinPortablePipeline\CygwinPortable.exe
+```
+
+If needed, start it directly from PowerShell:
+
+```powershell
+& "$env:USERPROFILE\CygwinPortablePipeline\App\Runtime\Cygwin\bin\mintty.exe" -
+```
+
+Inside Cygwin, change into the project by using `/mnt/c/...` paths, then run
+the smoke test or pipeline:
+
+```bash
+cd /mnt/c/Users/<username>/Desktop/MultiGWAS-Explorer-main/MultiGWAS-Explorer-main/MultiGWAS-Explorer
+bash install/check_pipeline_install.sh
+perl ./auto_prepare_and_run_diff_gwas_with_gunplot.pl \
+  --spec configs/spec_pgc_scz_sex_common_automation.json \
+  --plots local_manhattan,local_gtf \
+  --target-snps rs185665940
 ```
 
 If you are already inside a supported Cygwin shell:
 
 ```bash
+cd MultiGWAS-Explorer
 bash install/install_cygwin.sh
 ```
 
@@ -41,12 +82,14 @@ bash install/install_cygwin.sh
 Ubuntu:
 
 ```bash
+cd MultiGWAS-Explorer
 bash install/install_ubuntu.sh
 ```
 
 ### macOS
 
 ```bash
+cd MultiGWAS-Explorer
 bash install/install_macos.sh
 ```
 
@@ -55,6 +98,7 @@ bash install/install_macos.sh
 Run this on any host install:
 
 ```bash
+cd MultiGWAS-Explorer
 bash install/check_pipeline_install.sh
 ```
 

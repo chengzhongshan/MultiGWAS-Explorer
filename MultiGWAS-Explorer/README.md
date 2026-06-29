@@ -299,11 +299,78 @@ powershell -NoProfile -ExecutionPolicy Bypass `
 
 This Windows bootstrap is built around
 `MachinaCore/CygwinPortable`. By default it creates an isolated portable root
-under `H:\TMP4SAS\CygwinPortablePipeline`, refreshes the required Cygwin
+under `%USERPROFILE%\CygwinPortablePipeline`, refreshes the required Cygwin
 packages there, and then runs the same repo-local phase-2 installer that the
-normal Cygwin path uses. During development, this portable path was exercised
-in isolated `H:\TMP4SAS\...` directories so the pipeline could be validated
-without depending on the user's preexisting global Cygwin installation.
+normal Cygwin path uses. You can still choose a different location explicitly:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass `
+  -File .\install\install_windows_portable_cygwin.ps1 `
+  -PortableRoot "$env:USERPROFILE\CygwinPortablePipeline"
+```
+
+The Windows package list includes the Cygwin headers needed to build htslib
+locally when `bgzip` and `tabix` are not already available:
+`libbz2-devel`, `libcurl-devel`, `liblzma-devel`, `openssl-devel`, and
+`zlib-devel`. If `tools/htslib-1.20.tar.bz2` is not already present, the
+installer downloads the expected upstream htslib release before building
+`local/bin/bgzip.exe` and `local/bin/tabix.exe`.
+
+If the machine sits behind TLS interception and Cygwin `curl` reports a
+self-signed certificate chain while bootstrapping `cpanm` or htslib, rerun with
+the explicit insecure-download opt-in:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass `
+  -File .\install\install_windows_portable_cygwin.ps1 `
+  -AllowInsecureDownloads
+```
+
+That switch sets `PIPELINE_CURL_INSECURE=1` only for the repo-local phase-2
+downloads. Use it only when you understand the local network trust boundary.
+
+After installation, the portable Cygwin terminal is under:
+
+```text
+C:\Users\<username>\CygwinPortablePipeline
+```
+
+The easiest launcher is:
+
+```text
+C:\Users\<username>\CygwinPortablePipeline\CygwinPortable.exe
+```
+
+If that launcher does not open a shell, start the terminal directly from
+PowerShell:
+
+```powershell
+& "$env:USERPROFILE\CygwinPortablePipeline\App\Runtime\Cygwin\bin\mintty.exe" -
+```
+
+Or open Cygwin bash in the current PowerShell window:
+
+```powershell
+& "$env:USERPROFILE\CygwinPortablePipeline\App\Runtime\Cygwin\bin\bash.exe" -l
+```
+
+Inside the Cygwin terminal, Windows drives are available under `/mnt/<drive>`.
+For example, a repository on `C:\Users\...` is reached through `/mnt/c/...`.
+Change into the pipeline directory before running commands:
+
+```bash
+cd /mnt/c/Users/<username>/Desktop/MultiGWAS-Explorer-main/MultiGWAS-Explorer-main/MultiGWAS-Explorer
+bash install/check_pipeline_install.sh
+```
+
+Then run the pipeline from that same Cygwin terminal, for example:
+
+```bash
+perl ./auto_prepare_and_run_diff_gwas_with_gunplot.pl \
+  --spec configs/spec_pgc_scz_sex_common_automation.json \
+  --plots local_manhattan,local_gtf \
+  --target-snps rs185665940
+```
 
 If you are already inside that portable shell, or inside another supported
 Cygwin shell, run the phase-2 installer directly:
@@ -319,6 +386,11 @@ of Linux-built repo-local Perl modules from a Cygwin shell, which caused
 `GD.pm` and `Compress::Raw::Zlib` version mismatches. The installer/runtime
 stack now avoids that by preferring `local/perl5-cygwin/` on portable Cygwin
 instead of sharing one generic `local/perl5/` tree across operating systems.
+
+SASPy ODA also needs a Java runtime. The smoke test can pass without opening an
+actual ODA session, but if the installer prints `Could not resolve a Windows
+java.exe`, install Java or set `SASPY_JAVA_WIN` to the Windows path of
+`java.exe` before running SAS ODA jobs.
 
 Ubuntu:
 
@@ -555,7 +627,8 @@ Validation status:
 Portable Cygwin validation note:
 
 - the top-level `auto_prepare_and_run_diff_gwas_with_gunplot.pl` wrapper was
-  validated from an isolated portable Cygwin install under `H:\TMP4SAS\...`
+  validated from an isolated portable Cygwin install under the user profile
+  portable root
 - `bash install/check_pipeline_install.sh` now also reports the active Perl
   archname and GD version, which helped confirm that the portable shell was
   using `x86_64-cygwin-threads-multi` plus the Cygwin GD build rather than a

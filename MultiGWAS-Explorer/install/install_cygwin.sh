@@ -28,7 +28,7 @@ CYGWIN_SETUP_URL="${CYGWIN_SETUP_URL:-https://cygwin.com/setup-x86_64.exe}"
 CYGWIN_SETUP_MIRROR="${CYGWIN_SETUP_MIRROR:-https://mirrors.kernel.org/sourceware/cygwin/}"
 CYGWIN_SETUP_EXE="${CYGWIN_SETUP_EXE:-${PIPELINE_INSTALL_DIR}/cache/setup-x86_64.exe}"
 CYGWIN_ROOT_WINDOWS="${CYGWIN_ROOT_WINDOWS:-$(resolve_cygwin_root_windows)}"
-CYGWIN_PACKAGES="${CYGWIN_PACKAGES:-bash,curl,cygwin,gcc-core,gcc-g++,gnuplot-base,ImageMagick,libgd-devel,make,perl,perl-File-Which,perl-GD,perl-JSON,perl-JSON-MaybeXS,perl-Mojolicious,pkg-config,python3,python312,python312-devel,python312-imaging,python312-pip,python312-setuptools,python312-wheel,unzip,wget,which,zip}"
+CYGWIN_PACKAGES="${CYGWIN_PACKAGES:-bash,ca-certificates,curl,cygwin,gcc-core,gcc-g++,gnuplot-base,ImageMagick,libbz2-devel,libcurl-devel,libgd-devel,liblzma-devel,make,openssl,openssl-devel,perl,perl-File-Which,perl-GD,perl-JSON,perl-JSON-MaybeXS,perl-Mojolicious,pkg-config,python3,python312,python312-devel,python312-imaging,python312-pip,python312-setuptools,python312-wheel,unzip,wget,which,zip,zlib-devel}"
 CYGWIN_SKIP_PACKAGE_UPDATE="${CYGWIN_SKIP_PACKAGE_UPDATE:-0}"
 CYGWIN_ONLY_PACKAGE_UPDATE="${CYGWIN_ONLY_PACKAGE_UPDATE:-0}"
 
