@@ -7,7 +7,7 @@ backend for genome-wide Manhattan plots, local Manhattan plots, local GTF
 gene-track plots, and forest plots.
 <img width="2400" height="2510" alt="Figure1_pipeline_overview_Zhongshan" src="https://github.com/user-attachments/assets/a56b8675-2a48-41c9-ba2c-1d1e793603ee" />
 For the full project guide, advanced troubleshooting, and validation notes,
-see [README.md](README.md).
+see [MultiGWAS-Explorer/README.md](MultiGWAS-Explorer/README.md).
 
 ## Main Scripts
 
@@ -173,4 +173,4 @@ perl ./auto_prepare_and_run_diff_gwas.pl \
 - On container runs, keep `PIPELINE_WORKDIR=/opt/MultiGWAS-Explorer` so the
   wrappers use the Linux-installed environment inside the image.
 - For detailed options, top-hit filtering behavior, troubleshooting, and file
-  management commands, see [README.md](README.md).
+  management commands, see [MultiGWAS-Explorer/README.md](MultiGWAS-Explorer/README.md).
