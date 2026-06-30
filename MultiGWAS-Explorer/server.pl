@@ -9,6 +9,12 @@ BEGIN {
     # Prefer vendored helper scripts and modules shipped with this repo, then
     # fall back to the user's historical global Linux_codes_SAM locations.
     require File::Basename;
+    require Config;
+    require Cwd;
+    require lib;
+    my $current_os = lc($^O || '');
+    my $platform_tag = $current_os;
+    $platform_tag =~ s/[^a-z0-9]+/_/g;
     my $is_arch_dir = sub {
         my ($dir) = @_;
         return 0 unless -d $dir;
@@ -17,19 +23,30 @@ BEGIN {
         return 1 if -d "$dir/auto";
         return 0;
     };
-    my $self_dir = __FILE__;
+    my $self_path = Cwd::abs_path(__FILE__) || __FILE__;
+    my $self_dir = File::Basename::dirname($self_path);
     $self_dir =~ s{\\}{/}g;
-    $self_dir =~ s{/[^/]+$}{};
     my $local_deps = ($self_dir ? "$self_dir/DiffGWASDeps" : "DiffGWASDeps");
     my $local_bin = ($self_dir ? "$self_dir/local/bin" : "local/bin");
     my $vendor_perl5 = ($self_dir ? "$self_dir/vendor/perl5" : "vendor/perl5");
     my $local_venv_bin = ($self_dir ? "$self_dir/.venv-pipeline/bin" : ".venv-pipeline/bin");
     my $local_venv_scripts = ($self_dir ? "$self_dir/.venv-pipeline/Scripts" : ".venv-pipeline/Scripts");
     my $local_python_record = ($self_dir ? "$self_dir/.venv-pipeline/.python-bin" : ".venv-pipeline/.python-bin");
-    my $local_perl5 = ($self_dir ? "$self_dir/local/perl5/lib/perl5" : "local/perl5/lib/perl5");
-    my @local_perl5_arch = grep { $is_arch_dir->($_) } glob("${local_perl5}/*");
+    my @local_perl5_bases = grep { defined && length && -d $_ } (
+        ($ENV{PIPELINE_PERL_LOCAL_DIR} ? "$ENV{PIPELINE_PERL_LOCAL_DIR}/lib/perl5" : ()),
+        ($self_dir ? "$self_dir/local/perl5-$platform_tag/lib/perl5" : "local/perl5-$platform_tag/lib/perl5"),
+        ($self_dir ? "$self_dir/local/perl5/lib/perl5" : "local/perl5/lib/perl5"),
+    );
+    my @local_perl5_arch;
+    for my $base (@local_perl5_bases) {
+        lib->import($base);
+        push @local_perl5_arch, grep { $is_arch_dir->($_) } glob("${base}/*");
+    }
+    lib->import($vendor_perl5) if -d $vendor_perl5;
+    lib->import($local_deps) if -d $local_deps;
+    lib->import(@local_perl5_arch) if @local_perl5_arch;
     $ENV{PATH} = join(':', grep { defined && length } $local_venv_bin, $local_venv_scripts, $local_bin, $local_deps, ($ENV{PATH} // ''), '/mnt/g/NGS_lib/Linux_codes_SAM', '//rs1.stjude.org/clusterhome/zcheng/NGS_lib/Linux_codes_SAM');
-    $ENV{PERL5LIB} = join(':', grep { defined && length } $vendor_perl5, $local_perl5, @local_perl5_arch, $local_deps, ($ENV{PERL5LIB} // ''), '/mnt/g/NGS_lib/Linux_codes_SAM', '//rs1.stjude.org/clusterhome/zcheng/NGS_lib/Linux_codes_SAM');
+    $ENV{PERL5LIB} = join(':', grep { defined && length } $vendor_perl5, @local_perl5_bases, @local_perl5_arch, $local_deps, ($ENV{PERL5LIB} // ''), '/mnt/g/NGS_lib/Linux_codes_SAM', '//rs1.stjude.org/clusterhome/zcheng/NGS_lib/Linux_codes_SAM');
     if (!$ENV{PIPELINE_PYTHON_BIN} && -f $local_python_record) {
         if (open(my $pfh, '<', $local_python_record)) {
             my $line = <$pfh>;
