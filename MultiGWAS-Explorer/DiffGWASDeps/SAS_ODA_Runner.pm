@@ -895,7 +895,7 @@ sub _autoload_macros_enabled {
 
 my $SERVER_HOST = '127.0.0.1';
 my $SERVER_PORT = 8765;
-my $SERVER_API_VERSION = '2026-06-24-prewarm-session-heartbeat-labels';
+my $SERVER_API_VERSION = '2026-06-30-persistent-bootstrap-fixes';
 my $SERVER_CONNECT_TIMEOUT_SECONDS = int($ENV{SAS_ODA_SESSION_CONNECT_TIMEOUT_SECONDS} // 5);
 my $SERVER_CREATE_TIMEOUT_SECONDS  = int($ENV{SAS_ODA_SESSION_CREATE_TIMEOUT_SECONDS} // 180);
 my $SERVER_FILEOP_TIMEOUT_SECONDS  = int($ENV{SAS_ODA_SESSION_FILEOP_TIMEOUT_SECONDS} // 20);
@@ -916,7 +916,7 @@ import os
 from datetime import datetime
 HOST = '127.0.0.1'
 PORT = 8765
-SERVER_API_VERSION = '2026-06-24-prewarm-session-heartbeat-labels'
+SERVER_API_VERSION = '2026-06-30-persistent-bootstrap-fixes'
 sessions = {}
 session_macros_loaded = {}
 session_macro_bootstrap_warning = {}
@@ -1431,9 +1431,11 @@ def handle_client(conn, addr):
                 def _submit(sess):
                     nonlocal macro_log, macro_warning, macro_meta
                     if load_macros:
+                        bootstrap_ran = not bool(session_macros_loaded.get(session_id, False))
                         macro_log = ensure_macros_loaded(session_id, sess) or ''
-                        macro_warning = bool(session_macro_bootstrap_warning.get(session_id, False))
-                        macro_meta = dict(session_macro_bootstrap_meta.get(session_id, {}) or {})
+                        if bootstrap_ran:
+                            macro_warning = bool(session_macro_bootstrap_warning.get(session_id, False))
+                            macro_meta = dict(session_macro_bootstrap_meta.get(session_id, {}) or {})
                     res = submit_with_heartbeat(sess, req.get('code',''), session_id, label="SAS ODA user job")
                     if not submit_result_has_visible_content(res):
                         alive, probe_detail = probe_session_after_empty_submit(sess)
@@ -1673,6 +1675,7 @@ sub _prewarm_session_server {
     my ($self) = @_;
     return 1 unless $self->{persistent} && $self->{session_id};
     return 1 if exists $ENV{SAS_ODA_SESSION_PREWARM} && !_runner_env_truthy($ENV{SAS_ODA_SESSION_PREWARM});
+    $self->{_prewarm_create_msg} = '';
 
     my $resp = _call_session_server(
         {
@@ -1684,6 +1687,7 @@ sub _prewarm_session_server {
 
     if ($resp && ($resp->{status} // '') eq 'ok') {
         my $msg = $resp->{msg} // '';
+        $self->{_prewarm_create_msg} = $msg;
         my $elapsed = defined $resp->{create_elapsed_seconds} ? $resp->{create_elapsed_seconds} : undef;
         if (defined $elapsed && length $elapsed) {
             print STDERR "SAS ODA persistent session prewarmed for $self->{session_id} in ${elapsed}s.\n";
@@ -1695,6 +1699,7 @@ sub _prewarm_session_server {
 
     warn "Warning: SAS ODA session server is reachable, but SAS session prewarm failed for $self->{session_id}: "
        . (($resp && $resp->{error}) ? $resp->{error} : 'unknown error') . "\n";
+    $self->{_prewarm_create_msg} = '';
     return 0;
 }
 
@@ -1716,6 +1721,7 @@ sub _call_persistent_session_server {
 sub _start_server_if_needed {
     my ($self) = @_;
     return unless $self->{persistent} && $self->{session_id};
+    $self->{_prewarm_create_msg} = '';
     # If a server is already reachable, make sure it speaks the current
     # protocol/version so file-only operations do not get stuck on an older
     # eager-macro-loading implementation.
@@ -1862,6 +1868,7 @@ sub new {
         _session => undef,
         persistent => $args{persistent} // 0,
         session_id => $args{session_id},
+        _prewarm_create_msg => '',
     };
     return bless $self, $class;
 }
@@ -1981,6 +1988,10 @@ sub _ensure_remote_macro_bootstrap_helper {
     my $local_helper = $self->_find_local_macro_bootstrap_helper();
     return '' unless $local_helper;
 
+    if ($self->{persistent} && $self->{session_id} && (($self->{_prewarm_create_msg} // '') eq 'exists')) {
+        return 'Skipped macro bootstrap helper upload for this submit because the persistent SAS ODA session already existed and keeps its previously loaded macro state.';
+    }
+
     warn "Preparing SAS ODA macro bootstrap helper upload: $local_helper\n";
     my $remote = eval {
         $self->upload(
@@ -2090,6 +2101,7 @@ sub run_code {
     my $has_targeted_remote_loader = ($dep_logs // '') =~ /Injected targeted remote macro loader/ ? 1 : 0;
     my $macro_autoload_enabled = _autoload_macros_enabled() ? 1 : 0;
     my $disable_global_macro_bootstrap = $macro_autoload_enabled ? 0 : 1;
+    $self->_start_server_if_needed() if $self->{persistent} && $self->{session_id};
     if ($macro_autoload_enabled) {
         my $macro_bootstrap_dep_log = $self->_ensure_remote_macro_bootstrap_helper();
         if (defined $macro_bootstrap_dep_log && length $macro_bootstrap_dep_log) {
