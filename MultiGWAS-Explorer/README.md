@@ -1614,6 +1614,23 @@ Pay attention to SAS macro loading as a separate layer:
   and delete should not be diagnosed first as SAS macro problems
 - when a new SAS ODA session is created, the runner auto-loads macros from
   `~/Macros` once via `importallmacros_ue(...)`
+- when global macro autoload is enabled, unresolved remote macro calls are left
+  to that `importallmacros_ue(...)` pass. The helper no longer injects
+  targeted loaders for submacros such as `FileOrDirExist`,
+  `del_file_with_fullpath`, or `list_files4dsd`, because those are expected to
+  be loaded together from `~/Macros`.
+- before that global macro autoload path runs, the wrapper compares and, when
+  needed, uploads the local `importallmacros_ue.sas` helper into SAS ODA `~`.
+  This check is also performed for reused persistent sessions so local helper
+  edits are not hidden by an older remote copy. The helper check/upload has a
+  short timeout, `SAS_ODA_MACRO_HELPER_UPLOAD_TIMEOUT_SECONDS`, defaulting to
+  `30`, because this file is tiny and a longer wait usually means the local
+  SASPy/IOM bridge is wedged.
+- if the submitted code calls a macro that exists as a local `.sas` file, the
+  wrapper uploads that local file into SAS ODA `~` and adds a `%include` for
+  that uploaded copy. This lets local macro edits override a stale copy already
+  present in `~/Macros` for that submit, while unresolved submacros are still
+  handled by the global `~/Macros` autoload.
 - when a persistent session is reused, that global macro bootstrap is not run
   again
 - for direct macro debugging, prefer a named persistent session so the expensive
@@ -1632,6 +1649,33 @@ Pay attention to SAS macro loading as a separate layer:
 - the client prints wait heartbeats every 20 seconds by default while it waits
   for the SAS ODA session server; override with
   `SAS_ODA_CLIENT_HEARTBEAT_SECONDS=10` for noisier debugging
+- persistent-session submits now have a bounded session-server response wait.
+  The default is `SAS_ODA_SESSION_SUBMIT_TIMEOUT_SECONDS=600`, which keeps a
+  fresh `~/Macros` bootstrap from hanging forever if the SASPy Java/IOM bridge
+  or SAS ODA control plane wedges. For quick debugging, shorten it:
+- the full `importallmacros_ue` bootstrap itself also has its own timeout,
+  `SAS_ODA_MACRO_BOOTSTRAP_TIMEOUT_SECONDS`, defaulting to `180`. This still
+  loads all macros from `~/Macros`; it only prevents a stuck SAS ODA/IOM bridge
+  from blocking the wrapper forever. If the timeout fires, the local persistent
+  session server is restarted so the next run starts cleanly.
+
+```bash
+SAS_ODA_MACRO_BOOTSTRAP_TIMEOUT_SECONDS=120 \
+SAS_ODA_MACRO_HELPER_UPLOAD_TIMEOUT_SECONDS=30 \
+SAS_ODA_SESSION_SUBMIT_TIMEOUT_SECONDS=120 \
+SAS_ODA_RUN_TIMEOUT_SECONDS=150 \
+./run_sas_codes_or_script_in_ODA.pl \
+  --code "%macroparas(macrorgx=lattice);proc print;run;" \
+  --persistent \
+  --session-id mc1
+```
+
+  If that returns `timed out waiting for session server response while reading
+  response header`, the submitted code is still blocked inside the local
+  session-server/SAS ODA response path rather than in local Perl. Clean up the
+  session and retry with a fresh `--session-id`, or explicitly opt into
+  one-shot fallback with `SAS_ODA_ALLOW_PERSISTENT_SUBMIT_FALLBACK=1` when you
+  do not need to preserve WORK tables or macro state.
 - if a tiny test such as `proc print data=sashelp.class;run;` appears to hang
   while printing `Waiting for SAS ODA session server response while reading
   response header...`, the SAS program itself has usually not started yet.
@@ -1641,7 +1685,10 @@ Pay attention to SAS macro loading as a separate layer:
   bridge process, transient SAS ODA/network delay, or a shell environment that
   is using the wrong Python/SASPy stack.
 - for clean direct helper tests, activate the repo-local runtime first,
-  especially if your prompt is inside Conda `(base)`:
+  especially if your prompt is inside Conda `(base)`. The helper now also
+  tries to force the repo-local SASPy/Python path for its background session
+  server automatically, but explicit activation keeps command-line diagnostics
+  easier to interpret:
 
 ```bash
 . install/common.sh
@@ -1686,6 +1733,16 @@ OPEN_RESULT_BROWSER=google-chrome-stable \
 
   To suppress browser launching completely, use `OPEN_RESULT=0`; the helper
   still prints the saved HTML path.
+- when Chrome Remote Desktop or another remote desktop starts LXDE/openbox on a
+  different X display than the terminal, the helper tries to detect that desktop
+  display and prints it, for example `Requested browser open on DISPLAY=:20`.
+  Override manually when needed:
+
+```bash
+OPEN_RESULT_DISPLAY=:20 \
+OPEN_RESULT_BROWSER=google-chrome-stable \
+./run_sas_codes_or_script_in_ODA.pl --code "proc print data=sashelp.class;run;"
+```
 - when the submitted SAS program already contains self-contained `%include`
   usage, the helper disables the global `importallmacros_ue` bootstrap for that
   submit and relies on the included files instead

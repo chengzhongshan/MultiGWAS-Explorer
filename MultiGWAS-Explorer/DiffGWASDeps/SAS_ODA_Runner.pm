@@ -896,16 +896,17 @@ sub _autoload_macros_enabled {
 
 my $SERVER_HOST = '127.0.0.1';
 my $SERVER_PORT = 8765;
-my $SERVER_API_VERSION = '2026-06-30-persistent-bootstrap-fixes';
+my $SERVER_API_VERSION = '2026-07-01-macro-bootstrap-timeout';
 my $SERVER_CONNECT_TIMEOUT_SECONDS = int($ENV{SAS_ODA_SESSION_CONNECT_TIMEOUT_SECONDS} // 5);
-my $SERVER_CREATE_TIMEOUT_SECONDS  = int($ENV{SAS_ODA_SESSION_CREATE_TIMEOUT_SECONDS} // 180);
+my $SERVER_CREATE_TIMEOUT_SECONDS  = int($ENV{SAS_ODA_SESSION_CREATE_TIMEOUT_SECONDS} // 60);
 my $SERVER_FILEOP_TIMEOUT_SECONDS  = int($ENV{SAS_ODA_SESSION_FILEOP_TIMEOUT_SECONDS} // 20);
-my $SERVER_SUBMIT_TIMEOUT_SECONDS  = int($ENV{SAS_ODA_SESSION_SUBMIT_TIMEOUT_SECONDS} // 0);
+my $SERVER_SUBMIT_TIMEOUT_SECONDS  = int($ENV{SAS_ODA_SESSION_SUBMIT_TIMEOUT_SECONDS} // 600);
 my $SERVER_METADATA_TIMEOUT_SECONDS = int($ENV{SAS_ODA_SESSION_METADATA_TIMEOUT_SECONDS} // 12);
 my $SERVER_DELETE_TIMEOUT_SECONDS   = int($ENV{SAS_ODA_SESSION_DELETE_TIMEOUT_SECONDS} // 12);
 my $SERVER_GETHOME_TIMEOUT_SECONDS  = int($ENV{SAS_ODA_SESSION_GETHOME_TIMEOUT_SECONDS} // 12);
 my $SERVER_UPLOAD_TIMEOUT_SECONDS   = int($ENV{SAS_ODA_SESSION_UPLOAD_TIMEOUT_SECONDS} // 180);
 my $SERVER_DOWNLOAD_TIMEOUT_SECONDS = int($ENV{SAS_ODA_SESSION_DOWNLOAD_TIMEOUT_SECONDS} // 180);
+my $MACRO_HELPER_UPLOAD_TIMEOUT_SECONDS = int($ENV{SAS_ODA_MACRO_HELPER_UPLOAD_TIMEOUT_SECONDS} // 30);
 
 # NOTE: This embedded copy is only written to disk when sas_oda_session_server.py
 # is missing. Keep it in sync with the standalone sas_oda_session_server.py file.
@@ -917,7 +918,7 @@ import os
 from datetime import datetime
 HOST = '127.0.0.1'
 PORT = 8765
-SERVER_API_VERSION = '2026-06-30-persistent-bootstrap-fixes'
+SERVER_API_VERSION = '2026-07-01-macro-bootstrap-timeout'
 sessions = {}
 session_macros_loaded = {}
 session_macro_bootstrap_warning = {}
@@ -959,6 +960,7 @@ options &_pipeline_opt_mprint &_pipeline_opt_mlogic &_pipeline_opt_symbolgen &_p
 %_pipeline_bootstrap_macros;
 '''
 SUBMIT_HEARTBEAT_SECONDS = max(0, int(os.environ.get('SAS_ODA_SUBMIT_HEARTBEAT_SECONDS', '20') or '20'))
+MACRO_BOOTSTRAP_TIMEOUT_SECONDS = max(0, int(os.environ.get('SAS_ODA_MACRO_BOOTSTRAP_TIMEOUT_SECONDS', '180') or '180'))
 def iter_saspy_cfg_names():
     preferred = os.environ.get('SASPY_CFGNAME') or os.environ.get('SASPY_CONFIG_NAME') or 'oda'
     seen = set()
@@ -1077,7 +1079,13 @@ def ensure_macros_loaded(session_id, sess):
         ])
     )
     print(f"[{session_id}] SAS ODA macro bootstrap started at {bootstrap_started_at}", flush=True)
-    res = submit_with_heartbeat(sess, LOAD_MACROS_CODE, session_id, label="SAS ODA macro bootstrap")
+    res = submit_with_heartbeat(
+        sess,
+        LOAD_MACROS_CODE,
+        session_id,
+        label="SAS ODA macro bootstrap",
+        timeout_seconds=MACRO_BOOTSTRAP_TIMEOUT_SECONDS,
+    )
     macro_log = res.get('LOG', '')
     bootstrap_ok = ''
     try:
@@ -1142,7 +1150,7 @@ def print_submit_heartbeat(label, elapsed_seconds):
     sys.stderr.write(f"{label} is still running in SAS ODA... elapsed {format_elapsed(elapsed_seconds)}\n")
     sys.stderr.flush()
 
-def submit_with_heartbeat(sess, sas_code, session_id, label=None):
+def submit_with_heartbeat(sess, sas_code, session_id, label=None, timeout_seconds=None):
     display_label = f"{label or 'SAS ODA job'} [{session_id}]"
     if SUBMIT_HEARTBEAT_SECONDS <= 0:
         return sess.submit(sas_code)
@@ -1166,6 +1174,12 @@ def submit_with_heartbeat(sess, sas_code, session_id, label=None):
     last_heartbeat = start
     while not done.wait(1.0):
         now = time.time()
+        if timeout_seconds and now - start >= timeout_seconds:
+            log_event(f"submit timeout label={display_label} session_id={session_id} elapsed={int(now - start)}s")
+            raise TimeoutError(
+                f"{display_label} timed out after {int(timeout_seconds)}s. "
+                "The local SASPy/IOM bridge may still be blocked inside SAS ODA and will be restarted."
+            )
         if now - last_heartbeat >= SUBMIT_HEARTBEAT_SECONDS:
             print_submit_heartbeat(display_label, now - start)
             log_event(f"submit heartbeat label={display_label} session_id={session_id} elapsed={int(now - start)}s")
@@ -1659,7 +1673,7 @@ sub _session_server_error_is_transport {
     return 0 unless $resp && ref($resp) eq 'HASH';
     my $error = $resp->{error};
     return 0 unless defined $error && length $error;
-    return ($error =~ /(cannot connect to session server|failed to send request to session server|timed out waiting for session server response|failed to read response header from session server|failed to read response body from session server|incomplete response header|incomplete response body|Broken pipe|No SAS process attached|SAS process has terminated unexpectedly)/i) ? 1 : 0;
+    return ($error =~ /(cannot connect to session server|failed to send request to session server|timed out waiting for session server response|timed out after \d+s|failed to read response header from session server|failed to read response body from session server|incomplete response header|incomplete response body|Broken pipe|No SAS process attached|SAS process has terminated unexpectedly)/i) ? 1 : 0;
 }
 
 sub _restart_session_server {
@@ -1672,19 +1686,63 @@ sub _restart_session_server {
     $self->_start_server_if_needed();
 }
 
+sub _repo_python_env_for_session_server {
+    my $module_file = abs_path(__FILE__) || File::Spec->rel2abs(__FILE__);
+    $module_file =~ s{\\}{/}g;
+    my $module_dir = dirname($module_file);
+    my $repo_root = dirname($module_dir);
+    my $venv_dir = File::Spec->catdir($repo_root, '.venv-pipeline');
+    my $python_bin = $ENV{PIPELINE_PYTHON_BIN} || '';
+    my @python_candidates = (
+        File::Spec->catfile($venv_dir, 'bin', 'python'),
+        File::Spec->catfile($venv_dir, 'bin', 'python3'),
+    );
+    if (!length($python_bin) && -f File::Spec->catfile($venv_dir, '.python-bin')) {
+        if (open(my $py_fh, '<', File::Spec->catfile($venv_dir, '.python-bin'))) {
+            chomp($python_bin = <$py_fh> // '');
+            close $py_fh;
+        }
+    }
+    for my $candidate (@python_candidates) {
+        if (!length($python_bin) && -x $candidate) {
+            $python_bin = $candidate;
+            last;
+        }
+    }
+    $python_bin = 'python3' unless length $python_bin;
+
+    my @site_candidates = (
+        File::Spec->catdir($venv_dir, 'Lib', 'site-packages'),
+        glob(File::Spec->catdir($venv_dir, 'lib', 'python*', 'site-packages')),
+        File::Spec->catdir($venv_dir, 'lib', 'site-packages'),
+    );
+    my $site_packages = '';
+    for my $candidate (@site_candidates) {
+        if (-d $candidate) {
+            $site_packages = $candidate;
+            last;
+        }
+    }
+    return ($python_bin, $site_packages);
+}
+
 sub _prewarm_session_server {
     my ($self) = @_;
     return 1 unless $self->{persistent} && $self->{session_id};
     return 1 if exists $ENV{SAS_ODA_SESSION_PREWARM} && !_runner_env_truthy($ENV{SAS_ODA_SESSION_PREWARM});
     $self->{_prewarm_create_msg} = '';
 
-    my $resp = _call_session_server(
-        {
-            cmd        => 'create',
-            session_id => $self->{session_id},
-        },
-        $SERVER_CREATE_TIMEOUT_SECONDS,
-    );
+    my $payload = {
+        cmd        => 'create',
+        session_id => $self->{session_id},
+    };
+    my $resp = _call_session_server($payload, $SERVER_CREATE_TIMEOUT_SECONDS);
+    if (_session_server_error_is_transport($resp) && !$self->{_prewarm_restart_in_progress}) {
+        warn "Warning: SAS ODA session prewarm hit a transport/timeout failure; restarting the local SAS ODA session server and retrying once.\n";
+        local $self->{_prewarm_restart_in_progress} = 1;
+        $self->_restart_session_server();
+        $resp = _call_session_server($payload, $SERVER_CREATE_TIMEOUT_SECONDS);
+    }
 
     if ($resp && ($resp->{status} // '') eq 'ok') {
         my $msg = $resp->{msg} // '';
@@ -1759,9 +1817,25 @@ sub _start_server_if_needed {
         chmod 0755, $server_path;
     }
     # start server in background
-    my $python_bin = $ENV{PIPELINE_PYTHON_BIN} || 'python3';
-    my $cmd = "nohup '$python_bin' '$server_path' >/dev/null 2>&1 &";
-    system($cmd);
+    my ($python_bin, $site_packages) = _repo_python_env_for_session_server();
+    my $pid = fork();
+    if (!defined $pid) {
+        warn "Could not fork SAS ODA session server launcher: $!\n";
+        return;
+    }
+    if ($pid == 0) {
+        if (defined($site_packages) && length($site_packages) && -d $site_packages) {
+            $ENV{PYTHONPATH} = length($ENV{PYTHONPATH} // '')
+              ? "$site_packages:$ENV{PYTHONPATH}"
+              : $site_packages;
+        }
+        $ENV{PIPELINE_PYTHON_BIN} = $python_bin if length $python_bin;
+        open STDIN,  '<', File::Spec->devnull();
+        open STDOUT, '>', File::Spec->devnull();
+        open STDERR, '>', File::Spec->devnull();
+        exec { $python_bin } $python_bin, $server_path;
+        exit 127;
+    }
     # wait a short time for server to start
     if (_wait_for_server_port_state(1, 10)) {
         my $ping = _call_session_server({ cmd => 'ping' }, $SERVER_CONNECT_TIMEOUT_SECONDS);
@@ -1947,24 +2021,13 @@ sub _build_targeted_remote_macro_loader {
     my ($self, $macro_names_ref) = @_;
     return '' unless ref($macro_names_ref) eq 'ARRAY' && @$macro_names_ref;
 
-    my %targeted_macro_dependencies = (
-        macroparas => [ 'FileOrDirExist', 'del_file_with_fullpath', 'list_files4dsd' ],
-    );
     my %seen;
     my @names;
     for my $requested (@$macro_names_ref) {
         next unless defined($requested) && length($requested);
         next if _is_builtin_macro_name($requested);
-        my @expanded = (
-            @{ $targeted_macro_dependencies{lc $requested} || [] },
-            $requested,
-        );
-        for my $name (@expanded) {
-            next unless defined($name) && length($name);
-            next if _is_builtin_macro_name($name);
-            next if $seen{lc $name}++;
-            push @names, $name;
-        }
+        next if $seen{lc $requested}++;
+        push @names, $requested;
     }
     return '' unless @names;
 
@@ -1972,6 +2035,7 @@ sub _build_targeted_remote_macro_loader {
 %let _home=%sysfunc(pathname(HOME));
 %let _macro_home=%sysfunc(pathname(HOME))/Macros;
 SAS
+
     for my $name (@names) {
         next unless $name =~ /^[A-Za-z_]\w*$/;
         print STDERR "\nSASPy automatically preparing targeted remote macro loader\n",
@@ -2022,26 +2086,23 @@ sub _ensure_remote_macro_bootstrap_helper {
     my $local_helper = $self->_find_local_macro_bootstrap_helper();
     return '' unless $local_helper;
 
-    if ($self->{persistent} && $self->{session_id} && (($self->{_prewarm_create_msg} // '') eq 'exists')) {
-        return 'Skipped macro bootstrap helper upload for this submit because the persistent SAS ODA session already existed and keeps its previously loaded macro state.';
-    }
-
     warn "Preparing SAS ODA macro bootstrap helper upload: $local_helper\n";
     my $remote = eval {
         $self->upload(
             $local_helper,
             {
                 progress_label => 'macro bootstrap helper: ' . basename($local_helper),
+                skip_if_same   => 0,
+                timeout_seconds => $MACRO_HELPER_UPLOAD_TIMEOUT_SECONDS,
             }
         );
     };
     if ($remote && $remote !~ /^PYTHON ERROR/) {
-        return "Uploaded macro bootstrap helper: $remote";
+        return "Checked/uploaded macro bootstrap helper: $remote";
     }
 
     my $detail = $@ || $remote || 'unknown upload failure';
-    warn "WARNING: Could not upload macro bootstrap helper $local_helper: $detail\n";
-    return '';
+    die "Could not verify/upload macro bootstrap helper $local_helper before loading ~/Macros: $detail\n";
 }
 
 sub _process_dependencies {
@@ -2096,10 +2157,14 @@ sub _process_dependencies {
         }
     }
 
-    my $targeted_remote_loader = $self->_build_targeted_remote_macro_loader(\@unresolved_macro_names);
+    my $targeted_remote_loader = _autoload_macros_enabled()
+      ? ''
+      : $self->_build_targeted_remote_macro_loader(\@unresolved_macro_names);
     if (length $targeted_remote_loader) {
         $header_includes = $targeted_remote_loader . "\n" . $header_includes;
         push @logs, "Injected targeted remote macro loader for: " . join(', ', @unresolved_macro_names);
+    } elsif (@unresolved_macro_names && _autoload_macros_enabled()) {
+        push @logs, "Using global importallmacros_ue bootstrap for unresolved remote macros: " . join(', ', @unresolved_macro_names);
     }
 
     my $sas_path_regex = qr/(?i)\b(datafile\s*=\s*|outfile\s*=\s*|infile\s+|file\s+|filename\s+\S+\s+|libname\s+\S+\s+)(["'])([^"']+)\2/;
@@ -2181,6 +2246,10 @@ sub run_code {
             $macro_bootstrap_meta = $resp->{macro_bootstrap_meta} if ref($resp->{macro_bootstrap_meta}) eq 'HASH';
         }
         if (!$resp || ($resp->{status} && $resp->{status} ne 'ok')) {
+            if (_session_server_error_is_transport($resp)) {
+                warn "Warning: persistent-session SAS submit hit a transport/timeout failure; restarting the local SAS ODA session server so the next run starts cleanly.\n";
+                $self->_restart_session_server();
+            }
             return { error => $resp->{error} // 'session server error', log => $resp_log, lst => $resp_lst, dep_logs => $dep_logs };
         }
         $result = [ $resp_log, $resp_lst, undef ];
@@ -2298,6 +2367,10 @@ sub upload {
     $opts = {} unless ref($opts) eq 'HASH';
     my $progress_label = $opts->{progress_label} // '';
     my $skip_if_same = exists $opts->{skip_if_same} ? ($opts->{skip_if_same} ? 1 : 0) : 1;
+    my $timeout_seconds = exists $opts->{timeout_seconds}
+      ? int($opts->{timeout_seconds} || 0)
+      : $SERVER_UPLOAD_TIMEOUT_SECONDS;
+    $timeout_seconds = $SERVER_UPLOAD_TIMEOUT_SECONDS if $timeout_seconds <= 0;
     if ($self->{persistent} && $self->{session_id}) {
         my $resp = $self->_call_persistent_session_server(
             {
@@ -2307,7 +2380,7 @@ sub upload {
                 progress_label => $progress_label,
                 skip_if_same   => $skip_if_same,
             },
-            $SERVER_UPLOAD_TIMEOUT_SECONDS,
+            $timeout_seconds,
             'remote upload',
         );
         return $resp->{remote_path} if $resp && ($resp->{status} // '') eq 'ok';

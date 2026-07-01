@@ -214,11 +214,81 @@ sub local_file_uri {
     return "file://$abs";
 }
 
+sub detect_desktop_open_env {
+    my %open_env;
+    if (defined($ENV{OPEN_RESULT_DISPLAY}) && length($ENV{OPEN_RESULT_DISPLAY})) {
+        $open_env{DISPLAY} = $ENV{OPEN_RESULT_DISPLAY};
+        $open_env{XAUTHORITY} = $ENV{OPEN_RESULT_XAUTHORITY}
+          if defined($ENV{OPEN_RESULT_XAUTHORITY}) && length($ENV{OPEN_RESULT_XAUTHORITY});
+        return \%open_env;
+    }
+
+    return \%open_env unless $^O eq 'linux' && -d '/proc';
+    my $current_display = $ENV{DISPLAY} // '';
+    my @desktop_patterns = qr/\blxsession\b/, qr/\bopenbox\b/, qr/\bxfce4-session\b/,
+      qr/\bgnome-session\b/, qr/\bplasmashell\b/;
+
+    opendir(my $proc_dh, '/proc') or return \%open_env;
+    my @pids = grep { /^\d+$/ } readdir($proc_dh);
+    closedir($proc_dh);
+
+    for my $pid (@pids) {
+        my $cmdline_path = "/proc/$pid/cmdline";
+        next unless -r $cmdline_path;
+        open my $cmd_fh, '<', $cmdline_path or next;
+        local $/;
+        my $cmdline = <$cmd_fh> // '';
+        close $cmd_fh;
+        $cmdline =~ tr/\0/ /;
+        next unless grep { $cmdline =~ $_ } @desktop_patterns;
+
+        my $env_path = "/proc/$pid/environ";
+        next unless -r $env_path;
+        open my $env_fh, '<', $env_path or next;
+        my $env_blob = <$env_fh> // '';
+        close $env_fh;
+        my %proc_env = map {
+            my ($k, $v) = split /=/, $_, 2;
+            defined($k) && defined($v) ? ($k => $v) : ()
+        } split /\0/, $env_blob;
+        my $desktop_display = $proc_env{DISPLAY} // '';
+        next unless length $desktop_display;
+        next if length($current_display) && $desktop_display eq $current_display;
+        $open_env{DISPLAY} = $desktop_display;
+        $open_env{XAUTHORITY} = $proc_env{XAUTHORITY}
+          if defined($proc_env{XAUTHORITY}) && length($proc_env{XAUTHORITY});
+        last;
+    }
+    return \%open_env;
+}
+
+sub launch_command_detached {
+    my ($cmd, $open_env) = @_;
+    return 0 unless ref($cmd) eq 'ARRAY' && @{$cmd};
+    my $pid = fork();
+    return 0 unless defined $pid;
+    return 1 if $pid;
+
+    eval { POSIX::setsid(); };
+    if (ref($open_env) eq 'HASH') {
+        for my $key (qw(DISPLAY XAUTHORITY)) {
+            next unless defined($open_env->{$key}) && length($open_env->{$key});
+            $ENV{$key} = $open_env->{$key};
+        }
+    }
+    open STDIN,  '<', File::Spec->devnull();
+    open STDOUT, '>', File::Spec->devnull();
+    open STDERR, '>', File::Spec->devnull();
+    exec { $cmd->[0] } @{$cmd};
+    exit 127;
+}
+
 sub auto_open_local_file {
     my ($path) = @_;
     return 0 unless defined $path && length $path && -f $path;
 
     my @commands;
+    my $open_env = detect_desktop_open_env();
     if ($^O eq 'cygwin' || $^O eq 'MSWin32') {
         push @commands, ['cygstart', $path] if find_executable_in_path('cygstart');
     } elsif ($^O eq 'darwin') {
@@ -258,8 +328,13 @@ sub auto_open_local_file {
     }
 
     for my $cmd (@commands) {
-        my $rc = system(@{$cmd});
-        return 1 if $rc == 0;
+        if (launch_command_detached($cmd, $open_env)) {
+            my $display_note = (ref($open_env) eq 'HASH' && $open_env->{DISPLAY})
+              ? " on DISPLAY=$open_env->{DISPLAY}"
+              : '';
+            print "Requested browser open$display_note: $path\n";
+            return 1;
+        }
     }
 
     warn "WARNING: Could not auto-open $path with the system default browser. Set OPEN_RESULT=0 to suppress this attempt.\n";

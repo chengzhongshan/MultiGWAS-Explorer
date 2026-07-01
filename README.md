@@ -177,10 +177,17 @@ session. Stop stale bridge processes with
 the repo-local environment. More details are in
 [MultiGWAS-Explorer/README.md](MultiGWAS-Explorer/README.md).
 
+Persistent SAS ODA submits are bounded by
+`SAS_ODA_SESSION_SUBMIT_TIMEOUT_SECONDS` so a wedged macro bootstrap returns a
+clear timeout instead of hanging forever. When global macro autoload is enabled,
+remote macro calls are resolved by the normal `~/Macros/importallmacros_ue`
+bootstrap rather than by injecting individual targeted loaders for submacros.
+
 On Linux, result HTML opens through a real browser binary such as Chrome or
 Firefox before falling back to `xdg-open`. Override the browser with
-`OPEN_RESULT_BROWSER=google-chrome-stable`, or set `OPEN_RESULT=0` to only
-print the saved HTML path.
+`OPEN_RESULT_BROWSER=google-chrome-stable`, override a remote desktop display
+with `OPEN_RESULT_DISPLAY=:20`, or set `OPEN_RESULT=0` to only print the saved
+HTML path.
 
 ### 2. Quick gunplot validation
 
