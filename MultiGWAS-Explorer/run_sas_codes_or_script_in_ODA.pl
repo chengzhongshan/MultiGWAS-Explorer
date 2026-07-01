@@ -67,7 +67,7 @@ use lib $Bin;
 use lib "$Bin/DiffGWASDeps";
 use Getopt::Long;
 use SAS_ODA_Runner;
-use JSON;
+use JSON::PP qw(encode_json decode_json);
 use Cwd qw(abs_path getcwd);
 use File::Basename;
 use File::Copy qw(move);
@@ -1619,6 +1619,62 @@ sub scan_sas_text_for_open_code_macro_control {
     };
 }
 
+sub line_number_for_offset {
+    my ($text, $offset) = @_;
+    return 1 unless defined $text && defined $offset && $offset > 0;
+    my $prefix = substr($text, 0, $offset);
+    my $count = () = ($prefix =~ /\n/g);
+    return $count + 1;
+}
+
+sub scan_sas_text_for_unbalanced_macro_invocations {
+    my ($text) = @_;
+    my $masked = sanitize_sas_text_for_macro_lint($text);
+    my @findings;
+    return \@findings unless defined $masked && length $masked;
+
+    while ($masked =~ /%([A-Za-z_]\w*)\s*\(/g) {
+        my $macro_name = $1;
+        my $macro_start = $-[0];
+        my $scan_pos = pos($masked);
+        my $depth = 1;
+        my $line_no = line_number_for_offset($masked, $macro_start);
+        my $len = length($masked);
+        my $closed = 0;
+        my $hit_statement_end = 0;
+
+        while ($scan_pos < $len) {
+            my $ch = substr($masked, $scan_pos, 1);
+            if ($ch eq '(') {
+                $depth++;
+            } elsif ($ch eq ')') {
+                $depth--;
+                if ($depth == 0) {
+                    $closed = 1;
+                    last;
+                }
+            } elsif ($ch eq ';' && $depth > 0) {
+                $hit_statement_end = 1;
+                last;
+            }
+            $scan_pos++;
+        }
+
+        next if $closed;
+        my $detail = $hit_statement_end
+          ? "before the statement semicolon"
+          : "before the end of submitted code";
+        push @findings, {
+            type        => 'unbalanced_macro_invocation',
+            line        => $line_no,
+            message     => "Macro invocation %$macro_name( is missing a matching ')' $detail; this can leave SAS waiting for more input",
+            context_ref => [ ($line_no - 2) .. ($line_no + 2) ],
+        };
+    }
+
+    return \@findings;
+}
+
 sub scan_sas_text_for_unbalanced_constructs {
     my ($text) = @_;
     my @lines = split /\n/, ($text // ''), -1;
@@ -1759,6 +1815,7 @@ sub scan_sas_text_for_unbalanced_constructs {
 
     my $macro_scan = scan_sas_text_for_open_code_macro_control($text);
     push @findings, @{ $macro_scan->{findings} || [] };
+    push @findings, @{ scan_sas_text_for_unbalanced_macro_invocations($text) };
 
     return {
         lines    => \@lines,
@@ -1837,18 +1894,46 @@ sub scan_sas_text_for_inline_data_step_cards {
     return \@findings;
 }
 
+sub scan_sas_text_for_common_macro_typos {
+    my ($text) = @_;
+    my @findings;
+    return \@findings unless defined $text && length $text;
+
+    my %suggestions = (
+        macorparas => 'macroparas',
+    );
+    my @lines = split /\r?\n/, $text, -1;
+    for my $idx (0 .. $#lines) {
+        my $line = $lines[$idx];
+        while ($line =~ /%([A-Za-z_]\w*)\b/g) {
+            my $macro_name = $1;
+            my $suggestion = $suggestions{lc $macro_name};
+            next unless defined $suggestion;
+            push @findings, {
+                line        => $idx + 1,
+                type        => 'common_macro_typo',
+                message     => "Macro %$macro_name is commonly a typo for %$suggestion; use %$suggestion(...) if you want the macro parameter listing helper.",
+                context_ref => [ $idx + 1 ],
+            };
+        }
+    }
+    return \@findings;
+}
+
 sub run_submission_preflight {
     my (%args) = @_;
     my $submitted_code = $args{submitted_code} // '';
     my $display_path = $args{display_path} // '(submitted SAS program)';
     my $scan = scan_sas_text_for_unbalanced_constructs($submitted_code);
-    my $warning_findings = scan_sas_text_for_inline_data_step_cards($submitted_code);
+    my @warning_findings;
+    push @warning_findings, @{ scan_sas_text_for_inline_data_step_cards($submitted_code) };
+    push @warning_findings, @{ scan_sas_text_for_common_macro_typos($submitted_code) };
     my $fatal = @{ $scan->{findings} || [] } ? 1 : 0;
     my $report = format_sas_preflight_report(
         heading => '=== Submission Preflight ===',
         display_path => $display_path,
         scan => $scan,
-        warning_findings => $warning_findings,
+        warning_findings => \@warning_findings,
         success_message => 'No obvious unmatched comments, unterminated quoted strings, or open-code macro-control statements were detected.',
     );
 

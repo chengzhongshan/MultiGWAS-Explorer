@@ -127,10 +127,10 @@ use Cwd qw(getcwd abs_path);
 use File::Temp qw(tempfile);
 use File::Basename;
 use File::Spec;
-use JSON;
+use JSON::PP qw(encode_json decode_json);
 use IO::Socket::INET;
 use IO::Select;
-use Inline (Python => <<'END_PYTHON');
+my $INLINE_PYTHON_SOURCE = <<'END_PYTHON';
 import saspy
 import json
 import os
@@ -878,6 +878,7 @@ def get_sas_home(session_obj):
     return sashomepath, session_obj
 
 END_PYTHON
+;
 
 our @EXPORT_OK = qw(new run_code run_file upload_file download_file);
 
@@ -1862,12 +1863,18 @@ sub _call_session_server {
 
 sub new {
     my ($class, %args) = @_;
+    my $requested_persistent = $args{persistent} // 0;
+    my $session_id = $args{session_id};
+    if (!defined($session_id) || !length($session_id)) {
+        $session_id = join('_', 'oneshot', $$, int(time() * 1000), int(rand(1_000_000)));
+    }
     my $self = {
         local_macro_dir => $args{local_macro_dir} || "./",
         open_html => $args{open_html} // 1,
         _session => undef,
-        persistent => $args{persistent} // 0,
-        session_id => $args{session_id},
+        persistent => 1,
+        session_id => $session_id,
+        requested_persistent => $requested_persistent,
         _prewarm_create_msg => '',
     };
     return bless $self, $class;

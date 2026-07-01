@@ -25,7 +25,16 @@ PIPELINE_HTSLIB_VERSION="${PIPELINE_HTSLIB_VERSION:-1.20}"
 PIPELINE_HTSLIB_URL="${PIPELINE_HTSLIB_URL:-https://github.com/samtools/htslib/releases/download/${PIPELINE_HTSLIB_VERSION}/htslib-${PIPELINE_HTSLIB_VERSION}.tar.bz2}"
 PIPELINE_CPANM_BIN=""
 PIPELINE_PYTHON_BIN="${PIPELINE_PYTHON_BIN:-}"
-PIPELINE_INLINE_PYTHON_BIN="${PIPELINE_INLINE_PYTHON_BIN:-}"
+
+if [[ "${PIPELINE_INSTALL_DEBUG:-0}" =~ ^(1|true|yes|y|on)$ ]]; then
+  export PS4='+ ${BASH_SOURCE[0]:-bash}:${LINENO}:${FUNCNAME[0]:-main}: '
+  if [ -n "${PIPELINE_INSTALL_DEBUG_LOG:-}" ]; then
+    mkdir -p "$(/usr/bin/dirname "${PIPELINE_INSTALL_DEBUG_LOG}")"
+    exec 9>>"${PIPELINE_INSTALL_DEBUG_LOG}"
+    export BASH_XTRACEFD=9
+  fi
+  set -x
+fi
 
 log() {
   printf '[install] %s\n' "$*"
@@ -710,7 +719,6 @@ install_perl_deps() {
   [ "${#modules[@]}" -gt 0 ] || die "No Perl modules were parsed from ${cpanfile_to_use}"
   for module_name in "${modules[@]}"; do
     case "${module_name}" in
-      Inline::Python) ;;
       PDL) needs_pdl=1 ;;
       *) regular_modules+=("${module_name}") ;;
     esac
@@ -724,7 +732,6 @@ install_perl_deps() {
   if [ "${needs_pdl}" -eq 1 ]; then
     install_pdl_perl_deps
   fi
-  install_inline_perl_deps
   if [ -n "${cpanfile_to_use}" ] && [ "${cpanfile_to_use}" != "${PIPELINE_CPANFILE}" ]; then
     rm -f "${cpanfile_to_use}"
   fi
@@ -743,125 +750,6 @@ install_pdl_perl_deps() {
     --configure-timeout 900 \
     --build-timeout 7200 \
     PDL
-}
-
-python_sysconfig_var() {
-  local python_bin="$1"
-  local key="$2"
-  "${python_bin}" - "$key" <<'PY'
-import sys
-import sysconfig
-
-value = sysconfig.get_config_var(sys.argv[1])
-print("" if value is None else value)
-PY
-}
-
-resolve_inline_python_bin() {
-  local cand=""
-  for cand in \
-    "${PIPELINE_INLINE_PYTHON_BIN:-}" \
-    "${PIPELINE_PYTHON_BIN:-}" \
-    "${PIPELINE_VENV_DIR}/bin/python" \
-    "${PIPELINE_VENV_DIR}/bin/python3" \
-    python3 \
-    python; do
-    [ -n "${cand}" ] || continue
-    if [ -x "${cand}" ]; then
-      printf '%s\n' "${cand}"
-      return 0
-    fi
-    if command_exists "${cand}"; then
-      command -v "${cand}"
-      return 0
-    fi
-  done
-  return 1
-}
-
-resolve_inline_python_include() {
-  local python_bin="$1"
-  local inc=""
-  inc="$(python_sysconfig_var "${python_bin}" INCLUDEPY)"
-  if [ -n "${inc}" ] && [ -f "${inc}/Python.h" ]; then
-    printf '%s\n' "${inc}"
-    return 0
-  fi
-  return 1
-}
-
-resolve_inline_python_library() {
-  local python_bin="$1"
-  local libpl="" libdir="" ldlib="" version="" framework_prefix="" candidate=""
-  libpl="$(python_sysconfig_var "${python_bin}" LIBPL)"
-  libdir="$(python_sysconfig_var "${python_bin}" LIBDIR)"
-  ldlib="$(python_sysconfig_var "${python_bin}" LDLIBRARY)"
-  version="$("${python_bin}" - <<'PY'
-import sys
-print(f"{sys.version_info.major}.{sys.version_info.minor}")
-PY
-)"
-  framework_prefix="$(python_sysconfig_var "${python_bin}" PYTHONFRAMEWORKPREFIX)"
-
-  for candidate in \
-    "${libpl}/libpython${version}.a" \
-    "${libpl}/libpython${version}.dylib" \
-    "${libdir}/libpython${version}.a" \
-    "${libdir}/libpython${version}.dylib" \
-    "${framework_prefix}/Python.framework/Versions/${version}/lib/python${version}/config-${version}-darwin/libpython${version}.a" \
-    "${framework_prefix}/Python.framework/Versions/${version}/lib/python${version}/config-${version}-darwin/libpython${version}.dylib" \
-    "${framework_prefix}/Python.framework/Versions/${version}/lib/libpython${version}.dylib"; do
-    [ -n "${candidate}" ] || continue
-    if [ -f "${candidate}" ]; then
-      printf '%s\n' "${candidate}"
-      return 0
-    fi
-  done
-
-  if [ -n "${ldlib}" ] && [ -f "${libpl}/${ldlib}" ]; then
-    printf '%s\n' "${libpl}/${ldlib}"
-    return 0
-  fi
-  return 1
-}
-
-install_inline_python() {
-  local python_bin="" include_dir="" python_lib="" extra_libs="" build_parent="" tarball="" build_dir=""
-  if perl -MInline::Python -e1 >/dev/null 2>&1; then
-    log "Inline::Python is already installed and loadable"
-    return 0
-  fi
-  python_bin="$(resolve_inline_python_bin || true)"
-  [ -n "${python_bin}" ] || die "Could not resolve a Python executable for Inline::Python"
-  include_dir="$(resolve_inline_python_include "${python_bin}" || true)"
-  [ -n "${include_dir}" ] || die "Could not find Python.h for ${python_bin}; install Python development headers or set PIPELINE_INLINE_PYTHON_BIN"
-  python_lib="$(resolve_inline_python_library "${python_bin}" || true)"
-  [ -n "${python_lib}" ] || die "Could not find libpython for ${python_bin}; set PIPELINE_INLINE_PYTHON_BIN to a framework/shared Python"
-  extra_libs="$(python_sysconfig_var "${python_bin}" LIBS)"
-  build_parent="${PIPELINE_LOCAL_DIR}/build"
-  tarball="${build_parent}/Inline-Python-0.58.tar.gz"
-  build_dir="${build_parent}/Inline-Python-0.58"
-  mkdir -p "${build_parent}"
-  download_url "https://cpan.metacpan.org/authors/id/N/NI/NINE/Inline-Python-0.58.tar.gz" "${tarball}"
-  rm -rf "${build_dir}"
-  /usr/bin/tar -xzf "${tarball}" -C "${build_parent}"
-  log "Installing Inline::Python against ${python_bin}"
-  (
-    cd "${build_dir}"
-    printf '%s\n%s\n%s\n' "${extra_libs}" "${python_lib}" "${include_dir}" | \
-      INLINE_PYTHON_EXECUTABLE="${python_bin}" perl Makefile.PL
-    make -j"$(num_cpus)"
-    make install
-  )
-}
-
-install_inline_perl_deps() {
-  log "Installing Inline and Inline::C before Inline::Python"
-  perl "${PIPELINE_CPANM_BIN}" \
-    --local-lib-contained "${PIPELINE_PERL_LOCAL_DIR}" \
-    --notest \
-    Inline Inline::C
-  install_inline_python
 }
 
 ensure_local_hts_tools() {

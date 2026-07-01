@@ -398,6 +398,52 @@ Ubuntu:
 bash install/install_ubuntu.sh
 ```
 
+What the Ubuntu installer installs with `apt-get`:
+
+- build/runtime tools: `bash`, `build-essential`, `curl`, `git`, `make`,
+  `pkg-config`, `unzip`, `wget`, and `zip`
+- plotting/conversion tools: `gnuplot-nox` and `imagemagick`
+- Perl/Python/Java runtime pieces: `perl`, `python3`, `python3-dev`,
+  `python3-pip`, `python3-venv`, and `default-jre-headless`
+- native library headers for CPAN/Python/htslib builds: `libbz2-dev`,
+  `libcurl4-openssl-dev`, `libgd-dev`, `liblzma-dev`, and `zlib1g-dev`
+- genomic indexing tools: `tabix` (provides `bgzip`/`tabix` on Ubuntu)
+
+If you are not root, the installer uses `sudo`. In noninteractive shells,
+authenticate first from a real terminal:
+
+```bash
+sudo -v
+bash install/install_ubuntu.sh
+```
+
+The Ubuntu installer intentionally uses `/usr/bin/python3` by default so an
+active Conda environment does not accidentally select an older Python. Override
+only when needed:
+
+```bash
+PIPELINE_UBUNTU_PYTHON_BIN=/path/to/python3 bash install/install_ubuntu.sh
+```
+
+If the apt package phase already completed and you only need to resume the
+repo-local Python/Perl dependency setup, skip apt:
+
+```bash
+PIPELINE_SKIP_APT=1 bash install/install_ubuntu.sh
+```
+
+For install debugging, enable shell tracing and optionally send the trace to a
+separate log:
+
+```bash
+PIPELINE_INSTALL_DEBUG=1 \
+PIPELINE_INSTALL_DEBUG_LOG=install_ubuntu.debug.log \
+bash install/install_ubuntu.sh
+```
+
+The normal installer output still goes to the terminal; the trace log records
+each shell command with source file and line number.
+
 If an Ubuntu smoke test cannot be launched through the bundled Vagrant harness,
 the same installer can be validated through Docker Desktop with an isolated
 `ubuntu:24.04` container. During the current validation cycle, that Docker
@@ -493,8 +539,8 @@ What this script does:
 - creates `.venv-pipeline/` and installs Python packages from
   `install/requirements-pipeline.txt`
 - installs repo-local Perl modules into `local/perl5-darwin/`
-- builds and installs `Inline`, `Inline::C`, and `Inline::Python` against a
-  Python executable with matching CPU architecture and development headers
+- uses the standalone Python SAS ODA session server; Perl `Inline::Python` is
+  not required
 - copies SASPy Java assets from
   `install/saspy-java-supplement/java/` into the active repo-local SASPy
   install before writing `saspy/sascfg_personal.py`
@@ -560,9 +606,9 @@ summary under `SAS_Output_RandID*/output.html.info.txt`.
 
 Common macOS troubleshooting:
 
-- If `Inline::Python` fails, make sure the installer selected a Python with the
-  same CPU architecture as the running Perl. On Apple Silicon this is normally
-  `/opt/homebrew/bin/python3`.
+- If SAS ODA fails before producing a SAS log, rerun
+  `bash install/install_macos.sh` so the bundled SASPy Java supplement is copied
+  again and `sascfg_personal.py` is regenerated.
 - If SAS ODA fails before producing a SAS log, rerun
   `bash install/install_macos.sh` so the bundled SASPy Java supplement is copied
   again and `sascfg_personal.py` is regenerated.
@@ -1289,7 +1335,7 @@ Important implementation detail from debugging this project:
 
 - the timeout path in `run_sas_codes_or_script_in_ODA.pl` now runs the real
   SAS submit in a fresh worker process instead of forking an already-loaded
-  `Inline::Python` / `saspy` session
+  SASPy session
 - this matters because the older in-process fork path could return an empty
   SAS result payload even for trivial code like `%put HELLO;`
 - if a direct `SAS_ODA_Runner->run_file(...)` replay succeeds but the helper

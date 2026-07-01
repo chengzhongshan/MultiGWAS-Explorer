@@ -1,9 +1,7 @@
 requires 'File::Which';
 requires 'GD';
-requires 'Inline::Python';
 requires 'IO::Compress::Gzip';
 requires 'IO::Uncompress::Gunzip';
-requires 'JSON';
 requires 'JSON::MaybeXS';
 requires 'Mojolicious';
 requires 'PDL';

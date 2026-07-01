@@ -89,12 +89,11 @@ brew_cmd install bash curl cpanminus gd gnuplot htslib imagemagick pkg-config py
 
 make_project_scripts_executable
 
-PIPELINE_INLINE_PYTHON_BIN="$(select_macos_python || true)"
-[ -n "${PIPELINE_INLINE_PYTHON_BIN}" ] || die "Could not find a Python with headers for the current CPU architecture"
-export PIPELINE_INLINE_PYTHON_BIN
-log "Using ${PIPELINE_INLINE_PYTHON_BIN} for Python packages and Inline::Python"
+PIPELINE_MACOS_PYTHON_BIN="$(select_macos_python || true)"
+[ -n "${PIPELINE_MACOS_PYTHON_BIN}" ] || die "Could not find a Python with headers for the current CPU architecture"
+log "Using ${PIPELINE_MACOS_PYTHON_BIN} for Python packages"
 
-create_python_venv "${PIPELINE_INLINE_PYTHON_BIN}"
+create_python_venv "${PIPELINE_MACOS_PYTHON_BIN}"
 install_perl_deps
 ensure_local_hts_tools
 run_pipeline_check
