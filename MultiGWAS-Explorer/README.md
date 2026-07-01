@@ -1632,6 +1632,25 @@ Pay attention to SAS macro loading as a separate layer:
 - the client prints wait heartbeats every 20 seconds by default while it waits
   for the SAS ODA session server; override with
   `SAS_ODA_CLIENT_HEARTBEAT_SECONDS=10` for noisier debugging
+- if a tiny test such as `proc print data=sashelp.class;run;` appears to hang
+  while printing `Waiting for SAS ODA session server response while reading
+  response header...`, the SAS program itself has usually not started yet.
+  That message means the helper is still waiting for the local SASPy Java/IOM
+  bridge to create or answer through an ODA session. Healthy session startup is
+  often around 8-15 seconds; much longer waits usually point to a wedged local
+  bridge process, transient SAS ODA/network delay, or a shell environment that
+  is using the wrong Python/SASPy stack.
+- for clean direct helper tests, activate the repo-local runtime first,
+  especially if your prompt is inside Conda `(base)`:
+
+```bash
+. install/common.sh
+activate_perl_env
+activate_python_env
+SAS_ODA_RUN_TIMEOUT_SECONDS=90 \
+./run_sas_codes_or_script_in_ODA.pl --code "proc print data=sashelp.class;run;"
+```
+
 - if a SASPy/SAS ODA session is wedged for too long, open another terminal and
   stop the local session server plus SASPy Java bridge processes:
 
@@ -1639,7 +1658,34 @@ Pay attention to SAS macro loading as a separate layer:
 ./run_sas_codes_or_script_in_ODA.pl --kill-saspy-sessions
 ```
 
-  Then rerun with a fresh `--session-id`.
+  If that helper action is unavailable in the broken shell, use the direct
+  process cleanup and then rerun the test from the repo-local environment:
+
+```bash
+pkill -f 'DiffGWASDeps/sas_oda_session_server.py'
+pkill -f 'pyiom.saspy2j'
+. install/common.sh
+activate_perl_env
+activate_python_env
+SAS_ODA_RUN_TIMEOUT_SECONDS=90 \
+./run_sas_codes_or_script_in_ODA.pl --code "proc print data=sashelp.class;run;"
+```
+
+  Then rerun production work with a fresh `--session-id`.
+- on Linux, the helper now prefers real browser binaries such as
+  `google-chrome-stable`, `google-chrome`, `chromium`, and `firefox` before
+  falling back to `xdg-open`. This avoids LXDE/`xdg-open` cases where the
+  command returns successfully but only prints a terminal-emulator warning or
+  hands the file to a browser that does not visibly focus. To force a specific
+  browser for result HTML:
+
+```bash
+OPEN_RESULT_BROWSER=google-chrome-stable \
+./run_sas_codes_or_script_in_ODA.pl --code "proc print data=sashelp.class;run;"
+```
+
+  To suppress browser launching completely, use `OPEN_RESULT=0`; the helper
+  still prints the saved HTML path.
 - when the submitted SAS program already contains self-contained `%include`
   usage, the helper disables the global `importallmacros_ue` bootstrap for that
   submit and relies on the included files instead

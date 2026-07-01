@@ -158,6 +158,30 @@ Useful before running any SAS-based plotting step:
 perl ./run_sas_codes_or_script_in_ODA.pl --check-sas-oda-login-only
 ```
 
+For a tiny direct submit test, prefer the repo-local runtime and a short
+timeout:
+
+```bash
+. install/common.sh
+activate_perl_env
+activate_python_env
+SAS_ODA_RUN_TIMEOUT_SECONDS=90 \
+./run_sas_codes_or_script_in_ODA.pl --code "proc print data=sashelp.class;run;"
+```
+
+If that test prints repeated `Waiting for SAS ODA session server response while
+reading response header...` messages, the SAS code usually has not started yet;
+the local SASPy Java/IOM bridge is still creating or answering through an ODA
+session. Stop stale bridge processes with
+`./run_sas_codes_or_script_in_ODA.pl --kill-saspy-sessions`, then rerun from
+the repo-local environment. More details are in
+[MultiGWAS-Explorer/README.md](MultiGWAS-Explorer/README.md).
+
+On Linux, result HTML opens through a real browser binary such as Chrome or
+Firefox before falling back to `xdg-open`. Override the browser with
+`OPEN_RESULT_BROWSER=google-chrome-stable`, or set `OPEN_RESULT=0` to only
+print the saved HTML path.
+
 ### 2. Quick gunplot validation
 
 This path does not require SAS ODA and is the easiest first functional test:

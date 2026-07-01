@@ -206,6 +206,14 @@ sub find_executable_in_path {
     return '';
 }
 
+sub local_file_uri {
+    my ($path) = @_;
+    my $abs = abs_path($path) || File::Spec->rel2abs($path);
+    $abs =~ s{\\}{/}g;
+    $abs =~ s/([^A-Za-z0-9\-\._~\/:])/sprintf("%%%02X", ord($1))/eg;
+    return "file://$abs";
+}
+
 sub auto_open_local_file {
     my ($path) = @_;
     return 0 unless defined $path && length $path && -f $path;
@@ -216,6 +224,26 @@ sub auto_open_local_file {
     } elsif ($^O eq 'darwin') {
         push @commands, ['open', $path] if find_executable_in_path('open');
     } else {
+        my $uri = local_file_uri($path);
+        my @browser_candidates;
+        push @browser_candidates, $ENV{OPEN_RESULT_BROWSER}
+          if defined($ENV{OPEN_RESULT_BROWSER}) && length($ENV{OPEN_RESULT_BROWSER});
+        push @browser_candidates, qw(
+          google-chrome-stable
+          google-chrome
+          chromium
+          chromium-browser
+          firefox
+          brave-browser
+          opera
+        );
+        my %seen_browser;
+        for my $browser (@browser_candidates) {
+            next if $seen_browser{$browser}++;
+            my $browser_path = find_executable_in_path($browser);
+            next unless $browser_path;
+            push @commands, [$browser_path, $uri];
+        }
         push @commands, ['xdg-open', $path] if find_executable_in_path('xdg-open');
         push @commands, ['open', $path] if find_executable_in_path('open');
     }
