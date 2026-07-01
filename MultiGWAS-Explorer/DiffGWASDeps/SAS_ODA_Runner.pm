@@ -176,7 +176,7 @@ options &_pipeline_opt_mprint &_pipeline_opt_mlogic &_pipeline_opt_symbolgen &_p
 %_pipeline_bootstrap_macros;
 '''
 
-SUBMIT_HEARTBEAT_SECONDS = max(0, int(os.environ.get('SAS_ODA_SUBMIT_HEARTBEAT_SECONDS', '60') or '60'))
+SUBMIT_HEARTBEAT_SECONDS = max(0, int(os.environ.get('SAS_ODA_SUBMIT_HEARTBEAT_SECONDS', '20') or '20'))
 STATUS_FILE = os.environ.get('SAS_ODA_STATUS_FILE') or ''
 
 def _status_timestamp():
@@ -958,7 +958,7 @@ options &_pipeline_opt_mprint &_pipeline_opt_mlogic &_pipeline_opt_symbolgen &_p
 %mend;
 %_pipeline_bootstrap_macros;
 '''
-SUBMIT_HEARTBEAT_SECONDS = max(0, int(os.environ.get('SAS_ODA_SUBMIT_HEARTBEAT_SECONDS', '60') or '60'))
+SUBMIT_HEARTBEAT_SECONDS = max(0, int(os.environ.get('SAS_ODA_SUBMIT_HEARTBEAT_SECONDS', '20') or '20'))
 def iter_saspy_cfg_names():
     preferred = os.environ.get('SASPY_CFGNAME') or os.environ.get('SASPY_CONFIG_NAME') or 'oda'
     seen = set()
@@ -1778,7 +1778,7 @@ sub _recv_exact_with_timeout {
     my $select = IO::Select->new($sock);
     my $data = '';
     my $deadline = ($timeout_seconds && $timeout_seconds > 0) ? time() + $timeout_seconds : 0;
-    my $heartbeat_seconds = int($ENV{SAS_ODA_CLIENT_HEARTBEAT_SECONDS} // 60);
+    my $heartbeat_seconds = int($ENV{SAS_ODA_CLIENT_HEARTBEAT_SECONDS} // 20);
     my $last_heartbeat = time();
 
     while (length($data) < $length) {
@@ -2137,6 +2137,9 @@ sub run_code {
     my $disable_global_macro_bootstrap = $macro_autoload_enabled ? 0 : 1;
     $self->_start_server_if_needed() if $self->{persistent} && $self->{session_id};
     if ($macro_autoload_enabled && !$disable_global_macro_bootstrap) {
+        if ($has_targeted_remote_loader || $has_local_macro_upload) {
+            warn "Loading all SAS macros from ~/Macros via importallmacros_ue; this can take a few minutes on a fresh SAS ODA session. Reuse --persistent --session-id <id> to avoid repeating this bootstrap.\n";
+        }
         my $macro_bootstrap_dep_log = $self->_ensure_remote_macro_bootstrap_helper();
         if (defined $macro_bootstrap_dep_log && length $macro_bootstrap_dep_log) {
             $dep_logs = length($dep_logs)

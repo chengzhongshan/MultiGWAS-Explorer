@@ -5,7 +5,7 @@ import os
 from datetime import datetime
 HOST = '127.0.0.1'
 PORT = 8765
-SERVER_API_VERSION = '2026-06-24-prewarm-session-heartbeat-labels'
+SERVER_API_VERSION = '2026-06-30-persistent-bootstrap-fixes'
 sessions = {}
 session_macros_loaded = {}
 session_macro_bootstrap_warning = {}
@@ -46,7 +46,7 @@ options &_pipeline_opt_mprint &_pipeline_opt_mlogic &_pipeline_opt_symbolgen &_p
 %mend;
 %_pipeline_bootstrap_macros;
 '''
-SUBMIT_HEARTBEAT_SECONDS = max(0, int(os.environ.get('SAS_ODA_SUBMIT_HEARTBEAT_SECONDS', '60') or '60'))
+SUBMIT_HEARTBEAT_SECONDS = max(0, int(os.environ.get('SAS_ODA_SUBMIT_HEARTBEAT_SECONDS', '20') or '20'))
 def iter_saspy_cfg_names():
     preferred = os.environ.get('SASPY_CFGNAME') or os.environ.get('SASPY_CONFIG_NAME') or 'oda'
     seen = set()
@@ -520,9 +520,11 @@ def handle_client(conn, addr):
                 def _submit(sess):
                     nonlocal macro_log, macro_warning, macro_meta
                     if load_macros:
+                        bootstrap_ran = not bool(session_macros_loaded.get(session_id, False))
                         macro_log = ensure_macros_loaded(session_id, sess) or ''
-                        macro_warning = bool(session_macro_bootstrap_warning.get(session_id, False))
-                        macro_meta = dict(session_macro_bootstrap_meta.get(session_id, {}) or {})
+                        if bootstrap_ran:
+                            macro_warning = bool(session_macro_bootstrap_warning.get(session_id, False))
+                            macro_meta = dict(session_macro_bootstrap_meta.get(session_id, {}) or {})
                     res = submit_with_heartbeat(sess, req.get('code',''), session_id, label="SAS ODA user job")
                     if not submit_result_has_visible_content(res):
                         alive, probe_detail = probe_session_after_empty_submit(sess)

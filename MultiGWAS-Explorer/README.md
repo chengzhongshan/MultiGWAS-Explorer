@@ -1566,6 +1566,22 @@ Pay attention to SAS macro loading as a separate layer:
   `~/Macros` once via `importallmacros_ue(...)`
 - when a persistent session is reused, that global macro bootstrap is not run
   again
+- for direct macro debugging, prefer a named persistent session so the expensive
+  global `~/Macros` bootstrap is paid once:
+
+```bash
+./run_sas_codes_or_script_in_ODA.pl \
+  --persistent \
+  --session-id mc2 \
+  --codes "%macroparas(macrorgx=GTEx);"
+```
+
+- without `--persistent --session-id`, each direct run creates a fresh
+  `oneshot_...` SAS session and can appear quiet while it uploads
+  `importallmacros_ue.sas` and loads every macro in `~/Macros`
+- the client prints wait heartbeats every 20 seconds by default while it waits
+  for the SAS ODA session server; override with
+  `SAS_ODA_CLIENT_HEARTBEAT_SECONDS=10` for noisier debugging
 - when the submitted SAS program already contains self-contained `%include`
   usage, the helper disables the global `importallmacros_ue` bootstrap for that
   submit and relies on the included files instead
