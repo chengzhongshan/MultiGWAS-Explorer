@@ -392,11 +392,19 @@ actual ODA session, but if the installer prints `Could not resolve a Windows
 java.exe`, install Java or set `SASPY_JAVA_WIN` to the Windows path of
 `java.exe` before running SAS ODA jobs.
 
-Ubuntu:
+### Ubuntu Pipeline Install
+
+Run these commands from the repository root on Ubuntu:
 
 ```bash
+sudo -v
 bash install/install_ubuntu.sh
+bash install/check_pipeline_install.sh
 ```
+
+The installer creates repo-local runtimes under `.venv-pipeline/` and
+`local/perl5-linux/`, so the pipeline does not depend on your global Python,
+Conda, or Perl module paths after installation.
 
 What the Ubuntu installer installs with `apt-get`:
 
@@ -409,8 +417,12 @@ What the Ubuntu installer installs with `apt-get`:
   `libcurl4-openssl-dev`, `libgd-dev`, `liblzma-dev`, and `zlib1g-dev`
 - genomic indexing tools: `tabix` (provides `bgzip`/`tabix` on Ubuntu)
 
-If you are not root, the installer uses `sudo`. In noninteractive shells,
-authenticate first from a real terminal:
+The successful smoke test should report the active Perl architecture, `gnuplot`
+path/version, Python imports, SASPy ODA config names, `GD`/`PDL` versions, and
+syntax checks for the main Perl and shell entry points.
+
+If you are not root, the installer uses `sudo`. In noninteractive shells or
+agent-driven terminals, authenticate first from a real terminal:
 
 ```bash
 sudo -v
@@ -418,8 +430,14 @@ bash install/install_ubuntu.sh
 ```
 
 The Ubuntu installer intentionally uses `/usr/bin/python3` by default so an
-active Conda environment does not accidentally select an older Python. Override
-only when needed:
+active Conda environment does not accidentally select an older Python. This
+avoids failures such as:
+
+```text
+ERROR: Could not find a version that satisfies the requirement Pillow>=10
+```
+
+Override the Python only when needed:
 
 ```bash
 PIPELINE_UBUNTU_PYTHON_BIN=/path/to/python3 bash install/install_ubuntu.sh
@@ -432,8 +450,8 @@ repo-local Python/Perl dependency setup, skip apt:
 PIPELINE_SKIP_APT=1 bash install/install_ubuntu.sh
 ```
 
-For install debugging, enable shell tracing and optionally send the trace to a
-separate log:
+For install debugging, enable shell tracing and send the trace to a separate
+log:
 
 ```bash
 PIPELINE_INSTALL_DEBUG=1 \
@@ -443,6 +461,16 @@ bash install/install_ubuntu.sh
 
 The normal installer output still goes to the terminal; the trace log records
 each shell command with source file and line number.
+
+Common Ubuntu fixes:
+
+- `sudo: a terminal is required`: run `sudo -v` in an interactive terminal, or
+  rerun with `PIPELINE_SKIP_APT=1` if apt already finished.
+- `Pillow>=10` cannot be resolved: remove the failed venv with
+  `rm -rf .venv-pipeline` and rerun `bash install/install_ubuntu.sh`; the
+  installer will use `/usr/bin/python3` unless you override it.
+- `Required command not found: gnuplot`: rerun the full installer so
+  `gnuplot-nox` is installed, or install the Ubuntu package manually.
 
 If an Ubuntu smoke test cannot be launched through the bundled Vagrant harness,
 the same installer can be validated through Docker Desktop with an isolated
