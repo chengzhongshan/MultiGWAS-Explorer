@@ -1778,6 +1778,8 @@ sub _recv_exact_with_timeout {
     my $select = IO::Select->new($sock);
     my $data = '';
     my $deadline = ($timeout_seconds && $timeout_seconds > 0) ? time() + $timeout_seconds : 0;
+    my $heartbeat_seconds = int($ENV{SAS_ODA_CLIENT_HEARTBEAT_SECONDS} // 60);
+    my $last_heartbeat = time();
 
     while (length($data) < $length) {
         my $wait_seconds;
@@ -1786,9 +1788,19 @@ sub _recv_exact_with_timeout {
             return (undef, "timed out waiting for session server response while reading $label")
               if $wait_seconds <= 0;
         }
-        my @ready = defined($wait_seconds) ? $select->can_read($wait_seconds) : $select->can_read();
-        return (undef, "timed out waiting for session server response while reading $label")
-          unless @ready;
+        my $poll_seconds = defined($wait_seconds)
+          ? (($heartbeat_seconds > 0 && $wait_seconds > $heartbeat_seconds) ? $heartbeat_seconds : $wait_seconds)
+          : (($heartbeat_seconds > 0) ? $heartbeat_seconds : undef);
+        my @ready = defined($poll_seconds) ? $select->can_read($poll_seconds) : $select->can_read();
+        unless (@ready) {
+            return (undef, "timed out waiting for session server response while reading $label")
+              if $deadline && time() >= $deadline;
+            if ($heartbeat_seconds > 0 && time() - $last_heartbeat >= $heartbeat_seconds) {
+                warn "Waiting for SAS ODA session server response while reading $label...\n";
+                $last_heartbeat = time();
+            }
+            next;
+        }
 
         my $chunk = '';
         my $got = $sock->recv($chunk, $length - length($data));
@@ -1935,10 +1947,25 @@ sub _build_targeted_remote_macro_loader {
     my ($self, $macro_names_ref) = @_;
     return '' unless ref($macro_names_ref) eq 'ARRAY' && @$macro_names_ref;
 
+    my %targeted_macro_dependencies = (
+        macroparas => [ 'FileOrDirExist', 'del_file_with_fullpath', 'list_files4dsd' ],
+    );
     my %seen;
-    my @names = grep {
-        defined($_) && length($_) && !$seen{lc $_}++ && !_is_builtin_macro_name($_)
-    } @$macro_names_ref;
+    my @names;
+    for my $requested (@$macro_names_ref) {
+        next unless defined($requested) && length($requested);
+        next if _is_builtin_macro_name($requested);
+        my @expanded = (
+            @{ $targeted_macro_dependencies{lc $requested} || [] },
+            $requested,
+        );
+        for my $name (@expanded) {
+            next unless defined($name) && length($name);
+            next if _is_builtin_macro_name($name);
+            next if $seen{lc $name}++;
+            push @names, $name;
+        }
+    }
     return '' unless @names;
 
     my $code = <<'SAS';
@@ -2109,7 +2136,7 @@ sub run_code {
     my $macro_autoload_enabled = _autoload_macros_enabled() ? 1 : 0;
     my $disable_global_macro_bootstrap = $macro_autoload_enabled ? 0 : 1;
     $self->_start_server_if_needed() if $self->{persistent} && $self->{session_id};
-    if ($macro_autoload_enabled) {
+    if ($macro_autoload_enabled && !$disable_global_macro_bootstrap) {
         my $macro_bootstrap_dep_log = $self->_ensure_remote_macro_bootstrap_helper();
         if (defined $macro_bootstrap_dep_log && length $macro_bootstrap_dep_log) {
             $dep_logs = length($dep_logs)
