@@ -1582,6 +1582,14 @@ Pay attention to SAS macro loading as a separate layer:
 - the client prints wait heartbeats every 20 seconds by default while it waits
   for the SAS ODA session server; override with
   `SAS_ODA_CLIENT_HEARTBEAT_SECONDS=10` for noisier debugging
+- if a SASPy/SAS ODA session is wedged for too long, open another terminal and
+  stop the local session server plus SASPy Java bridge processes:
+
+```bash
+./run_sas_codes_or_script_in_ODA.pl --kill-saspy-sessions
+```
+
+  Then rerun with a fresh `--session-id`.
 - when the submitted SAS program already contains self-contained `%include`
   usage, the helper disables the global `importallmacros_ue` bootstrap for that
   submit and relies on the included files instead

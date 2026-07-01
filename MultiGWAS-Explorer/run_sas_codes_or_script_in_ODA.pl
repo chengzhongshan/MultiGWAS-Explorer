@@ -81,7 +81,8 @@ use overload ();
 use Scalar::Util qw(blessed);
 
 my ($code, $file, $macro_dir, $no_html, $output_prefix, $help, $persistent, $session_id,
-    $dry_run, $dir4listing, $monitor_status_file, $monitor_interval_seconds);
+    $dry_run, $dir4listing, $monitor_status_file, $monitor_interval_seconds,
+    $kill_saspy_sessions);
 my ($internal_runner_result_json, $internal_execution_file, $internal_execution_code_file,
     $internal_macro_dir, $internal_open_html, $internal_persistent, $internal_session_id);
 my (@upload_files, @download_files, @download_local_paths, @delete_files, @delete_file_rgxs, @file_infos);
@@ -271,6 +272,7 @@ GetOptions(
     'check-sas-oda-login-only!' => \$check_sas_oda_login_only,
     'monitor-status-file=s' => \$monitor_status_file,
     'monitor-interval-seconds=i' => \$monitor_interval_seconds,
+    'kill-saspy-sessions|kill-sas-oda-sessions|kill-saspy-session-server!' => \$kill_saspy_sessions,
     'run-timeout-seconds=i' => \$cli_sas_run_timeout_seconds,
     'run-timeout-grace-seconds=i' => \$cli_sas_run_timeout_grace_seconds,
     'no-run-timeout!' => \$disable_run_timeout,
@@ -284,6 +286,61 @@ GetOptions(
     '_internal-persistent!' => \$internal_persistent,
     '_internal-session-id=s' => \$internal_session_id,
 ) or die "Error in command line arguments\n";
+
+sub collect_matching_pids {
+    my (@patterns) = @_;
+    my %seen;
+    my @pids;
+    return @pids if $^O =~ /^(?:MSWin32|cygwin)$/i;
+
+    for my $pattern (@patterns) {
+        next unless defined $pattern && length $pattern;
+        open(my $pgrep, '-|', 'pgrep', '-f', $pattern) or next;
+        while (my $line = <$pgrep>) {
+            chomp $line;
+            next unless $line =~ /^\d+$/;
+            next if $line == $$;
+            next if $seen{$line}++;
+            push @pids, int($line);
+        }
+        close $pgrep;
+    }
+    return @pids;
+}
+
+sub kill_saspy_session_processes {
+    my @patterns = (
+        'DiffGWASDeps/sas_oda_session_server\.py',
+        'pyiom\.saspy2j',
+    );
+    my @pids = collect_matching_pids(@patterns);
+    if (!@pids) {
+        print "No local SAS ODA session server or SASPy Java bridge processes found.\n";
+        return 0;
+    }
+
+    print "Stopping local SAS ODA/SASPy session processes: @pids\n";
+    kill 'TERM', @pids;
+    select undef, undef, undef, 2.0;
+
+    my %wanted = map { $_ => 1 } @pids;
+    my @still_running;
+    for my $pid (@pids) {
+        next unless $wanted{$pid};
+        push @still_running, $pid if kill 0, $pid;
+    }
+    if (@still_running) {
+        print "Forcibly killing still-running SAS ODA/SASPy processes: @still_running\n";
+        kill 'KILL', @still_running;
+    }
+    print "SAS ODA/SASPy local session cleanup requested.\n";
+    return scalar(@pids);
+}
+
+if ($kill_saspy_sessions) {
+    kill_saspy_session_processes();
+    exit 0;
+}
 
 if (defined $persistent && $persistent && !defined $session_id) {
     $session_id = "default_session";
@@ -713,6 +770,9 @@ Options:
   --monitor-status-file <f>  Follow a live SAS ODA status JSON sidecar from another terminal.
   --monitor-interval-seconds <n>
                              Poll interval for --monitor-status-file (default: 5 seconds).
+  --kill-saspy-sessions      Stop local SAS ODA session server and SASPy Java bridge
+                             processes, then exit. Use from another terminal when a
+                             persistent SASPy/ODA session is wedged.
   --run-timeout-seconds <n>  Override the overall submit timeout for this run.
                              Use 0 to disable the timeout completely.
   --run-timeout-grace-seconds <n>
@@ -735,6 +795,7 @@ Examples:
   $0 --delete-file my.file.txt --delete-file old.log --persistent --session-id mysession
   $0 --delete-file-rgx '^tmp_.*\\.sas\$' --delete-dir '~' --persistent --session-id mysession
   $0 --file-info '~/big.tsv.gz' --file-info '~/plot.png' --persistent --session-id mysession
+  $0 --kill-saspy-sessions
   $0 --code "proc print data=sashelp.class; run;" --persistent --session-id mysession
   $0 --file long_job.sas --run-timeout-seconds 7200 --persistent --session-id mysession
   $0 --file very_long_job.sas --no-run-timeout --persistent --session-id mysession
