@@ -594,18 +594,30 @@ prepare_perl_cpanfile() {
 activate_python_env() {
   local site_packages=""
   local venv_python=""
+  local repo_site_packages=""
   PIPELINE_PYTHON_BIN=""
   venv_python="$(resolve_venv_python || true)"
   if [ -n "$venv_python" ]; then
     PIPELINE_PYTHON_BIN="$venv_python"
     prepend_path "$(/usr/bin/dirname "${PIPELINE_PYTHON_BIN}")"
-    site_packages="$("${PIPELINE_PYTHON_BIN}" - <<'PY'
+    repo_site_packages="$(resolve_venv_site_packages || true)"
+    case "${PIPELINE_PYTHON_BIN}" in
+      "${PIPELINE_VENV_DIR}"/*) ;;
+      *)
+        if [ -n "$repo_site_packages" ] && [ -d "$repo_site_packages" ]; then
+          site_packages="$repo_site_packages"
+        fi
+        ;;
+    esac
+    if [ -z "$site_packages" ]; then
+      site_packages="$("${PIPELINE_PYTHON_BIN}" - <<'PY'
 import sysconfig
 print(sysconfig.get_path("purelib"))
 PY
 )"
+    fi
     if [ -z "$site_packages" ] || [ ! -d "$site_packages" ]; then
-      site_packages="$(resolve_venv_site_packages || true)"
+      site_packages="$repo_site_packages"
     fi
     if [ -n "$site_packages" ] && [ -d "$site_packages" ]; then
       prepend_env_list PYTHONPATH "$site_packages"

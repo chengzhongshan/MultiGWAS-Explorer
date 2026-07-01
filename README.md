@@ -79,12 +79,20 @@ bash install/install_cygwin.sh
 
 ### Linux
 
-Ubuntu:
+Recommended hosts are supported Ubuntu LTS/current releases, Debian-like Linux
+systems with equivalent packages, or the Docker/Singularity paths below for old
+or locked-down machines. On Ubuntu, run:
 
 ```bash
 cd MultiGWAS-Explorer
-bash install/install_ubuntu.sh
+sudo bash install/install_ubuntu.sh
+bash install/check_pipeline_install.sh
 ```
+
+For non-Ubuntu Linux, install equivalent system packages first, then run the
+repo-local phase with `PIPELINE_SKIP_APT=1 bash install/install_ubuntu.sh`.
+See [MultiGWAS-Explorer/README.md](MultiGWAS-Explorer/README.md) for package
+details and legacy Ubuntu troubleshooting.
 
 ### macOS
 

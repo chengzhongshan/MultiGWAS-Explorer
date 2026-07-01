@@ -16,7 +16,12 @@ else
   else
     SUDO=(sudo)
     if ! sudo -n true >/dev/null 2>&1; then
-      die "Ubuntu package installation requires sudo. Run 'sudo -v' in this terminal first, or run this installer from an interactive terminal where sudo can prompt for your password. If packages are already installed, rerun with PIPELINE_SKIP_APT=1."
+      if [ -t 0 ]; then
+        log "Ubuntu package installation requires sudo; requesting credentials"
+        sudo -v || die "sudo authentication failed. If packages are already installed, rerun with PIPELINE_SKIP_APT=1."
+      else
+        die "Ubuntu package installation requires sudo, but this shell cannot accept a password prompt. Run 'sudo bash install/install_ubuntu.sh' from a normal terminal, or run 'sudo -v' there first and rerun this installer. If apt packages are already installed, rerun with PIPELINE_SKIP_APT=1."
+      fi
     fi
   fi
 

@@ -392,13 +392,21 @@ actual ODA session, but if the installer prints `Could not resolve a Windows
 java.exe`, install Java or set `SASPY_JAVA_WIN` to the Windows path of
 `java.exe` before running SAS ODA jobs.
 
-### Ubuntu Pipeline Install
+### Ubuntu / Linux Pipeline Install
+
+Recommended host systems:
+
+- Ubuntu LTS or current supported Ubuntu releases, such as 22.04 LTS, 24.04
+  LTS, or newer supported releases
+- Debian-like Linux distributions with equivalent packages available through
+  the system package manager
+- Docker or Singularity / Apptainer when the host Linux distribution is old,
+  locked down, or has mixed package repositories
 
 Run these commands from the repository root on Ubuntu:
 
 ```bash
-sudo -v
-bash install/install_ubuntu.sh
+sudo bash install/install_ubuntu.sh
 bash install/check_pipeline_install.sh
 ```
 
@@ -417,6 +425,19 @@ What the Ubuntu installer installs with `apt-get`:
   `libcurl4-openssl-dev`, `libgd-dev`, `liblzma-dev`, and `zlib1g-dev`
 - genomic indexing tools: `tabix` (provides `bgzip`/`tabix` on Ubuntu)
 
+For non-Ubuntu Linux systems, install the equivalent packages with the native
+package manager first, then run the repo-local phase with:
+
+```bash
+PIPELINE_SKIP_APT=1 bash install/install_ubuntu.sh
+bash install/check_pipeline_install.sh
+```
+
+Equivalent package names vary by distribution, but the required capabilities
+are: Bash, Perl, a C/C++ build toolchain, Python 3 with `venv`/`pip`/headers,
+Java, gnuplot, ImageMagick, curl/wget, htslib tools or htslib build headers,
+and development headers for zlib, bzip2, lzma, curl, and GD/libgd.
+
 The successful smoke test should report the active Perl architecture, `gnuplot`
 path/version, Python imports, SASPy ODA config names, `GD`/`PDL` versions, and
 syntax checks for the main Perl and shell entry points.
@@ -425,8 +446,7 @@ If you are not root, the installer uses `sudo`. In noninteractive shells or
 agent-driven terminals, authenticate first from a real terminal:
 
 ```bash
-sudo -v
-bash install/install_ubuntu.sh
+sudo bash install/install_ubuntu.sh
 ```
 
 The Ubuntu installer intentionally uses `/usr/bin/python3` by default so an
@@ -466,6 +486,36 @@ Common Ubuntu fixes:
 
 - `sudo: a terminal is required`: run `sudo -v` in an interactive terminal, or
   rerun with `PIPELINE_SKIP_APT=1` if apt already finished.
+- `apt-get update` fails with `404`, `does not have a Release file`, or
+  dependency versions that do not match: first check that the operating system
+  release is still supported and that `apt-get update` succeeds outside this
+  pipeline. For most future users, the best fix is to use a supported Ubuntu
+  LTS/current release or the Docker/Singularity install path below.
+- Legacy Ubuntu 22.10 / `kinetic` only: Ubuntu 22.10 is end-of-life, so active
+  `archive.ubuntu.com` and `kinetic-proposed` entries return `404`, old
+  installer media can leave an active `cdrom:` source, and third-party 22.10
+  repositories may also disappear. Disable those stale apt entries or move them
+  to `old-releases.ubuntu.com`, make sure the matching `kinetic-updates` and
+  `kinetic-security` pockets are enabled, then rerun
+  `sudo bash install/install_ubuntu.sh`. For example, on a 22.10 machine with
+  stale CD-ROM, archive, proposed, and MEGA entries:
+
+  ```bash
+  sudo cp /etc/apt/sources.list /etc/apt/sources.list.pipeline.bak
+  sudo sed -i \
+    -e 's|^deb cdrom:|# deb cdrom:|' \
+    -e 's|^deb http://archive.ubuntu.com/ubuntu kinetic |# deb http://archive.ubuntu.com/ubuntu kinetic |' \
+    -e 's|^deb-src http://archive.ubuntu.com/ubuntu kinetic |# deb-src http://archive.ubuntu.com/ubuntu kinetic |' \
+    -e 's|^deb http://archive.ubuntu.com/ubuntu kinetic-proposed |# deb http://archive.ubuntu.com/ubuntu kinetic-proposed |' \
+    /etc/apt/sources.list
+  sudo sed -i 's|^deb |# deb |' /etc/apt/sources.list.d/megasync.list
+  printf '%s\n' \
+    'deb http://old-releases.ubuntu.com/ubuntu/ kinetic-updates main restricted universe multiverse' \
+    'deb http://old-releases.ubuntu.com/ubuntu/ kinetic-security main restricted universe multiverse' |
+    sudo tee /etc/apt/sources.list.d/kinetic-old-releases-updates.list
+  sudo apt-get update
+  sudo bash install/install_ubuntu.sh
+  ```
 - `Pillow>=10` cannot be resolved: remove the failed venv with
   `rm -rf .venv-pipeline` and rerun `bash install/install_ubuntu.sh`; the
   installer will use `/usr/bin/python3` unless you override it.
