@@ -5,7 +5,7 @@ import os
 from datetime import datetime
 HOST = '127.0.0.1'
 PORT = 8765
-SERVER_API_VERSION = '2026-06-30-persistent-bootstrap-fixes'
+SERVER_API_VERSION = '2026-07-01-macro-bootstrap-timeout'
 sessions = {}
 session_macros_loaded = {}
 session_macro_bootstrap_warning = {}
@@ -47,6 +47,7 @@ options &_pipeline_opt_mprint &_pipeline_opt_mlogic &_pipeline_opt_symbolgen &_p
 %_pipeline_bootstrap_macros;
 '''
 SUBMIT_HEARTBEAT_SECONDS = max(0, int(os.environ.get('SAS_ODA_SUBMIT_HEARTBEAT_SECONDS', '20') or '20'))
+MACRO_BOOTSTRAP_TIMEOUT_SECONDS = max(0, int(os.environ.get('SAS_ODA_MACRO_BOOTSTRAP_TIMEOUT_SECONDS', '420') or '420'))
 def iter_saspy_cfg_names():
     preferred = os.environ.get('SASPY_CFGNAME') or os.environ.get('SASPY_CONFIG_NAME') or 'oda'
     seen = set()
@@ -165,7 +166,13 @@ def ensure_macros_loaded(session_id, sess):
         ])
     )
     print(f"[{session_id}] SAS ODA macro bootstrap started at {bootstrap_started_at}", flush=True)
-    res = submit_with_heartbeat(sess, LOAD_MACROS_CODE, session_id, label="SAS ODA macro bootstrap")
+    res = submit_with_heartbeat(
+        sess,
+        LOAD_MACROS_CODE,
+        session_id,
+        label="SAS ODA macro bootstrap",
+        timeout_seconds=MACRO_BOOTSTRAP_TIMEOUT_SECONDS,
+    )
     macro_log = res.get('LOG', '')
     bootstrap_ok = ''
     try:
@@ -230,7 +237,7 @@ def print_submit_heartbeat(label, elapsed_seconds):
     sys.stderr.write(f"{label} is still running in SAS ODA... elapsed {format_elapsed(elapsed_seconds)}\n")
     sys.stderr.flush()
 
-def submit_with_heartbeat(sess, sas_code, session_id, label=None):
+def submit_with_heartbeat(sess, sas_code, session_id, label=None, timeout_seconds=None):
     display_label = f"{label or 'SAS ODA job'} [{session_id}]"
     if SUBMIT_HEARTBEAT_SECONDS <= 0:
         return sess.submit(sas_code)
@@ -254,6 +261,12 @@ def submit_with_heartbeat(sess, sas_code, session_id, label=None):
     last_heartbeat = start
     while not done.wait(1.0):
         now = time.time()
+        if timeout_seconds and now - start >= timeout_seconds:
+            log_event(f"submit timeout label={display_label} session_id={session_id} elapsed={int(now - start)}s")
+            raise TimeoutError(
+                f"{display_label} timed out after {int(timeout_seconds)}s. "
+                "The local SASPy/IOM bridge may still be blocked inside SAS ODA and will be restarted."
+            )
         if now - last_heartbeat >= SUBMIT_HEARTBEAT_SECONDS:
             print_submit_heartbeat(display_label, now - start)
             log_event(f"submit heartbeat label={display_label} session_id={session_id} elapsed={int(now - start)}s")

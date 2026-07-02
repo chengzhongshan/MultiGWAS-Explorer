@@ -1660,18 +1660,19 @@ Pay attention to SAS macro loading as a separate layer:
   fresh `~/Macros` bootstrap from hanging forever if the SASPy Java/IOM bridge
   or SAS ODA control plane wedges. For quick debugging, shorten it:
 - the full `importallmacros_ue` bootstrap itself also has its own timeout,
-  `SAS_ODA_MACRO_BOOTSTRAP_TIMEOUT_SECONDS`, defaulting to `180`. This still
-  loads all macros from `~/Macros`; it only prevents a stuck SAS ODA/IOM bridge
-  from blocking the wrapper forever. If the timeout fires, the local persistent
-  session server is restarted so the next run starts cleanly.
+  `SAS_ODA_MACRO_BOOTSTRAP_TIMEOUT_SECONDS`, defaulting to `420`. In local
+  debugging on 2026-07-01, a full `~/Macros` bootstrap took about 215 seconds,
+  so this default gives ODA room to finish while still preventing a stuck
+  SASPy/IOM bridge from blocking the wrapper forever. If the timeout fires, the
+  local persistent session server is restarted so the next run starts cleanly.
 
 ```bash
-SAS_ODA_MACRO_BOOTSTRAP_TIMEOUT_SECONDS=120 \
+SAS_ODA_MACRO_BOOTSTRAP_TIMEOUT_SECONDS=420 \
 SAS_ODA_MACRO_HELPER_UPLOAD_TIMEOUT_SECONDS=30 \
-SAS_ODA_SESSION_SUBMIT_TIMEOUT_SECONDS=120 \
-SAS_ODA_RUN_TIMEOUT_SECONDS=150 \
+SAS_ODA_SESSION_SUBMIT_TIMEOUT_SECONDS=480 \
+SAS_ODA_RUN_TIMEOUT_SECONDS=480 \
 ./run_sas_codes_or_script_in_ODA.pl \
-  --code "%macroparas(macrorgx=lattice);proc print;run;" \
+  --code "%macroparas(macrorgx=Lattice);proc print;run;" \
   --persistent \
   --session-id mc1
 ```

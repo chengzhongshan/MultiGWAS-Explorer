@@ -960,7 +960,7 @@ options &_pipeline_opt_mprint &_pipeline_opt_mlogic &_pipeline_opt_symbolgen &_p
 %_pipeline_bootstrap_macros;
 '''
 SUBMIT_HEARTBEAT_SECONDS = max(0, int(os.environ.get('SAS_ODA_SUBMIT_HEARTBEAT_SECONDS', '20') or '20'))
-MACRO_BOOTSTRAP_TIMEOUT_SECONDS = max(0, int(os.environ.get('SAS_ODA_MACRO_BOOTSTRAP_TIMEOUT_SECONDS', '180') or '180'))
+MACRO_BOOTSTRAP_TIMEOUT_SECONDS = max(0, int(os.environ.get('SAS_ODA_MACRO_BOOTSTRAP_TIMEOUT_SECONDS', '420') or '420'))
 def iter_saspy_cfg_names():
     preferred = os.environ.get('SASPY_CFGNAME') or os.environ.get('SASPY_CONFIG_NAME') or 'oda'
     seen = set()

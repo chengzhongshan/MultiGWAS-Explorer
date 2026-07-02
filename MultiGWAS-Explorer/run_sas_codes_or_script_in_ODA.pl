@@ -390,34 +390,42 @@ GetOptions(
     '_internal-session-id=s' => \$internal_session_id,
 ) or die "Error in command line arguments\n";
 
-sub collect_matching_pids {
-    my (@patterns) = @_;
+sub collect_sas_oda_session_pids {
     my %seen;
     my @pids;
     return @pids if $^O =~ /^(?:MSWin32|cygwin)$/i;
 
-    for my $pattern (@patterns) {
-        next unless defined $pattern && length $pattern;
-        open(my $pgrep, '-|', 'pgrep', '-f', $pattern) or next;
-        while (my $line = <$pgrep>) {
-            chomp $line;
-            next unless $line =~ /^\d+$/;
-            next if $line == $$;
-            next if $seen{$line}++;
-            push @pids, int($line);
+    open(my $ps, '-|', 'ps', '-eo', 'pid=,ppid=,args=') or return @pids;
+    while (my $line = <$ps>) {
+        chomp $line;
+        next unless $line =~ /^\s*(\d+)\s+(\d+)\s+(.*)$/;
+        my ($pid, $ppid, $cmd) = ($1, $2, $3);
+        next if $pid == $$;
+        next if $seen{$pid}++;
+
+        if ($cmd =~ /run_sas_codes_or_script_in_ODA\.pl/) {
+            next if $cmd =~ /--kill-saspy-sessions|--kill-sas-oda-sessions|--kill-saspy-session-server/;
+            next unless $cmd =~ m{(?:^|/|\s)perl(?:\s|$)};
+            push @pids, int($pid);
+            next;
         }
-        close $pgrep;
+        if ($cmd =~ /DiffGWASDeps\/sas_oda_session_server\.py/) {
+            next unless $cmd =~ m{(?:^|/|\s)python[0-9.]*(?:\s|$)};
+            push @pids, int($pid);
+            next;
+        }
+        if ($cmd =~ /pyiom\.saspy2j/) {
+            next unless $cmd =~ m{(?:^|/|\s)java(?:\s|$)};
+            push @pids, int($pid);
+            next;
+        }
     }
+    close $ps;
     return @pids;
 }
 
 sub kill_saspy_session_processes {
-    my @patterns = (
-        'run_sas_codes_or_script_in_ODA\.pl',
-        'DiffGWASDeps/sas_oda_session_server\.py',
-        'pyiom\.saspy2j',
-    );
-    my @pids = collect_matching_pids(@patterns);
+    my @pids = collect_sas_oda_session_pids();
     if (!@pids) {
         print "No active SAS ODA wrapper, session server, or SASPy Java bridge processes found.\n";
         return 0;
