@@ -1699,7 +1699,8 @@ SAS_ODA_RUN_TIMEOUT_SECONDS=90 \
 ```
 
 - if a SASPy/SAS ODA session is wedged for too long, open another terminal and
-  stop the local session server plus SASPy Java bridge processes:
+  stop the active wrapper job, local session server, and SASPy Java bridge
+  processes:
 
 ```bash
 ./run_sas_codes_or_script_in_ODA.pl --kill-saspy-sessions

@@ -413,16 +413,17 @@ sub collect_matching_pids {
 
 sub kill_saspy_session_processes {
     my @patterns = (
+        'run_sas_codes_or_script_in_ODA\.pl',
         'DiffGWASDeps/sas_oda_session_server\.py',
         'pyiom\.saspy2j',
     );
     my @pids = collect_matching_pids(@patterns);
     if (!@pids) {
-        print "No local SAS ODA session server or SASPy Java bridge processes found.\n";
+        print "No active SAS ODA wrapper, session server, or SASPy Java bridge processes found.\n";
         return 0;
     }
 
-    print "Stopping local SAS ODA/SASPy session processes: @pids\n";
+    print "Stopping local SAS ODA wrapper/session processes: @pids\n";
     kill 'TERM', @pids;
     select undef, undef, undef, 2.0;
 
@@ -433,10 +434,10 @@ sub kill_saspy_session_processes {
         push @still_running, $pid if kill 0, $pid;
     }
     if (@still_running) {
-        print "Forcibly killing still-running SAS ODA/SASPy processes: @still_running\n";
+        print "Forcibly killing still-running SAS ODA wrapper/session processes: @still_running\n";
         kill 'KILL', @still_running;
     }
-    print "SAS ODA/SASPy local session cleanup requested.\n";
+    print "SAS ODA wrapper/session cleanup requested.\n";
     return scalar(@pids);
 }
 
@@ -873,9 +874,10 @@ Options:
   --monitor-status-file <f>  Follow a live SAS ODA status JSON sidecar from another terminal.
   --monitor-interval-seconds <n>
                              Poll interval for --monitor-status-file (default: 5 seconds).
-  --kill-saspy-sessions      Stop local SAS ODA session server and SASPy Java bridge
-                             processes, then exit. Use from another terminal when a
-                             persistent SASPy/ODA session is wedged.
+  --kill-saspy-sessions      Stop active local SAS ODA wrapper jobs, session server,
+                             and SASPy Java bridge processes, then exit. Use from
+                             another terminal when a persistent SASPy/ODA session
+                             is wedged.
   --run-timeout-seconds <n>  Override the overall submit timeout for this run.
                              Use 0 to disable the timeout completely.
   --run-timeout-grace-seconds <n>
