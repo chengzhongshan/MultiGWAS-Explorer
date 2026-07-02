@@ -45,7 +45,7 @@ BEGIN {
     lib->import($vendor_perl5) if -d $vendor_perl5;
     lib->import($local_deps) if -d $local_deps;
     lib->import(@local_perl5_arch) if @local_perl5_arch;
-    $ENV{PATH} = join(':', grep { defined && length } $local_venv_bin, $local_venv_scripts, $local_bin, $local_deps, ($ENV{PATH} // ''), '/mnt/g/NGS_lib/Linux_codes_SAM', '//rs1.stjude.org/clusterhome/zcheng/NGS_lib/Linux_codes_SAM');
+    $ENV{PATH} = join(':', grep { defined && length } $local_venv_bin, $local_venv_scripts, $self_dir, $local_bin, $local_deps, ($ENV{PATH} // ''), '/mnt/g/NGS_lib/Linux_codes_SAM', '//rs1.stjude.org/clusterhome/zcheng/NGS_lib/Linux_codes_SAM');
     $ENV{PERL5LIB} = join(':', grep { defined && length } $vendor_perl5, @local_perl5_bases, @local_perl5_arch, $local_deps, ($ENV{PERL5LIB} // ''), '/mnt/g/NGS_lib/Linux_codes_SAM', '//rs1.stjude.org/clusterhome/zcheng/NGS_lib/Linux_codes_SAM');
     if (!$ENV{PIPELINE_PYTHON_BIN} && -f $local_python_record) {
         if (open(my $pfh, '<', $local_python_record)) {
@@ -79,6 +79,21 @@ use File::Path qw(make_path);
 use File::Which qw(which); # Ensure this is installed, or use the backtick version below
 use Mojo::Util   qw(md5_sum);
 use JSON::MaybeXS qw(encode_json);
+
+sub resolve_repo_script_path {
+    my ($script_name) = @_;
+    return '' unless defined $script_name && length $script_name;
+    return $script_name if $script_name =~ m{[\\/]} && -f $script_name;
+
+    my @candidates = (
+        File::Spec->catfile($Bin, $script_name),
+        File::Spec->catfile($Bin, 'DiffGWASDeps', $script_name),
+    );
+    for my $candidate (@candidates) {
+        return $candidate if defined $candidate && -f $candidate;
+    }
+    return $script_name;
+}
 
 sub shell_quote_single {
     my ($text) = @_;
@@ -847,7 +862,8 @@ $server->tool(
                 local $ENV{PIPELINE_SAS_ODA_ACCOUNT} = $sas_oda_account if defined $sas_oda_account && length $sas_oda_account;
                 local $ENV{PIPELINE_SAS_ODA_PASSWORD} = $sas_oda_password if defined $sas_oda_password && length $sas_oda_password;
                 local $ENV{PIPELINE_FORCE_SAS_ODA_AUTH_PROMPT} = 1 if defined $prompt_sas_oda_auth && $prompt_sas_oda_auth =~ /^(?:1|true|yes|y)$/i;
-                my $cmd = "perl -S run_sas_codes_or_script_in_ODA.pl --output-prefix $tmpdir ";
+                my $oda_runner = resolve_repo_script_path('run_sas_codes_or_script_in_ODA.pl');
+                my $cmd = "perl " . shell_quote_single($oda_runner) . " --output-prefix $tmpdir ";
                 $cmd .= "--persistent --session-id " . shell_quote_single($session_id_arg) . " " if $use_persistent;
                 $cmd .= $sas_codes;
                 print STDERR "Executing command in background: $cmd\n";
