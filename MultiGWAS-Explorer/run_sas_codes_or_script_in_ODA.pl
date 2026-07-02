@@ -928,16 +928,16 @@ Examples:
   #Macros in ~/Macros are auto-imported only when the session is created; they are not re-imported on reuse.
   #both --persistent and --session-id must be used together to enable session reuse. The output files will have prefixes "reuse1" and "reuse2" respectively.
   perl -S run_sas_codes_or_script_in_ODA.pl   --code "proc print data=a; run;"   --persistent --session-id reuse_test --output-prefix reuse2
-  cat <<'SAS' | $0 --code - --persistent --session-id mysession
-  data a;
-  input a @;
-  datalines;
-  10 20
-  ;
-  run;
-  proc print data=a;
-  run;
-  SAS
+  printf '%s\\n' \\
+    'data a;' \\
+    'input a @@;' \\
+    'datalines;' \\
+    '10 20' \\
+    ';' \\
+    'run;' \\
+    'proc print data=a;' \\
+    'run;' |
+  $0 --code - --persistent --session-id mysession
 USAGE
     exit 0;
 }
