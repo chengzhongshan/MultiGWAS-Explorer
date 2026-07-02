@@ -1013,6 +1013,53 @@ def artifact_path_for_suffix(suffix):
     base_dir = os.path.dirname(STATUS_FILE) if STATUS_FILE else os.getcwd()
     return os.path.join(base_dir or os.getcwd(), suffix.lstrip('.'))
 
+def _coerce_epoch(value):
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return int(value)
+    text = str(value).strip()
+    if not text:
+        return None
+    text = ' '.join(text.split())
+    for fmt in (
+        '%d%b%Y:%H:%M:%S',
+        '%d%b%Y:%H:%M',
+        '%d%b%Y %H:%M:%S',
+        '%d%b%Y %H:%M',
+        '%Y-%m-%d %H:%M:%S',
+        '%Y-%m-%d %H:%M',
+        '%m/%d/%Y %H:%M:%S',
+        '%m/%d/%Y %H:%M',
+        '%a, %d %b %Y %H:%M:%S',
+    ):
+        try:
+            return int(datetime.strptime(text, fmt).timestamp())
+        except Exception:
+            pass
+    try:
+        return int(datetime.fromisoformat(text).timestamp())
+    except Exception:
+        return None
+
+def _local_file_metadata(local_path):
+    stat = os.stat(local_path)
+    created_epoch = None
+    modified_epoch = None
+    try:
+        created_epoch = int(os.path.getctime(local_path))
+    except Exception:
+        pass
+    try:
+        modified_epoch = int(os.path.getmtime(local_path))
+    except Exception:
+        pass
+    return {
+        'size': int(stat.st_size),
+        'created_epoch': created_epoch,
+        'modified_epoch': modified_epoch,
+    }
+
 def _remote_file_matches_local_upload(remote_info, local_path):
     if not isinstance(remote_info, dict) or not remote_info.get('exists'):
         return False
@@ -2319,9 +2366,10 @@ sub run_code {
             $dep_logs = length($dep_logs) ? join("\n", $dep_logs, $msg) : $msg;
         }
     } else {
+        my $disable_msg = 'Global importallmacros_ue bootstrap disabled via SAS_ODA_AUTOLOAD_MACROS=0 for this submit.';
         $dep_logs = length($dep_logs)
-          ? join("\n", $dep_logs, 'Global importallmacros_ue bootstrap disabled via SAS_ODA_AUTOLOAD_MACROS=0 for this submit.')
-          : 'Global importallmacros_ue bootstrap disabled via SAS_ODA_AUTOLOAD_MACROS=0 for this submit.';
+          ? join("\n", $dep_logs, $disable_msg)
+          : $disable_msg;
     }
 
     my $result;
