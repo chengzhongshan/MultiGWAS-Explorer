@@ -1627,10 +1627,16 @@ Pay attention to SAS macro loading as a separate layer:
   `30`, because this file is tiny and a longer wait usually means the local
   SASPy/IOM bridge is wedged.
 - if the submitted code calls a macro that exists as a local `.sas` file, the
-  wrapper uploads that local file into SAS ODA `~` and adds a `%include` for
-  that uploaded copy. This lets local macro edits override a stale copy already
-  present in `~/Macros` for that submit, while unresolved submacros are still
-  handled by the global `~/Macros` autoload.
+  wrapper compares the local file timestamp against the matching
+  `~/Macros/<macro>.sas` copy in SAS ODA. If the local file is newer, the ODA
+  copy is missing, or the timestamp cannot be compared, the wrapper uploads the
+  local file into SAS ODA `~` and adds a `%include` for that uploaded copy after
+  the global `~/Macros` bootstrap. This lets local macro edits override a stale
+  ODA macro for that submit, while unresolved submacros are still handled by the
+  global `~/Macros` autoload.
+- for normal macro work, do not set `SAS_ODA_AUTOLOAD_MACROS=0`; that mode is
+  only for narrow bootstrap debugging because it skips the full interconnected
+  `~/Macros` library.
 - when a persistent session is reused, that global macro bootstrap is not run
   again
 - for direct macro debugging, prefer a named persistent session so the expensive

@@ -2017,18 +2017,62 @@ sub _find_local_macro_file {
     return;
 }
 
+sub _local_file_modified_epoch {
+    my ($path) = @_;
+    return unless defined $path && -e $path;
+    my @st = stat($path);
+    return $st[9] if @st;
+    return;
+}
+
+sub _remote_macro_info_candidates {
+    my ($self, $macro_name, $local_path) = @_;
+    my @remote_paths;
+    my $base = defined($local_path) && length($local_path) ? basename($local_path) : '';
+    push @remote_paths, "~/Macros/$base" if length $base;
+    push @remote_paths, "~/Macros/$macro_name.sas" if defined($macro_name) && length($macro_name);
+
+    my %seen;
+    for my $remote_path (@remote_paths) {
+        next unless defined $remote_path && length $remote_path;
+        next if $seen{lc $remote_path}++;
+        my $info = eval { $self->fileinfo($remote_path) };
+        next if $@;
+        next unless ref($info) eq 'HASH';
+        $info->{requested_path} = $remote_path;
+        return $info if $info->{exists};
+    }
+    return;
+}
+
+sub _local_macro_should_overlay_remote {
+    my ($self, $macro_name, $local_path) = @_;
+    my $local_epoch = _local_file_modified_epoch($local_path);
+    my $remote_info = $self->_remote_macro_info_candidates($macro_name, $local_path);
+    my $remote_path = ref($remote_info) eq 'HASH'
+      ? ($remote_info->{requested_path} || $remote_info->{path} || '')
+      : ("~/Macros/" . basename($local_path || ''));
+
+    if (ref($remote_info) ne 'HASH' || !$remote_info->{exists}) {
+        return (1, "remote macro $remote_path is missing", $remote_info);
+    }
+
+    my $remote_epoch = $remote_info->{modified_epoch};
+    if (defined($local_epoch) && defined($remote_epoch) && $local_epoch =~ /^\d+$/ && $remote_epoch =~ /^\d+$/) {
+        if ($local_epoch > $remote_epoch) {
+            return (1, "local macro is newer than $remote_path", $remote_info);
+        }
+        return (0, "remote macro $remote_path is same age or newer", $remote_info);
+    }
+
+    return (1, "could not compare timestamps with $remote_path, overlaying local macro", $remote_info);
+}
+
 sub _build_targeted_remote_macro_loader {
     my ($self, $macro_names_ref) = @_;
     return '' unless ref($macro_names_ref) eq 'ARRAY' && @$macro_names_ref;
 
-    my %seen;
-    my @names;
-    for my $requested (@$macro_names_ref) {
-        next unless defined($requested) && length($requested);
-        next if _is_builtin_macro_name($requested);
-        next if $seen{lc $requested}++;
-        push @names, $requested;
-    }
+    my @names = _expanded_targeted_remote_macro_names($macro_names_ref);
     return '' unless @names;
 
     my $code = <<'SAS';
@@ -2059,6 +2103,32 @@ SAS
 };
     }
     return $code;
+}
+
+sub _expanded_targeted_remote_macro_names {
+    my ($macro_names_ref) = @_;
+    return () unless ref($macro_names_ref) eq 'ARRAY' && @$macro_names_ref;
+
+    my %targeted_macro_dependencies = (
+        macroparas => [ 'FileOrDirExist', 'del_file_with_fullpath', 'list_files4dsd' ],
+    );
+    my %seen;
+    my @names;
+    for my $requested (@$macro_names_ref) {
+        next unless defined($requested) && length($requested);
+        next if _is_builtin_macro_name($requested);
+        my @expanded = (
+            @{ $targeted_macro_dependencies{lc $requested} || [] },
+            $requested,
+        );
+        for my $name (@expanded) {
+            next unless defined($name) && length($name);
+            next if _is_builtin_macro_name($name);
+            next if $seen{lc $name}++;
+            push @names, $name;
+        }
+    }
+    return @names;
 }
 
 sub _find_local_macro_bootstrap_helper {
@@ -2139,18 +2209,29 @@ sub _process_dependencies {
         next if $defined_in_code{lc $m_name};
         my $local_m_path = $self->_find_local_macro_file($m_name);
         if (defined $local_m_path && -e $local_m_path && !$uploaded{$local_m_path}++) {
-            _warn_dependency_upload(kind => 'macro file', detail => "%$m_name", path => $local_m_path);
-            my $remote = eval {
-                $self->upload(
-                    $local_m_path,
-                    {
-                        progress_label => "macro file for %$m_name: " . basename($local_m_path),
-                    }
-                );
-            };
-            if ($remote && $remote !~ /^PYTHON ERROR/) {
-                push @logs, "Detected macro: %$m_name. Uploaded to $remote";
-                $header_includes .= qq{%include "$remote";\n};
+            my ($should_overlay, $overlay_reason) = _autoload_macros_enabled()
+              ? $self->_local_macro_should_overlay_remote($m_name, $local_m_path)
+              : (1, 'global macro autoload disabled; targeted local macro overlay required');
+            if ($should_overlay) {
+                _warn_dependency_upload(kind => 'macro file', detail => "%$m_name", path => $local_m_path);
+                my $remote = eval {
+                    $self->upload(
+                        $local_m_path,
+                        {
+                            progress_label => "macro file for %$m_name: " . basename($local_m_path),
+                        }
+                    );
+                };
+                if ($remote && $remote !~ /^PYTHON ERROR/) {
+                    push @logs, "Detected local macro: %$m_name. Uploaded overlay to $remote ($overlay_reason)";
+                    $header_includes .= qq{%include "$remote";\n};
+                } else {
+                    push @logs, "Could not upload local macro overlay for %$m_name; falling back to remote/global macro resolution.";
+                    push @unresolved_macro_names, $m_name;
+                }
+            } else {
+                push @logs, "Detected local macro: %$m_name. Keeping ODA ~/Macros copy because $overlay_reason.";
+                push @unresolved_macro_names, $m_name unless _autoload_macros_enabled();
             }
         } else {
             push @unresolved_macro_names, $m_name;
@@ -2162,7 +2243,8 @@ sub _process_dependencies {
       : $self->_build_targeted_remote_macro_loader(\@unresolved_macro_names);
     if (length $targeted_remote_loader) {
         $header_includes = $targeted_remote_loader . "\n" . $header_includes;
-        push @logs, "Injected targeted remote macro loader for: " . join(', ', @unresolved_macro_names);
+        my @expanded_targeted_names = _expanded_targeted_remote_macro_names(\@unresolved_macro_names);
+        push @logs, "Injected targeted remote macro loader for: " . join(', ', @expanded_targeted_names);
     } elsif (@unresolved_macro_names && _autoload_macros_enabled()) {
         push @logs, "Using global importallmacros_ue bootstrap for unresolved remote macros: " . join(', ', @unresolved_macro_names);
     }
@@ -2196,7 +2278,7 @@ sub _process_dependencies {
 sub run_code {
     my ($self, $sas_code) = @_;
     my ($processed_code, $dep_logs) = $self->_process_dependencies($sas_code);
-    my $has_local_macro_upload = ($dep_logs // '') =~ /Detected macro:/ ? 1 : 0;
+    my $has_local_macro_upload = ($dep_logs // '') =~ /Uploaded overlay to/ ? 1 : 0;
     my $has_targeted_remote_loader = ($dep_logs // '') =~ /Injected targeted remote macro loader/ ? 1 : 0;
     my $macro_autoload_enabled = _autoload_macros_enabled() ? 1 : 0;
     my $disable_global_macro_bootstrap = $macro_autoload_enabled ? 0 : 1;
