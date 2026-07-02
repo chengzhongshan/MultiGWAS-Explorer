@@ -900,13 +900,26 @@ my $SERVER_API_VERSION = '2026-07-01-macro-bootstrap-timeout';
 my $SERVER_CONNECT_TIMEOUT_SECONDS = int($ENV{SAS_ODA_SESSION_CONNECT_TIMEOUT_SECONDS} // 5);
 my $SERVER_CREATE_TIMEOUT_SECONDS  = int($ENV{SAS_ODA_SESSION_CREATE_TIMEOUT_SECONDS} // 60);
 my $SERVER_FILEOP_TIMEOUT_SECONDS  = int($ENV{SAS_ODA_SESSION_FILEOP_TIMEOUT_SECONDS} // 20);
-my $SERVER_SUBMIT_TIMEOUT_SECONDS  = int($ENV{SAS_ODA_SESSION_SUBMIT_TIMEOUT_SECONDS} // 600);
 my $SERVER_METADATA_TIMEOUT_SECONDS = int($ENV{SAS_ODA_SESSION_METADATA_TIMEOUT_SECONDS} // 12);
 my $SERVER_DELETE_TIMEOUT_SECONDS   = int($ENV{SAS_ODA_SESSION_DELETE_TIMEOUT_SECONDS} // 12);
 my $SERVER_GETHOME_TIMEOUT_SECONDS  = int($ENV{SAS_ODA_SESSION_GETHOME_TIMEOUT_SECONDS} // 12);
 my $SERVER_UPLOAD_TIMEOUT_SECONDS   = int($ENV{SAS_ODA_SESSION_UPLOAD_TIMEOUT_SECONDS} // 180);
 my $SERVER_DOWNLOAD_TIMEOUT_SECONDS = int($ENV{SAS_ODA_SESSION_DOWNLOAD_TIMEOUT_SECONDS} // 180);
 my $MACRO_HELPER_UPLOAD_TIMEOUT_SECONDS = int($ENV{SAS_ODA_MACRO_HELPER_UPLOAD_TIMEOUT_SECONDS} // 30);
+
+sub _server_submit_timeout_seconds {
+    if (exists $ENV{SAS_ODA_SESSION_SUBMIT_TIMEOUT_SECONDS}) {
+        my $explicit = int($ENV{SAS_ODA_SESSION_SUBMIT_TIMEOUT_SECONDS} || 0);
+        return $explicit > 0 ? $explicit : 0;
+    }
+
+    my $run_timeout = int($ENV{SAS_ODA_RUN_TIMEOUT_SECONDS} || 0);
+    return 0 if $run_timeout <= 0;
+
+    my $grace = int($ENV{SAS_ODA_RUN_TIMEOUT_GRACE_SECONDS} || 0);
+    $grace = 0 if $grace < 0;
+    return $run_timeout + $grace + 60;
+}
 
 # NOTE: This embedded copy is only written to disk when sas_oda_session_server.py
 # is missing. Keep it in sync with the standalone sas_oda_session_server.py file.
@@ -1851,6 +1864,7 @@ sub _recv_exact_with_timeout {
     my ($sock, $length, $timeout_seconds, $label) = @_;
     my $select = IO::Select->new($sock);
     my $data = '';
+    my $started = time();
     my $deadline = ($timeout_seconds && $timeout_seconds > 0) ? time() + $timeout_seconds : 0;
     my $heartbeat_seconds = int($ENV{SAS_ODA_CLIENT_HEARTBEAT_SECONDS} // 20);
     my $last_heartbeat = time();
@@ -1870,7 +1884,11 @@ sub _recv_exact_with_timeout {
             return (undef, "timed out waiting for session server response while reading $label")
               if $deadline && time() >= $deadline;
             if ($heartbeat_seconds > 0 && time() - $last_heartbeat >= $heartbeat_seconds) {
-                warn "Waiting for SAS ODA session server response while reading $label...\n";
+                my $elapsed = int(time() - $started);
+                my $timeout_note = $deadline
+                  ? sprintf(", timeout=%ds", int($timeout_seconds || 0))
+                  : ", timeout=disabled";
+                warn "Waiting for SAS ODA session server response while reading $label (elapsed=${elapsed}s$timeout_note)...\n";
                 $last_heartbeat = time();
             }
             next;
@@ -2156,19 +2174,19 @@ sub _ensure_remote_macro_bootstrap_helper {
     my $local_helper = $self->_find_local_macro_bootstrap_helper();
     return '' unless $local_helper;
 
-    warn "Preparing SAS ODA macro bootstrap helper upload: $local_helper\n";
+    warn "Checking SAS ODA macro bootstrap helper upload/reuse: $local_helper\n";
     my $remote = eval {
         $self->upload(
             $local_helper,
             {
                 progress_label => 'macro bootstrap helper: ' . basename($local_helper),
-                skip_if_same   => 0,
+                skip_if_same   => 1,
                 timeout_seconds => $MACRO_HELPER_UPLOAD_TIMEOUT_SECONDS,
             }
         );
     };
     if ($remote && $remote !~ /^PYTHON ERROR/) {
-        return "Checked/uploaded macro bootstrap helper: $remote";
+        return "Checked/reused/uploaded macro bootstrap helper: $remote";
     }
 
     my $detail = $@ || $remote || 'unknown upload failure';
@@ -2318,7 +2336,7 @@ sub run_code {
                 code        => $processed_code,
                 load_macros => (_autoload_macros_enabled() && !$disable_global_macro_bootstrap) ? 1 : 0,
             },
-            $SERVER_SUBMIT_TIMEOUT_SECONDS,
+            _server_submit_timeout_seconds(),
         );
         my $resp_log = '';
         my $resp_lst = '';

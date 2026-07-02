@@ -1619,13 +1619,15 @@ Pay attention to SAS macro loading as a separate layer:
   targeted loaders for submacros such as `FileOrDirExist`,
   `del_file_with_fullpath`, or `list_files4dsd`, because those are expected to
   be loaded together from `~/Macros`.
-- before that global macro autoload path runs, the wrapper compares and, when
-  needed, uploads the local `importallmacros_ue.sas` helper into SAS ODA `~`.
-  This check is also performed for reused persistent sessions so local helper
-  edits are not hidden by an older remote copy. The helper check/upload has a
-  short timeout, `SAS_ODA_MACRO_HELPER_UPLOAD_TIMEOUT_SECONDS`, defaulting to
-  `30`, because this file is tiny and a longer wait usually means the local
-  SASPy/IOM bridge is wedged.
+- before that global macro autoload path runs, the wrapper checks the local
+  `importallmacros_ue.sas` helper against the copy in SAS ODA `~`. When the
+  remote copy already has the same size and timestamp, the upload is skipped;
+  otherwise the local helper is uploaded. This check is also performed for
+  reused persistent sessions so local helper edits are not hidden by an older
+  remote copy. The helper check/upload has a short timeout,
+  `SAS_ODA_MACRO_HELPER_UPLOAD_TIMEOUT_SECONDS`, defaulting to `30`, because
+  this file is tiny and a longer wait usually means the local SASPy/IOM bridge
+  is wedged.
 - if the submitted code calls a macro that exists as a local `.sas` file, the
   wrapper compares the local file timestamp against the matching
   `~/Macros/<macro>.sas` copy in SAS ODA. If the local file is newer, the ODA
@@ -1655,10 +1657,14 @@ Pay attention to SAS macro loading as a separate layer:
 - the client prints wait heartbeats every 20 seconds by default while it waits
   for the SAS ODA session server; override with
   `SAS_ODA_CLIENT_HEARTBEAT_SECONDS=10` for noisier debugging
-- persistent-session submits now have a bounded session-server response wait.
-  The default is `SAS_ODA_SESSION_SUBMIT_TIMEOUT_SECONDS=600`, which keeps a
-  fresh `~/Macros` bootstrap from hanging forever if the SASPy Java/IOM bridge
-  or SAS ODA control plane wedges. For quick debugging, shorten it:
+- persistent-session submits wait for the SAS ODA session server response for
+  as long as the wrapper run timeout allows. In other words,
+  `--run-timeout-seconds 7200` also gives the persistent-session submit socket
+  enough time for a two-hour SAS job. If `--no-run-timeout` is used, the
+  persistent submit response wait is also unbounded.
+- set `SAS_ODA_SESSION_SUBMIT_TIMEOUT_SECONDS=<seconds>` only when you want a
+  separate lower-level socket cutoff for debugging a wedged SASPy Java/IOM
+  bridge or SAS ODA control plane. Set it to `0` to disable that socket cutoff.
 - the full `importallmacros_ue` bootstrap itself also has its own timeout,
   `SAS_ODA_MACRO_BOOTSTRAP_TIMEOUT_SECONDS`, defaulting to `420`. In local
   debugging on 2026-07-01, a full `~/Macros` bootstrap took about 215 seconds,
@@ -1669,12 +1675,21 @@ Pay attention to SAS macro loading as a separate layer:
 ```bash
 SAS_ODA_MACRO_BOOTSTRAP_TIMEOUT_SECONDS=420 \
 SAS_ODA_MACRO_HELPER_UPLOAD_TIMEOUT_SECONDS=30 \
-SAS_ODA_SESSION_SUBMIT_TIMEOUT_SECONDS=480 \
 SAS_ODA_RUN_TIMEOUT_SECONDS=480 \
 ./run_sas_codes_or_script_in_ODA.pl \
   --code "%macroparas(macrorgx=Lattice);proc print;run;" \
   --persistent \
   --session-id mc1
+```
+
+For a long SAS program, prefer an explicit wrapper timeout:
+
+```bash
+OPEN_RESULT=0 ./run_sas_codes_or_script_in_ODA.pl \
+  --file long_job.sas \
+  --run-timeout-seconds 7200 \
+  --persistent \
+  --session-id long_job
 ```
 
   If that returns `timed out waiting for session server response while reading
@@ -1684,8 +1699,13 @@ SAS_ODA_RUN_TIMEOUT_SECONDS=480 \
   one-shot fallback with `SAS_ODA_ALLOW_PERSISTENT_SUBMIT_FALLBACK=1` when you
   do not need to preserve WORK tables or macro state.
 - if a tiny test such as `proc print data=sashelp.class;run;` appears to hang
-  while printing `Waiting for SAS ODA session server response while reading
-  response header...`, the SAS program itself has usually not started yet.
+  while printing a heartbeat like this, the SAS program itself has usually not
+  started yet:
+
+```text
+Waiting for SAS ODA session server response while reading response header (elapsed=60s, timeout=3675s)...
+```
+
   That message means the helper is still waiting for the local SASPy Java/IOM
   bridge to create or answer through an ODA session. Healthy session startup is
   often around 8-15 seconds; much longer waits usually point to a wedged local
@@ -1868,7 +1888,8 @@ perl ./DiffGWASDeps/run_sas_codes_or_script_in_ODA.pl \
 How to read the new bootstrap diagnostics:
 
 - `Upload step: macro bootstrap helper: importallmacros_ue.sas ...`
-  - the tiny helper file is being uploaded
+  - the tiny helper file is being uploaded, or it is being skipped because the
+    remote copy already matches local size/timestamp
   - this is not the actual macro bootstrap submit
 - `SAS ODA macro bootstrap started at ...`
   - the wrapper has entered the real global `~/Macros` autoload submit

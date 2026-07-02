@@ -471,6 +471,8 @@ if ($disable_run_timeout) {
 }
 $sas_run_timeout_seconds = 0 if $sas_run_timeout_seconds < 0;
 $sas_run_timeout_grace_seconds = 0 if $sas_run_timeout_grace_seconds < 0;
+$ENV{SAS_ODA_RUN_TIMEOUT_SECONDS} = $sas_run_timeout_seconds;
+$ENV{SAS_ODA_RUN_TIMEOUT_GRACE_SECONDS} = $sas_run_timeout_grace_seconds;
 $monitor_interval_seconds = defined($monitor_interval_seconds) ? int($monitor_interval_seconds) : 5;
 $monitor_interval_seconds = 1 if $monitor_interval_seconds < 1;
 
@@ -898,6 +900,9 @@ Environment:
   SAS_ODA_RUN_TIMEOUT_SECONDS        Overall timeout for submit and file-transfer helper actions
                                      in this wrapper (default: ${default_sas_run_timeout_seconds}s; set to 0 to disable)
   SAS_ODA_RUN_TIMEOUT_GRACE_SECONDS  Extra wait after TERM before forcible kill (default: ${sas_run_timeout_grace_seconds}s)
+  SAS_ODA_SESSION_SUBMIT_TIMEOUT_SECONDS
+                                     Optional persistent session-server response timeout.
+                                     If unset, it follows SAS_ODA_RUN_TIMEOUT_SECONDS; set 0 to disable.
 
 Examples:
   $0 --upload-file mydata.csv --upload-file myplot.png --persistent --session-id mysession
