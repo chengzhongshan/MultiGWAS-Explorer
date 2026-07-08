@@ -5,7 +5,7 @@ import os
 from datetime import datetime
 HOST = '127.0.0.1'
 PORT = 8765
-SERVER_API_VERSION = '2026-07-01-macro-bootstrap-timeout'
+SERVER_API_VERSION = '2026-07-08-transfer-progress-stdio'
 sessions = {}
 session_macros_loaded = {}
 session_macro_bootstrap_warning = {}
@@ -657,7 +657,13 @@ def handle_client(conn, addr):
                         final_size = info.get('size') or local_size
                     except Exception:
                         final_size = local_size
-                    print_upload_progress(progress_line_label, final_size, local_size, done=True)
+                    if local_size >= 10 * 1024 * 1024:
+                        print_upload_progress(progress_line_label, final_size, local_size, done=True)
+                    else:
+                        print(
+                            f"Upload step [{session_id}]: completed {display_label} -> {remote_path} ({final_size:,} bytes)",
+                            flush=True,
+                        )
                     log_event(f"upload done session_id={session_id} remote_path={remote_path}")
                     return remote_path
                 remote_path = with_retry(session_id, _upload)
@@ -681,6 +687,10 @@ def handle_client(conn, addr):
                         raise FileNotFoundError(f"Remote file does not exist in SAS ODA: {remote_path}")
                     remote_path = remote_info.get('path') or remote_path
                     remote_size = remote_info.get('size') or 0
+                    print(
+                        f"Download step [{session_id}]: {remote_path} -> {out_path} ({remote_size:,} bytes)",
+                        flush=True,
+                    )
                     stop_event = threading.Event()
                     poller = None
                     try:
@@ -704,6 +714,11 @@ def handle_client(conn, addr):
                         raise IOError(f"Downloaded local file is empty despite non-empty remote file: {out_path}")
                     if remote_size >= 10 * 1024 * 1024:
                         print_upload_progress(f"Download progress [{session_id}]", final_size, remote_size, done=True)
+                    else:
+                        print(
+                            f"Download step [{session_id}]: saved {out_path} ({final_size:,} bytes)",
+                            flush=True,
+                        )
                     log_event(f"download done session_id={session_id} local_path={out_path}")
                     return out_path
                 saved_path = with_retry(session_id, _download)

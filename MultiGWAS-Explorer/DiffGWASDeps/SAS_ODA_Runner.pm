@@ -896,7 +896,7 @@ sub _autoload_macros_enabled {
 
 my $SERVER_HOST = '127.0.0.1';
 my $SERVER_PORT = 8765;
-my $SERVER_API_VERSION = '2026-07-01-macro-bootstrap-timeout';
+my $SERVER_API_VERSION = '2026-07-08-transfer-progress-stdio';
 my $SERVER_CONNECT_TIMEOUT_SECONDS = int($ENV{SAS_ODA_SESSION_CONNECT_TIMEOUT_SECONDS} // 5);
 my $SERVER_CREATE_TIMEOUT_SECONDS  = int($ENV{SAS_ODA_SESSION_CREATE_TIMEOUT_SECONDS} // 60);
 my $SERVER_FILEOP_TIMEOUT_SECONDS  = int($ENV{SAS_ODA_SESSION_FILEOP_TIMEOUT_SECONDS} // 20);
@@ -931,7 +931,7 @@ import os
 from datetime import datetime
 HOST = '127.0.0.1'
 PORT = 8765
-SERVER_API_VERSION = '2026-07-01-macro-bootstrap-timeout'
+SERVER_API_VERSION = '2026-07-08-transfer-progress-stdio'
 sessions = {}
 session_macros_loaded = {}
 session_macro_bootstrap_warning = {}
@@ -1583,7 +1583,13 @@ def handle_client(conn, addr):
                         final_size = info.get('size') or local_size
                     except Exception:
                         final_size = local_size
-                    print_upload_progress(progress_line_label, final_size, local_size, done=True)
+                    if local_size >= 10 * 1024 * 1024:
+                        print_upload_progress(progress_line_label, final_size, local_size, done=True)
+                    else:
+                        print(
+                            f"Upload step [{session_id}]: completed {display_label} -> {remote_path} ({final_size:,} bytes)",
+                            flush=True,
+                        )
                     log_event(f"upload done session_id={session_id} remote_path={remote_path}")
                     return remote_path
                 remote_path = with_retry(session_id, _upload)
@@ -1607,6 +1613,10 @@ def handle_client(conn, addr):
                         raise FileNotFoundError(f"Remote file does not exist in SAS ODA: {remote_path}")
                     remote_path = remote_info.get('path') or remote_path
                     remote_size = remote_info.get('size') or 0
+                    print(
+                        f"Download step [{session_id}]: {remote_path} -> {out_path} ({remote_size:,} bytes)",
+                        flush=True,
+                    )
                     stop_event = threading.Event()
                     poller = None
                     try:
@@ -1630,6 +1640,11 @@ def handle_client(conn, addr):
                         raise IOError(f"Downloaded local file is empty despite non-empty remote file: {out_path}")
                     if remote_size >= 10 * 1024 * 1024:
                         print_upload_progress(f"Download progress [{session_id}]", final_size, remote_size, done=True)
+                    else:
+                        print(
+                            f"Download step [{session_id}]: saved {out_path} ({final_size:,} bytes)",
+                            flush=True,
+                        )
                     log_event(f"download done session_id={session_id} local_path={out_path}")
                     return out_path
                 saved_path = with_retry(session_id, _download)
@@ -1878,6 +1893,11 @@ sub _start_server_if_needed {
     }
     # start server in background
     my ($python_bin, $site_packages) = _repo_python_env_for_session_server();
+    my $server_stdio_mode = $ENV{SAS_ODA_SERVER_STDIO} // '';
+    my $inherit_server_stdio =
+      $server_stdio_mode =~ /^(?:1|true|yes|on|inherit|show)$/i ? 1 :
+      $server_stdio_mode =~ /^(?:0|false|no|off|silent|hide)$/i ? 0 :
+      ((-t STDOUT || -t STDERR) ? 1 : 0);
     my $pid = fork();
     if (!defined $pid) {
         warn "Could not fork SAS ODA session server launcher: $!\n";
@@ -1891,8 +1911,10 @@ sub _start_server_if_needed {
         }
         $ENV{PIPELINE_PYTHON_BIN} = $python_bin if length $python_bin;
         open STDIN,  '<', File::Spec->devnull();
-        open STDOUT, '>', File::Spec->devnull();
-        open STDERR, '>', File::Spec->devnull();
+        unless ($inherit_server_stdio) {
+            open STDOUT, '>', File::Spec->devnull();
+            open STDERR, '>', File::Spec->devnull();
+        }
         exec { $python_bin } $python_bin, $server_path;
         exit 127;
     }
