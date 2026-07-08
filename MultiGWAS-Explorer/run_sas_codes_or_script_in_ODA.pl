@@ -1740,6 +1740,121 @@ sub sanitize_sas_text_for_macro_lint {
     return $masked;
 }
 
+sub _count_newlines {
+    my ($text) = @_;
+    return 0 unless defined $text && length $text;
+    my $count = ($text =~ tr/\n//);
+    return $count;
+}
+
+sub scan_sas_text_for_macro_invocation_spans {
+    my ($text) = @_;
+    my $masked = sanitize_sas_text_for_macro_lint($text);
+    my @spans;
+    my @stack;
+    my $line_no = 1;
+    my $i = 0;
+    my $len = length($masked // '');
+
+    while ($i < $len) {
+        my $rest = substr($masked, $i);
+        if ($rest =~ /^%([A-Za-z_]\w*)([ \t\r\n]*)\(/) {
+            my $name = $1;
+            my $ws = $2 // '';
+            $stack[-1]{paren_depth}++ if @stack;
+            push @stack, {
+                name        => lc($name),
+                display_name=> $name,
+                start_line  => $line_no,
+                paren_depth => 1,
+            };
+            $line_no += _count_newlines($ws);
+            $i += length($&) ;
+            next;
+        }
+
+        my $ch = substr($masked, $i, 1);
+        if ($ch eq "\n") {
+            $line_no++;
+            $i++;
+            next;
+        }
+
+        if (@stack) {
+            if ($ch eq '(') {
+                $stack[-1]{paren_depth}++;
+            } elsif ($ch eq ')') {
+                $stack[-1]{paren_depth}--;
+                if ($stack[-1]{paren_depth} <= 0) {
+                    my $done = pop @stack;
+                    $done->{end_line} = $line_no;
+                    $done->{closed} = 1;
+                    push @spans, $done;
+                    $stack[-1]{paren_depth}-- if @stack;
+                }
+            }
+        }
+
+        $i++;
+    }
+
+    for my $open (@stack) {
+        $open->{closed} = 0;
+        $open->{end_line} = undef;
+        push @spans, $open;
+    }
+
+    return \@spans;
+}
+
+sub scan_sas_text_for_unclosed_macro_invocations {
+    my ($text) = @_;
+    my $spans = scan_sas_text_for_macro_invocation_spans($text);
+    my @findings;
+    my @lines = split /\n/, ($text // ''), -1;
+
+    for my $span (@{$spans || []}) {
+        next if $span->{closed};
+        my $line = $span->{start_line} || 1;
+        my $name = $span->{display_name} || ($span->{name} // 'macro');
+        push @findings, {
+            type        => 'unclosed_macro_invocation',
+            line        => $line,
+            message     => "Macro invocation %$name( appears to be missing its closing ')'",
+            context_ref => [ ($line - 2) .. scalar(@lines) ],
+        };
+    }
+
+    return {
+        lines    => \@lines,
+        findings => \@findings,
+    };
+}
+
+sub suppress_balanced_macro_invocation_false_positives {
+    my ($text, $findings_ref) = @_;
+    return $findings_ref unless ref($findings_ref) eq 'ARRAY' && @{$findings_ref || []};
+    my $spans = scan_sas_text_for_macro_invocation_spans($text);
+    my %closed_by_start;
+    for my $span (@{$spans || []}) {
+        next unless $span->{closed};
+        my $key = join(':', lc($span->{name} // ''), ($span->{start_line} || 0));
+        $closed_by_start{$key} = $span;
+    }
+
+    my @filtered;
+    for my $finding (@{$findings_ref}) {
+        my $message = $finding->{message} // '';
+        my ($name) = $message =~ /Macro invocation %([A-Za-z_]\w*)\(/i;
+        if (defined $name && $message =~ /missing .*?\)/i) {
+            my $key = join(':', lc($name), ($finding->{line} || 0));
+            next if $closed_by_start{$key};
+        }
+        push @filtered, $finding;
+    }
+    return \@filtered;
+}
+
 sub scan_sas_text_for_open_code_macro_control {
     my ($text) = @_;
     my $masked = sanitize_sas_text_for_macro_lint($text);
@@ -1992,9 +2107,12 @@ sub scan_sas_text_for_unbalanced_constructs {
         };
     }
 
+    my $macro_invocation_scan = scan_sas_text_for_unclosed_macro_invocations($text);
+    push @findings, @{ $macro_invocation_scan->{findings} || [] };
+
     my $macro_scan = scan_sas_text_for_open_code_macro_control($text);
     push @findings, @{ $macro_scan->{findings} || [] };
-    push @findings, @{ scan_sas_text_for_unbalanced_macro_invocations($text) };
+    @findings = @{ suppress_balanced_macro_invocation_false_positives($text, \@findings) || [] };
 
     return {
         lines    => \@lines,
