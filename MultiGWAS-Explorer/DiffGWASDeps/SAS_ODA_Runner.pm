@@ -2054,6 +2054,35 @@ sub _warn_dependency_upload {
     warn $msg;
 }
 
+sub _resolve_local_dependency_path {
+    my ($self, $path) = @_;
+    return '' unless defined $path && length $path;
+    return $path if -e $path;
+
+    my @candidates;
+    push @candidates, File::Spec->catfile(getcwd(), $path)
+      unless File::Spec->file_name_is_absolute($path);
+    push @candidates, File::Spec->catfile($self->{local_macro_dir}, $path)
+      if defined($self->{local_macro_dir}) && length($self->{local_macro_dir}) && !File::Spec->file_name_is_absolute($path);
+
+    if ($path =~ m{^(?:~\/|/)} || $path =~ /[\\\/]/) {
+        my $base = basename($path);
+        if (defined $base && length $base) {
+            push @candidates, File::Spec->catfile(getcwd(), $base);
+            push @candidates, File::Spec->catfile($self->{local_macro_dir}, $base)
+              if defined($self->{local_macro_dir}) && length($self->{local_macro_dir});
+        }
+    }
+
+    my %seen;
+    for my $candidate (@candidates) {
+        next unless defined $candidate && length $candidate;
+        next if $seen{$candidate}++;
+        return $candidate if -e $candidate;
+    }
+    return '';
+}
+
 sub _is_builtin_macro_name {
     my ($name) = @_;
     return 1 unless defined $name && length $name;
@@ -2314,27 +2343,40 @@ sub _process_dependencies {
         push @logs, "Using global importallmacros_ue bootstrap for unresolved remote macros: " . join(', ', @unresolved_macro_names);
     }
 
-    my $sas_path_regex = qr/(?i)\b(datafile\s*=\s*|outfile\s*=\s*|infile\s+|file\s+|filename\s+\S+\s+|libname\s+\S+\s+)(["'])([^"']+)\2/;
+    my $upload_dependency = sub {
+        my ($cmd, $path) = @_;
+        next if $path =~ /^\/home\// || $path =~ /&/;
+        my $local_path = $self->_resolve_local_dependency_path($path);
+        return unless $local_path && !$uploaded{$local_path}++;
+        my $detail = $cmd;
+        $detail =~ s/\s+$//;
+        _warn_dependency_upload(kind => 'file dependency', detail => $detail, path => $path);
+        my $remote = eval {
+            $self->upload(
+                $local_path,
+                {
+                    progress_label => "file dependency ($detail): " . basename($local_path),
+                }
+            );
+        };
+        if ($remote && $remote !~ /^PYTHON ERROR/) {
+            push @logs, "Detected $cmd dependency. Uploaded: $path -> $remote";
+            $code =~ s/\Q$path\E/$remote/g;
+        }
+    };
+
+    my $sas_path_regex = qr/(?i)\b(datafile\s*=\s*|outfile\s*=\s*|zip\s*=\s*|infile\s+|file\s+|filename\s+\S+\s+|libname\s+\S+\s+)(["'])([^"']+)\2/;
     while ($scan_code =~ /$sas_path_regex/g) {
         my ($cmd, $quote, $path) = ($1, $2, $3);
-        next if $path =~ /^\/home\// || $path =~ /&/;
-        if (-e $path && !$uploaded{$path}++) {
-            my $detail = $cmd;
-            $detail =~ s/\s+$//;
-            _warn_dependency_upload(kind => 'file dependency', detail => $detail, path => $path);
-            my $remote = eval {
-                $self->upload(
-                    $path,
-                    {
-                        progress_label => "file dependency ($detail): " . basename($path),
-                    }
-                );
-            };
-            if ($remote && $remote !~ /^PYTHON ERROR/) {
-                push @logs, "Detected $cmd dependency. Uploaded: $path -> $remote";
-                $code =~ s/\Q$path\E/$remote/g;
-            }
-        }
+        $upload_dependency->($cmd, $path);
+    }
+
+    my $sas_unquoted_assignment_regex = qr/(?i)\b(datafile\s*=\s*|outfile\s*=\s*|zip\s*=\s*)([^\s,;\)\r\n]+)/;
+    while ($scan_code =~ /$sas_unquoted_assignment_regex/g) {
+        my ($cmd, $path) = ($1, $2);
+        next unless defined $path && length $path;
+        next if $path =~ /^["']/;
+        $upload_dependency->($cmd, $path);
     }
 
     return ($header_includes . $code, join("\n", @logs));
