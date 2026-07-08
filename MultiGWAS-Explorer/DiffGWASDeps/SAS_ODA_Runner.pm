@@ -896,7 +896,7 @@ sub _autoload_macros_enabled {
 
 my $SERVER_HOST = '127.0.0.1';
 my $SERVER_PORT = 8765;
-my $SERVER_API_VERSION = '2026-07-08-transfer-progress-stdio';
+my $SERVER_API_VERSION = '2026-07-08-download-scope-fix';
 my $SERVER_CONNECT_TIMEOUT_SECONDS = int($ENV{SAS_ODA_SESSION_CONNECT_TIMEOUT_SECONDS} // 5);
 my $SERVER_CREATE_TIMEOUT_SECONDS  = int($ENV{SAS_ODA_SESSION_CREATE_TIMEOUT_SECONDS} // 60);
 my $SERVER_FILEOP_TIMEOUT_SECONDS  = int($ENV{SAS_ODA_SESSION_FILEOP_TIMEOUT_SECONDS} // 20);
@@ -953,7 +953,7 @@ import os
 from datetime import datetime
 HOST = '127.0.0.1'
 PORT = 8765
-SERVER_API_VERSION = '2026-07-08-transfer-progress-stdio'
+SERVER_API_VERSION = '2026-07-08-download-scope-fix'
 sessions = {}
 session_macros_loaded = {}
 session_macro_bootstrap_warning = {}
@@ -1633,10 +1633,10 @@ def handle_client(conn, addr):
                     remote_info = run_fileinfo(sess, remote_path)
                     if not isinstance(remote_info, dict) or not remote_info.get('exists'):
                         raise FileNotFoundError(f"Remote file does not exist in SAS ODA: {remote_path}")
-                    remote_path = remote_info.get('path') or remote_path
+                    resolved_remote_path = remote_info.get('path') or remote_path
                     remote_size = remote_info.get('size') or 0
                     print(
-                        f"Download step [{session_id}]: {remote_path} -> {out_path} ({remote_size:,} bytes)",
+                        f"Download step [{session_id}]: {resolved_remote_path} -> {out_path} ({remote_size:,} bytes)",
                         flush=True,
                     )
                     stop_event = threading.Event()
@@ -1650,7 +1650,7 @@ def handle_client(conn, addr):
                                 daemon=True,
                             )
                             poller.start()
-                        sess.download(out_path, remote_path)
+                        sess.download(out_path, resolved_remote_path)
                     finally:
                         stop_event.set()
                         if poller is not None:
