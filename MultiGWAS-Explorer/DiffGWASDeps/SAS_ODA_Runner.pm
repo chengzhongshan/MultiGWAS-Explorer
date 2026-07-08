@@ -921,6 +921,28 @@ sub _server_submit_timeout_seconds {
     return $run_timeout + $grace + 60;
 }
 
+sub _macro_bootstrap_transport_timeout_seconds {
+    my $bootstrap_timeout = int($ENV{SAS_ODA_MACRO_BOOTSTRAP_TIMEOUT_SECONDS} // 420);
+    return 0 if $bootstrap_timeout <= 0;
+
+    my $grace = int($ENV{SAS_ODA_MACRO_BOOTSTRAP_RESPONSE_GRACE_SECONDS} // 120);
+    $grace = 0 if $grace < 0;
+    return $bootstrap_timeout + $grace;
+}
+
+sub _effective_persistent_submit_timeout_seconds {
+    my (%args) = @_;
+    my $load_macros = $args{load_macros} ? 1 : 0;
+    my $timeout = _server_submit_timeout_seconds();
+    return 0 if $timeout <= 0;
+
+    if ($load_macros) {
+        my $macro_timeout = _macro_bootstrap_transport_timeout_seconds();
+        $timeout = $macro_timeout if $macro_timeout > $timeout;
+    }
+    return $timeout;
+}
+
 # NOTE: This embedded copy is only written to disk when sas_oda_session_server.py
 # is missing. Keep it in sync with the standalone sas_oda_session_server.py file.
 my $SERVER_PY = <<'END_SERVER_PY';
@@ -2440,15 +2462,19 @@ sub run_code {
     my $macro_bootstrap_meta;
     local $ENV{SAS_ODA_AUTOLOAD_MACROS} = 0 if $disable_global_macro_bootstrap;
     if ($self->{persistent} && $self->{session_id}) {
+        my $load_macros = (_autoload_macros_enabled() && !$disable_global_macro_bootstrap) ? 1 : 0;
+        my $submit_timeout = _effective_persistent_submit_timeout_seconds(
+            load_macros => $load_macros,
+        );
         $self->_start_server_if_needed();
         my $resp = _call_session_server(
             {
                 cmd         => 'submit',
                 session_id  => $self->{session_id},
                 code        => $processed_code,
-                load_macros => (_autoload_macros_enabled() && !$disable_global_macro_bootstrap) ? 1 : 0,
+                load_macros => $load_macros,
             },
-            _server_submit_timeout_seconds(),
+            $submit_timeout,
         );
         my $resp_log = '';
         my $resp_lst = '';
