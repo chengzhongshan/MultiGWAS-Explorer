@@ -943,6 +943,61 @@ sub _effective_persistent_submit_timeout_seconds {
     return $timeout;
 }
 
+sub _effective_upload_timeout_seconds {
+    my (%args) = @_;
+    my $requested_timeout = exists $args{timeout_seconds}
+      ? int($args{timeout_seconds} || 0)
+      : 0;
+    return $requested_timeout if $requested_timeout > 0;
+
+    if (!exists $ENV{SAS_ODA_SESSION_UPLOAD_TIMEOUT_SECONDS}) {
+        my $run_timeout = int($ENV{SAS_ODA_RUN_TIMEOUT_SECONDS} || 0);
+        return 0 if $run_timeout <= 0;
+    }
+
+    my $timeout = $SERVER_UPLOAD_TIMEOUT_SECONDS;
+    my $local_path = $args{local_path} // '';
+    if (length($local_path) && -e $local_path) {
+        my $size_bytes = -s $local_path;
+        if (defined $size_bytes && $size_bytes > 0) {
+            my $size_mb = int(($size_bytes + 1024 * 1024 - 1) / (1024 * 1024));
+            my $base_seconds = int($ENV{SAS_ODA_UPLOAD_TIMEOUT_BASE_SECONDS} // 180);
+            my $per_mb_seconds = int($ENV{SAS_ODA_UPLOAD_TIMEOUT_SECONDS_PER_MB} // 5);
+            $base_seconds = 0 if $base_seconds < 0;
+            $per_mb_seconds = 0 if $per_mb_seconds < 0;
+            my $size_based_timeout = $base_seconds + ($size_mb * $per_mb_seconds);
+            $timeout = $size_based_timeout if $size_based_timeout > $timeout;
+        }
+    }
+
+    return $timeout > 0 ? $timeout : $SERVER_UPLOAD_TIMEOUT_SECONDS;
+}
+
+sub _persistent_direct_upload_threshold_bytes {
+    my $threshold = int($ENV{SAS_ODA_PERSISTENT_DIRECT_UPLOAD_THRESHOLD_BYTES} // (10 * 1024 * 1024));
+    return $threshold > 0 ? $threshold : 0;
+}
+
+sub _should_use_direct_upload_for_persistent_session {
+    my ($self, %args) = @_;
+    return 0 unless $self->{persistent} && $self->{session_id};
+
+    if (exists $ENV{SAS_ODA_FORCE_DIRECT_UPLOAD}) {
+        return _runner_env_truthy($ENV{SAS_ODA_FORCE_DIRECT_UPLOAD}) ? 1 : 0;
+    }
+
+    my $threshold = _persistent_direct_upload_threshold_bytes();
+    return 0 unless $threshold > 0;
+
+    my $local_path = $args{local_path} // '';
+    return 0 unless length($local_path) && -e $local_path;
+
+    my $size_bytes = -s $local_path;
+    return 0 unless defined $size_bytes && $size_bytes >= $threshold;
+
+    return 1;
+}
+
 # NOTE: This embedded copy is only written to disk when sas_oda_session_server.py
 # is missing. Keep it in sync with the standalone sas_oda_session_server.py file.
 my $SERVER_PY = <<'END_SERVER_PY';
@@ -2067,6 +2122,7 @@ sub new {
         local_macro_dir => $args{local_macro_dir} || "./",
         open_html => $args{open_html} // 1,
         _session => undef,
+        _transfer_session => undef,
         persistent => 1,
         session_id => $session_id,
         requested_persistent => $requested_persistent,
@@ -2605,10 +2661,19 @@ sub upload {
     $opts = {} unless ref($opts) eq 'HASH';
     my $progress_label = $opts->{progress_label} // '';
     my $skip_if_same = exists $opts->{skip_if_same} ? ($opts->{skip_if_same} ? 1 : 0) : 1;
-    my $timeout_seconds = exists $opts->{timeout_seconds}
-      ? int($opts->{timeout_seconds} || 0)
-      : $SERVER_UPLOAD_TIMEOUT_SECONDS;
-    $timeout_seconds = $SERVER_UPLOAD_TIMEOUT_SECONDS if $timeout_seconds <= 0;
+    my $timeout_seconds = _effective_upload_timeout_seconds(
+        local_path      => $local_path,
+        timeout_seconds => $opts->{timeout_seconds},
+    );
+    if ($self->_should_use_direct_upload_for_persistent_session(local_path => $local_path)) {
+        my $threshold_bytes = _persistent_direct_upload_threshold_bytes();
+        warn "Using direct SAS ODA upload path for large persistent transfer ($local_path, threshold=${threshold_bytes} bytes) to avoid long-lived session-server socket stalls.\n";
+        my ($result, $sess) = eval { upload_file($local_path, $self->{_transfer_session}, $progress_label, $skip_if_same) };
+        $self->{_transfer_session} = $sess if ref $sess;
+        return $result if defined $result && $result !~ /^PYTHON ERROR/;
+        my $detail = $@ || $result || 'direct upload failure';
+        return "PYTHON ERROR: $detail";
+    }
     if ($self->{persistent} && $self->{session_id}) {
         my $resp = $self->_call_persistent_session_server(
             {
