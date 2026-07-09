@@ -1740,6 +1740,64 @@ sub sanitize_sas_text_for_macro_lint {
     return $masked;
 }
 
+sub scan_sas_text_for_open_code_macro_control {
+    my ($text) = @_;
+    my $masked = sanitize_sas_text_for_macro_lint($text);
+    my @lines = split /\n/, ($masked // ''), -1;
+    my @findings;
+    my $macro_depth = 0;
+
+    for my $idx (0 .. $#lines) {
+        my $line_no = $idx + 1;
+        my $line = $lines[$idx] // '';
+
+        if ($line =~ /^\s*%macro\b/i) {
+            $macro_depth++;
+            next;
+        }
+
+        if ($line =~ /^\s*%mend\b/i) {
+            if ($macro_depth > 0) {
+                $macro_depth--;
+            } else {
+                push @findings, {
+                    type        => 'open_code_mend',
+                    line        => $line_no,
+                    message     => "Macro end statement %mend appears outside a %macro/%mend block",
+                    context_ref => [ ($line_no - 2) .. ($line_no + 2) ],
+                };
+            }
+            next;
+        }
+
+        next if $macro_depth > 0;
+
+        if ($line =~ /^\s*%(goto|return)\b/i) {
+            my $stmt = lc($1);
+            push @findings, {
+                type        => 'open_code_macro_control',
+                line        => $line_no,
+                message     => "Macro control statement %$stmt appears in open SAS code outside a %macro/%mend block",
+                context_ref => [ ($line_no - 2) .. ($line_no + 2) ],
+            };
+        }
+    }
+
+    if ($macro_depth > 0) {
+        push @findings, {
+            type        => 'unclosed_macro_definition',
+            line        => scalar(@lines) || 1,
+            message     => "A %macro block appears to be missing its matching %mend",
+            context_ref => [ ((scalar(@lines) || 1) - 4) .. (scalar(@lines) || 1) ],
+        };
+    }
+
+    return {
+        lines    => \@lines,
+        findings => \@findings,
+    };
+}
+
 sub _count_newlines {
     my ($text) = @_;
     return 0 unless defined $text && length $text;
@@ -1763,13 +1821,13 @@ sub scan_sas_text_for_macro_invocation_spans {
             my $ws = $2 // '';
             $stack[-1]{paren_depth}++ if @stack;
             push @stack, {
-                name        => lc($name),
-                display_name=> $name,
-                start_line  => $line_no,
-                paren_depth => 1,
+                name         => lc($name),
+                display_name => $name,
+                start_line   => $line_no,
+                paren_depth  => 1,
             };
             $line_no += _count_newlines($ws);
-            $i += length($&) ;
+            $i += length($&);
             next;
         }
 
@@ -1853,120 +1911,6 @@ sub suppress_balanced_macro_invocation_false_positives {
         push @filtered, $finding;
     }
     return \@filtered;
-}
-
-sub scan_sas_text_for_open_code_macro_control {
-    my ($text) = @_;
-    my $masked = sanitize_sas_text_for_macro_lint($text);
-    my @lines = split /\n/, ($masked // ''), -1;
-    my @findings;
-    my $macro_depth = 0;
-
-    for my $idx (0 .. $#lines) {
-        my $line_no = $idx + 1;
-        my $line = $lines[$idx] // '';
-
-        if ($line =~ /^\s*%macro\b/i) {
-            $macro_depth++;
-            next;
-        }
-
-        if ($line =~ /^\s*%mend\b/i) {
-            if ($macro_depth > 0) {
-                $macro_depth--;
-            } else {
-                push @findings, {
-                    type        => 'open_code_mend',
-                    line        => $line_no,
-                    message     => "Macro end statement %mend appears outside a %macro/%mend block",
-                    context_ref => [ ($line_no - 2) .. ($line_no + 2) ],
-                };
-            }
-            next;
-        }
-
-        next if $macro_depth > 0;
-
-        if ($line =~ /^\s*%(goto|return)\b/i) {
-            my $stmt = lc($1);
-            push @findings, {
-                type        => 'open_code_macro_control',
-                line        => $line_no,
-                message     => "Macro control statement %$stmt appears in open SAS code outside a %macro/%mend block",
-                context_ref => [ ($line_no - 2) .. ($line_no + 2) ],
-            };
-        }
-    }
-
-    if ($macro_depth > 0) {
-        push @findings, {
-            type        => 'unclosed_macro_definition',
-            line        => scalar(@lines) || 1,
-            message     => "A %macro block appears to be missing its matching %mend",
-            context_ref => [ ((scalar(@lines) || 1) - 4) .. (scalar(@lines) || 1) ],
-        };
-    }
-
-    return {
-        lines    => \@lines,
-        findings => \@findings,
-    };
-}
-
-sub line_number_for_offset {
-    my ($text, $offset) = @_;
-    return 1 unless defined $text && defined $offset && $offset > 0;
-    my $prefix = substr($text, 0, $offset);
-    my $count = () = ($prefix =~ /\n/g);
-    return $count + 1;
-}
-
-sub scan_sas_text_for_unbalanced_macro_invocations {
-    my ($text) = @_;
-    my $masked = sanitize_sas_text_for_macro_lint($text);
-    my @findings;
-    return \@findings unless defined $masked && length $masked;
-
-    while ($masked =~ /%([A-Za-z_]\w*)\s*\(/g) {
-        my $macro_name = $1;
-        my $macro_start = $-[0];
-        my $scan_pos = pos($masked);
-        my $depth = 1;
-        my $line_no = line_number_for_offset($masked, $macro_start);
-        my $len = length($masked);
-        my $closed = 0;
-        my $hit_statement_end = 0;
-
-        while ($scan_pos < $len) {
-            my $ch = substr($masked, $scan_pos, 1);
-            if ($ch eq '(') {
-                $depth++;
-            } elsif ($ch eq ')') {
-                $depth--;
-                if ($depth == 0) {
-                    $closed = 1;
-                    last;
-                }
-            } elsif ($ch eq ';' && $depth > 0) {
-                $hit_statement_end = 1;
-                last;
-            }
-            $scan_pos++;
-        }
-
-        next if $closed;
-        my $detail = $hit_statement_end
-          ? "before the statement semicolon"
-          : "before the end of submitted code";
-        push @findings, {
-            type        => 'unbalanced_macro_invocation',
-            line        => $line_no,
-            message     => "Macro invocation %$macro_name( is missing a matching ')' $detail; this can leave SAS waiting for more input",
-            context_ref => [ ($line_no - 2) .. ($line_no + 2) ],
-        };
-    }
-
-    return \@findings;
 }
 
 sub scan_sas_text_for_unbalanced_constructs {
