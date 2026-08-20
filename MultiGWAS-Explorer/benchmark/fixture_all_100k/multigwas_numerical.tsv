@@ -1,0 +1,10 @@
+METRIC	VALUE
+rows_compared	100000
+elapsed_seconds	2.45165205001831
+rows_per_second	40788.8223776507
+max_abs_diff_beta	4.9960036108132e-16
+max_abs_diff_se	4.9960036108132e-16
+max_abs_diff_p	5.55111512312578e-16
+max_abs_diff_gwama_q_vs_z2	0
+easystrata_target	CALCPDIFF option 1, covariance correction rho=0
+gwama_target	two-stratum Cochran Q equivalence when rho=0

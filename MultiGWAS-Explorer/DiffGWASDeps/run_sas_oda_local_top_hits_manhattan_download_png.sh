@@ -29,6 +29,14 @@ TOP_HIT_FOCUS_PVAR="${TOP_HIT_FOCUS_PVAR:-ASN_STD_P}"
 TOP_HIT_FILTER_EXPR="${TOP_HIT_FILTER_EXPR:-((ASN_STD_P>0) and (ASN_STD_P<1E-6)) or ((EUR_STD_P>0) and (EUR_STD_P<1E-6))}"
 TOP_HIT_SIGNAL_THRSHD="${TOP_HIT_SIGNAL_THRSHD:-1e-6}"
 TOP_HIT_DIST_BP="${TOP_HIT_DIST_BP:-1e6}"
+TOP_HIT_SELECTION_METHOD="${TOP_HIT_SELECTION_METHOD:-ld}"
+TOP_HIT_LD_R2_THRESHOLD="${TOP_HIT_LD_R2_THRESHOLD:-0.1}"
+TOP_HIT_LD_POPULATIONS="${TOP_HIT_LD_POPULATIONS:-EUR ASN}"
+TOP_HIT_LD_POPULATION_RULE="${TOP_HIT_LD_POPULATION_RULE:-ANY}"
+TOP_HIT_LD_QUERY_FAILURE_ACTION="${TOP_HIT_LD_QUERY_FAILURE_ACTION:-DISTANCE}"
+TOP_HIT_LD_CACHE_TSV="${TOP_HIT_LD_CACHE_TSV:-}"
+TOP_HIT_LD_CACHE_MIN_R2="${TOP_HIT_LD_CACHE_MIN_R2:-0.2}"
+TOP_HIT_LD_CACHE_MISS_ACTION="${TOP_HIT_LD_CACHE_MISS_ACTION:-WEB}"
 LOCAL_WINDOW_BP="${LOCAL_WINDOW_BP:-1e7}"
 TARGET_SNP_LIST="${TARGET_SNP_LIST:-}"
 TARGET_SNP_GENES="${TARGET_SNP_GENES:-}"
@@ -69,6 +77,8 @@ GET_GTF_MACRO_SAS="${GET_GTF_MACRO_SAS:-${DEPS_DIR}/get_genecode_gtf_data.sas}"
 LOCAL_GTF_INCLUDE_NON_PROTEIN_CODING_GENES="${LOCAL_GTF_INCLUDE_NON_PROTEIN_CODING_GENES:-1}"
 MACRO_SAS="${DEPS_DIR}/Manhattan4DiffGWASs_png.sas"
 TOP_HIT_DIST_MACRO_SAS="${DEPS_DIR}/get_top_signal_within_dist.sas"
+TOP_HIT_LD_MACRO_SAS="${DEPS_DIR}/get_top_signal_with_ld.sas"
+HAPLOREG_LD_QUERY_MACRO_SAS="${DEPS_DIR}/QueryLD_SNPs_at_Haploreg4.sas"
 RUN_SAS_TEMPLATE="${DEPS_DIR}/run_sas_oda_local_top_hits_manhattan.sas"
 SCHEMA_CONFIG_JSON="${SCHEMA_CONFIG_JSON:-${EXTRACTOR_CONFIG_JSON:-${WORKDIR}/configs/preset_pgc_scz_sex_diff.json}}"
 SCHEMA_INCLUDE_HELPER="${SCHEMA_INCLUDE_HELPER:-${DEPS_DIR}/generate_sas_wide_import_include.pl}"
@@ -155,6 +165,7 @@ TOP_HIT_GNOMAD_POP_MAP="${TOP_HIT_GNOMAD_POP_MAP:-}"
 LOCAL_OUTPUT_PREFIX="${LOCAL_OUTPUT_PREFIX:-${OUTPUT_PREFIX:-${PROJECT_TAG}_SAS_local_top_hits_manhattan}}"
 LOCAL_HTML_TITLE="${LOCAL_HTML_TITLE:-${HTML_TITLE:-${PROJECT_TAG} Local Top Hits Manhattan Plot}}"
 LOCAL_TOP_HITS_CSV_BASENAME="${LOCAL_TOP_HITS_CSV_BASENAME:-${LOCAL_OUTPUT_PREFIX}_top_hits.csv}"
+TOP_HIT_LD_AUDIT_BASENAME="${TOP_HIT_LD_AUDIT_BASENAME:-${LOCAL_TOP_HITS_CSV_BASENAME%.csv}_ld_audit.tsv}"
 if [[ -n "${TARGET_SNP_LIST}" ]]; then
   IFS=',' read -r -a _target_snp_csv_names <<< "${TARGET_SNP_LIST}"
   if [[ "${#_target_snp_csv_names[@]}" -eq 1 ]]; then
@@ -218,6 +229,20 @@ stamp="$(date +%Y%m%d_%H%M%S)"
 PNG_OUT="${WORKDIR}/${LOCAL_OUTPUT_PREFIX}.png"
 HTML_OUT="${WORKDIR}/${LOCAL_OUTPUT_PREFIX}.html"
 CSV_OUT="${WORKDIR}/${LOCAL_TOP_HITS_CSV_BASENAME}"
+LD_AUDIT_OUT="${WORKDIR}/${TOP_HIT_LD_AUDIT_BASENAME}"
+TOP_HIT_LD_CACHE_BASENAME=""
+if [[ -n "${TOP_HIT_LD_CACHE_TSV}" ]]; then
+  if [[ ! -s "${TOP_HIT_LD_CACHE_TSV}" ]]; then
+    echo "ERROR: TOP_HIT_LD_CACHE_TSV does not exist or is empty: ${TOP_HIT_LD_CACHE_TSV}" >&2
+    exit 1
+  fi
+  TOP_HIT_LD_CACHE_BASENAME="$(basename "${TOP_HIT_LD_CACHE_TSV}")"
+  perl -e 'exit(($ARGV[0]+0) < ($ARGV[1]+0) ? 1 : 0)' \
+    "${TOP_HIT_LD_R2_THRESHOLD}" "${TOP_HIT_LD_CACHE_MIN_R2}" || {
+      echo "ERROR: LD cutoff ${TOP_HIT_LD_R2_THRESHOLD} is below cache minimum ${TOP_HIT_LD_CACHE_MIN_R2}. Use live queries or raise the cutoff." >&2
+      exit 1
+    }
+fi
 RUN_SAS_RENDERED="${WORKDIR}/run_sas_oda_local_top_hits_manhattan.${stamp}.sas"
 LOCAL_DEBUG_SAS_RENDERED="${WORKDIR}/run_sas_local_debug_local_top_hits_manhattan.${stamp}.sas"
 IMPORT_BLOCK_RENDERED="${WORKDIR}/auto_wide_import_local_hits.${stamp}.sas"
@@ -324,6 +349,7 @@ cleanup_remote_generated_outputs() {
   echo "[cleanup] Removing generated remote Manhattan outputs from SAS ODA..."
   oda_delete_many "cleanup_local_hits_manhattan_output_html_${stamp}" --delete-file "${LOCAL_OUTPUT_PREFIX}.html" || true
   oda_delete_many "cleanup_local_hits_manhattan_output_csv_${stamp}" --delete-file "${LOCAL_TOP_HITS_CSV_BASENAME}" || true
+  oda_delete_many "cleanup_local_hits_manhattan_output_ld_audit_${stamp}" --delete-file "${TOP_HIT_LD_AUDIT_BASENAME}" || true
 
   while IFS= read -r remote_png; do
     [[ -z "${remote_png}" ]] && continue
@@ -465,6 +491,13 @@ upload_data_with_integrity_check() {
 generate_requested_top_hits_csv_locally() {
   [[ -x "${LOCAL_TOP_HITS_CSV_HELPER}" || -f "${LOCAL_TOP_HITS_CSV_HELPER}" ]] || return 1
   echo "[prep] Generating MAF-filtered requested local-top-hit CSV locally..."
+  local candidate_dist_bp="${TOP_HIT_DIST_BP}"
+  local candidate_max_hits="${TOP_HIT_MAX_LOCI}"
+  if [[ "${TOP_HIT_SELECTION_METHOD^^}" == "LD" && -z "${TARGET_SNP_LIST}" ]]; then
+    candidate_dist_bp="0"
+    candidate_max_hits="0"
+    echo "[prep] Generating all MAF-passing significant candidates; SAS will perform LD clumping."
+  fi
   local -a cmd=(
     perl "${LOCAL_TOP_HITS_CSV_HELPER}"
     --input "${DATA_GZ}"
@@ -473,9 +506,9 @@ generate_requested_top_hits_csv_locally() {
     --top-hit-focus-pvar "${TOP_HIT_FOCUS_PVAR}"
     --top-hit-signal-thrshd "${TOP_HIT_SIGNAL_THRSHD}"
     --top-hit-signal-thrshds "${TOP_HIT_SIGNAL_THRSHDS:-${TOP_HIT_SIGNAL_THRSHD}}"
-    --top-hit-dist-bp "${TOP_HIT_DIST_BP}"
+    --top-hit-dist-bp "${candidate_dist_bp}"
     --maf-threshold "${TOP_HIT_MAF_THRESHOLD}"
-    --max-hits "${TOP_HIT_MAX_LOCI}"
+    --max-hits "${candidate_max_hits}"
   )
   if [[ -n "${RUNNER_CONFIG_JSON}" ]]; then
     cmd+=(--runner-config "${RUNNER_CONFIG_JSON}")
@@ -632,6 +665,16 @@ perl "${RENDER_SAS_HELPER}" \
   --replace "TOP_HIT_SIGNAL_THRSHD=${TOP_HIT_SIGNAL_THRSHD}" \
   --replace "TOP_HIT_SIGNAL_THRSHDS=${TOP_HIT_SIGNAL_THRSHDS:-${TOP_HIT_SIGNAL_THRSHD}}" \
   --replace "TOP_HIT_DIST_BP=${TOP_HIT_DIST_BP}" \
+  --replace "TOP_HIT_SELECTION_METHOD=${TOP_HIT_SELECTION_METHOD}" \
+  --replace "TOP_HIT_LD_R2_THRESHOLD=${TOP_HIT_LD_R2_THRESHOLD}" \
+  --replace "TOP_HIT_LD_POPULATIONS=${TOP_HIT_LD_POPULATIONS}" \
+  --replace "TOP_HIT_LD_POPULATION_RULE=${TOP_HIT_LD_POPULATION_RULE}" \
+  --replace "TOP_HIT_LD_QUERY_FAILURE_ACTION=${TOP_HIT_LD_QUERY_FAILURE_ACTION}" \
+  --replace "TOP_HIT_LD_CACHE_BASENAME=${TOP_HIT_LD_CACHE_BASENAME}" \
+  --replace "TOP_HIT_LD_CACHE_MIN_R2=${TOP_HIT_LD_CACHE_MIN_R2}" \
+  --replace "TOP_HIT_LD_CACHE_MISS_ACTION=${TOP_HIT_LD_CACHE_MISS_ACTION}" \
+  --replace "TOP_HIT_MAX_LOCI=${TOP_HIT_MAX_LOCI}" \
+  --replace "TOP_HIT_LD_AUDIT_BASENAME=${TOP_HIT_LD_AUDIT_BASENAME}" \
   --replace "TARGET_SNP_LIST=${TARGET_SNP_LIST}" \
   --replace "TARGET_SNP_GENES=${TARGET_SNP_GENES}" \
   --replace "COMMON_ASSOC_P_VARS=${COMMON_ASSOC_P_VARS:-}" \
@@ -786,7 +829,17 @@ oda_upload_many \
   "upload_local_hits_support_${stamp}" \
   --upload-file "${MACRO_SAS}" \
   --upload-file "${TOP_HIT_DIST_MACRO_SAS}" \
+  --upload-file "${TOP_HIT_LD_MACRO_SAS}" \
+  --upload-file "${HAPLOREG_LD_QUERY_MACRO_SAS}" \
   --upload-file "${GET_GTF_MACRO_UPLOAD}"
+
+if [[ -n "${TOP_HIT_LD_CACHE_TSV}" ]]; then
+  upload_home_file_if_needed \
+    "[1a/5]" \
+    "${TOP_HIT_LD_CACHE_TSV}" \
+    "${TOP_HIT_LD_CACHE_BASENAME}" \
+    "upload_local_hits_ld_cache_${stamp}"
+fi
 
 if [[ -s "${CSV_OUT}" ]]; then
   upload_home_file_if_needed \
@@ -855,7 +908,9 @@ oda_download_many \
   --download-file "~/${LOCAL_OUTPUT_PREFIX}.html" \
   --download-local-path "${HTML_OUT}" \
   --download-file "~/${LOCAL_TOP_HITS_CSV_BASENAME}" \
-  --download-local-path "${CSV_OUT}" || true
+  --download-local-path "${CSV_OUT}" \
+  --download-file "~/${TOP_HIT_LD_AUDIT_BASENAME}" \
+  --download-local-path "${LD_AUDIT_OUT}" || true
 
 remote_pngs="$(
   run_oda_helper \
@@ -942,6 +997,9 @@ fi
 echo "Verified PNG:  ${PNG_OUT} ($(wc -c < "${PNG_OUT}") bytes)"
 echo "Verified HTML: ${HTML_OUT} ($(wc -c < "${HTML_OUT}") bytes)"
 echo "Verified CSV:  ${CSV_OUT} ($(wc -c < "${CSV_OUT}") bytes)"
+if [[ "${TOP_HIT_SELECTION_METHOD^^}" == "LD" && -s "${LD_AUDIT_OUT}" ]]; then
+  echo "Verified LD audit: ${LD_AUDIT_OUT} ($(wc -c < "${LD_AUDIT_OUT}") bytes)"
+fi
 
 cleanup_remote_generated_outputs
 

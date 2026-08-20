@@ -1,0 +1,17 @@
+{
+   "archive_proxy_edges" : 5,
+   "archive_rows_scanned" : 3,
+   "archive_source" : "benchmark/fixtures/haploreg_cache_archive.tsv",
+   "candidate_count" : 4,
+   "candidate_file" : "benchmark/fixtures/haploreg_cache_candidates.csv",
+   "candidate_proxies_only" : true,
+   "matched_query_count" : 3,
+   "minimum_r2" : 0.2,
+   "missing_queries" : [
+      "RS999999"
+   ],
+   "missing_query_count" : 1,
+   "output" : "benchmark/fixtures/haploreg_cache_edges.tsv",
+   "population" : "EUR",
+   "retained_candidate_edges" : 4
+}

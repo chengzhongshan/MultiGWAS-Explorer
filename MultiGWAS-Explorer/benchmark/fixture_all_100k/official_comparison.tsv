@@ -1,0 +1,3 @@
+software	expected_rows	observed_rows	matched_rows	missing_rows	mean_abs_p_diff	p95_abs_p_diff	max_abs_p_diff	max_abs_log10p_diff	discordant_p_lt_0p05	discordant_p_lt_1e_5	discordant_p_lt_5e_8
+GWAMA_2.2.2_q_p-value	100000	100000	100000	0	2.50947555841106e-07	4.79489466964633e-07	5.82889301048439e-07	0.00177394526484687	0	0	0
+EasyStrata_8.6_CALCPDIFF	100000	100000	100000	0	2.27423085398557e-08	6.23373909158786e-08	8.30128220608017e-08	4.072157588908e-08	0	0	0

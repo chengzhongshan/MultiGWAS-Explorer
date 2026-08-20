@@ -6,7 +6,14 @@ pos_var=pos,
 p_var=p,
 dsdout=tophits,
 p_thrsd=1e-5, /*Only keep these signals with smaller values than the threshold*/
-dist4get_uniq_top_hit=1e6 /*Only get the top one hit among the distance by pos with the top one at the center*/
+dist4get_uniq_top_hit=1e6, /*Used only as an LD-query failure fallback when selection_method=LD*/
+selection_method=LD,
+ld_pops=EUR,
+ld_r2_threshold=0.1,
+ld_population_rule=ANY,
+ld_query_failure_action=DISTANCE,
+max_leads=0,
+ld_audit_out=top_hit_ld_audit
 );
 *Note: these global macro vars will be used to draw Manhattan plot later;
 %global _chr_colors_ _top_snps_;
@@ -83,21 +90,42 @@ quit;
 
 %put NOTE: get_top_hits4Manhattan is selecting candidate hits with &p_var <= &p_thrsd.;
 
-%get_top_signal_within_dist(
-dsdin=_top_hits,
-grp_var=&chr_var,
-signal_var=&p_var,
-select_smallest_signal=1,
-pos_var=&pos_var,
-pos_dist_thrshd=&dist4get_uniq_top_hit,
-dsdout=top_ind,
-signal_thrshd=&p_thrsd
-); 
+%if %upcase(&selection_method)=LD %then %do;
+  %get_top_signal_with_ld(
+    dsdin=_top_hits,
+    snp_var=&snp_var,
+    grp_var=&chr_var,
+    signal_var=&p_var,
+    select_smallest_signal=1,
+    pos_var=&pos_var,
+    signal_thrshd=&p_thrsd,
+    ld_pops=&ld_pops,
+    ld_r2_threshold=&ld_r2_threshold,
+    ld_population_rule=&ld_population_rule,
+    query_failure_action=&ld_query_failure_action,
+    fallback_dist_bp=&dist4get_uniq_top_hit,
+    max_leads=&max_leads,
+    dsdout=top_ind,
+    audit_out=&ld_audit_out
+  );
+%end;
+%else %do;
+  %get_top_signal_within_dist(
+    dsdin=_top_hits,
+    grp_var=&chr_var,
+    signal_var=&p_var,
+    select_smallest_signal=1,
+    pos_var=&pos_var,
+    pos_dist_thrshd=&dist4get_uniq_top_hit,
+    dsdout=top_ind,
+    signal_thrshd=&p_thrsd
+  );
+%end;
 proc sql noprint;
 select count(*) into: _top_snp_n trimmed
 from top_ind;
 quit;
-%put NOTE: get_top_hits4Manhattan retained &_top_snp_n lead SNPs after distance pruning.;
+%put NOTE: get_top_hits4Manhattan retained &_top_snp_n lead SNPs after &selection_method selection.;
 
 proc sql outobs=200 noprint;
 select &snp_var into: _top_snps_ separated by ' '

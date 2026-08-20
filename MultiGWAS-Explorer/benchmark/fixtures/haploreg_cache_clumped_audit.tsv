@@ -1,0 +1,5 @@
+CHR	BP	candidate_snp	lead_snp	selection_action	independence_method	query_status	ld_population	candidate_rank	signal	lead_rank	prune_r2
+7	100000	RS10	RS10	SELECTED_LEAD	LD	OK_LOCAL_CACHE		1	1e-09	1	
+7	101000	RS2237570	RS10	PRUNED_LD	LD		EUR	2	2e-09	1	0.3
+7	102000	RS117465896	RS10	PRUNED_LD	LD		EUR	3	3e-09	1	0.75
+8	200000	RS999999	RS999999	SELECTED_LEAD	DISTANCE_FALLBACK	NO_LD_RESPONSE		4	4e-09	2	

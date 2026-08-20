@@ -31,6 +31,7 @@ TOP_HIT_FOCUS_PVAR="${TOP_HIT_FOCUS_PVAR:-ALL_STD_P}"
 TOP_HIT_SIGNAL_THRSHD="${TOP_HIT_SIGNAL_THRSHD:-1e-6}"
 TOP_HIT_SIGNAL_THRSHDS="${TOP_HIT_SIGNAL_THRSHDS:-${TOP_HIT_SIGNAL_THRSHD}}"
 TOP_HIT_DIST_BP="${TOP_HIT_DIST_BP:-1e6}"
+TOP_HIT_SELECTION_METHOD="${TOP_HIT_SELECTION_METHOD:-ld}"
 TOP_HIT_MAF_THRESHOLD="${TOP_HIT_MAF_THRESHOLD:-0.01}"
 TOP_HIT_MAX_LOCI="${TOP_HIT_MAX_LOCI:-0}"
 TOP_HIT_GNOMAD_FREQ_FILE="${TOP_HIT_GNOMAD_FREQ_FILE:-}"
@@ -198,6 +199,27 @@ delete_remote_file_quiet() {
 
 generate_requested_top_hits_csv_locally() {
   [[ -x "${LOCAL_TOP_HITS_CSV_HELPER}" || -f "${LOCAL_TOP_HITS_CSV_HELPER}" ]] || return 1
+  if [[ "${TOP_HIT_SELECTION_METHOD^^}" == "LD" && -z "${TARGET_SNP_LIST}" ]]; then
+    local ld_source_csv="${TOP_HIT_LD_SOURCE_CSV:-}"
+    if [[ -z "${ld_source_csv}" && -n "${LOCAL_TOP_HITS_CSV_BASENAME:-}" ]]; then
+      ld_source_csv="${WORKDIR}/${LOCAL_TOP_HITS_CSV_BASENAME}"
+    fi
+    if [[ -n "${ld_source_csv}" && -s "${ld_source_csv}" ]]; then
+      if ! head -n 1 "${ld_source_csv}" | grep -q 'INDEPENDENCE_METHOD'; then
+        echo "ERROR: Candidate CSV ${ld_source_csv} has not yet been LD-clumped (INDEPENDENCE_METHOD is absent)." >&2
+        echo "ERROR: Run plot_local_manhattan to create the final LD-independent top-hit CSV before the forest step." >&2
+        return 1
+      fi
+      if [[ "${ld_source_csv}" != "${CSV_OUT}" ]]; then
+        cp -f "${ld_source_csv}" "${CSV_OUT}"
+      fi
+      echo "[prep] Reusing LD-independent top-hit CSV for forest plots: ${ld_source_csv}"
+      return 0
+    fi
+    echo "ERROR: LD selection is active, but no LD-independent top-hit CSV is available for the forest plot." >&2
+    echo "ERROR: Run plot_local_manhattan first or set TOP_HIT_LD_SOURCE_CSV to its downloaded top-hit CSV." >&2
+    return 1
+  fi
   echo "[prep] Generating requested forest-plot top-hit CSV locally..."
   local -a cmd=(
     perl "${LOCAL_TOP_HITS_CSV_HELPER}"

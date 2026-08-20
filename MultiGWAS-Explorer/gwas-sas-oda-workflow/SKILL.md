@@ -306,6 +306,23 @@ Before running a workflow, identify:
    If a Windows-editable workbook is needed afterward, use:
    - `DiffGWASDeps/export_augmented_table_s1_excel.ps1`
 
+14. Use LD clumping, not physical distance, for automatic lead selection.
+   The default SAS top-hit path now uses
+   `DiffGWASDeps/get_top_signal_with_ld.sas`. Candidates are ranked by raw
+   differential P value or the applicable common-association P value, then
+   pruned against each selected lead with configurable HaploReg populations,
+   r-squared threshold, and ANY/ALL population logic. Preserve the audit fields
+   distinguishing `SELECTED_LEAD`, `PRUNED_LD`, and
+   `PRUNED_DISTANCE_FALLBACK`. Describe these as LD-clumped leads, not
+   conditionally independent loci. Physical distance is allowed only as an
+   explicitly selected legacy method or a labeled failed-query fallback.
+   For large candidate sets and thresholds of at least r-squared 0.2, prefer a
+   candidate-restricted cache built from the official HaploReg v4 archives:
+   - `DiffGWASDeps/build_haploreg_ld_candidate_cache.sh`
+   - `DiffGWASDeps/clump_top_hits_with_haploreg_cache.pl`
+   Lower thresholds must continue through live HaploReg queries because the
+   downloadable archives begin at r-squared 0.2.
+
 ## Project Scripts
 
 When working in this user's GWAS/SAS ODA project, prefer these existing scripts if present:
@@ -323,6 +340,10 @@ When working in this user's GWAS/SAS ODA project, prefer these existing scripts 
 - `run_sas_oda_local_top_hits_manhattan_download_png.sh`
 - `run_sas_oda_local_top_hits_with_gtf_download_html.sh`
 - `run_sas_oda_single_snp_with_gtf_download_html.sh`
+- `get_top_signal_with_ld.sas`
+- `QueryLD_SNPs_at_Haploreg4.sas`
+- `build_haploreg_ld_candidate_cache.sh`
+- `clump_top_hits_with_haploreg_cache.pl`
 - `regenerate_manuscript_hit_tables.pl`
 - `augment_common_hits_table_s1.pl`
 - `auto_prepare_and_run_diff_gwas.pl`
@@ -343,6 +364,12 @@ For a new project, copy/adapt the script templates in this skill's `scripts/` fo
   because `maf_source=UNKNOWN`.
 - Use `perl DiffGWASDeps/test_top_hit_maf_filter.pl --no-real --keep-workdir`
   for a quick synthetic regression of the MAF safeguard branches.
+- Confirm automatic lead selection reports `top_hit_selection_method=ld`, an
+  explicit population set, r-squared threshold, query-failure action, and a
+  non-empty lead/pruning audit. Do not report the retained count as a count of
+  conditionally independent loci.
+- Use `bash benchmark/run_differential_gwas_revision_benchmarks.sh
+  validate-results` for the compact reviewer-revision syntax/result check.
 - For the bundled PGC schizophrenia example, expect the real differential and
   common-association validations to take minutes rather than seconds; run them
   separately if you want clearer timing/logs.

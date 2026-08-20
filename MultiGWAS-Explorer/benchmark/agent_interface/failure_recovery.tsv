@@ -1,0 +1,4 @@
+"run"	"injected_failure_detected"	"corrected_retry_success"	"recovery_seconds"	"recovered_artifact_set_sha256"
+"1"	"1"	"1"	"2.61965"	"e7bf1e288818687edb80b11f8da5946c4d6e29340603bd58f2936dd609b8e4b5"
+"2"	"1"	"1"	"2.620425"	"e7bf1e288818687edb80b11f8da5946c4d6e29340603bd58f2936dd609b8e4b5"
+"3"	"1"	"1"	"2.719137"	"e7bf1e288818687edb80b11f8da5946c4d6e29340603bd58f2936dd609b8e4b5"

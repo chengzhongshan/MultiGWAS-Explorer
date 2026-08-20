@@ -21,6 +21,16 @@ companion runner/script pair:
 %let top_hit_signal_thrshd=__TOP_HIT_SIGNAL_THRSHD__;
 %let top_hit_signal_thrshds=__TOP_HIT_SIGNAL_THRSHDS__;
 %let top_hit_dist_bp=__TOP_HIT_DIST_BP__;
+%let top_hit_selection_method=__TOP_HIT_SELECTION_METHOD__;
+%let top_hit_ld_r2_threshold=__TOP_HIT_LD_R2_THRESHOLD__;
+%let top_hit_ld_populations=__TOP_HIT_LD_POPULATIONS__;
+%let top_hit_ld_population_rule=__TOP_HIT_LD_POPULATION_RULE__;
+%let top_hit_ld_query_failure_action=__TOP_HIT_LD_QUERY_FAILURE_ACTION__;
+%let top_hit_ld_cache_basename=__TOP_HIT_LD_CACHE_BASENAME__;
+%let top_hit_ld_cache_min_r2=__TOP_HIT_LD_CACHE_MIN_R2__;
+%let top_hit_ld_cache_miss_action=__TOP_HIT_LD_CACHE_MISS_ACTION__;
+%let top_hit_max_loci=__TOP_HIT_MAX_LOCI__;
+%let top_hit_ld_audit_basename=__TOP_HIT_LD_AUDIT_BASENAME__;
 %let local_window_bp=__LOCAL_WINDOW_BP__;
 %let local_max_hits_per_fig=__LOCAL_MAX_HITS_PER_FIG__;
 %let local_n_gwas_tracks=%eval(1 + %sysfunc(countw(%str(__MANHATTAN_OTHER_P_VARS__),%str( ))));
@@ -49,8 +59,25 @@ ods listing;
 %end;
 
 %include "~/get_top_signal_within_dist.sas";
+%include "~/QueryLD_SNPs_at_Haploreg4.sas";
+%include "~/get_top_signal_with_ld.sas";
 %include "~/__GET_GTF_MACRO_BASENAME__";
 %include "~/Manhattan4DiffGWASs_png.sas";
+
+%if not %sysevalf(%superq(top_hit_ld_cache_basename)=,boolean) %then %do;
+proc import datafile="~/&top_hit_ld_cache_basename"
+  out=top_hit_ld_cache dbms=tab replace;
+  guessingrows=max;
+run;
+proc datasets library=work nolist;
+  modify top_hit_ld_cache;
+  index create query_population=(query_snp ld_population);
+quit;
+%let HAPLOREG_LD_CACHE_DSD=work.top_hit_ld_cache;
+%let HAPLOREG_LD_CACHE_MIN_R2=&top_hit_ld_cache_min_r2;
+%let HAPLOREG_LD_CACHE_MISS_ACTION=&top_hit_ld_cache_miss_action;
+%put NOTE: Loaded candidate-specific HaploReg LD cache &top_hit_ld_cache_basename (minimum r2=&top_hit_ld_cache_min_r2).;
+%end;
 
 %macro _find_first_column(lib=,mem=,outvar=,candidates=);
   %global &outvar;
@@ -162,6 +189,8 @@ ods listing;
   %_find_first_column(lib=WORK,mem=%upcase(&outdsd),outvar=req_bp_var,candidates=BP bp POS pos position);
   %_find_first_column(lib=WORK,mem=%upcase(&outdsd),outvar=req_snp_var,candidates=SNP rsid marker id);
   %_find_first_column(lib=WORK,mem=%upcase(&outdsd),outvar=req_hit_order_var,candidates=hit_order HIT_ORDER order panel_order rank);
+  %_find_first_column(lib=WORK,mem=%upcase(&outdsd),outvar=req_gene_var,candidates=gene GENE nearest_gene gene_symbol symbol);
+  %_find_first_column(lib=WORK,mem=%upcase(&outdsd),outvar=req_snp_gene_var,candidates=snp_gene SNP_GENE snp2gene);
 
   %if %superq(req_chr_var)= or %superq(req_bp_var)= or %superq(req_snp_var)= %then %do;
     %put WARNING: Requested top-hit CSV lacks resolvable CHR/BP/SNP columns, so it will be ignored.;
@@ -174,7 +203,7 @@ ods listing;
 
   data &outdsd;
     set &outdsd;
-    length CHR 8 BP 8 SNP $128 hit_order 8;
+    length CHR 8 BP 8 SNP $128 hit_order 8 gene $256 snp_gene $128;
     CHR=input(strip(vvaluex("&req_chr_var")),best32.);
     BP=input(strip(vvaluex("&req_bp_var")),best32.);
     SNP=strip(vvaluex("&req_snp_var"));
@@ -184,8 +213,21 @@ ods listing;
     %else %do;
     hit_order=_n_;
     %end;
+    %if %superq(req_gene_var) ne %then %do;
+    gene=strip(vvaluex("&req_gene_var"));
+    %end;
+    %else %do;
+    gene='';
+    %end;
+    %if %superq(req_snp_gene_var) ne %then %do;
+    snp_gene=strip(vvaluex("&req_snp_gene_var"));
+    %end;
+    %else %do;
+    snp_gene='';
+    %end;
+    if upcase(gene)='NA' then gene='';
+    if upcase(snp_gene)='NA' then snp_gene='';
     if missing(CHR) or missing(BP) or missing(SNP) then delete;
-    keep CHR BP SNP hit_order;
   run;
 
   proc sort data=&outdsd nodupkey;
@@ -359,6 +401,91 @@ run;
 %end;
 
 %_load_requested_target_snps(outdsd=requested_target_snps);
+%_load_req_top_hits_csv(outdsd=requested_top_hits_csv);
+%if not %sysfunc(exist(work.requested_top_hits_csv)) %then %do;
+data requested_top_hits_csv;
+  length CHR 8 BP 8 SNP $128 hit_order 8 gene $256 snp_gene $128;
+  stop;
+run;
+%end;
+
+%if %sysevalf(&requested_top_hits_loaded,boolean)
+    and %upcase(&top_hit_mode)=COMMON_ASSOCIATION %then %do;
+data requested_top_hits_csv;
+  set requested_top_hits_csv;
+  COMMON_ASSOC_P=min(of &common_assoc_pvars);
+run;
+%end;
+
+%macro _pick_top_hits_by_thr(candidate_dsd=);
+  %local _i _n _thr _n_hits_this;
+  %let _n=%sysfunc(countw(%superq(top_hit_signal_thrshds),%str( )));
+  %if &_n=0 %then %let _n=1;
+  %do _i=1 %to &_n;
+    %let _thr=%scan(%superq(top_hit_signal_thrshds),&_i,%str( ));
+    %if %superq(_thr)= %then %let _thr=&top_hit_signal_thrshd;
+    %put NOTE: Trying top-hit threshold &_thr for mode=&top_hit_mode focus=&top_hit_focus_pvar;
+    %let _n_hits_this=0;
+    proc sql noprint;
+      select count(*) into: _n_hits_this trimmed
+      from &candidate_dsd
+      where (&top_hit_focus_pvar>0) and (&top_hit_focus_pvar<&_thr);
+    quit;
+    %if %sysevalf(&_n_hits_this>0) %then %do;
+      %let top_hit_signal_thrshd=&_thr;
+      %goto _picked;
+    %end;
+  %end;
+  %_picked:
+%mend;
+
+%macro _select_computed_top_hits(candidate_dsd=,outdsd=);
+  %if %upcase(&top_hit_selection_method)=LD %then %do;
+    %put NOTE: Selecting LD-clumped top hits (r2 >= &top_hit_ld_r2_threshold; populations=&top_hit_ld_populations; rule=&top_hit_ld_population_rule).;
+    %get_top_signal_with_ld(
+      dsdin=&candidate_dsd,
+      snp_var=SNP,
+      grp_var=CHR,
+      signal_var=&top_hit_focus_pvar,
+      select_smallest_signal=1,
+      pos_var=BP,
+      signal_thrshd=&top_hit_signal_thrshd,
+      ld_pops=&top_hit_ld_populations,
+      ld_r2_threshold=&top_hit_ld_r2_threshold,
+      ld_population_rule=&top_hit_ld_population_rule,
+      query_failure_action=&top_hit_ld_query_failure_action,
+      fallback_dist_bp=&top_hit_dist_bp,
+      max_leads=&top_hit_max_loci,
+      dsdout=&outdsd,
+      audit_out=top_hit_ld_audit
+    );
+    data &outdsd;
+      set &outdsd;
+      requested_hit_order=LD_LEAD_RANK;
+    run;
+  %end;
+  %else %do;
+    %put NOTE: Selecting top hits by legacy physical-distance pruning because TOP_HIT_SELECTION_METHOD=&top_hit_selection_method.;
+    %get_top_signal_within_dist(
+      dsdin=&candidate_dsd,
+      grp_var=CHR,
+      signal_var=&top_hit_focus_pvar,
+      select_smallest_signal=1,
+      pos_var=BP,
+      pos_dist_thrshd=&top_hit_dist_bp,
+      dsdout=&outdsd,
+      signal_thrshd=&top_hit_signal_thrshd
+    );
+    data &outdsd;
+      set &outdsd;
+      requested_hit_order=.;
+      length INDEPENDENCE_METHOD $24;
+      INDEPENDENCE_METHOD='DISTANCE';
+      LD_R2_THRESHOLD=.;
+      LD_FALLBACK_BP=&top_hit_dist_bp;
+    run;
+  %end;
+%mend;
 
 %if %sysevalf(&requested_target_snps_loaded,boolean) %then %do;
 proc sql;
@@ -371,6 +498,11 @@ proc sql;
   order by b.hit_order, a.CHR, a.BP, a.SNP
   ;
 quit;
+data top_hit4diffp_raw;
+  set top_hit4diffp_raw;
+  length INDEPENDENCE_METHOD $24;
+  INDEPENDENCE_METHOD='USER_TARGET';
+run;
 %end;
 %else %do;
 data top_hit_candidates;
@@ -378,46 +510,26 @@ data top_hit_candidates;
   if &top_hit_filter_expr;
 run;
 
-%macro _pick_top_hits_by_thr;
-  %local _i _n _thr _n_hits_this;
-  %let _n=%sysfunc(countw(%superq(top_hit_signal_thrshds),%str( )));
-  %if &_n=0 %then %let _n=1;
-  %do _i=1 %to &_n;
-    %let _thr=%scan(%superq(top_hit_signal_thrshds),&_i,%str( ));
-    %if %superq(_thr)= %then %let _thr=&top_hit_signal_thrshd;
-    %put NOTE: Trying top-hit threshold &_thr for mode=&top_hit_mode focus=&top_hit_focus_pvar;
-    %let _n_hits_this=0;
-    proc sql noprint;
-      select count(*) into: _n_hits_this trimmed
-      from top_hit_candidates
-      where (&top_hit_focus_pvar>0) and (&top_hit_focus_pvar<&_thr);
-    quit;
-    %if %sysevalf(&_n_hits_this>0) %then %do;
-      %let top_hit_signal_thrshd=&_thr;
-      %goto _picked;
-    %end;
-  %end;
-  %_picked:
-%mend;
-%_pick_top_hits_by_thr;
-
-%get_top_signal_within_dist(
-  dsdin=top_hit_candidates,
-  grp_var=CHR,
-  signal_var=&top_hit_focus_pvar,
-  select_smallest_signal=1,
-  pos_var=BP,
-  pos_dist_thrshd=&top_hit_dist_bp,
-  dsdout=top_hit4diffp_raw,
-  signal_thrshd=&top_hit_signal_thrshd
-);
+%if %sysevalf(&requested_top_hits_loaded,boolean) %then %do;
+  %_pick_top_hits_by_thr(candidate_dsd=requested_top_hits_csv);
+  %_select_computed_top_hits(candidate_dsd=requested_top_hits_csv,outdsd=top_hit4diffp_raw);
+  data top_hit4diffp_raw;
+    length A1 A2 $8 requested_hit_order 8;
+    set top_hit4diffp_raw;
+    requested_hit_order=coalesce(LD_LEAD_RANK,hit_order,_n_);
+    SNP=strip(SNP);
+    if missing(A1) then A1=strip(coalescec(EFFECT_ALLELE, ALTERNATIVE_ALLELE));
+    if missing(A2) then A2=strip(coalescec(OTHER_ALLELE, REFERENCE_ALLELE));
+  run;
+  proc sort data=top_hit4diffp_raw;
+    by requested_hit_order CHR BP SNP;
+  run;
+  %put NOTE: The uploaded MAF-filtered CSV supplied LD-clumping candidates; only LD-independent leads are retained.;
 %end;
-
-%if not %sysevalf(&requested_target_snps_loaded,boolean) %then %do;
-data top_hit4diffp_raw;
-  set top_hit4diffp_raw;
-  requested_hit_order=.;
-run;
+%else %do;
+  %_pick_top_hits_by_thr(candidate_dsd=top_hit_candidates);
+  %_select_computed_top_hits(candidate_dsd=top_hit_candidates,outdsd=top_hit4diffp_raw);
+%end;
 %end;
 
 %_load_requested_target_snp_genes(outdsd=requested_target_snp_genes);
@@ -428,27 +540,10 @@ run;
   run;
 %end;
 
-%_load_req_top_hits_csv(outdsd=requested_top_hits_csv);
-
-%if %sysevalf(&requested_top_hits_loaded,boolean) %then %do;
-proc sql;
-  create table top_hit4diffp_raw as
-  select a.*,
-         b.hit_order as requested_hit_order
-  from scz_mh as a
-  inner join requested_top_hits_csv as b
-    on a.CHR=b.CHR
-   and a.BP=b.BP
-   and a.SNP=b.SNP
-  order by b.hit_order, a.CHR, a.BP, a.SNP
-  ;
-quit;
-%put NOTE: Requested local-top-hit CSV is being treated as the explicit source of truth for this local Manhattan batch, so previously selected loci will not be re-pruned by distance or threshold filtering.;
-%end;
-
 proc sql noprint;
-  select SNP into: top_snps separated by ' '
+  select strip(SNP) into: top_snps separated by ' '
   from top_hit4diffp_raw
+  where not missing(SNP)
   order by coalesce(requested_hit_order, 999999999), CHR, BP;
 quit;
 
@@ -460,60 +555,92 @@ quit;
 %mend;
 %_check_top_snps_;
 
-%QueryHaploreg(
-  rsids=&top_snps,
-  dsdout=snps2genes,
-  print_html=0
-);
+%macro _build_haploreg_gene_map;
+  %QueryHaploreg(
+    rsids=&top_snps,
+    dsdout=snps2genes,
+    print_html=0
+  );
 
-%if %sysfunc(exist(WORK.SNPS2GENES)) %then %do;
+  %if %sysfunc(exist(WORK.SNPS2GENES)) %then %do;
+    data snps2genes_clean;
+      length rsid $40 gene $256;
+      set snps2genes;
+      rsid=strip(rsid);
+      gene=strip(gene);
+      if prxmatch('/^rs[0-9]+$/i', rsid)=0 then delete;
+      if prxmatch('/<[^>]+>/', gene) > 0 then gene='';
+      if prxmatch('/could not connect/i', gene) > 0 then gene='';
+      if prxmatch('/^detail view for /i', gene) > 0 then gene='';
+      gene=prxchange('s/\s*[,;|].*$//',1,gene);
+      if upcase(gene)='NA' then gene='';
+      if missing(gene) then delete;
+    run;
+
+    proc sort data=snps2genes_clean nodupkey;
+      by rsid;
+    run;
+  %end;
+  %else %do;
+    data snps2genes_clean;
+      length rsid $40 gene $256;
+      stop;
+    run;
+  %end;
+%mend;
+
+%if %sysevalf(&requested_top_hits_loaded,boolean) %then %do;
   data snps2genes_clean;
     length rsid $40 gene $256;
-    set snps2genes;
-    rsid=strip(rsid);
+    set requested_top_hits_csv;
+    rsid=strip(SNP);
     gene=strip(gene);
-    if prxmatch('/^rs[0-9]+$/i', rsid)=0 then delete;
-    if prxmatch('/<[^>]+>/', gene) > 0 then gene='';
-    if prxmatch('/could not connect/i', gene) > 0 then gene='';
-    if prxmatch('/^detail view for /i', gene) > 0 then gene='';
-    gene=prxchange('s/\s*[,;|].*$//',1,gene);
+    if missing(gene) then gene=scan(strip(snp_gene),2,':');
     if upcase(gene)='NA' then gene='';
-    if missing(gene) then delete;
+    if missing(rsid) then delete;
+    keep rsid gene;
   run;
 
   proc sort data=snps2genes_clean nodupkey;
     by rsid;
   run;
-%end;
-%else %do;
-  data snps2genes_clean;
-    length rsid $40 gene $256;
+
+  data snps2genes_gtf_fallback;
+    length rsid $40 gtf_gene $256;
     stop;
   run;
 %end;
+%else %do;
+  %_build_haploreg_gene_map;
 
-%_ensure_effective_gtf_dsd(top_hits_dsd=top_hit4diffp_raw);
+  %_ensure_effective_gtf_dsd(top_hits_dsd=top_hit4diffp_raw);
 
-%_prepare_gtf_gene_fallback(
-  top_hits_dsd=top_hit4diffp_raw,
-  gtf_dsd=&effective_gtf_dsd,
-  outdsd=snps2genes_gtf_fallback
-);
+  %_prepare_gtf_gene_fallback(
+    top_hits_dsd=top_hit4diffp_raw,
+    gtf_dsd=&effective_gtf_dsd,
+    outdsd=snps2genes_gtf_fallback
+  );
+%end;
 
 proc sql;
   create table top_hit4diffp as
   select a.*,
-         coalescec(u.gene, b.gene, c.gtf_gene) as gene length=256,
+         coalescec(u.gene, r.gene, b.gene, c.gtf_gene) as gene length=256,
          case
            when not missing(u.gene) then 'USER'
+           when not missing(r.gene) then 'REQUESTED'
            when not missing(b.gene) then 'HaploReg'
            when not missing(c.gtf_gene) then 'GTF'
            else 'NA'
          end as gene_source length=16,
-         catx(':', a.SNP, coalescec(u.gene, b.gene, c.gtf_gene, 'NA')) as snp_gene length=128
+         coalescec(r.snp_gene, catx(':', a.SNP, coalescec(u.gene, r.gene, b.gene, c.gtf_gene, 'NA'))) as snp_gene length=128
   from top_hit4diffp_raw as a
   left join requested_target_snp_genes as u
     on upcase(strip(a.SNP))=upcase(strip(u.SNP))
+  left join requested_top_hits_csv as r
+    on a.CHR=r.CHR
+   and a.BP=r.BP
+   and upcase(strip(a.SNP))=upcase(strip(r.SNP))
   left join snps2genes_clean as b
     on a.SNP=b.rsid
   left join snps2genes_gtf_fallback as c
@@ -603,6 +730,16 @@ proc export data=top_hit4diffp_export
   dbms=csv
   replace;
 run;
+
+%if %upcase(&top_hit_selection_method)=LD
+    and %sysfunc(exist(work.top_hit_ld_audit))
+    and not %sysevalf(%superq(top_hit_ld_audit_basename)=,boolean) %then %do;
+proc export data=top_hit_ld_audit
+  outfile="~/&top_hit_ld_audit_basename"
+  dbms=tab
+  replace;
+run;
+%end;
 
 data _null_;
   length _lmhpf 8 _nth 8 _nhb 8 _ngt 8;

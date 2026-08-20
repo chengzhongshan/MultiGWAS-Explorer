@@ -1,0 +1,4 @@
+TASK	INPUT_ROWS	ELAPSED_SECONDS	STATUS	NOTES
+pre_exclusion_unfiltered_qc	22292345	991.8	PASS	Full-stream raw-Z lambda and candidate sensitivity analysis
+full_source_harmonization_audit	44930352	1833.1	PASS	Pair-presence, allele category, ambiguity, duplicate, and frequency audit
+harmonization_filtered_unfiltered_qc	22292345	1310.7	PASS	Revised ambiguity and EAF checks before lambda and candidate enumeration

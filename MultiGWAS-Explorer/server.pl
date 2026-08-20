@@ -1033,6 +1033,18 @@ $server->tool(
                 type => 'integer',
                 description => 'Optional requested upper bound for local top-hit columns per panel. The current pipeline allows up to 30 columns per local Manhattan figure.'
             },
+            standardize_method => {
+                type => 'string',
+                description => 'Optional differential standardization method, for example: mean_sd or mean_sd_clipped.'
+            },
+            clip_lower_quantile => {
+                type => 'string',
+                description => 'Optional lower winsorization quantile used by standardize_method=mean_sd_clipped, for example: 0.001'
+            },
+            clip_upper_quantile => {
+                type => 'string',
+                description => 'Optional upper winsorization quantile used by standardize_method=mean_sd_clipped, for example: 0.999'
+            },
             reference_build => {
                 type => 'string',
                 description => 'Optional reference genome build override for build-aware local GTF annotation, for example: hg19, hg38, or t2t. If omitted, the pipeline tries explicit spec fields first, then header/path tokens, and otherwise falls back to hg38.'
@@ -1147,6 +1159,9 @@ $server->tool(
         my $from_step = $args->{from_step} // '';
         my $to_step = $args->{to_step} // '';
         my $local_max_hits_per_fig = $args->{local_max_hits_per_fig};
+        my $standardize_method = $args->{standardize_method} // '';
+        my $clip_lower_quantile = $args->{clip_lower_quantile} // '';
+        my $clip_upper_quantile = $args->{clip_upper_quantile} // '';
         my $reference_build = $args->{reference_build} // '';
         my $local_gtf_window_bp = $args->{local_gtf_window_bp} // '';
         my $local_manhattan_angle4xaxis_label = $args->{local_manhattan_angle4xaxis_label} // '';
@@ -1288,6 +1303,12 @@ $server->tool(
             push @cmd, ('--from-step', $from_step) if defined $from_step && length $from_step;
             push @cmd, ('--to-step', $to_step) if defined $to_step && length $to_step;
             push @cmd, ('--local-max-hits-per-fig', $local_max_hits_per_fig) if defined $local_max_hits_per_fig && $local_max_hits_per_fig =~ /^\d+$/;
+            push @cmd, ('--standardize-method', $standardize_method)
+              if defined $standardize_method && length $standardize_method;
+            push @cmd, ('--clip-lower-quantile', $clip_lower_quantile)
+              if defined $clip_lower_quantile && length $clip_lower_quantile;
+            push @cmd, ('--clip-upper-quantile', $clip_upper_quantile)
+              if defined $clip_upper_quantile && length $clip_upper_quantile;
             push @cmd, ('--reference-build', $reference_build)
               if defined $reference_build && length $reference_build;
             push @cmd, ('--local-gtf-window-bp', $local_gtf_window_bp)

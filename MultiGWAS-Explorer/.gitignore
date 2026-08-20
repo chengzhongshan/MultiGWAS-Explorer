@@ -19,6 +19,20 @@ cache/local_gtf_reuse/
 cache/local_manhattan_reuse/
 cache/gtf/
 
+# Reviewer-benchmark reruns and large downloadable HaploReg intermediates.
+benchmark/reproduction/
+benchmark/smoke_*/
+benchmark/pgc_common_ld_candidates.csv
+benchmark/*candidate_ld.tsv
+benchmark/*candidate_ld.sqlite
+benchmark/fixture_all_100k/expected.tsv
+benchmark/fixture_all_100k/female.gwama.tsv
+benchmark/fixture_all_100k/male.gwama.tsv
+benchmark/fixture_all_100k/multigwas.tsv
+benchmark/fixture_all_100k/easystrata.tsv
+benchmark/fixture_all_100k/EasyStrata.easystrata.results.txt
+benchmark/fixture_all_100k/gwama.out
+
 *.docx
 *.html
 *.png

@@ -5,7 +5,7 @@
    "DISPLAY_GWAS" : "ALL,EUR,ASN,ALL_FEMALE,ALL_MALE,ASN_FEMALE,ASN_MALE,EUR_FEMALE,EUR_MALE",
    "DISPLAY_GWAS_AVAILABLE" : "ALL|EUR|ASN|ALL_FEMALE|ALL_MALE|ASN_FEMALE|ASN_MALE|EUR_FEMALE|EUR_MALE",
    "DISPLAY_GWAS_MODE" : "multi",
-   "EXTRACTOR_CONFIG_JSON" : "/mnt/g/NGS_lib/Linux_codes_SAM/Conda_and_Docker_Related_Scripts/perlMCP4Gemini_Paper/configs/auto_PGC_SCZ_female_vs_male_diff_effects_preset.json",
+   "EXTRACTOR_CONFIG_JSON" : "/mnt/e/LongCOVID_HGI_GWAS/PGC_Large_GWASs/Manuscript4AI_with_PGC_GWASs/FR_Reviewers_Comments/perlMCP4Gemini_Paper/configs/auto_PGC_SCZ_female_vs_male_diff_effects_preset.json",
    "FOREST_DEFAULT_HIT_CLASS" : "DIFFERENTIAL",
    "FOREST_DOTSIZE" : 8,
    "FOREST_FIG_HEIGHT" : "",
@@ -76,7 +76,7 @@
          "zvar" : "EUR_GROUP2_Z"
       }
    },
-   "GTF_ASSOC_PVARS" : "ALL_STD_P EUR_STD_P ASN_STD_P ALL_FEMALE_P ALL_MALE_P ASN_FEMALE_P ASN_MALE_P EUR_FEMALE_P EUR_MALE_P",
+   "GTF_ASSOC_PVARS" : "ALL_DIFF_P EUR_DIFF_P ASN_DIFF_P ALL_FEMALE_P ALL_MALE_P ASN_FEMALE_P ASN_MALE_P EUR_FEMALE_P EUR_MALE_P",
    "GTF_COLORBAR_LABEL" : "Z score",
    "GTF_DIST2SNP" : 100000,
    "GTF_DSD" : "FM.GTF_HG19",
@@ -110,11 +110,11 @@
    "LOCAL_WINDOW_BP" : "1e6",
    "MANHATTAN_FIG_HEIGHT" : 1250,
    "MANHATTAN_FIG_WIDTH" : 1800,
-   "MANHATTAN_GWAS_LABEL_NAMES" : "All standardized diff P|EUR standardized diff P|ASN standardized diff P|ALL FEMALE association P|ALL MALE association P|ASN FEMALE association P|ASN MALE association P|EUR FEMALE association P|EUR MALE association P",
+   "MANHATTAN_GWAS_LABEL_NAMES" : "All differential P|EUR differential P|ASN differential P|ALL FEMALE association P|ALL MALE association P|ASN FEMALE association P|ASN MALE association P|EUR FEMALE association P|EUR MALE association P",
    "MANHATTAN_GWAS_MODE" : "multi",
    "MANHATTAN_OTHER_P_VARS" : [
-      "EUR_STD_P",
-      "ASN_STD_P",
+      "EUR_DIFF_P",
+      "ASN_DIFF_P",
       "ALL_FEMALE_P",
       "ALL_MALE_P",
       "ASN_FEMALE_P",
@@ -122,7 +122,7 @@
       "EUR_FEMALE_P",
       "EUR_MALE_P"
    ],
-   "MANHATTAN_P_VAR" : "ALL_STD_P",
+   "MANHATTAN_P_VAR" : "ALL_DIFF_P",
    "OUTPUT_HTML_BASENAME" : "PGC_SCZ_SAS_local_top_hits_with_gtf_common.html",
    "OUTPUT_PREFIX" : "PGC_SCZ_SAS_manhattan",
    "PAIR_DEFS" : [
@@ -160,10 +160,16 @@
    "REFERENCE_BUILD_SOURCE" : "explicit_override",
    "SOURCE_LONG_GZ" : "/mnt/e/LongCOVID_HGI_GWAS/PGC_Large_GWASs/PGC_SCZ_Sex_Stratified_GWASs/PGC_SCZ_female_vs_male_diff_effects.stdized.tsv.gz",
    "TARGET_SNP_GENES" : "",
-   "TARGET_SNP_LIST" : "rs185665940",
+   "TARGET_SNP_LIST" : "",
    "TOP_HIT_DIST_BP" : "1e6",
-   "TOP_HIT_FILTER_EXPR" : "((ALL_STD_P>0) and (ALL_STD_P<1e-6)) or ((EUR_STD_P>0) and (EUR_STD_P<1e-6)) or ((ASN_STD_P>0) and (ASN_STD_P<1e-6))",
-   "TOP_HIT_FOCUS_PVAR" : "ALL_STD_P",
+   "TOP_HIT_SELECTION_METHOD" : "LD",
+   "TOP_HIT_LD_R2_THRESHOLD" : "0.1",
+   "TOP_HIT_LD_POPULATIONS" : "EUR ASN",
+   "TOP_HIT_LD_POPULATION_RULE" : "ANY",
+   "TOP_HIT_LD_QUERY_FAILURE_ACTION" : "DISTANCE",
+   "TOP_HIT_LD_AUDIT_BASENAME" : "PGC_SCZ_SAS_local_top_hits_manhattan_common_top_hits_ld_audit.tsv",
+   "TOP_HIT_FILTER_EXPR" : "((ALL_DIFF_P>0) and (ALL_DIFF_P<1e-6)) or ((EUR_DIFF_P>0) and (EUR_DIFF_P<1e-6)) or ((ASN_DIFF_P>0) and (ASN_DIFF_P<1e-6))",
+   "TOP_HIT_FOCUS_PVAR" : "ALL_DIFF_P",
    "TOP_HIT_GNOMAD_FREQ_FILE" : "",
    "TOP_HIT_GNOMAD_POP_MAP" : "",
    "TOP_HIT_MAF_THRESHOLD" : 0.01,
@@ -173,4 +179,3 @@
    "TOP_HIT_SIGNAL_THRSHDS" : "1e-6 1e-5",
    "TOP_HIT_SIGNAL_THRSHD_FALLBACK" : "1e-5"
 }
-

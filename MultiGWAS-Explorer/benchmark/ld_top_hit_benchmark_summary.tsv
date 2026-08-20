@@ -1,0 +1,6 @@
+BENCHMARK	MODE	SIGNAL_THRESHOLD	LD_POPULATIONS	LD_R2_THRESHOLD	LD_POPULATION_RULE	CANDIDATES	SELECTED_LEADS	PRUNED_LD	PRUNED_DISTANCE_FALLBACK	QUERY_COMPLETE_LEADS	QUERY_PARTIAL_LEADS	QUERY_FAILED_LEADS	NOTES
+four_snp_fixture_distance	differential	1e-6	NA	NA	NA	4	1	0	3	NA	NA	NA	Legacy 1-Mb physical-distance selector
+four_snp_fixture_ld	differential	1e-6	EUR	0.5	ANY	4	2	2	0	2	0	0	rs3768644 pruned under rs10166057 at r2=0.52; rs139205793 pruned under rs185665940 at r2=0.59
+pgc_real_differential_ld	differential	1e-6	EUR ASN	0.1	ANY	3	2	1	0	2	0	0	rs7755143 pruned under rs753634 at ASN r2=0.82
+pgc_real_common_archive_cache_local	common_association	5e-8	EUR ASN	0.2	ANY	11701	175	8839	2687	116	20	39	Archive extraction 402.0 s; SQLite indexing plus full clump 118.832 s; cache-absent leads used labeled distance fallback
+pgc_real_common_archive_cache_sas_hybrid	common_association	5e-8	EUR ASN	0.2	ANY	11701	206	8947	2548	182	0	24	SAS ODA archive cache plus live web fallback for archive misses; 1126 s compute after upload/bootstrap; 123 cache-only, 20 mixed cache/web, and 39 web-only leads returned complete LD responses

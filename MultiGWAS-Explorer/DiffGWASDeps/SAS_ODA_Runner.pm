@@ -762,7 +762,8 @@ def normalize_delete_target(remote_file, remote_dir, session_obj):
 def download_file(remote_filepath, local_path, session_obj):
     try:
         session, session_obj = get_session(session_obj)
-        filename = os.path.basename(remote_filepath)
+        requested_remote_path = str(remote_filepath or '')
+        filename = os.path.basename(requested_remote_path)
         
         # Logic to handle empty local_path
         if not local_path or local_path.strip() == '':
@@ -773,10 +774,10 @@ def download_file(remote_filepath, local_path, session_obj):
 
         if dir_name and not os.path.exists(dir_name):
             os.makedirs(dir_name, exist_ok=True)
-        remote_info, session_obj = remote_file_info(remote_filepath, session_obj)
+        remote_info, session_obj = remote_file_info(requested_remote_path, session_obj)
         if not isinstance(remote_info, dict) or not remote_info.get('exists'):
-            raise FileNotFoundError(f"Remote file does not exist in SAS ODA: {remote_filepath}")
-        remote_filepath = remote_info.get('path') or remote_filepath
+            raise FileNotFoundError(f"Remote file does not exist in SAS ODA: {requested_remote_path}")
+        resolved_remote_path = remote_info.get('path') or requested_remote_path
         remote_size = 0
         if isinstance(remote_info, dict):
             remote_size = remote_info.get('size') or 0
@@ -791,7 +792,7 @@ def download_file(remote_filepath, local_path, session_obj):
                     daemon=True,
                 )
                 poller.start()
-            session.download(local_path, remote_filepath)
+            session.download(local_path, resolved_remote_path)
         finally:
             stop_event.set()
             if poller is not None:
@@ -1917,20 +1918,20 @@ def handle_client(conn, addr):
                 resp = {'status':'error','error':str(e)}
                 log_event(f"upload error session_id={session_id} local_path={local_path} err={e}")
         elif cmd == 'download':
-            remote_path = req.get('remote_path', '')
+            requested_remote_path = str(req.get('remote_path', '') or '')
             local_path = req.get('local_path', '')
             try:
                 def _download(sess):
-                    log_event(f"download start session_id={session_id} remote_path={remote_path} local_path={local_path}")
-                    out_path = local_path or os.path.basename(remote_path)
+                    log_event(f"download start session_id={session_id} remote_path={requested_remote_path} local_path={local_path}")
+                    out_path = local_path or os.path.basename(requested_remote_path)
                     out_path = os.path.abspath(out_path)
                     out_dir = os.path.dirname(out_path)
                     if out_dir and not os.path.exists(out_dir):
                         os.makedirs(out_dir, exist_ok=True)
-                    remote_info = run_fileinfo(sess, remote_path)
+                    remote_info = run_fileinfo(sess, requested_remote_path)
                     if not isinstance(remote_info, dict) or not remote_info.get('exists'):
-                        raise FileNotFoundError(f"Remote file does not exist in SAS ODA: {remote_path}")
-                    resolved_remote_path = remote_info.get('path') or remote_path
+                        raise FileNotFoundError(f"Remote file does not exist in SAS ODA: {requested_remote_path}")
+                    resolved_remote_path = remote_info.get('path') or requested_remote_path
                     remote_size = remote_info.get('size') or 0
                     print(
                         f"Download step [{session_id}]: {resolved_remote_path} -> {out_path} ({remote_size:,} bytes)",
@@ -1970,7 +1971,7 @@ def handle_client(conn, addr):
                 resp = {'status':'ok','local_path':saved_path}
             except Exception as e:
                 resp = {'status':'error','error':str(e)}
-                log_event(f"download error session_id={session_id} remote_path={remote_path} err={e}")
+                log_event(f"download error session_id={session_id} remote_path={requested_remote_path} err={e}")
         elif cmd == 'delete':
             remote_file = req.get('remote_file', '')
             remote_dir = req.get('remote_dir', '')
@@ -2078,7 +2079,6 @@ sub _session_server_progress_is_macro_bootstrap {
     return 1 if $kind eq 'submit_heartbeat' && (($progress->{label} // '') =~ /macro bootstrap/i);
     return 0;
 }
-
 sub _restart_session_server {
     my ($self) = @_;
     $self->{_session_server_ready} = 0 if ref $self;
@@ -2411,6 +2411,41 @@ sub _call_session_server {
     return $resp;
 }
 
+sub _normalize_local_path_for_python {
+    my ($path) = @_;
+    return $path unless defined $path && length $path;
+    # Cygwin getcwd() may yield E:/... even though the helper Python is the
+    # POSIX /usr/bin/python. Linux Python treats E:/... as relative and
+    # prepends cwd, so convert it to the project's /mnt/<drive>/ convention.
+    if ($^O eq 'cygwin' && $path =~ m{^([A-Za-z]):[\\/](.*)$}) {
+        my ($drive, $rest) = (lc($1), $2 // '');
+        $rest =~ s{\\}{/}g;
+        return "/mnt/$drive/$rest";
+    }
+    return $path if $path =~ m{^[A-Za-z]:[\\/]} || $path =~ m{^\\\\};
+    return $path if $^O eq 'cygwin' && $path =~ m{^/mnt/[A-Za-z](?:/|$)};
+    if ($path =~ m{^/mnt/([A-Za-z])(?:/(.*))?$}) {
+        my ($drive, $rest) = (uc($1), $2 // '');
+        return length($rest) ? "${drive}:/$rest" : "${drive}:/";
+    }
+    if ($path =~ m{^/([A-Za-z])/(.*)$}) {
+        my ($drive, $rest) = (uc($1), $2);
+        return "${drive}:/$rest";
+    }
+    return $path;
+}
+
+sub _normalize_python_action_args {
+    my ($args_ref) = @_;
+    $args_ref = {} unless ref($args_ref) eq 'HASH';
+    my %normalized = %{$args_ref};
+    for my $key (qw(local_path download_local_path code_path result_path args_path json_path py_path)) {
+        next unless exists $normalized{$key};
+        $normalized{$key} = _normalize_local_path_for_python($normalized{$key});
+    }
+    return \%normalized;
+}
+
 sub _run_nonpersistent_sas_logic_via_python {
     my ($sas_code) = @_;
 
@@ -2479,14 +2514,17 @@ END_NONPERSISTENT_PY
     close $pyfh;
 
     my ($python_bin, $site_packages) = _repo_python_env_for_session_server();
+    my $py_path_for_python   = _normalize_local_path_for_python($py_path);
+    my $code_path_for_python = _normalize_local_path_for_python($code_path);
+    my $json_path_for_python = _normalize_local_path_for_python($json_path);
     local $ENV{PIPELINE_PYTHON_BIN} = $python_bin if defined($python_bin) && length($python_bin);
     if (defined($site_packages) && length($site_packages) && -d $site_packages) {
         local $ENV{PYTHONPATH} = length($ENV{PYTHONPATH} // '')
           ? "$site_packages:$ENV{PYTHONPATH}"
           : $site_packages;
-        system { $python_bin } $python_bin, $py_path, $code_path, $json_path;
+        system { $python_bin } $python_bin, $py_path_for_python, $code_path_for_python, $json_path_for_python;
     } else {
-        system { $python_bin } $python_bin, $py_path, $code_path, $json_path;
+        system { $python_bin } $python_bin, $py_path_for_python, $code_path_for_python, $json_path_for_python;
     }
 
     my $exit_code = $? >> 8;
@@ -2530,7 +2568,7 @@ END_NONPERSISTENT_PY
 
 sub _run_nonpersistent_python_action {
     my ($action, $args_ref) = @_;
-    $args_ref = {} unless ref($args_ref) eq 'HASH';
+    $args_ref = _normalize_python_action_args($args_ref);
 
     my ($argsfh, $args_path) = tempfile('sas_action_args_XXXX', SUFFIX => '.json', UNLINK => 0, DIR => getcwd());
     print {$argsfh} encode_json($args_ref);
@@ -2609,14 +2647,17 @@ END_NONPERSISTENT_ACTION_PY
     close $pyfh;
 
     my ($python_bin, $site_packages) = _repo_python_env_for_session_server();
+    my $py_path_for_python   = _normalize_local_path_for_python($py_path);
+    my $args_path_for_python = _normalize_local_path_for_python($args_path);
+    my $json_path_for_python = _normalize_local_path_for_python($json_path);
     local $ENV{PIPELINE_PYTHON_BIN} = $python_bin if defined($python_bin) && length($python_bin);
     if (defined($site_packages) && length($site_packages) && -d $site_packages) {
         local $ENV{PYTHONPATH} = length($ENV{PYTHONPATH} // '')
           ? "$site_packages:$ENV{PYTHONPATH}"
           : $site_packages;
-        system { $python_bin } $python_bin, $py_path, $action, $args_path, $json_path;
+        system { $python_bin } $python_bin, $py_path_for_python, $action, $args_path_for_python, $json_path_for_python;
     } else {
-        system { $python_bin } $python_bin, $py_path, $action, $args_path, $json_path;
+        system { $python_bin } $python_bin, $py_path_for_python, $action, $args_path_for_python, $json_path_for_python;
     }
 
     my $exit_code = $? >> 8;

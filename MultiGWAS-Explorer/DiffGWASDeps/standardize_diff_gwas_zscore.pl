@@ -13,17 +13,28 @@ my $manifest =
 my $z_col = 'DIFF_Z';
 my $htsbin = "$Bin/../local/bin";
 my $index_output = 1;
+my $method = 'mean_sd';
+my $clip_lower_quantile = 0.001;
+my $clip_upper_quantile = 0.999;
 
 GetOptions(
-    'input=s'    => \$input,
-    'output=s'   => \$output,
-    'manifest=s' => \$manifest,
-    'z-col=s'    => \$z_col,
-    'htsbin=s'   => \$htsbin,
-    'index-output!' => \$index_output,
+    'input=s'               => \$input,
+    'output=s'              => \$output,
+    'manifest=s'            => \$manifest,
+    'z-col=s'               => \$z_col,
+    'htsbin=s'              => \$htsbin,
+    'method=s'              => \$method,
+    'clip-lower-quantile=s' => \$clip_lower_quantile,
+    'clip-upper-quantile=s' => \$clip_upper_quantile,
+    'index-output!'         => \$index_output,
 ) or die usage();
 
 die "Input file not found: $input\n" unless -s $input;
+validate_method($method);
+$clip_lower_quantile = validate_quantile($clip_lower_quantile, 'clip-lower-quantile');
+$clip_upper_quantile = validate_quantile($clip_upper_quantile, 'clip-upper-quantile');
+die "--clip-lower-quantile must be smaller than --clip-upper-quantile\n"
+    unless $clip_lower_quantile < $clip_upper_quantile;
 
 my ($header, $cols, $idx) = read_header($input);
 my %idx = %$idx;
@@ -39,13 +50,20 @@ my $can_index_output = (
     && exists $idx{BP}
 );
 
-my ($n, $mean, $sd) = z_stats($input, $idx{$z_col});
+my $stats = compute_standardization_stats(
+    path                => $input,
+    col_i               => $idx{$z_col},
+    method              => $method,
+    clip_lower_quantile => $clip_lower_quantile,
+    clip_upper_quantile => $clip_upper_quantile,
+);
+my ($n, $mean, $sd) = @{$stats}{qw(n mean sd)};
 die "No numeric values found in $z_col\n" unless $n > 0;
 die "Cannot standardize because standard deviation is zero\n" unless $sd > 0;
 
 open my $in,  '-|', "zcat '$input'"       or die "Cannot read $input with zcat: $!\n";
 my $writer_cmd = $can_index_output
-  ? "$bgzip -@ 4 -c > '$output'"
+  ? "$bgzip -c > '$output'"
   : "gzip -c > '$output'";
 open my $out, '|-', $writer_cmd or die "Cannot write $output: $!\n";
 
@@ -99,6 +117,15 @@ print {$man} join("\t", qw(METRIC VALUE)), "\n";
 print {$man} join("\t", 'input',        $input), "\n";
 print {$man} join("\t", 'output',       $output), "\n";
 print {$man} join("\t", 'z_col',        $z_col), "\n";
+print {$man} join("\t", 'inference_p_column', 'DIFF_P'), "\n";
+print {$man} join("\t", 'std_diff_p_use', 'legacy_visualization_only_not_inferential'), "\n";
+print {$man} join("\t", 'method',       $method), "\n";
+print {$man} join("\t", 'clip_lower_quantile', fmt($clip_lower_quantile)), "\n";
+print {$man} join("\t", 'clip_upper_quantile', fmt($clip_upper_quantile)), "\n";
+print {$man} join("\t", 'clip_lower_value', fmt($stats->{clip_lower_value})), "\n";
+print {$man} join("\t", 'clip_upper_value', fmt($stats->{clip_upper_value})), "\n";
+print {$man} join("\t", 'lower_tail_clipped_n', $stats->{lower_tail_clipped_n} // 0), "\n";
+print {$man} join("\t", 'upper_tail_clipped_n', $stats->{upper_tail_clipped_n} // 0), "\n";
 print {$man} join("\t", 'index_output', $index_output ? 1 : 0), "\n";
 print {$man} join("\t", 'index_status', $index_status), "\n";
 print {$man} join("\t", 'numeric_n',    $n), "\n";
@@ -111,10 +138,17 @@ close $man;
 print "Input:        $input\n";
 print "Output:       $output\n";
 print "Manifest:     $manifest\n";
+print "Method:       $method\n";
 print "Index status: $index_status\n";
 print "Numeric N:    $n\n";
 print "Mean $z_col:  ", fmt($mean), "\n";
 print "SD $z_col:    ", fmt($sd), "\n";
+if ($method eq 'mean_sd_clipped') {
+    print "Clip lower q: ", fmt($clip_lower_quantile), " => ", fmt($stats->{clip_lower_value}), "\n";
+    print "Clip upper q: ", fmt($clip_upper_quantile), " => ", fmt($stats->{clip_upper_value}), "\n";
+    print "Lower clipped:", ' ', ($stats->{lower_tail_clipped_n} // 0), "\n";
+    print "Upper clipped:", ' ', ($stats->{upper_tail_clipped_n} // 0), "\n";
+}
 print "Rows written: $rows\n";
 print "Index:        $output.tbi\n" if $index_status eq 'created';
 
@@ -153,6 +187,32 @@ sub read_header {
     return ($h, \@c, \%i);
 }
 
+sub compute_standardization_stats {
+    my (%args) = @_;
+    my $method = $args{method} // 'mean_sd';
+    if ($method eq 'mean_sd') {
+        my ($n, $mean, $sd) = z_stats($args{path}, $args{col_i});
+        return {
+            n                   => $n,
+            mean                => $mean,
+            sd                  => $sd,
+            clip_lower_value    => undef,
+            clip_upper_value    => undef,
+            lower_tail_clipped_n => 0,
+            upper_tail_clipped_n => 0,
+        };
+    }
+    if ($method eq 'mean_sd_clipped') {
+        return z_stats_clipped(
+            $args{path},
+            $args{col_i},
+            $args{clip_lower_quantile},
+            $args{clip_upper_quantile},
+        );
+    }
+    die "Unsupported standardization method: $method\n";
+}
+
 sub z_stats {
     my ($path, $col_i) = @_;
     open my $fh, '-|', "zcat '$path'" or die "Cannot read $path with zcat: $!\n";
@@ -173,6 +233,84 @@ sub z_stats {
     close $fh;
     my $sd = $n > 1 ? sqrt($m2 / ($n - 1)) : 0;
     return ($n, $mean, $sd);
+}
+
+sub z_stats_clipped {
+    my ($path, $col_i, $lower_q, $upper_q) = @_;
+    my @values = read_numeric_values($path, $col_i);
+    my $n = scalar @values;
+    return {
+        n                    => 0,
+        mean                 => 0,
+        sd                   => 0,
+        clip_lower_value     => undef,
+        clip_upper_value     => undef,
+        lower_tail_clipped_n => 0,
+        upper_tail_clipped_n => 0,
+    } unless $n;
+
+    @values = sort { $a <=> $b } @values;
+    my $lower_value = empirical_quantile(\@values, $lower_q);
+    my $upper_value = empirical_quantile(\@values, $upper_q);
+    my ($mean, $m2) = (0, 0);
+    my ($lower_tail_clipped_n, $upper_tail_clipped_n) = (0, 0);
+    my $seen = 0;
+    for my $x (@values) {
+        my $clipped = $x;
+        if ($clipped < $lower_value) {
+            $clipped = $lower_value;
+            $lower_tail_clipped_n++;
+        }
+        elsif ($clipped > $upper_value) {
+            $clipped = $upper_value;
+            $upper_tail_clipped_n++;
+        }
+        $seen++;
+        my $delta = $clipped - $mean;
+        $mean += $delta / $seen;
+        my $delta2 = $clipped - $mean;
+        $m2 += $delta * $delta2;
+    }
+    my $sd = $seen > 1 ? sqrt($m2 / ($seen - 1)) : 0;
+    return {
+        n                    => $seen,
+        mean                 => $mean,
+        sd                   => $sd,
+        clip_lower_value     => $lower_value,
+        clip_upper_value     => $upper_value,
+        lower_tail_clipped_n => $lower_tail_clipped_n,
+        upper_tail_clipped_n => $upper_tail_clipped_n,
+    };
+}
+
+sub read_numeric_values {
+    my ($path, $col_i) = @_;
+    open my $fh, '-|', "zcat '$path'" or die "Cannot read $path with zcat: $!\n";
+    <$fh>;
+    my @values;
+    while (my $line = <$fh>) {
+        chomp $line;
+        $line =~ s/\r$//;
+        my @v = split /\t/, $line, -1;
+        my $x = numeric($v[$col_i]);
+        push @values, $x if defined $x;
+    }
+    close $fh;
+    return @values;
+}
+
+sub empirical_quantile {
+    my ($sorted, $q) = @_;
+    my $n = scalar @{$sorted};
+    return undef unless $n;
+    return $sorted->[0] if $n == 1 || $q <= 0;
+    return $sorted->[$n - 1] if $q >= 1;
+    my $pos = ($n - 1) * $q;
+    my $lo = int($pos);
+    my $hi = $lo < $n - 1 ? $lo + 1 : $lo;
+    my $frac = $pos - $lo;
+    return $sorted->[$lo] if $hi == $lo;
+    return $sorted->[$lo] + (($sorted->[$hi] - $sorted->[$lo]) * $frac);
 }
 
 sub value {
@@ -217,6 +355,23 @@ sub p_fmt {
     return sprintf('%.6e', $x);
 }
 
+sub validate_method {
+    my ($method) = @_;
+    my %allowed = map { $_ => 1 } qw(mean_sd mean_sd_clipped);
+    die "Unsupported --method $method. Allowed values: mean_sd, mean_sd_clipped\n"
+        unless defined $method && $allowed{$method};
+}
+
+sub validate_quantile {
+    my ($value, $name) = @_;
+    die "--$name is required\n" unless defined $value;
+    my $numeric = numeric($value);
+    die "--$name must be numeric\n" unless defined $numeric;
+    die "--$name must be between 0 and 1 inclusive\n"
+        unless $numeric >= 0 && $numeric <= 1;
+    return $numeric;
+}
+
 sub usage {
     return <<"USAGE";
 Usage:
@@ -227,6 +382,9 @@ Options:
   --output FILE.tsv.gz      Output with ORIG_DIFF_Z, ORIG_DIFF_P, STD_DIFF_Z, STD_DIFF_P
   --manifest FILE.tsv       Run summary with mean and sample SD
   --z-col NAME              Z-score column to standardize. Default: DIFF_Z
+  --method NAME             mean_sd|mean_sd_clipped . Default: mean_sd
+  --clip-lower-quantile Q   Lower winsorization quantile for mean_sd_clipped. Default: 0.001
+  --clip-upper-quantile Q   Upper winsorization quantile for mean_sd_clipped. Default: 0.999
   --htsbin DIR              Directory containing bgzip/tabix. Default: ../local/bin
   --index-output            Try to bgzip-index the standardized output with tabix. Default: on
   --no-index-output         Write plain gzip output without tabix indexing

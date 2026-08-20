@@ -24,6 +24,16 @@ Note:
 %let top_hit_signal_thrshd=__TOP_HIT_SIGNAL_THRSHD__;
 %let top_hit_signal_thrshds=__TOP_HIT_SIGNAL_THRSHDS__;
 %let top_hit_dist_bp=__TOP_HIT_DIST_BP__;
+%let top_hit_selection_method=__TOP_HIT_SELECTION_METHOD__;
+%let top_hit_ld_r2_threshold=__TOP_HIT_LD_R2_THRESHOLD__;
+%let top_hit_ld_populations=__TOP_HIT_LD_POPULATIONS__;
+%let top_hit_ld_population_rule=__TOP_HIT_LD_POPULATION_RULE__;
+%let top_hit_ld_query_failure_action=__TOP_HIT_LD_QUERY_FAILURE_ACTION__;
+%let top_hit_ld_cache_basename=__TOP_HIT_LD_CACHE_BASENAME__;
+%let top_hit_ld_cache_min_r2=__TOP_HIT_LD_CACHE_MIN_R2__;
+%let top_hit_ld_cache_miss_action=__TOP_HIT_LD_CACHE_MISS_ACTION__;
+%let top_hit_max_loci=__TOP_HIT_MAX_LOCI__;
+%let top_hit_ld_audit_basename=__TOP_HIT_LD_AUDIT_BASENAME__;
 %let local_window_bp=__LOCAL_WINDOW_BP__;
 %let local_max_hits_per_fig=__LOCAL_MAX_HITS_PER_FIG__;
 %let local_top_hits_csv_basename=__LOCAL_TOP_HITS_CSV_BASENAME__;
@@ -72,12 +82,29 @@ ods graphics on / outputfmt=png;
 %end;
 
 %include "~/get_top_signal_within_dist.sas";
+%include "~/QueryLD_SNPs_at_Haploreg4.sas";
+%include "~/get_top_signal_with_ld.sas";
 %include "~/__GET_GTF_MACRO_BASENAME__";
 %include "~/adj_grpnum4close_gene_bed_regs.sas";
 %include "~/Multgscatter_with_gene_exons.sas";
 %include "~/map_grp_assoc2gene4covidsexgwas.sas";
 %include "~/SNP_Local_Manhattan_With_GTF.sas";
 %include "~/Lattice_gscatter_over_bed_track.sas";
+
+%if not %sysevalf(%superq(top_hit_ld_cache_basename)=,boolean) %then %do;
+proc import datafile="~/&top_hit_ld_cache_basename"
+  out=top_hit_ld_cache dbms=tab replace;
+  guessingrows=max;
+run;
+proc datasets library=work nolist;
+  modify top_hit_ld_cache;
+  index create query_population=(query_snp ld_population);
+quit;
+%let HAPLOREG_LD_CACHE_DSD=work.top_hit_ld_cache;
+%let HAPLOREG_LD_CACHE_MIN_R2=&top_hit_ld_cache_min_r2;
+%let HAPLOREG_LD_CACHE_MISS_ACTION=&top_hit_ld_cache_miss_action;
+%put NOTE: Loaded candidate-specific HaploReg LD cache &top_hit_ld_cache_basename (minimum r2=&top_hit_ld_cache_min_r2).;
+%end;
 
 __GTF_IMPORT_BLOCK__
 
@@ -228,7 +255,6 @@ __GTF_IMPORT_BLOCK__
     hit_order=input(_hit_order_text,best32.);
     if missing(hit_order) then hit_order=_n_;
     if missing(CHR) or missing(BP) or missing(SNP) then delete;
-    keep hit_order CHR BP SNP;
   run;
 
   proc sort data=&outdsd nodupkey;
@@ -568,6 +594,90 @@ run;
 %end;
 
 %_load_requested_target_snps(outdsd=requested_target_snps);
+%_load_req_top_hits_csv(outdsd=requested_top_hits_csv);
+%if not %sysfunc(exist(work.requested_top_hits_csv)) %then %do;
+data requested_top_hits_csv;
+  length CHR 8 BP 8 SNP $128 hit_order 8;
+  stop;
+run;
+%end;
+
+%if %sysevalf(&requested_top_hits_loaded,boolean)
+    and %upcase(&top_hit_mode)=COMMON_ASSOCIATION %then %do;
+data requested_top_hits_csv;
+  set requested_top_hits_csv;
+  COMMON_ASSOC_P=min(of &common_assoc_pvars);
+run;
+%end;
+
+%macro _pick_top_hits_by_thr(candidate_dsd=);
+  %local _i _n _thr _n_hits_this;
+  %let _n=%sysfunc(countw(%superq(top_hit_signal_thrshds),%str( )));
+  %if &_n=0 %then %let _n=1;
+  %do _i=1 %to &_n;
+    %let _thr=%scan(%superq(top_hit_signal_thrshds),&_i,%str( ));
+    %if %superq(_thr)= %then %let _thr=&top_hit_signal_thrshd;
+    %put NOTE: Trying top-hit threshold &_thr for mode=&top_hit_mode focus=&top_hit_focus_pvar;
+    %let _n_hits_this=0;
+    proc sql noprint;
+      select count(*) into: _n_hits_this trimmed
+      from &candidate_dsd
+      where (&top_hit_focus_pvar>0) and (&top_hit_focus_pvar<&_thr);
+    quit;
+    %if %sysevalf(&_n_hits_this>0) %then %do;
+      %let top_hit_signal_thrshd=&_thr;
+      %goto _picked;
+    %end;
+  %end;
+  %_picked:
+%mend;
+
+%macro _select_computed_top_hits(candidate_dsd=,outdsd=);
+  %if %upcase(&top_hit_selection_method)=LD %then %do;
+    %put NOTE: Selecting LD-clumped top hits (r2 >= &top_hit_ld_r2_threshold; populations=&top_hit_ld_populations; rule=&top_hit_ld_population_rule).;
+    %get_top_signal_with_ld(
+      dsdin=&candidate_dsd,
+      snp_var=SNP,
+      grp_var=CHR,
+      signal_var=&top_hit_focus_pvar,
+      select_smallest_signal=1,
+      pos_var=BP,
+      signal_thrshd=&top_hit_signal_thrshd,
+      ld_pops=&top_hit_ld_populations,
+      ld_r2_threshold=&top_hit_ld_r2_threshold,
+      ld_population_rule=&top_hit_ld_population_rule,
+      query_failure_action=&top_hit_ld_query_failure_action,
+      fallback_dist_bp=&top_hit_dist_bp,
+      max_leads=&top_hit_max_loci,
+      dsdout=&outdsd,
+      audit_out=top_hit_ld_audit
+    );
+    data &outdsd;
+      set &outdsd;
+      requested_hit_order=LD_LEAD_RANK;
+    run;
+  %end;
+  %else %do;
+    %get_top_signal_within_dist(
+      dsdin=&candidate_dsd,
+      grp_var=CHR,
+      signal_var=&top_hit_focus_pvar,
+      select_smallest_signal=1,
+      pos_var=BP,
+      pos_dist_thrshd=&top_hit_dist_bp,
+      dsdout=&outdsd,
+      signal_thrshd=&top_hit_signal_thrshd
+    );
+    data &outdsd;
+      set &outdsd;
+      requested_hit_order=.;
+      length INDEPENDENCE_METHOD $24;
+      INDEPENDENCE_METHOD='DISTANCE';
+      LD_R2_THRESHOLD=.;
+      LD_FALLBACK_BP=&top_hit_dist_bp;
+    run;
+  %end;
+%mend;
 
 %if %sysevalf(&requested_target_snps_loaded,boolean) %then %do;
 proc sql;
@@ -580,6 +690,11 @@ proc sql;
   order by b.hit_order, a.CHR, a.BP, a.SNP
   ;
 quit;
+data top_hit4diffp_raw;
+  set top_hit4diffp_raw;
+  length INDEPENDENCE_METHOD $24;
+  INDEPENDENCE_METHOD='USER_TARGET';
+run;
 %end;
 %else %do;
 data top_hit_candidates;
@@ -587,46 +702,22 @@ data top_hit_candidates;
   if &top_hit_filter_expr;
 run;
 
-%macro _pick_top_hits_by_thr;
-  %local _i _n _thr _n_hits_this;
-  %let _n=%sysfunc(countw(%superq(top_hit_signal_thrshds),%str( )));
-  %if &_n=0 %then %let _n=1;
-  %do _i=1 %to &_n;
-    %let _thr=%scan(%superq(top_hit_signal_thrshds),&_i,%str( ));
-    %if %superq(_thr)= %then %let _thr=&top_hit_signal_thrshd;
-    %put NOTE: Trying top-hit threshold &_thr for mode=&top_hit_mode focus=&top_hit_focus_pvar;
-    %let _n_hits_this=0;
-    proc sql noprint;
-      select count(*) into: _n_hits_this trimmed
-      from top_hit_candidates
-      where (&top_hit_focus_pvar>0) and (&top_hit_focus_pvar<&_thr);
-    quit;
-    %if %sysevalf(&_n_hits_this>0) %then %do;
-      %let top_hit_signal_thrshd=&_thr;
-      %goto _picked;
-    %end;
-  %end;
-  %_picked:
-%mend;
-%_pick_top_hits_by_thr;
-
-%get_top_signal_within_dist(
-  dsdin=top_hit_candidates,
-  grp_var=CHR,
-  signal_var=&top_hit_focus_pvar,
-  select_smallest_signal=1,
-  pos_var=BP,
-  pos_dist_thrshd=&top_hit_dist_bp,
-  dsdout=top_hit4diffp_raw,
-  signal_thrshd=&top_hit_signal_thrshd
-);
+%if %sysevalf(&requested_top_hits_loaded,boolean) %then %do;
+  %_pick_top_hits_by_thr(candidate_dsd=requested_top_hits_csv);
+  %_select_computed_top_hits(candidate_dsd=requested_top_hits_csv,outdsd=top_hit4diffp_raw);
+  data top_hit4diffp_raw;
+    length A1 A2 $8 requested_hit_order 8;
+    set top_hit4diffp_raw;
+    requested_hit_order=coalesce(LD_LEAD_RANK,hit_order,_n_);
+    if missing(A1) then A1=strip(coalescec(EFFECT_ALLELE, ALTERNATIVE_ALLELE));
+    if missing(A2) then A2=strip(coalescec(OTHER_ALLELE, REFERENCE_ALLELE));
+  run;
+  %put NOTE: The uploaded MAF-filtered CSV supplied LD-clumping candidates; only LD-independent leads are retained.;
 %end;
-
-%if not %sysevalf(&requested_target_snps_loaded,boolean) %then %do;
-data top_hit4diffp_raw;
-  set top_hit4diffp_raw;
-  requested_hit_order=.;
-run;
+%else %do;
+  %_pick_top_hits_by_thr(candidate_dsd=top_hit_candidates);
+  %_select_computed_top_hits(candidate_dsd=top_hit_candidates,outdsd=top_hit4diffp_raw);
+%end;
 %end;
 
 %_load_requested_target_snp_genes(outdsd=requested_target_snp_genes);
@@ -635,24 +726,6 @@ run;
     length SNP $128 gene $256;
     stop;
   run;
-%end;
-
-%_load_req_top_hits_csv(outdsd=requested_top_hits_csv);
-
-%if %sysevalf(&requested_top_hits_loaded,boolean) %then %do;
-proc sql;
-  create table top_hit4diffp_raw as
-  select a.*,
-         b.hit_order as requested_hit_order
-  from scz_mh as a
-  inner join requested_top_hits_csv as b
-    on a.CHR=b.CHR
-   and a.BP=b.BP
-   and a.SNP=b.SNP
-  order by b.hit_order, a.CHR, a.BP, a.SNP
-  ;
-quit;
-%put NOTE: Requested local-top-hit CSV is being treated as the explicit source of truth for this GTF batch, so previously selected loci will not be re-pruned by distance or threshold filtering.;
 %end;
 
 proc sql noprint;
@@ -821,6 +894,16 @@ proc export data=top_hit4diffp_export
   dbms=csv
   replace;
 run;
+
+%if %upcase(&top_hit_selection_method)=LD
+    and %sysfunc(exist(work.top_hit_ld_audit))
+    and not %sysevalf(%superq(top_hit_ld_audit_basename)=,boolean) %then %do;
+proc export data=top_hit_ld_audit
+  outfile="~/&top_hit_ld_audit_basename"
+  dbms=tab
+  replace;
+run;
+%end;
 
 %macro _emit_or_plot_local_gtf;
   %global top_snps effective_gtf_label_snps;

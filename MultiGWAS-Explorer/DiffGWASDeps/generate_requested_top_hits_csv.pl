@@ -366,9 +366,11 @@ sub build_export_rows {
             : ($hit->{snp_gene} || '');
         $snp_gene = ($hit->{SNP} || '') . ':' . (length($gene) ? $gene : 'NA')
             unless length $snp_gene;
-        my $focus_signal = (length($args{focus_pvar} || '') && exists $wide{ $args{focus_pvar} })
-            ? $wide{ $args{focus_pvar} }
-            : $hit->{focus_signal};
+        my $focus_signal = ($top_hit_mode =~ /^common_association$/i && defined $hit->{focus_signal})
+            ? $hit->{focus_signal}
+            : ((length($args{focus_pvar} || '') && exists $wide{ $args{focus_pvar} })
+                ? $wide{ $args{focus_pvar} }
+                : $hit->{focus_signal});
         my $hit_class = length($hit->{hit_class} || '')
             ? $hit->{hit_class}
             : normalize_hit_class($top_hit_mode);

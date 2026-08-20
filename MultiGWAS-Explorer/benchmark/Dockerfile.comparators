@@ -1,0 +1,11 @@
+FROM ubuntu:24.04
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gwama perl libio-compress-perl r-base r-cran-data.table r-cran-getopt r-cran-cairo r-cran-plotrix \
+    curl ca-certificates time && rm -rf /var/lib/apt/lists/*
+RUN curl -fsSL -o /tmp/EasyStrata_8.6.tar.gz \
+    https://homepages.uni-regensburg.de/~wit59712/easystrata/EasyStrata_8.6.tar.gz \
+    && R CMD INSTALL /tmp/EasyStrata_8.6.tar.gz \
+    && rm /tmp/EasyStrata_8.6.tar.gz
+WORKDIR /benchmark
+CMD ["bash"]

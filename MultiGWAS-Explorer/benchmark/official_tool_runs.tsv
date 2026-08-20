@@ -1,0 +1,4 @@
+tool	version	input_fixture	command	rows_input	rows_output	elapsed_seconds	peak_rss_kb	status	notes
+MultiGWAS-Explorer	local revision 2026-08-19	fixture_all_100k/multigwas.tsv	perl DiffGWASDeps/benchmark_diff_methods.pl --input benchmark/fixture_all_100k/multigwas.tsv --prefix ALL --rho 0 --limit 100000 --output benchmark/fixture_all_100k/multigwas_numerical.tsv	100000	100000	2.73	17484	PASS	Direct formula audit; /usr/bin/time -v; 100000 matched unfiltered-source variants
+GWAMA	2.2.2	fixture_all_100k/female.gwama.tsv + male.gwama.tsv	GWAMA --filelist gwama.in --output gwama --quantitative --sex	100000	100000	91.55	79624	PASS	Official binary in Ubuntu 24.04 container; q_p-value compared with independent two-stratum contrast P
+EasyStrata	8.6	fixture_all_100k/easystrata.tsv	Rscript run_easystrata.R (CALCPDIFF option 1)	100000	100000	4.78	97520	PASS	Official package in Ubuntu 24.04 container; upstream empty-comment-index parser workaround documented

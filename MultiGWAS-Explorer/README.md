@@ -159,6 +159,65 @@ perl DiffGWASDeps/generate_requested_top_hits_csv.pl \
   --maf-threshold 0.01
 ```
 
+## LD-Clumped Lead Selection
+
+Automatic common- and differential-hit selection now defaults to greedy
+HaploReg LD clumping instead of treating physical separation as independence.
+Candidates are ranked by the applicable raw P value. After each lead is
+selected, candidates at or above the configured r-squared threshold are
+removed and written to an edge-level audit table.
+
+Default configuration:
+
+```json
+{
+  "top_hit_selection_method": "ld",
+  "top_hit_ld_r2_threshold": "0.1",
+  "top_hit_ld_populations": "EUR ASN",
+  "top_hit_ld_population_rule": "ANY",
+  "top_hit_ld_query_failure_action": "DISTANCE"
+}
+```
+
+Equivalent command-line overrides are:
+
+```bash
+perl auto_prepare_and_run_diff_gwas.pl \
+  --spec configs/spec_pgc_scz_sex_common_automation.json \
+  --top-hit-selection-method ld \
+  --top-hit-ld-r2-threshold 0.1 \
+  --top-hit-ld-populations "EUR ASN" \
+  --top-hit-ld-population-rule ANY
+```
+
+Audit outputs distinguish `SELECTED_LEAD`, `PRUNED_LD`, and
+`PRUNED_DISTANCE_FALLBACK`. These are LD-clumped lead variants, not proof of
+conditional independence or genotype-by-stratum interaction.
+
+For large candidate sets, build a candidate-restricted local cache from the
+official HaploReg v4 downloads:
+
+```bash
+bash DiffGWASDeps/build_haploreg_ld_candidate_cache.sh \
+  --candidates benchmark/pgc_common_ld_candidates.csv \
+  --populations "EUR ASN" \
+  --min-r2 0.2 \
+  --output benchmark/pgc_common_haploreg_candidate_ld.tsv
+```
+
+The official archives contain edges from r-squared 0.2 upward. A configured
+cache therefore requires an LD threshold of at least 0.2; lower cutoffs remain
+available through live HaploReg queries. Cache misses use the web path by
+default and may instead be configured to fail explicitly.
+
+Reviewer-requested comparator, QC, power, LD, and MCP-interface commands are
+collected in:
+
+```bash
+bash benchmark/run_differential_gwas_revision_benchmarks.sh --help
+bash benchmark/run_differential_gwas_revision_benchmarks.sh validate-results
+```
+
 ## Forest Plot Support
 
 Top-hit forest plots are now supported in both rendering backends:

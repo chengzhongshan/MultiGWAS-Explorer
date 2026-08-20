@@ -17,6 +17,8 @@ my $se_col = 'SE';
 my $p_col = 'P';
 my $rho = 0;
 my $limit = 0;
+my $exclude_strand_ambiguous = 1;
+my $max_eaf_abs_diff = 0.20;
 
 GetOptions(
     'config=s'        => \$config_file,
@@ -29,6 +31,8 @@ GetOptions(
     'p-col=s'         => \$p_col,
     'rho=f'           => \$rho,
     'limit=i'         => \$limit,
+    'exclude-strand-ambiguous!' => \$exclude_strand_ambiguous,
+    'max-eaf-abs-diff=f' => \$max_eaf_abs_diff,
 ) or die usage();
 
 die "--config is required\n" unless length $config_file;
@@ -43,6 +47,8 @@ $se_col = cfg_or($cfg, 'se_col', $se_col);
 $p_col = cfg_or($cfg, 'p_col', $p_col);
 $rho = cfg_or($cfg, 'rho', $rho);
 $limit = cfg_or($cfg, 'limit', $limit);
+$exclude_strand_ambiguous = cfg_or($cfg, 'exclude_strand_ambiguous', $exclude_strand_ambiguous) ? 1 : 0;
+$max_eaf_abs_diff = cfg_or($cfg, 'max_eaf_abs_diff', $max_eaf_abs_diff);
 
 die "Config $config_file must define input\n" unless length $input;
 die "Config $config_file must define output\n" unless length $output;
@@ -63,6 +69,7 @@ my @out_cols = qw(
   GROUP1_P GROUP2_P
   GROUP1_FRQ_A GROUP1_FRQ_U GROUP2_FRQ_A GROUP2_FRQ_U
   GROUP1_INFO GROUP2_INFO
+  ALLELE_RELATION STRAND_AMBIGUOUS EAF_ABS_DIFF HARMONIZATION_STATUS
   CHR_ORIGINAL IS_CHRX
 );
 
@@ -88,6 +95,9 @@ my %stats = (
     skipped_bad_num    => 0,
     skipped_bad_var    => 0,
     skipped_unknown_gw => 0,
+    skipped_strand_ambiguous => 0,
+    skipped_eaf_discordance => 0,
+    accepted_exact_allele_match => 0,
 );
 
 my $in = open_reader($input);
@@ -125,6 +135,8 @@ for my $metric (sort keys %stats) {
 print {$man} join("\t", 'input', $input), "\n";
 print {$man} join("\t", 'output', $output), "\n";
 print {$man} join("\t", 'rho', $rho), "\n";
+print {$man} join("\t", 'exclude_strand_ambiguous', $exclude_strand_ambiguous), "\n";
+print {$man} join("\t", 'max_eaf_abs_diff', length($max_eaf_abs_diff) ? $max_eaf_abs_diff : 'disabled'), "\n";
 print {$man} join("\t", 'pairs', join(',', map { $_ . '=' . join(':', @{ $pair_defs{$_} }) } sort keys %pair_defs)), "\n";
 close $man;
 
@@ -154,6 +166,21 @@ sub process_bucket {
 
         if (!$g1 || !$g2) {
             $stats{skipped_no_pair}++;
+            next;
+        }
+
+        my $a1 = value($g1, 'A1');
+        my $a2 = value($g1, 'A2');
+        my $strand_ambiguous = is_strand_ambiguous($a1, $a2);
+        if ($exclude_strand_ambiguous && $strand_ambiguous) {
+            $stats{skipped_strand_ambiguous}++;
+            next;
+        }
+        my $eaf1 = mean_frequency(value($g1, 'FRQ_A'), value($g1, 'FRQ_U'));
+        my $eaf2 = mean_frequency(value($g2, 'FRQ_A'), value($g2, 'FRQ_U'));
+        my $eaf_abs_diff = defined($eaf1) && defined($eaf2) ? abs($eaf1 - $eaf2) : undef;
+        if (length($max_eaf_abs_diff) && defined($eaf_abs_diff) && $eaf_abs_diff > $max_eaf_abs_diff) {
+            $stats{skipped_eaf_discordance}++;
             next;
         }
 
@@ -208,12 +235,17 @@ sub process_bucket {
             GROUP2_FRQ_U      => value($g2, 'FRQ_U'),
             GROUP1_INFO       => value($g1, 'INFO'),
             GROUP2_INFO       => value($g2, 'INFO'),
+            ALLELE_RELATION   => 'DIRECT',
+            STRAND_AMBIGUOUS  => $strand_ambiguous,
+            EAF_ABS_DIFF      => defined($eaf_abs_diff) ? fmt($eaf_abs_diff) : '',
+            HARMONIZATION_STATUS => 'accepted_exact_allele_match',
             CHR_ORIGINAL      => value($g1, 'CHR_ORIGINAL'),
             IS_CHRX           => value($g1, 'IS_CHRX'),
         );
 
         print {$out} join("\t", map { defined $o{$_} ? $o{$_} : '' } @out_cols), "\n";
         $stats{pairs_written}++;
+        $stats{accepted_exact_allele_match}++;
         last if $limit && $stats{pairs_written} >= $limit;
     }
 }
@@ -244,7 +276,7 @@ sub open_reader {
             open $fh, '-|', $cmd or die "Cannot read gzip input $path with gzip -dc: $!\n";
         }
         else {
-            $fh = IO::Uncompress::Gunzip->new($path)
+            $fh = IO::Uncompress::Gunzip->new($path, MultiStream => 1)
               or die "Cannot open gzip input $path: $GunzipError\n";
         }
     }
@@ -285,6 +317,20 @@ sub numeric {
     return undef if $x eq '' || $x =~ /^(?:NA|NaN|null|\.)$/i;
     return undef unless $x =~ /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/;
     return 0 + $x;
+}
+
+sub mean_frequency {
+    my @x = grep { defined $_ } map { numeric($_) } @_;
+    return undef unless @x;
+    my $sum = 0;
+    $sum += $_ for @x;
+    return $sum / @x;
+}
+
+sub is_strand_ambiguous {
+    my ($a1, $a2) = @_;
+    my $key = join('', sort(uc($a1 // ''), uc($a2 // '')));
+    return ($key eq 'AT' || $key eq 'CG') ? 1 : 0;
 }
 
 sub two_sided_p_from_z {
@@ -367,6 +413,9 @@ Options:
   --se-col NAME         SE column in merged long input. Default: SE
   --p-col NAME          P-value column in merged long input. Default: P
   --rho FLOAT           Correlation between paired betas. Default: 0
+  --[no-]exclude-strand-ambiguous
+                        Exclude A/T and C/G pairs. Default: enabled
+  --max-eaf-abs-diff F  Exclude pairs above aligned mean-EAF difference. Default: 0.20
   --limit N             Optional output-pair limit for debugging
 USAGE
 }

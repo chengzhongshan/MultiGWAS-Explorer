@@ -268,6 +268,10 @@ sub run_synthetic_common_test {
     assert_eq($row->{SNP}, 'rsCommonCommon', 'synthetic common-association test should keep rsCommonCommon');
     assert_eq($row->{maf_source}, 'GWAS', 'synthetic common-association test should prefer GWAS MAF');
     assert_num_gt($row->{selected_maf}, 0.01, 'synthetic common-association selected_maf should exceed threshold');
+    assert_true(
+        defined($row->{focus_signal}) && abs((0 + $row->{focus_signal}) - 1e-8) < 1e-15,
+        'synthetic common-association focus_signal should preserve COMMON_ASSOC_P rather than a differential P column',
+    );
     print "PASS synthetic common-association: SNP=$row->{SNP} selected_maf=$row->{selected_maf} source=$row->{maf_source}\n";
 }
 

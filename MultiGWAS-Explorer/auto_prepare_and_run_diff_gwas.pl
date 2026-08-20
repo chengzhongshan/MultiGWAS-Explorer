@@ -52,7 +52,17 @@ my $preview_spec = 0;
 my $project_tag_override = '';
 my $artifact_stem_override = '';
 my $reference_build_override = '';
+my $standardize_method_override = '';
+my $clip_lower_quantile_override = '';
+my $clip_upper_quantile_override = '';
 my $top_hit_dist_bp_override = '';
+my $top_hit_selection_method_override = '';
+my $top_hit_ld_r2_threshold_override = '';
+my $top_hit_ld_populations_override = '';
+my $top_hit_ld_population_rule_override = '';
+my $top_hit_ld_cache_tsv_override = '';
+my $top_hit_ld_cache_min_r2_override = '';
+my $top_hit_ld_cache_miss_action_override = '';
 my $top_hit_max_loci_override;
 my $local_max_hits_per_fig_override = 0;
 my $local_gtf_window_bp_override = '';
@@ -126,7 +136,17 @@ GetOptions(
     'project-tag=s'       => \$project_tag_override,
     'artifact-stem=s'     => \$artifact_stem_override,
     'reference-build=s'   => \$reference_build_override,
+    'standardize-method=s' => \$standardize_method_override,
+    'clip-lower-quantile=s' => \$clip_lower_quantile_override,
+    'clip-upper-quantile=s' => \$clip_upper_quantile_override,
     'top-hit-dist-bp=s'   => \$top_hit_dist_bp_override,
+    'top-hit-selection-method=s' => \$top_hit_selection_method_override,
+    'top-hit-ld-r2-threshold=s' => \$top_hit_ld_r2_threshold_override,
+    'top-hit-ld-populations=s' => \$top_hit_ld_populations_override,
+    'top-hit-ld-population-rule=s' => \$top_hit_ld_population_rule_override,
+    'top-hit-ld-cache-tsv=s' => \$top_hit_ld_cache_tsv_override,
+    'top-hit-ld-cache-min-r2=s' => \$top_hit_ld_cache_min_r2_override,
+    'top-hit-ld-cache-miss-action=s' => \$top_hit_ld_cache_miss_action_override,
     'top-hit-max-loci=i'  => \$top_hit_max_loci_override,
     'local-max-hits-per-fig=i' => \$local_max_hits_per_fig_override,
     'local-gtf-window-bp=s' => \$local_gtf_window_bp_override,
@@ -214,6 +234,12 @@ $spec->{raw_column_aliases} = merge_alias_override_specs($spec->{raw_column_alia
   if ref($cli_raw_column_aliases) eq 'HASH' && keys %{$cli_raw_column_aliases};
 $spec->{reference_build} = $reference_build_override
   if defined $reference_build_override && length $reference_build_override;
+$spec->{standardize_method} = $standardize_method_override
+  if defined $standardize_method_override && length $standardize_method_override;
+$spec->{clip_lower_quantile} = $clip_lower_quantile_override
+  if defined $clip_lower_quantile_override && length $clip_lower_quantile_override;
+$spec->{clip_upper_quantile} = $clip_upper_quantile_override
+  if defined $clip_upper_quantile_override && length $clip_upper_quantile_override;
 $spec->{local_gtf_window_bp} = $local_gtf_window_bp_override
   if defined $local_gtf_window_bp_override && length $local_gtf_window_bp_override;
 $spec->{gtf_yaxis_offset4max} = $local_gtf_yaxis_offset4max_override
@@ -246,6 +272,14 @@ my $reference_build_profile = resolve_reference_build_profile_for_spec(
     reference_override => $reference_build_override,
     source_mode        => $source_mode,
 );
+my $standardize_method = cfg_or($spec, 'standardize_method', 'mean_sd');
+my $clip_lower_quantile = cfg_or($spec, 'clip_lower_quantile', '0.001');
+my $clip_upper_quantile = cfg_or($spec, 'clip_upper_quantile', '0.999');
+my $standardize_cli_args = build_standardize_cli_args(
+    method => $standardize_method,
+    clip_lower_quantile => $clip_lower_quantile,
+    clip_upper_quantile => $clip_upper_quantile,
+);
 my $threshold = cfg_or($spec, 'threshold', 0.05);
 my $window_bp = cfg_or($spec, 'window_bp', 10_000_000);
 my $top_hit_threshold = cfg_or($spec, 'top_hit_signal_thrshd', '1e-6');
@@ -253,6 +287,44 @@ my $top_hit_threshold_fallback = cfg_or($spec, 'top_hit_signal_thrshd_fallback',
 my $top_hit_dist_bp = length($top_hit_dist_bp_override)
     ? $top_hit_dist_bp_override
     : cfg_or($spec, 'top_hit_dist_bp', '1e6');
+my $top_hit_selection_method = length($top_hit_selection_method_override)
+    ? lc($top_hit_selection_method_override)
+    : lc(cfg_or($spec, 'top_hit_selection_method', 'ld'));
+die "top_hit_selection_method must be 'ld' or 'distance'\n"
+    unless $top_hit_selection_method =~ /^(?:ld|distance)$/;
+my $top_hit_ld_r2_threshold = length($top_hit_ld_r2_threshold_override)
+    ? $top_hit_ld_r2_threshold_override
+    : cfg_or($spec, 'top_hit_ld_r2_threshold', '0.1');
+die "top_hit_ld_r2_threshold must be between 0 and 1\n"
+    unless $top_hit_ld_r2_threshold =~ /^(?:0(?:\.\d+)?|1(?:\.0+)?)$/
+       && $top_hit_ld_r2_threshold > 0
+       && $top_hit_ld_r2_threshold <= 1;
+my $top_hit_ld_populations = length($top_hit_ld_populations_override)
+    ? $top_hit_ld_populations_override
+    : cfg_or($spec, 'top_hit_ld_populations', '');
+my $top_hit_ld_population_rule = length($top_hit_ld_population_rule_override)
+    ? uc($top_hit_ld_population_rule_override)
+    : uc(cfg_or($spec, 'top_hit_ld_population_rule', 'ANY'));
+die "top_hit_ld_population_rule must be ANY or ALL\n"
+    unless $top_hit_ld_population_rule =~ /^(?:ANY|ALL)$/;
+my $top_hit_ld_cache_tsv = length($top_hit_ld_cache_tsv_override)
+    ? $top_hit_ld_cache_tsv_override
+    : cfg_or($spec, 'top_hit_ld_cache_tsv', '');
+my $top_hit_ld_cache_min_r2 = length($top_hit_ld_cache_min_r2_override)
+    ? $top_hit_ld_cache_min_r2_override
+    : cfg_or($spec, 'top_hit_ld_cache_min_r2', '0.2');
+die "top_hit_ld_cache_min_r2 must be between 0.2 and 1 for HaploReg download archives\n"
+    unless $top_hit_ld_cache_min_r2 =~ /^(?:0(?:\.\d+)?|1(?:\.0+)?)$/
+       && $top_hit_ld_cache_min_r2 >= 0.2
+       && $top_hit_ld_cache_min_r2 <= 1;
+my $top_hit_ld_cache_miss_action = length($top_hit_ld_cache_miss_action_override)
+    ? uc($top_hit_ld_cache_miss_action_override)
+    : uc(cfg_or($spec, 'top_hit_ld_cache_miss_action', 'WEB'));
+die "top_hit_ld_cache_miss_action must be WEB or FAIL\n"
+    unless $top_hit_ld_cache_miss_action =~ /^(?:WEB|FAIL)$/;
+if (length($top_hit_ld_cache_tsv) && $top_hit_ld_r2_threshold < $top_hit_ld_cache_min_r2) {
+    die "top_hit_ld_r2_threshold cannot be below top_hit_ld_cache_min_r2 when a local cache is configured\n";
+}
 my $top_hit_max_loci = defined($top_hit_max_loci_override)
     ? $top_hit_max_loci_override
     : cfg_or($spec, 'top_hit_max_loci', 0);
@@ -306,6 +378,13 @@ my $runner_cfg = build_runner_config(
     focus_prefix       => $focus_prefix,
     top_hit_threshold  => $top_hit_threshold,
     top_hit_dist_bp    => $top_hit_dist_bp,
+    top_hit_selection_method => $top_hit_selection_method,
+    top_hit_ld_r2_threshold => $top_hit_ld_r2_threshold,
+    top_hit_ld_populations => $top_hit_ld_populations,
+    top_hit_ld_population_rule => $top_hit_ld_population_rule,
+    top_hit_ld_cache_tsv => $top_hit_ld_cache_tsv,
+    top_hit_ld_cache_min_r2 => $top_hit_ld_cache_min_r2,
+    top_hit_ld_cache_miss_action => $top_hit_ld_cache_miss_action,
     top_hit_max_loci   => $top_hit_max_loci,
     local_window_bp    => $local_window_bp,
     local_gtf_window_bp => $local_gtf_window_bp,
@@ -396,7 +475,7 @@ if ($source_mode eq 'raw_pgc_vcf_sumstats') {
       {
         name        => 'standardize_diff',
         description => 'Standardize differential Z-scores and P-values',
-        command     => qq{perl "$deps_dir/standardize_diff_gwas_zscore.pl" --input "$generated->{diff_output}" --output "$generated->{stdized_output}" --manifest "$generated->{stdized_manifest}" --z-col DIFF_Z},
+        command     => qq{perl "$deps_dir/standardize_diff_gwas_zscore.pl" --input "$generated->{diff_output}" --output "$generated->{stdized_output}" --manifest "$generated->{stdized_manifest}" --z-col DIFF_Z$standardize_cli_args},
         outputs     => [ $generated->{stdized_output}, $generated->{stdized_manifest} ],
       };
 }
@@ -408,7 +487,7 @@ elsif ($source_mode eq 'precomputed_diff') {
       {
         name        => 'standardize_diff',
         description => 'Standardize precomputed differential GWAS results',
-        command     => qq{perl "$deps_dir/standardize_diff_gwas_zscore.pl" --input "} . normalize_unix_path($spec->{input_diff}) . qq{" --output "$generated->{stdized_output}" --manifest "$generated->{stdized_manifest}" --z-col DIFF_Z},
+        command     => qq{perl "$deps_dir/standardize_diff_gwas_zscore.pl" --input "} . normalize_unix_path($spec->{input_diff}) . qq{" --output "$generated->{stdized_output}" --manifest "$generated->{stdized_manifest}" --z-col DIFF_Z$standardize_cli_args},
         outputs     => [ $generated->{stdized_output}, $generated->{stdized_manifest} ],
       };
 }
@@ -878,6 +957,9 @@ sub infer_spec_from_gwas_dir {
         top_hit_focus_prefix   => $focus_prefix,
         top_hit_signal_thrshd  => '1e-6',
         top_hit_dist_bp        => '1e6',
+        top_hit_selection_method => 'ld',
+        top_hit_ld_r2_threshold => '0.1',
+        top_hit_ld_population_rule => 'ANY',
         local_window_bp        => '1e7',
         local_gtf_window_bp    => '1e7',
         include_non_protein_coding_genes_in_local_gtf => 0,
@@ -1154,6 +1236,9 @@ sub infer_merged_spec_from_dir {
         top_hit_focus_prefix  => $pairs[0]{prefix},
         top_hit_signal_thrshd => '1e-6',
         top_hit_dist_bp       => '1e6',
+        top_hit_selection_method => 'ld',
+        top_hit_ld_r2_threshold => '0.1',
+        top_hit_ld_population_rule => 'ANY',
         local_window_bp       => '1e7',
         local_gtf_window_bp   => '1e7',
         include_non_protein_coding_genes_in_local_gtf => 0,
@@ -1535,6 +1620,9 @@ sub infer_precomputed_spec_from_dir {
         top_hit_focus_prefix  => $prefixes[0],
         top_hit_signal_thrshd => '1e-6',
         top_hit_dist_bp       => '1e6',
+        top_hit_selection_method => 'ld',
+        top_hit_ld_r2_threshold => '0.1',
+        top_hit_ld_population_rule => 'ANY',
         local_window_bp       => '1e7',
         local_gtf_window_bp   => '1e7',
         include_non_protein_coding_genes_in_local_gtf => 0,
@@ -1607,6 +1695,8 @@ sub verify_diff_gwas_deps {
         'run_sas_oda_manhattan4diffgwas_uncompressed.sas',
         'run_sas_oda_local_top_hits_manhattan.sas',
         'run_sas_oda_local_top_hits_with_gtf.sas',
+        'get_top_signal_with_ld.sas',
+        'QueryLD_SNPs_at_Haploreg4.sas',
         'run_sas_oda_single_snp_with_gtf.sas',
         'Manhattan4DiffGWASs_png.sas',
         'Lattice_gscatter_over_bed_track.sas',
@@ -1891,12 +1981,12 @@ sub build_display_track_catalog {
         my $gtf_label = $gtf_labels[$i] // safe_name($label);
         my $entry = {
             id => $prefix,
-            kind => 'std',
+            kind => 'std', # Internal differential-track tag; P thresholds use raw DIFF_P.
             prefix => $prefix,
-            pvar => $prefix . '_STD_P',
+            pvar => $prefix . '_DIFF_P',
             zvar => $prefix . '_STD_Z',
             betavar => '',
-            manhattan_label => $label . ' standardized diff P',
+            manhattan_label => $label . ' differential P',
             gtf_label => $gtf_label,
         };
         push @catalog, $entry;
@@ -1905,6 +1995,7 @@ sub build_display_track_catalog {
             $entry,
             $entry->{id},
             $prefix . '_DIFF',
+            $prefix . '_DIFF_P',
             $prefix . '_STD',
             $prefix . '_STD_P',
             $prefix . '_STD_Z',
@@ -2147,6 +2238,8 @@ sub build_diff_config {
         se_col        => 'SE',
         p_col         => 'P',
         rho           => cfg_or($spec, 'rho', 0),
+        exclude_strand_ambiguous => cfg_or($spec, 'exclude_strand_ambiguous', 1),
+        max_eaf_abs_diff => cfg_or($spec, 'max_eaf_abs_diff', 0.2),
         pairs         => \%pairs,
     };
 }
@@ -2309,6 +2402,10 @@ sub build_runner_config {
     my $focus_prefix = $args{focus_prefix};
     my $top_hit_threshold = $args{top_hit_threshold};
     my $top_hit_dist_bp = $args{top_hit_dist_bp};
+    my $top_hit_selection_method = $args{top_hit_selection_method} || 'ld';
+    my $top_hit_ld_r2_threshold = $args{top_hit_ld_r2_threshold} || '0.1';
+    my $top_hit_ld_populations = $args{top_hit_ld_populations} || '';
+    my $top_hit_ld_population_rule = $args{top_hit_ld_population_rule} || 'ANY';
     my $top_hit_max_loci = $args{top_hit_max_loci};
     my $local_window_bp = $args{local_window_bp};
     my $local_gtf_window_bp = $args{local_gtf_window_bp};
@@ -2396,6 +2493,12 @@ sub build_runner_config {
             ? 'common_and_differential'
             : (@selected_std_tracks ? 'differential' : 'single_gwas'));
     my $top_hit_focus_pvar = $get_common_associations ? 'COMMON_ASSOC_P' : $primary_focus_track->{pvar};
+    if (!length $top_hit_ld_populations) {
+        my $ld_focus = uc($focus_prefix || '');
+        $top_hit_ld_populations = $ld_focus eq 'EUR' ? 'EUR'
+            : $ld_focus eq 'ASN' ? 'ASN'
+            : 'EUR ASN';
+    }
     my $top_hit_filter_expr;
     my $top_hit_signal_thrshds;
     if ($get_common_associations) {
@@ -2500,6 +2603,19 @@ sub build_runner_config {
               : ''
         ),
         TOP_HIT_DIST_BP => $top_hit_dist_bp,
+        TOP_HIT_SELECTION_METHOD => uc($top_hit_selection_method),
+        TOP_HIT_LD_R2_THRESHOLD => $top_hit_ld_r2_threshold,
+        TOP_HIT_LD_POPULATIONS => $top_hit_ld_populations,
+        TOP_HIT_LD_POPULATION_RULE => uc($top_hit_ld_population_rule),
+        TOP_HIT_LD_QUERY_FAILURE_ACTION => uc(cfg_or($spec, 'top_hit_ld_query_failure_action', 'DISTANCE')),
+        TOP_HIT_LD_CACHE_TSV => $args{top_hit_ld_cache_tsv} // '',
+        TOP_HIT_LD_CACHE_MIN_R2 => $args{top_hit_ld_cache_min_r2} // '0.2',
+        TOP_HIT_LD_CACHE_MISS_ACTION => uc($args{top_hit_ld_cache_miss_action} // 'WEB'),
+        TOP_HIT_LD_AUDIT_BASENAME => cfg_or(
+            $spec,
+            'top_hit_ld_audit_basename',
+            ($local_top_hits_csv_basename =~ s/\.csv\z/_ld_audit.tsv/ir)
+        ),
         TOP_HIT_MAX_LOCI => (
             defined($top_hit_max_loci) && $top_hit_max_loci =~ /^\d+$/
               ? $top_hit_max_loci
@@ -3248,6 +3364,20 @@ sub normalized_numeric_text {
     return sprintf('%.12g', $num);
 }
 
+sub build_standardize_cli_args {
+    my (%args) = @_;
+    my $method = trim($args{method});
+    $method = 'mean_sd' unless length $method;
+    my $text = qq{ --method $method};
+    if (defined $args{clip_lower_quantile} && length trim($args{clip_lower_quantile})) {
+        $text .= qq{ --clip-lower-quantile } . trim($args{clip_lower_quantile});
+    }
+    if (defined $args{clip_upper_quantile} && length trim($args{clip_upper_quantile})) {
+        $text .= qq{ --clip-upper-quantile } . trim($args{clip_upper_quantile});
+    }
+    return $text;
+}
+
 sub infer_group_label {
     my ($tag) = @_;
     return '' unless defined $tag;
@@ -3329,7 +3459,30 @@ Options:
                       plot_manhattan, plot_local_manhattan, plot_local_gtf,
                       and plot_forest.
   --local-sas-only     Emit the local desktop-SAS plot scripts and stop before
-                      any SAS ODA submit/upload work for plot steps.
+                       any SAS ODA submit/upload work for plot steps.
+  --top-hit-selection-method ld|distance
+                       Select independent leads by HaploReg LD clumping (the
+                       default) or use the legacy physical-distance rule.
+  --top-hit-ld-r2-threshold N
+                       Prune candidate SNPs at r2 >= N. Default: 0.1.
+  --top-hit-ld-populations "EUR ASN"
+                       HaploReg populations; inferred from the focus ancestry
+                       when omitted.
+  --top-hit-ld-population-rule ANY|ALL
+                       Prune when LD is present in any requested population
+                       (default) or in all requested populations.
+  --top-hit-ld-cache-tsv FILE
+                       Candidate-specific cache extracted from the official
+                       HaploReg downloadable LD archives. Avoids per-lead web
+                       queries. The archive supports r2 >= 0.2 only.
+  --top-hit-ld-cache-min-r2 N
+                       Minimum r2 represented by the cache. Default: 0.2.
+  --top-hit-ld-cache-miss-action WEB|FAIL
+                       Query HaploReg on a cache miss (default) or fail that
+                       lookup without a web request.
+  --top-hit-dist-bp N  Total physical span used only as the LD-query failure
+                       fallback when LD selection is active.
+  --top-hit-max-loci N Stop after N independent leads; 0 means no limit.
   --local-max-hits-per-fig N
                        Requested upper bound for local top-hit columns per panel.
                        Current pipeline maximum is 15.
@@ -3366,6 +3519,16 @@ Options:
                        pipeline renders single-GWAS genomewide/local Manhattan
                        and local GTF plots and uses that selected GWAS for
                        top-hit selection unless --target-snps is provided.
+  --standardize-method NAME
+                       Differential standardization method passed to
+                       standardize_diff_gwas_zscore.pl. Supported values:
+                       mean_sd, mean_sd_clipped. Default: mean_sd.
+  --clip-lower-quantile Q
+                       Lower winsorization quantile used by
+                       --standardize-method mean_sd_clipped. Default: 0.001.
+  --clip-upper-quantile Q
+                       Upper winsorization quantile used by
+                       --standardize-method mean_sd_clipped. Default: 0.999.
   --reference-build BUILD
                        Optional genome-build override for local gene-track
                        annotations. Accepted values: hg19, hg38, t2t. When
@@ -3482,9 +3645,12 @@ sub full_help {
     $text .= "    custom genomic half-window without changing the local Manhattan stage\n";
         $text .= "  - use --target-snps rs1,rs2,... when you want the local Manhattan and\n";
         $text .= "  - use --target-snp-genes rs1:GENE1,rs2:GENE2 to override adjacent-gene labels\n";
-    $text .= "    local GTF plots to render an explicit SNP list in your chosen order\n";
-    $text .= "  - use --local-gtf-label-snps rs1,rs2,... when you want to label extra or\n";
-    $text .= "    specific SNP names on top of the local GTF plot window\n";
+        $text .= "    local GTF plots to render an explicit SNP list in your chosen order\n";
+        $text .= "  - use --standardize-method mean_sd_clipped --clip-lower-quantile 0.001\n";
+        $text .= "    --clip-upper-quantile 0.999 when you want robust winsorized mean/SD\n";
+        $text .= "    standardization for differential Z values before plotting and ranking\n";
+        $text .= "  - use --local-gtf-label-snps rs1,rs2,... when you want to label extra or\n";
+        $text .= "    specific SNP names on top of the local GTF plot window\n";
     $text .= "  - use --local-gtf-label-layout vertical or --local-gtf-label-layout horizontal\n";
     $text .= "    to choose how those top SNP labels are drawn; auto keeps the macro-driven default\n";
     $text .= "  - use --local-gtf-yaxis-offset4max N when you want to set the starting\n";
@@ -3583,7 +3749,7 @@ sub full_help {
         $text .= "  DIFF_Z                    : raw differential Z-score\n";
         $text .= "  DIFF_P                    : raw differential P-value\n";
         $text .= "  STD_DIFF_Z                : standardized differential Z-score used for cross-comparison plotting\n";
-        $text .= "  STD_DIFF_P                : standardized differential P-value used for default plotting focus\n";
+        $text .= "  STD_DIFF_P                : legacy visualization-standardized value; not used for inferential thresholds\n";
     }
 
     if ($show_example) {
@@ -3613,6 +3779,10 @@ sub full_help {
         $text .= "    Optional genome-build hint for local gene-track annotations. Accepted values are hg19,\n";
         $text .= "    hg38, and t2t. If omitted, the pipeline heuristically checks input filenames and headers,\n";
         $text .= "    then falls back to hg38. Explicitly set this field when your files do not carry a clear build token.\n";
+        $text .= "  standardize_method / clip_lower_quantile / clip_upper_quantile\n";
+        $text .= "    Optional differential-standardization controls. The default is mean_sd.\n";
+        $text .= "    Use standardize_method=mean_sd_clipped with clip_lower_quantile=0.001 and\n";
+        $text .= "    clip_upper_quantile=0.999 when you want mean/SD estimated after tail clipping.\n";
         $text .= "  keep_remote_plot_data\n";
         $text .= "    When 1, keep the uploaded wide gz subset in SAS ODA for reuse across later plot reruns.\n";
         $text .= "  include_non_protein_coding_genes_in_local_gtf\n";
@@ -3642,6 +3812,8 @@ sub full_help {
         $text .= "    perl auto_prepare_and_run_diff_gwas.pl --spec your_spec.json --mode configs\n";
         $text .= "  Full pipeline:\n";
         $text .= "    perl auto_prepare_and_run_diff_gwas.pl --spec your_spec.json\n";
+        $text .= "  Full pipeline with clipped mean/SD standardization:\n";
+        $text .= "    perl auto_prepare_and_run_diff_gwas.pl --spec your_spec.json --standardize-method mean_sd_clipped --clip-lower-quantile 0.001 --clip-upper-quantile 0.999\n";
         $text .= "  Only rerun selected plots:\n";
         $text .= "    perl auto_prepare_and_run_diff_gwas.pl --spec your_spec.json --plots manhattan,local_gtf\n";
         $text .= "  List the exact step names available for one spec:\n";
@@ -3694,6 +3866,9 @@ sub sample_spec_json {
   "output_dir": "/mnt/e/LongCOVID_HGI_GWAS/PGC_Large_GWASs/PGC_SCZ_Ancestry_Stratified_GWASs",
   "workdir": "/mnt/g/NGS_lib/Linux_codes_SAM/Conda_and_Docker_Related_Scripts/perlMCP4Gemini_Paper",
   "reference_build": "hg19",
+  "standardize_method": "mean_sd_clipped",
+  "clip_lower_quantile": 0.001,
+  "clip_upper_quantile": 0.999,
   "threshold": 0.05,
   "keep_remote_plot_data": 1,
   "top_hit_focus_prefix": "ASN_EUR",

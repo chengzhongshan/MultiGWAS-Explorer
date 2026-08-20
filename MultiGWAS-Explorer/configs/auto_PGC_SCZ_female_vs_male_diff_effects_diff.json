@@ -7,9 +7,11 @@
       "SNP"
    ],
    "beta_col" : "BETA",
+   "exclude_strand_ambiguous" : 1,
    "group_tag_col" : "GWAS_TAG",
    "input" : "/mnt/e/LongCOVID_HGI_GWAS/PGC_Large_GWASs/PGC_SCZ_Sex_Stratified_GWASs/PGC_SCZ_female_vs_male_diff_effects_merged_long.sorted.coord.tsv.gz",
    "manifest" : "/mnt/e/LongCOVID_HGI_GWAS/PGC_Large_GWASs/PGC_SCZ_Sex_Stratified_GWASs/PGC_SCZ_female_vs_male_diff_effects.manifest.tsv",
+   "max_eaf_abs_diff" : 0.2,
    "output" : "/mnt/e/LongCOVID_HGI_GWAS/PGC_Large_GWASs/PGC_SCZ_Sex_Stratified_GWASs/PGC_SCZ_female_vs_male_diff_effects.tsv.gz",
    "p_col" : "P",
    "pairs" : {
