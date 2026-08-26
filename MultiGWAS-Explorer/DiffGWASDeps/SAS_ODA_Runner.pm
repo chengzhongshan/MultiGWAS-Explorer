@@ -3054,7 +3054,7 @@ sub _process_dependencies {
 
     my $upload_dependency = sub {
         my ($cmd, $path) = @_;
-        next if $path =~ /^\/home\// || $path =~ /&/;
+        return if $path =~ /^\/home\// || $path =~ /&/;
         my $local_path = $self->_resolve_local_dependency_path($path);
         return unless $local_path && !$uploaded{$local_path}++;
         my $detail = $cmd;

@@ -309,8 +309,21 @@ sub build_export_rows {
         my $chr = normalize_chr($row->{CHR} || $_->{CHR});
         length($chr) ? ($chr => 1) : ()
     } @{ $args{hits} || [] };
+    my $needs_gtf_annotation = 0;
+    for my $hit (@{ $args{hits} || [] }) {
+        my $snp = uc($hit->{SNP} || '');
+        my $gene = $gene_override{$snp} || $hit->{gene} || '';
+        $gene = extract_gene_from_snp_gene($hit->{snp_gene}) if !length $gene;
+        if (!length($gene) || $gene =~ /^(?:NA|N\/A|null)$/i) {
+            $needs_gtf_annotation = 1;
+            last;
+        }
+    }
     my $genes_by_chr = {};
-    if (defined $args{gene_annotation_gtf} && length($args{gene_annotation_gtf}) && -s $args{gene_annotation_gtf}) {
+    if ($needs_gtf_annotation
+        && defined $args{gene_annotation_gtf}
+        && length($args{gene_annotation_gtf})
+        && -s $args{gene_annotation_gtf}) {
         $genes_by_chr = load_gtf_genes(
             file         => $args{gene_annotation_gtf},
             selected_chr => \%selected_chr,

@@ -595,8 +595,32 @@ activate_python_env() {
   local site_packages=""
   local venv_python=""
   local repo_site_packages=""
+  local configured_python="${PIPELINE_PYTHON_BIN:-}"
+  local candidate_python=""
   PIPELINE_PYTHON_BIN=""
   venv_python="$(resolve_venv_python || true)"
+  if [ -z "$venv_python" ] && [ -n "$configured_python" ]; then
+    if [ -x "$configured_python" ] || command_exists "$configured_python"; then
+      venv_python="$configured_python"
+    fi
+  fi
+  # Match SAS_ODA_Runner's supported Windows fallback. A portable Cygwin
+  # checkout can intentionally use the user's existing Anaconda saspy install
+  # when a repo-local venv has not been provisioned yet.
+  if [ -z "$venv_python" ] && command_exists cygpath && [ -n "${USERPROFILE:-}" ]; then
+    candidate_python="$(cygpath -u "${USERPROFILE}\\anaconda3\\python.exe" 2>/dev/null || true)"
+    if [ -n "$candidate_python" ] && [ -x "$candidate_python" ]; then
+      if "$candidate_python" -c 'import PIL, saspy' >/dev/null 2>&1; then
+        venv_python="$candidate_python"
+      fi
+    fi
+  fi
+  if [ -z "$venv_python" ]; then
+    candidate_python="$(find_system_python || true)"
+    if [ -n "$candidate_python" ] && "$candidate_python" -c 'import PIL, saspy' >/dev/null 2>&1; then
+      venv_python="$candidate_python"
+    fi
+  fi
   if [ -n "$venv_python" ]; then
     PIPELINE_PYTHON_BIN="$venv_python"
     prepend_path "$(/usr/bin/dirname "${PIPELINE_PYTHON_BIN}")"

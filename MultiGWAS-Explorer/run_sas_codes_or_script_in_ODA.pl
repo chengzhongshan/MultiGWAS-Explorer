@@ -2551,13 +2551,14 @@ sub summarize_sas_log_text {
 sub sas_log_contains_fatal_error {
     my ($text) = @_;
     return 0 unless defined $text && length $text;
-    return 1 if $text =~ /WARNING:\s+Apparent invocation of macro\s+\w+\s+not resolved\./i;
-    return 1 if $text =~ /ERROR:\s+Macro\s+\w+\s+not defined/i;
-    return 1 if $text =~ /ERROR:\s+The macro\s+\w+\s+was not found/i;
-    return 1 if $text =~ /ERROR:\s+The macro\s+\w+\s+will stop executing\./i;
-    return 1 if $text =~ /ERROR:\s+A character operand was found in the %EVAL function or %IF condition where a numeric operand is required\./i;
-    return 1 if $text =~ /ERROR:\s+/i;
-    return 1 if $text =~ /^\s*ERROR\s+\d+-\d+:/mi;
+    for my $line (split /\r?\n/, $text) {
+        # SAS SOURCE/SOURCE2 listings prefix submitted source with a line
+        # number.  A listed "%put ERROR:" is code, not a runtime error.
+        next if $line =~ /^\s*\d+(?:\s+|!\s*)/;
+        return 1 if $line =~ /WARNING:\s+Apparent invocation of macro\s+\w+\s+not resolved\./i;
+        return 1 if $line =~ /ERROR:\s+/i;
+        return 1 if $line =~ /^\s*ERROR\s+\d+-\d+:/i;
+    }
     return 0;
 }
 
@@ -2566,6 +2567,7 @@ sub first_fatal_sas_log_line {
     return '' unless defined $text && length $text;
     for my $line (split /\r?\n/, $text) {
         next unless defined $line;
+        next if $line =~ /^\s*\d+(?:\s+|!\s*)/;
         if ($line =~ /WARNING:\s+Apparent invocation of macro\s+\w+\s+not resolved\./i
             || $line =~ /ERROR:\s+/i
             || $line =~ /^\s*ERROR\s+\d+-\d+:/i) {

@@ -176,6 +176,7 @@ if [[ -n "${TARGET_SNP_LIST}" ]]; then
   LOCAL_TOP_HITS_CSV_BASENAME="${LOCAL_TOP_HITS_CSV_BASENAME%.csv}_${_single_target_csv_tag}.csv"
   echo "[prep] TARGET_SNP_LIST is set, so a target-specific local-top-hit CSV will be used: ${LOCAL_TOP_HITS_CSV_BASENAME}"
 fi
+REQUESTED_TOP_HITS_CSV_BASENAME="${LOCAL_TOP_HITS_CSV_BASENAME%.csv}_requested_input.csv"
 OPEN_RESULT="${OPEN_RESULT:-1}"
 platform_is_linux=0
 if [[ "$(uname -s)" == "Linux" ]]; then
@@ -215,6 +216,9 @@ INCLUDE_PREFLIGHT_STANDALONE_DEBUG="${INCLUDE_PREFLIGHT_STANDALONE_DEBUG:-0}"
 export SAS_ODA_RUN_TIMEOUT_SECONDS="${SAS_ODA_RUN_TIMEOUT_SECONDS:-${LOCAL_MH_SUBMIT_TIMEOUT_SECONDS}}"
 export SAS_ODA_RUN_TIMEOUT_GRACE_SECONDS="${SAS_ODA_RUN_TIMEOUT_GRACE_SECONDS:-${LOCAL_MH_SUBMIT_TIMEOUT_GRACE_SECONDS}}"
 export STANDALONE_INCLUDE_TARGET_DEBUG="${INCLUDE_PREFLIGHT_STANDALONE_DEBUG}"
+# Dependencies are uploaded and verified below while holding the global lock;
+# avoid refreshing the same %include files again during submit.
+export INCLUDE_PREFLIGHT_REFRESH_REMOTE="${INCLUDE_PREFLIGHT_REFRESH_REMOTE:-0}"
 LOCAL_MH_REUSE_CACHE_DIR="${LOCAL_MH_REUSE_CACHE_DIR:-${WORKDIR}/cache/local_manhattan_reuse}"
 
 cd "${WORKDIR}"
@@ -349,6 +353,7 @@ cleanup_remote_generated_outputs() {
   echo "[cleanup] Removing generated remote Manhattan outputs from SAS ODA..."
   oda_delete_many "cleanup_local_hits_manhattan_output_html_${stamp}" --delete-file "${LOCAL_OUTPUT_PREFIX}.html" || true
   oda_delete_many "cleanup_local_hits_manhattan_output_csv_${stamp}" --delete-file "${LOCAL_TOP_HITS_CSV_BASENAME}" || true
+  oda_delete_many "cleanup_local_hits_manhattan_input_csv_${stamp}" --delete-file "${REQUESTED_TOP_HITS_CSV_BASENAME}" || true
   oda_delete_many "cleanup_local_hits_manhattan_output_ld_audit_${stamp}" --delete-file "${TOP_HIT_LD_AUDIT_BASENAME}" || true
 
   while IFS= read -r remote_png; do
@@ -426,6 +431,7 @@ upload_home_file_if_needed() {
   local remote_basename="$3"
   local output_prefix="$4"
   local upload_path="${local_path}"
+  local upload_attempt max_attempts
   [[ -s "${local_path}" ]] || return 1
   if remote_home_file_matches_local_size "${local_path}" "${remote_basename}"; then
     echo "${step_label} Reusing existing remote file in SAS ODA home: ${remote_basename}"
@@ -437,12 +443,27 @@ upload_home_file_if_needed() {
     upload_path="${WORKDIR}/.oda_upload_aliases/${remote_basename}"
     cp -f "${local_path}" "${upload_path}"
   fi
-  run_oda_helper \
-    --upload-file "${upload_path}" \
-    --output-prefix "${output_prefix}"
+  max_attempts="${ODA_SMALL_UPLOAD_MAX_ATTEMPTS:-2}"
+  upload_attempt=1
+  while [[ "${upload_attempt}" -le "${max_attempts}" ]]; do
+    run_oda_helper \
+      --upload-file "${upload_path}" \
+      --output-prefix "${output_prefix}_try${upload_attempt}"
+    if remote_home_file_matches_local_size "${local_path}" "${remote_basename}"; then
+      if [[ "${upload_path}" != "${local_path}" ]]; then
+        rm -f "${upload_path}"
+      fi
+      return 0
+    fi
+    echo "[retry] Remote verification failed for ${remote_basename} after upload ${upload_attempt}/${max_attempts}." >&2
+    run_oda_helper --delete-file "${remote_basename}" --output-prefix "delete_bad_${output_prefix}_${upload_attempt}" >/dev/null 2>&1 || true
+    upload_attempt=$((upload_attempt+1))
+  done
   if [[ "${upload_path}" != "${local_path}" ]]; then
     rm -f "${upload_path}"
   fi
+  echo "ERROR: Could not upload and verify ${remote_basename} after ${max_attempts} attempt(s)." >&2
+  return 1
 }
 
 delete_partial_remote_data() {
@@ -700,6 +721,7 @@ perl "${RENDER_SAS_HELPER}" \
   --replace "LOCAL_MANHATTAN_Y_AXIS_LABEL_SIZE=${LOCAL_MANHATTAN_Y_AXIS_LABEL_SIZE}" \
   --replace "LOCAL_MANHATTAN_Y_AXIS_VALUE_SIZE=${LOCAL_MANHATTAN_Y_AXIS_VALUE_SIZE}" \
   --replace "LOCAL_TOP_HITS_CSV_BASENAME=${LOCAL_TOP_HITS_CSV_BASENAME}" \
+  --replace "REQUESTED_TOP_HITS_CSV_BASENAME=${REQUESTED_TOP_HITS_CSV_BASENAME}" \
   --replace "OUTPUT_PREFIX=${LOCAL_OUTPUT_PREFIX}" \
   --replace "HTML_TITLE=${LOCAL_HTML_TITLE}" \
   --replace-file "WIDE_IMPORT_BLOCK=${IMPORT_BLOCK_RENDERED}"
@@ -822,9 +844,19 @@ if [[ "${LOCAL_SAS_DEBUG_ONLY}" == "1" ]]; then
   exit 0
 fi
 
-echo "[1/5] Uploading PNG Manhattan macro to SAS ODA..."
-# File uploads land in the shared SAS ODA home directory, so they do not need
-# to flow through the persistent session server.
+# SAS ODA home filenames and plot outputs are shared across sessions. Serialize
+# staging, submission, download, and cleanup to prevent cross-job corruption.
+mkdir -p "${WORKDIR}/cache"
+SAS_ODA_PIPELINE_LOCK_FILE="${SAS_ODA_PIPELINE_LOCK_FILE:-${WORKDIR}/cache/sas_oda_pipeline.lock}"
+exec 9>"${SAS_ODA_PIPELINE_LOCK_FILE}"
+echo "[lock] Waiting for exclusive SAS ODA pipeline access: ${SAS_ODA_PIPELINE_LOCK_FILE}"
+flock -w "${SAS_ODA_PIPELINE_LOCK_TIMEOUT_SECONDS:-14400}" 9 || {
+  echo "ERROR: Timed out waiting for the SAS ODA pipeline lock." >&2
+  exit 1
+}
+echo "[lock] Acquired exclusive SAS ODA pipeline access."
+
+echo "[1/5] Uploading and verifying SAS include dependencies..."
 oda_upload_many \
   "upload_local_hits_support_${stamp}" \
   --upload-file "${MACRO_SAS}" \
@@ -845,7 +877,7 @@ if [[ -s "${CSV_OUT}" ]]; then
   upload_home_file_if_needed \
     "[1b/5]" \
     "${CSV_OUT}" \
-    "${LOCAL_TOP_HITS_CSV_BASENAME}" \
+    "${REQUESTED_TOP_HITS_CSV_BASENAME}" \
     "upload_local_hits_requested_csv_${stamp}"
 fi
 

@@ -574,6 +574,11 @@ gtf_submit_needs_retry_for_log() {
 gtf_log_has_terminal_failure() {
   local logfile="$1"
   [[ -s "${logfile}" ]] || return 1
+  # Match real SAS error records, but not numbered source lines echoed in the
+  # log (for example, "123  ERROR: ..." inside submitted source text).
+  if grep -Eq '^[[:space:]]*ERROR:' "${logfile}"; then
+    return 0
+  fi
   if grep -Eiq 'ERROR: Insufficient space in file WORK\.|ERROR: File WORK\..* is damaged|ERROR: Sort initialization failure|We failed in getConnection|The application could not log on to the server|server configuration is invalid|No SAS process attached|SAS process has terminated unexpectedly|ERROR: The SAS job likely failed before producing the final figure' "${logfile}"; then
     return 0
   fi
@@ -865,7 +870,6 @@ build_completed_html_from_png_assets_if_available() {
   local figure_title="${5:-Local Manhattan and GTF plot for top hits}"
   local image_alt="${6:-Local top-hit GTF plot}"
   local image_src=""
-  local use_iframe=0
 
   if [[ -s "${png_path}" ]]; then
     annotate_png_with_visible_axis_labels_if_needed "${png_path}" "${GTF_YAXIS_LABEL}" "${GTF_COLORBAR_LABEL}"
@@ -878,7 +882,10 @@ build_completed_html_from_png_assets_if_available() {
     else
       image_src="$(extract_embedded_png_data_uri_from_html_path "${html_path}" || true)"
       if [[ -z "${image_src}" ]]; then
-        use_iframe=1
+        # The submit helper's HTML can contain only textual SAS output. Do not
+        # wrap that file in an iframe and call it a completed plot; leave the
+        # artifact unready so the remote PNG recovery path must run.
+        return 1
       fi
     fi
   fi
@@ -893,11 +900,7 @@ build_completed_html_from_png_assets_if_available() {
     if [[ "${VISIBLE_YLABEL_ENABLED}" == "1" ]]; then
       echo "<div style=\"writing-mode:vertical-rl;transform:rotate(180deg);font-size:20px;font-weight:600;color:${VISIBLE_YLABEL_FILL};line-height:1\">${GTF_YAXIS_LABEL}</div>"
     fi
-    if [[ "${use_iframe}" -eq 1 ]]; then
-      echo "<div style=\"flex:1;min-width:0\"><iframe src=\"$(basename "${raw_html_path}")\" title=\"${image_alt}\" style=\"width:100%;height:1700px;border:1px solid #ccc;background:#fff\"></iframe></div>"
-    else
-      echo "<div><img src=\"${image_src}\" alt=\"${image_alt}\" style=\"max-width:100%;height:auto;border:1px solid #ccc\"></div>"
-    fi
+    echo "<div><img src=\"${image_src}\" alt=\"${image_alt}\" style=\"max-width:100%;height:auto;border:1px solid #ccc\"></div>"
     echo '</div>'
     if [[ -n "${csv_path}" && -s "${csv_path}" ]]; then
       echo "<p><a href=\"$(basename "${csv_path}")\">Top-hit CSV</a></p>"
@@ -905,15 +908,7 @@ build_completed_html_from_png_assets_if_available() {
     echo "<p><a href=\"$(basename "${raw_html_path}")\">Raw SAS HTML output</a></p>"
     echo '</body></html>'
   } > "${html_path}"
-  if [[ "${use_iframe}" -eq 1 ]]; then
-    if [[ "${VISIBLE_YLABEL_ENABLED}" == "1" ]]; then
-      echo "[recover] Wrapped the raw SAS HTML with a visible y-axis label because no standalone PNG could be extracted: ${html_path}"
-    else
-      echo "[recover] Wrapped the raw SAS HTML because no standalone PNG could be extracted: ${html_path}"
-    fi
-  else
-    echo "[recover] Replaced the opened HTML with a figure-first wrapper because a final PNG was generated: ${html_path}"
-  fi
+  echo "[recover] Replaced the opened HTML with a figure-first wrapper because a final PNG was generated: ${html_path}"
 }
 
 build_completed_html_from_png_if_available() {
@@ -932,17 +927,13 @@ html_has_rendered_plot() {
     exit 0 if /<img\b/i;
     exit 0 if /data:image\/png;base64,/i;
     exit 0 if /<svg\b/i;
-    exit 0 if /<iframe\b/i;
     exit 1;
   ' "${HTML_OUT}" 2>/dev/null
 }
 
 delivered_gtf_artifact_ready() {
-  [[ -s "${HTML_OUT}" ]] || return 1
-  if html_has_rendered_plot; then
-    return 0
-  fi
-  [[ -s "${RAW_HTML_OUT}" ]]
+  [[ -s "${PNG_OUT}" ]] || return 1
+  html_has_rendered_plot
 }
 
 remote_data_exists() {
@@ -1978,6 +1969,11 @@ if [[ -f "${CSV_OUT}" && -s "${CSV_OUT}" ]]; then
         "${batch_csv}" \
         "Local Manhattan and GTF plot for top hits (Part ${part})" \
         "Local top-hit GTF plot (Part ${part})" || true
+
+      if [[ ! -s "${batch_png}" ]]; then
+        echo "ERROR: Batch ${part} SAS completed without a downloadable or embedded PNG: ${batch_run_log_file}" >&2
+        exit 1
+      fi
 
       if [[ ! -s "${batch_output_html}" ]]; then
         echo "ERROR: Batch ${part} expected downloaded HTML was not created or is empty: ${batch_output_html}" >&2

@@ -198,6 +198,28 @@ $ENV{PIPELINE_SAS_ODA_PASSWORD} = $sas_oda_password_override
   if defined $sas_oda_password_override && length $sas_oda_password_override;
 $ENV{PIPELINE_FORCE_SAS_ODA_AUTH_PROMPT} = 1 if $prompt_sas_oda_auth_override;
 
+my $common_association_cli_threshold = '';
+if (defined $get_common_associations) {
+    my $raw = $get_common_associations;
+    $raw =~ s/^\s+|\s+$//g;
+    if ($raw eq '' || $raw =~ /^(?:1|true|yes|on)$/i) {
+        $get_common_associations = 1;
+    }
+    elsif ($raw =~ /^(?:0|false|no|off)$/i) {
+        $get_common_associations = 0;
+    }
+    elsif ($raw =~ /^(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i
+           && $raw > 0 && $raw <= 1) {
+        # Backward compatible shorthand: a probability other than the boolean
+        # values 0/1 enables the mode and becomes the first p-value threshold.
+        $common_association_cli_threshold = $raw;
+        $get_common_associations = 1;
+    }
+    else {
+        die "Invalid --get-common-associations value '$raw'. Use 0/1, true/false, or a p-value in (0,1).\n";
+    }
+}
+
 my $cli_raw_column_aliases = load_alias_override_file($raw_column_alias_config);
 
 if (!length $spec_file && length $gwas_dir) {
@@ -403,11 +425,15 @@ my $runner_cfg = build_runner_config(
     local_gtf_label_layout_override => $local_gtf_label_layout_override,
     local_gtf_yaxis_offset4max_override => $local_gtf_yaxis_offset4max_override,
     local_gtf_yoffset4textlabels_override => $local_gtf_yoffset4textlabels_override,
-    get_common_associations => ((defined $get_common_associations) || cfg_or($spec, 'get_common_associations', 0)),
+    get_common_associations => (
+        defined($get_common_associations)
+          ? ($get_common_associations ? 1 : 0)
+          : cfg_or($spec, 'get_common_associations', 0)
+    ),
     common_assoc_top_hit_threshold_override => (
         length($common_assoc_top_hit_threshold_override)
         ? $common_assoc_top_hit_threshold_override
-        : (defined($get_common_associations) && length($get_common_associations) ? $get_common_associations : '')
+        : $common_association_cli_threshold
     ),
 );
 
@@ -630,7 +656,13 @@ $summary{plots_requested} = $skip_plots ? 'none' : $plots;
 # enumerate all candidate common-association loci and write an easy-to-read
 # TSV for inspection and downstream use. This helps catch cases where the
 # SAS top-hit selection may have been overly restrictive.
-if ($runner_cfg->{TOP_HIT_MODE} && lc($runner_cfg->{TOP_HIT_MODE}) eq 'common_association') {
+if ($runner_cfg->{TOP_HIT_MODE}
+    && lc($runner_cfg->{TOP_HIT_MODE}) eq 'common_association'
+    && defined($runner_cfg->{TARGET_SNP_LIST})
+    && length($runner_cfg->{TARGET_SNP_LIST})) {
+    print "[skip] Common-association verifier is not needed because explicit target SNPs control this run: $runner_cfg->{TARGET_SNP_LIST}\n";
+}
+elsif ($runner_cfg->{TOP_HIT_MODE} && lc($runner_cfg->{TOP_HIT_MODE}) eq 'common_association') {
     my $verify = File::Spec->catfile($deps_dir, 'verify_common_association_loci.pl');
     if (-e cygpath_to_win($verify)) {
         my $out_base = safe_name($artifact_stem) . '.common_assoc_verify';

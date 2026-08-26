@@ -35,6 +35,7 @@ companion runner/script pair:
 %let local_max_hits_per_fig=__LOCAL_MAX_HITS_PER_FIG__;
 %let local_n_gwas_tracks=%eval(1 + %sysfunc(countw(%str(__MANHATTAN_OTHER_P_VARS__),%str( ))));
 %let local_top_hits_csv_basename=__LOCAL_TOP_HITS_CSV_BASENAME__;
+%let requested_top_hits_csv_basename=__REQUESTED_TOP_HITS_CSV_BASENAME__;
 %let target_snp_list=__TARGET_SNP_LIST__;
 %let target_snp_gene_map=__TARGET_SNP_GENES__;
 %let common_assoc_pvars=__COMMON_ASSOC_P_VARS__;
@@ -54,9 +55,12 @@ companion runner/script pair:
 ods _all_ close;
 ods listing;
 
+%macro _initialize_optional_library;
 %if %length(&fm_libpath) > 0 %then %do;
   libname FM "&fm_libpath";
 %end;
+%mend;
+%_initialize_optional_library;
 
 %include "~/get_top_signal_within_dist.sas";
 %include "~/QueryLD_SNPs_at_Haploreg4.sas";
@@ -64,6 +68,7 @@ ods listing;
 %include "~/__GET_GTF_MACRO_BASENAME__";
 %include "~/Manhattan4DiffGWASs_png.sas";
 
+%macro _load_optional_ld_cache;
 %if not %sysevalf(%superq(top_hit_ld_cache_basename)=,boolean) %then %do;
 proc import datafile="~/&top_hit_ld_cache_basename"
   out=top_hit_ld_cache dbms=tab replace;
@@ -78,6 +83,8 @@ quit;
 %let HAPLOREG_LD_CACHE_MISS_ACTION=&top_hit_ld_cache_miss_action;
 %put NOTE: Loaded candidate-specific HaploReg LD cache &top_hit_ld_cache_basename (minimum r2=&top_hit_ld_cache_min_r2).;
 %end;
+%mend;
+%_load_optional_ld_cache;
 
 %macro _find_first_column(lib=,mem=,outvar=,candidates=);
   %global &outvar;
@@ -174,9 +181,9 @@ quit;
   %global requested_top_hits_loaded;
   %let requested_top_hits_loaded=0;
 
-  %if %superq(local_top_hits_csv_basename)= %then %return;
+  %if %superq(requested_top_hits_csv_basename)= %then %return;
 
-  proc import datafile="~/&local_top_hits_csv_basename"
+  proc import datafile="~/&requested_top_hits_csv_basename"
     out=&outdsd
     dbms=csv
     replace;
@@ -393,6 +400,9 @@ proc sort data=scz_mh;
   by CHR BP;
 run;
 
+%macro _prepare_req_top_hit_inputs;
+%global requested_top_hits_loaded;
+%let requested_top_hits_loaded=0;
 %if %upcase(&top_hit_mode)=COMMON_ASSOCIATION %then %do;
 data scz_mh;
   set scz_mh;
@@ -401,6 +411,14 @@ run;
 %end;
 
 %_load_requested_target_snps(outdsd=requested_target_snps);
+%if %sysevalf(&requested_target_snps_loaded,boolean) %then %do;
+%let requested_top_hits_loaded=0;
+data requested_top_hits_csv;
+  length CHR 8 BP 8 SNP $128 hit_order 8 gene $256 snp_gene $128;
+  stop;
+run;
+%end;
+%else %do;
 %_load_req_top_hits_csv(outdsd=requested_top_hits_csv);
 %if not %sysfunc(exist(work.requested_top_hits_csv)) %then %do;
 data requested_top_hits_csv;
@@ -416,6 +434,9 @@ data requested_top_hits_csv;
   COMMON_ASSOC_P=min(of &common_assoc_pvars);
 run;
 %end;
+%end;
+%mend;
+%_prepare_req_top_hit_inputs;
 
 %macro _pick_top_hits_by_thr(candidate_dsd=);
   %local _i _n _thr _n_hits_this;
@@ -487,6 +508,7 @@ run;
   %end;
 %mend;
 
+%macro _select_top_hit_candidates;
 %if %sysevalf(&requested_target_snps_loaded,boolean) %then %do;
 proc sql;
   create table top_hit4diffp_raw as
@@ -531,14 +553,19 @@ run;
   %_select_computed_top_hits(candidate_dsd=top_hit_candidates,outdsd=top_hit4diffp_raw);
 %end;
 %end;
+%mend;
+%_select_top_hit_candidates;
 
 %_load_requested_target_snp_genes(outdsd=requested_target_snp_genes);
+%macro _ensure_req_target_snp_genes;
 %if not %sysfunc(exist(work.requested_target_snp_genes)) %then %do;
   data requested_target_snp_genes;
     length SNP $128 gene $256;
     stop;
   run;
 %end;
+%mend;
+%_ensure_req_target_snp_genes;
 
 proc sql noprint;
   select strip(SNP) into: top_snps separated by ' '
@@ -589,7 +616,21 @@ quit;
   %end;
 %mend;
 
-%if %sysevalf(&requested_top_hits_loaded,boolean) %then %do;
+%macro _prepare_top_hit_gene_map;
+%if %sysevalf(&requested_target_snps_loaded,boolean) %then %do;
+  /* Explicit target-SNP runs use TARGET_SNP_GENE_MAP below.  Avoid making
+     their success depend on optional HaploReg or GTF network lookups. */
+  data snps2genes_clean;
+    length rsid $40 gene $256;
+    stop;
+  run;
+
+  data snps2genes_gtf_fallback;
+    length rsid $40 gtf_gene $256;
+    stop;
+  run;
+%end;
+%else %if %sysevalf(&requested_top_hits_loaded,boolean) %then %do;
   data snps2genes_clean;
     length rsid $40 gene $256;
     set requested_top_hits_csv;
@@ -621,6 +662,8 @@ quit;
     outdsd=snps2genes_gtf_fallback
   );
 %end;
+%mend;
+%_prepare_top_hit_gene_map;
 
 proc sql;
   create table top_hit4diffp as
@@ -731,6 +774,7 @@ proc export data=top_hit4diffp_export
   replace;
 run;
 
+%macro _export_top_hit_ld_audit;
 %if %upcase(&top_hit_selection_method)=LD
     and %sysfunc(exist(work.top_hit_ld_audit))
     and not %sysevalf(%superq(top_hit_ld_audit_basename)=,boolean) %then %do;
@@ -740,6 +784,8 @@ proc export data=top_hit_ld_audit
   replace;
 run;
 %end;
+%mend;
+%_export_top_hit_ld_audit;
 
 data _null_;
   length _lmhpf 8 _nth 8 _nhb 8 _ngt 8;

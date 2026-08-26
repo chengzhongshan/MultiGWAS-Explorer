@@ -71,14 +71,17 @@ use SAS_ODA_Runner; # Ensure this module is in your Perl library path
 use Mojolicious::Lite -signatures;
 use MCP::Server;
 use POSIX qw(strftime);
-use Cwd qw(getcwd);
+use Cwd qw(getcwd abs_path);
 use HTTP::Tiny; # Core module - always available
-use File::Temp qw(tempfile);
+use File::Temp qw(tempfile tempdir);
 use File::Basename;
 use File::Path qw(make_path);
 use File::Which qw(which); # Ensure this is installed, or use the backtick version below
 use Mojo::Util   qw(md5_sum);
-use JSON::MaybeXS qw(encode_json);
+use JSON::MaybeXS qw(encode_json decode_json);
+use Digest::SHA qw(sha256_hex);
+
+my $MCP_SERVER_DIR = File::Basename::dirname(abs_path(__FILE__) || __FILE__);
 
 sub resolve_repo_script_path {
     my ($script_name) = @_;
@@ -86,8 +89,8 @@ sub resolve_repo_script_path {
     return $script_name if $script_name =~ m{[\\/]} && -f $script_name;
 
     my @candidates = (
-        File::Spec->catfile($Bin, $script_name),
-        File::Spec->catfile($Bin, 'DiffGWASDeps', $script_name),
+        File::Spec->catfile($MCP_SERVER_DIR, $script_name),
+        File::Spec->catfile($MCP_SERVER_DIR, 'DiffGWASDeps', $script_name),
     );
     for my $candidate (@candidates) {
         return $candidate if defined $candidate && -f $candidate;
@@ -127,7 +130,7 @@ sub cleanup_generated_tmpdir_if_empty {
     return unless defined $dir && length $dir && -d $dir;
 
     my $base = basename($dir);
-    return unless defined $base && $base =~ /^tmp\d+$/;
+    return unless defined $base && $base =~ /^tmp(?:\d+|_auto_[A-Za-z0-9_]+)$/;
 
     opendir(my $dh, $dir) or return;
     my @entries = grep { $_ ne '.' && $_ ne '..' } readdir($dh);
@@ -1136,9 +1139,17 @@ $server->tool(
             pid => {
                 type => 'integer',
                 description => 'Optional PID to check status of a previous auto_prepare_and_run_diff_gwas query.'
+            },
+            wait_seconds => {
+                type => 'integer',
+                minimum => 0,
+                maximum => 25,
+                description => 'When checking a PID, wait server-side for up to this many seconds for a terminal result. Default and maximum: 25, kept below common 30-second HTTP transport timeouts.'
             }
         },
-        required => ['spec_file']
+        # Either spec_file or gwas_dir is accepted. Enforce this alternative
+        # requirement in the handler because MCP clients vary in JSON Schema support.
+        required => []
     },
     code => sub ($tool, $args) {
         cleanup_all_generated_empty_tmpdirs();
@@ -1184,6 +1195,9 @@ $server->tool(
         my $exclude_non_protein_coding_genes_in_local_gtf = $args->{exclude_non_protein_coding_genes_in_local_gtf} // '';
         my $output_file = $args->{output_file};
         my $pid_arg = $args->{pid};
+        my $wait_seconds = defined($args->{wait_seconds}) && $args->{wait_seconds} =~ /^\d+$/
+          ? $args->{wait_seconds} : 25;
+        $wait_seconds = 25 if $wait_seconds > 25;
         my $out_file;
         my $pid_file;
 
@@ -1198,9 +1212,10 @@ $server->tool(
                 close $pfh;
                 chomp $stored_line;
 
-                my ($stored_pid, $stored_out_file, $stored_err_file) = split(/\t/, $stored_line, 3);
+                my ($stored_pid, $stored_out_file, $stored_err_file, $stored_status_file) = split(/\t/, $stored_line, 4);
                 $stored_out_file //= '';
                 $stored_err_file //= '';
+                $stored_status_file //= '';
 
                 next unless $stored_pid == $pid_arg;
 
@@ -1211,12 +1226,28 @@ $server->tool(
                     $out_file =~ s/\.pid$/.txt/;
                 }
 
-                if (pid_is_running($pid_arg)) {
+                my $deadline = time() + $wait_seconds;
+                while ($wait_seconds > 0 && time() < $deadline
+                       && !($stored_status_file && -s $stored_status_file)
+                       && pid_is_running($pid_arg)) {
+                    select(undef, undef, undef, 0.5);
+                }
+
+                if (!pid_is_running($pid_arg) && $stored_status_file && !-s $stored_status_file) {
+                    my $status_grace_deadline = time() + 3;
+                    while (time() < $status_grace_deadline && !-s $stored_status_file) {
+                        select(undef, undef, undef, 0.2);
+                    }
+                }
+
+                if (!($stored_status_file && -s $stored_status_file) && pid_is_running($pid_arg)) {
                     return {
                         content => [{
                             type => "text",
                             text => "STATUS: RUNNING (PID $pid_arg)\n" .
-                                    "Output file: $out_file\nAsk the AI agent to check status again in a moment."
+                                    "Output file: $out_file\n" .
+                                    "Waited server-side: ${wait_seconds}s\n" .
+                                    "Poll again with the same pid and wait_seconds=25 until a terminal completion response is returned; do not impose a fixed maximum number of checks and do not start a duplicate job."
                         }]
                     };
                 }
@@ -1243,13 +1274,27 @@ $server->tool(
                     }
                 }
 
-                unlink $pf;
-                cleanup_generated_tmpdir_if_empty($pf);
+                my ($exit_code, $signal) = (undef, undef);
+                if ($stored_status_file && -s $stored_status_file) {
+                    eval {
+                        my $status_text = do {
+                            open(my $sfh, '<:raw', $stored_status_file) or die $!;
+                            local $/; my $x = <$sfh>; close $sfh; $x;
+                        };
+                        my $status = decode_json($status_text);
+                        $exit_code = $status->{exit_code};
+                        $signal = $status->{signal};
+                        1;
+                    } or do { print STDERR "Could not decode background status $stored_status_file: $@\n"; };
+                }
+                my $outcome = defined($exit_code) && $exit_code == 0 ? 'success' : 'failed';
+                my $exit_note = defined($exit_code) ? "exit_code=$exit_code" : 'exit_code=unknown';
+                $exit_note .= ", signal=$signal" if defined($signal) && $signal;
 
                 return {
                     content => [{
                         type => "text",
-                        text => "STATUS: COMPLETE (PID $pid_arg)\n\nAutomation log saved to: $out_file\n\n" . $content
+                        text => "STATUS: COMPLETE (PID $pid_arg; outcome=$outcome; $exit_note)\n\nAutomation log saved to: $out_file\n\n" . $content
                     }]
                 };
             }
@@ -1264,13 +1309,11 @@ $server->tool(
 
         die "Either spec_file or gwas_dir is required\n" unless length($spec_file) || length($gwas_dir);
 
-        my $tmpdir = "tmp" . time();
-        unless (-d $tmpdir) {
-            mkdir $tmpdir or die "Failed to create tmp directory: $!";
-        }
+        my $tmpdir = tempdir('tmp_auto_XXXXXXXX', DIR => '.', CLEANUP => 0);
 
         $pid_file = "$tmpdir/auto_prepare_and_run_diff_gwas.pid";
         $out_file = $output_file // "$tmpdir/output.html.info.txt";
+        my $status_file = "$tmpdir/auto_prepare_and_run_diff_gwas.status.json";
 
         my $out_dir = dirname($out_file);
         if (defined $out_dir && length $out_dir && $out_dir ne '.' && !-d $out_dir) {
@@ -1278,7 +1321,7 @@ $server->tool(
         }
 
         unless (-f $pid_file) {
-            my $automation_script = File::Spec->catfile($Bin, 'auto_prepare_and_run_diff_gwas.pl');
+            my $automation_script = File::Spec->catfile($MCP_SERVER_DIR, 'auto_prepare_and_run_diff_gwas.pl');
             my @cmd = (
                 'perl',
                 $automation_script,
@@ -1366,7 +1409,47 @@ $server->tool(
                 push @cmd, $cli_flag if defined $val && $val =~ /^(?:1|true|yes|y)$/i;
             }
 
+            # Attach identical concurrent requests to one backend process.
+            my $job_signature = sha256_hex(join("\0", @cmd));
+            for my $existing_request (glob('tmp*/auto_prepare_and_run_diff_gwas.request')) {
+                next unless -f $existing_request;
+                open(my $rfh, '<', $existing_request) or next;
+                my $existing_signature = <$rfh> // '';
+                close $rfh;
+                chomp $existing_signature;
+                next unless $existing_signature eq $job_signature;
+                my $existing_pid_file = $existing_request;
+                $existing_pid_file =~ s/\.request$/.pid/;
+                next unless -f $existing_pid_file;
+                open(my $epfh, '<', $existing_pid_file) or next;
+                my $existing_line = <$epfh> // '';
+                close $epfh;
+                chomp $existing_line;
+                my ($existing_pid, $existing_out, undef, $existing_status) = split(/\t/, $existing_line, 4);
+                next unless $existing_pid && $existing_pid =~ /^\d+$/;
+                next if $existing_status && -s $existing_status;
+                next unless pid_is_running($existing_pid);
+                rmdir $tmpdir;
+                return {
+                    content => [{
+                        type => 'text',
+                        text => "STATUS: RUNNING (PID $existing_pid; deduplicated=true)\n" .
+                                "An identical workflow is already active; this request was attached to it instead of launching a competing job.\n" .
+                                "Output file: $existing_out\n" .
+                                "Poll with the same pid and wait_seconds=25 until a terminal completion response is returned."
+                    }]
+                };
+            }
+
+            my $request_file = "$tmpdir/auto_prepare_and_run_diff_gwas.request";
+            open(my $request_fh, '>', $request_file) or die "Failed to write request signature $request_file: $!\n";
+            print {$request_fh} $job_signature, "\n";
+            close $request_fh;
+
             my $cmd_preview = join(' ', map { shell_quote_single($_) } @cmd);
+            my $background_runner = File::Spec->catfile($MCP_SERVER_DIR, 'DiffGWASDeps', 'run_background_job.pl');
+            die "Background runner is missing: $background_runner\n" unless -f $background_runner;
+            my @launch_cmd = ($^X, $background_runner, '--status-file', File::Spec->rel2abs($status_file), '--', @cmd);
             my $pid;
 
             if ($^O =~ /^(?:cygwin|MSWin32)$/i) {
@@ -1379,7 +1462,7 @@ $server->tool(
                 my $err_file_win = cygpath_to_windows($err_file_abs);
                 my $launch_pid_file = File::Spec->catfile($tmpdir, 'auto_prepare_launch.pid');
                 my $launch_pid_file_win = cygpath_to_windows(File::Spec->rel2abs($launch_pid_file));
-                my $arg_list = '@(' . join(', ', map { powershell_quote_single($_) } @cmd[1 .. $#cmd]) . ')';
+                my $arg_list = '@(' . join(', ', map { powershell_quote_single($_) } @launch_cmd[1 .. $#launch_cmd]) . ')';
                 my @ps_env_prefix;
                 push @ps_env_prefix, '$env:PIPELINE_SAS_ODA_ACCOUNT=' . powershell_quote_single($sas_oda_account) . ';'
                   if defined $sas_oda_account && length $sas_oda_account;
@@ -1397,7 +1480,7 @@ $server->tool(
                     '-RedirectStandardError', powershell_quote_single($err_file_win),
                     '-WindowStyle Hidden -PassThru;',
                     'Set-Content -Path', powershell_quote_single($launch_pid_file_win), '-Value $p.Id;';
-                print STDERR "Executing command in background via Start-Process: $cmd_preview\n";
+                print STDERR "Executing durable background command via Start-Process: $cmd_preview\n";
                 my $ps_status = system('powershell', '-NoProfile', '-NonInteractive', '-Command', $ps_cmd);
                 die "Failed to invoke PowerShell Start-Process launcher\n" if $ps_status != 0;
                 open(my $pidfh, '<', $launch_pid_file)
@@ -1409,7 +1492,7 @@ $server->tool(
                 ($pid) = ($pid_out =~ /(\d+)/);
                 die "Failed to start background automation process via PowerShell Start-Process\n" unless $pid;
                 open(my $pfh, '>', $pid_file);
-                print $pfh "$pid\t$out_file\t$err_file\n";
+                print $pfh "$pid\t$out_file\t$err_file\t$status_file\n";
                 close $pfh;
             }
             else {
@@ -1427,12 +1510,12 @@ $server->tool(
                     select STDOUT; $| = 1;
                     select STDERR; $| = 1;
                     print STDERR "Executing command in background: $cmd_preview\n";
-                    exec @cmd;
+                    exec @launch_cmd;
                     exit(1);
                 }
                 $pid = $child_pid;
                 open(my $pfh, '>', $pid_file);
-                print $pfh "$pid\t$out_file\n";
+                print $pfh "$pid\t$out_file\t\t$status_file\n";
                 close $pfh;
             }
 
@@ -1443,9 +1526,9 @@ $server->tool(
                             "Ask the AI agent to check status with: {" .
                             (length($spec_file) ? "\"spec_file\": \"$spec_file\", " : '') .
                             (length($gwas_dir) ? "\"gwas_dir\": \"$gwas_dir\", " : '') .
-                            "\"pid\": $pid}\n" .
+                            "\"pid\": $pid, \"wait_seconds\": 25}\n" .
                             "Hints: use preview_spec=true and generate_spec_only=true with gwas_dir for merged-wide GWAS inspection; use spec_out=\"configs/auto_aoa_merged.spec.json\" to keep the inferred spec; use list_steps=true to inspect exact stage names; use step=\"plot_local_gtf\" or from_step=\"extract_wide_subset\" for targeted reruns; use display_gwas=\"ALL_FEMALE\" or display_gwas=\"EUR,EUR_FEMALE,EUR_MALE\" for custom displayed GWAS tracks; use target_snps=\"rs123\" for inquiry-SNP local plots; use get_common_associations=\"true\" or get_common_associations=\"5e-8\" for shared-association top-hit mode with concordant direction.\n" .
-                            "The loop should be no more than 3 times with an interval of 30 seconds to avoid excessive checking.\n"
+                            "Use server-side long polling (wait_seconds=25) and continue checking the same PID until a terminal completion response is returned. Never launch a duplicate job merely because the first job is still running.\n"
                 }]
             };
         }
@@ -1554,7 +1637,7 @@ $server->tool(
         $pid_file = "$tmpdir/gunplot_wrapper.pid";
         $out_file = $output_file // "$tmpdir/output.gunplot.txt";
 
-        my $script = File::Spec->catfile($Bin, 'auto_prepare_and_run_diff_gwas_with_gunplot.pl');
+        my $script = File::Spec->catfile($MCP_SERVER_DIR, 'auto_prepare_and_run_diff_gwas_with_gunplot.pl');
         my @cmd = ('perl', $script, '--spec', $spec);
         push @cmd, ('--plots', $plots) if length $plots;
         if (length $step) {
@@ -2568,7 +2651,7 @@ any '/mcp' => sub ($c) {
     # --------------------------------------------------
     if ($method eq 'notifications/initialized') {
         #warn "[MCP] Received initialized notification\n";
-        return $c->render(json => { jsonrpc => "2.0", result => {} });
+        return $c->rendered(202);
     }
 
     # --------------------------------------------------
@@ -2637,12 +2720,18 @@ any '/mcp' => sub ($c) {
             });
         }
 
-        my $text = ref($result) ? encode_json($result) : ($result // '');
+        my $call_result =
+            ref($result) eq 'HASH' && ref($result->{content}) eq 'ARRAY'
+          ? $result
+          : { content => [{
+                type => "text",
+                text => ref($result) ? encode_json($result) : ($result // '')
+            }] };
 
         return $c->render(json => {
             jsonrpc => "2.0",
             id      => $json->{id},
-            result  => { content => [{ type => "text", text => $text }] }
+            result  => $call_result
         });
     }
 
@@ -2652,7 +2741,7 @@ any '/mcp' => sub ($c) {
     # --------------------------------------------------
     if (!defined $json->{id}) {
         warn "[MCP] Unhandled notification: $method\n";
-        return $c->render(json => { jsonrpc => "2.0", result => {} });
+        return $c->rendered(202);
     }
 
     warn "[MCP] Unhandled method: $method\n";
