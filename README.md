@@ -39,7 +39,8 @@ request records are published under `benchmark/agent_interface/`.
   Main automation entry point for the non-SAS gunplot workflow.
 - `run_sas_codes_or_script_in_ODA.pl`
   Low-level helper for SAS ODA submit, upload, download, delete, and session
-  reuse.
+  reuse. Repeated upload/download arguments are transferred through one SASPy
+  session.
 
 ## Installation
 
@@ -65,8 +66,10 @@ powershell -NoProfile -ExecutionPolicy Bypass `
   -AllowInsecureDownloads
 ```
 
-The installer can download htslib 1.20 into `tools/` and build repo-local
-`bgzip` / `tabix` when those tools are not already available.
+The pipeline also ships Windows `bgzip.exe` / `tabix.exe` under
+`DiffGWASDeps/` and places that directory on the portable-Cygwin runtime path.
+The installer can still download htslib 1.20 into `tools/` and build newer
+repo-local copies when needed.
 
 After installation, open the portable shell with:
 
@@ -243,6 +246,12 @@ perl ./auto_prepare_and_run_diff_gwas.pl \
   --step plot_local_gtf \
   --target-snps rs185665940
 ```
+
+Explicit target-SNP local-GTF runs now create their MAF-filtered target CSV
+before indexed GTF extraction, use bundled tabix/bgzip by default on Windows,
+and prepare all known ODA uploads as one manifest. Existing local-GTF output is
+reused only when its request key matches the current target/configuration, so a
+new target no longer requires `--force` merely to avoid an unrelated result.
 
 ### 4. Forest plot examples
 

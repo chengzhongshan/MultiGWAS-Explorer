@@ -155,7 +155,7 @@ Before running a workflow, identify:
    Close SASPy's internal inline destination with `ods _all_ close;`, use `ods listing` for SAS/GRAPH PNG output, and create a tiny HTML wrapper that references the PNG.
 
 7. Download and verify outputs.
-   Download the PNG and HTML explicitly after the plot run. Check both local files exist and are non-empty. Open the HTML only after verification. When a local GTF run produces a PNG, prefer a small figure-first final HTML that embeds that PNG and keep any raw SAS HTML as a sidecar instead of opening the sparse helper HTML directly.
+   Download the PNG and HTML explicitly after the plot run. Check both local files exist and are non-empty. Open the HTML only after verification. When a local GTF run produces a PNG, prefer a small figure-first final HTML that references that PNG. Treat raw SAS HTML as a temporary recovery input and remove the final `.sasraw.html` sidecar.
    For forest plots, also verify that:
    - a single-SNP run produced one manifest row with `track_id=single_snp`
    - a multi-SNP run produced one manifest row per displayed GWAS / cohort
@@ -179,6 +179,16 @@ Before running a workflow, identify:
    `/home/...` consistently for `download-file`, `delete-file`, and
    `file-info`, and it verifies deletes by checking that the target no longer
    resolves afterward.
+
+   Build transfer manifests before opening SASPy whenever the required local
+   paths can be determined in advance. Repeated `--upload-file` or
+   `--download-file` arguments are handled in one ODA session, so queue the
+   complete set instead of invoking the helper once per file. For local-GTF
+   runs, inventory the static SAS support files, requested-hit CSV, compact GTF
+   subset, and compact GWAS subset before submission. After submission, parse
+   the SAS log for the dynamically generated PNG path and download all
+   then-known results together. Use `ODA_TRANSFER_MANIFEST_ONLY=1` to audit the
+   planned uploads without connecting to ODA.
 
 9. Preserve local GTF gene-track intent explicitly.
    When building local GTF plots, prefer a region-limited Gencode subset over a
@@ -216,7 +226,22 @@ Before running a workflow, identify:
    final HTML, prefer recovering the helper-saved `sas_res_*.html` artifact and
    the final PNG path mentioned in the SAS log before declaring the rerun
    failed. If the PNG was recovered successfully, rebuild the user-facing final
-   HTML around that PNG and keep the raw SAS HTML as a sidecar.
+   HTML around that PNG and remove the temporary raw SAS HTML; do not retain a
+   final `.sasraw.html` sidecar.
+
+   For explicit target SNPs, generate the MAF-filtered requested-hit CSV before
+   extracting the GTF subset and use it as the region source. Do not run the
+   genome-wide common-association verifier merely to locate an explicitly
+   supplied target. Local-GTF output reuse must include a request key derived
+   from the rendered runner configuration so a different target cannot reuse
+   an unrelated generic HTML result.
+
+   Use tabix for GTF interval extraction by default. On Windows/Cygwin, prefer
+   the bundled `DiffGWASDeps/tabix.exe` and `DiffGWASDeps/bgzip.exe`; otherwise
+   resolve the repository or system installations. Build and cache a sorted
+   BGZF GTF plus `.tbi` once, merge overlapping query regions, and retain an
+   exact interval-overlap check on returned rows. Use the sequential gzip scan
+   only when the caller explicitly requests `--no-use-tabix`.
    For the direct single-SNP SAS local-GTF wrapper, remember that
    `TARGET_SNP` still defines the centered local window while
    `GTF_LABEL_SNPS` can supply additional comma-separated rsIDs to label inside
@@ -374,6 +399,12 @@ For a new project, copy/adapt the script templates in this skill's `scripts/` fo
   common-association validations to take minutes rather than seconds; run them
   separately if you want clearer timing/logs.
 - For tabix output, test at least one autosomal interval and chrX/23 interval.
+- For an explicit target-SNP local-GTF run, confirm the requested-hit CSV is
+  generated before the GTF subset and that the common-association verifier is
+  skipped.
+- Use `ODA_TRANSFER_MANIFEST_ONLY=1` to confirm all expected uploads are known
+  before ODA access. For a real two-or-more-file transfer, confirm the SASPy log
+  shows one session rather than one connection per file.
 - For SAS ODA output, verify local PNG and HTML sizes. A tiny HTML wrapper is expected; a hundreds-of-MB HTML file means inline ODS output leaked into the result.
 - For custom genome-wide Manhattan subsets, visually verify that the x-axis
   starts with `chr1` and does not contain a phantom pre-`chr1` block caused by

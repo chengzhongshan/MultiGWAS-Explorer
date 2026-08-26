@@ -344,8 +344,10 @@ personal `PERL5LIB` or a globally preconfigured Python:
   `local/perl5-cygwin/`, `local/perl5-linux/`, or `local/perl5-darwin/`
 - Python packages such as `saspy` and `Pillow` are installed under
   `.venv-pipeline/`
-- `bgzip` / `tabix` are taken from system packages when available, or built
-  into `local/bin/` through `install/build_local_htslib.sh`
+- on Windows/Cygwin, the bundled `DiffGWASDeps/bgzip.exe` and
+  `DiffGWASDeps/tabix.exe` are placed first on `PATH`; other platforms use
+  system packages or the copies built under `local/bin/` by
+  `install/build_local_htslib.sh`
 
 Recommended entry points:
 
@@ -368,8 +370,10 @@ powershell -NoProfile -ExecutionPolicy Bypass `
   -PortableRoot "$env:USERPROFILE\CygwinPortablePipeline"
 ```
 
-The Windows package list includes the Cygwin headers needed to build htslib
-locally when `bgzip` and `tabix` are not already available:
+The repository includes tested Windows executables at
+`DiffGWASDeps/bgzip.exe` and `DiffGWASDeps/tabix.exe`. The Windows package list
+also includes the Cygwin headers needed to build a newer local htslib when the
+bundled tools cannot be used:
 `libbz2-devel`, `libcurl-devel`, `liblzma-devel`, `openssl-devel`, and
 `zlib-devel`. If `tools/htslib-1.20.tar.bz2` is not already present, the
 installer downloads the expected upstream htslib release before building
@@ -1402,9 +1406,31 @@ The helper now owns first-run SAS ODA credential bootstrap too:
 - only a successful login is written back to the authinfo file
 - later SAS ODA wrapper calls then reuse that saved entry automatically
 
-now supports bulk file operations in a single invocation. This is useful both
-for manual debugging and for reducing repeated wrapper startup overhead in
-automation.
+The helper supports bulk file operations in a single invocation. Repeated uploads or
+downloads are dispatched through one SASPy/ODA session, including the existing
+size-based upload reuse and post-transfer verification. This avoids opening a
+new ODA connection for every file.
+
+The local-GTF wrapper builds its complete upload inventory before opening
+SASPy. Static SAS support files, the target/top-hit CSV, the compact GTF
+subset, and the compact GWAS subset are then uploaded or reused together. Use
+the following dry-run diagnostic to inspect that inventory without connecting
+to ODA:
+
+```bash
+ODA_TRANSFER_MANIFEST_ONLY=1 \
+perl ./auto_prepare_and_run_diff_gwas.pl \
+  --spec configs/spec_pgc_scz_sex_common_automation.json \
+  --target-snps rs17425819 \
+  --target-snp-genes rs17425819:JAK2 \
+  --step plot_local_gtf --force
+```
+
+After SAS finishes, every result whose path is then known (HTML, CSV, LD audit,
+and the PNG path reported by SAS) is likewise downloaded in one invocation.
+The PNG name cannot always be known before submission because the plotting
+macro creates it dynamically, so the wrapper parses the completed SAS log
+before constructing the download manifest.
 
 Practical remote-path lessons from the recent SAS ODA debugging:
 
@@ -2065,14 +2091,29 @@ The local GTF wrapper is also more resilient for long SAS ODA runs:
 - if SAS already finished remotely but the expected final HTML download is
   flaky, the wrapper can now reuse the helper-saved `sas_res_*.html` artifact
   and separately download the final PNG path reported in the SAS log
-- when that PNG is available, the wrapper now opens a figure-first HTML page
-  that embeds the completed plot and keeps the raw SAS HTML beside it as a
-  `.sasraw.html` sidecar, instead of opening the sparse helper HTML directly
+- when that PNG is available, the wrapper opens a compact figure-first HTML
+  page that references the completed plot; raw SAS HTML is treated as a
+  recovery input and the final `.sasraw.html` sidecar is removed
 
-For target-SNP extraction, the standardized long differential GWAS output is
-now bgzip-indexed with `tabix` when `bgzip/tabix` are available locally. The
-single-SNP wide extractor then uses that index for the region/window pass after
-it resolves the target SNP location, instead of doing a second full-file scan.
+For explicit target SNPs, the wrapper first generates the requested MAF-filtered
+target/top-hit CSV and uses that file as the authoritative region source for
+GTF extraction. It does not run the genome-wide common-association verifier for
+that request. This ordering prevents a one-locus request from scanning an
+unrelated large verifier table.
+
+`DiffGWASDeps/extract_gencode_gtf_subset.pl` requires indexed extraction by
+default. It locates `tabix` and `bgzip` in `DiffGWASDeps/`, the repository root,
+`local/bin/`, or `PATH`, builds a sorted BGZF GTF plus `.tbi` once when needed,
+and queries only the merged target regions. Use `--no-use-tabix` only as an
+explicit slow compatibility fallback. The exact overlap is still checked by
+the extractor after the tabix GFF query, so an additional bedtools pass is not
+needed for a single indexed locus.
+
+Local-GTF output reuse is request-aware. The automation stores an MD5 request
+key beside the final HTML and reuses an existing result only when the current
+runner configuration and target-specific output match that key. Changing
+`--target-snps`, `--target-snp-genes`, or another rendered runner setting now
+reruns `plot_local_gtf` without requiring `--force`.
 
 The SAS ODA plotting wrappers now use the same timeout/retry pattern across:
 

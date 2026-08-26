@@ -790,12 +790,10 @@ install_pdl_perl_deps() {
 
 ensure_local_hts_tools() {
   prepend_path "${PIPELINE_LOCAL_DIR}/bin"
+  prepend_path "${PIPELINE_ROOT}"
+  prepend_path "${PIPELINE_ROOT}/DiffGWASDeps"
   if command_exists bgzip && command_exists tabix; then
     log "Using bgzip/tabix from PATH"
-    return 0
-  fi
-  if [ -x "${PIPELINE_LOCAL_DIR}/bin/bgzip.exe" ] && [ -x "${PIPELINE_LOCAL_DIR}/bin/tabix.exe" ]; then
-    log "Using bundled Windows bgzip/tabix under ${PIPELINE_LOCAL_DIR}/bin"
     return 0
   fi
   log "bgzip/tabix not found; building a repo-local htslib copy"

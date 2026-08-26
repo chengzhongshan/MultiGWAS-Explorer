@@ -2825,8 +2825,25 @@ sub compose_remote_path_for_match {
 
 #Make the upload file before running any codes, so that the uploaded file can be used in the code if needed.
 if(@upload_files){
-    for my $upload_path (@upload_files) {
-        upload_one_file($upload_path);
+    print "Bulk upload manifest: " . scalar(@upload_files) . " file(s); using one SASPy session.\n";
+    my @items = map {
+        +{
+            local_path     => $_,
+            progress_label => 'manifest upload: ' . basename($_),
+            skip_if_same   => $skip_upload_if_same ? 1 : 0,
+        }
+    } @upload_files;
+    my $bulk_result = run_with_possible_fallback(
+        'bulk upload',
+        sub {
+            my ($active_runner) = @_;
+            return $active_runner->transfer_many({ uploads => \@items, downloads => [] });
+        },
+    );
+    die "Bulk upload failed: " . (defined($bulk_result) ? $bulk_result : 'unknown error') . "\n"
+      if !ref($bulk_result) || ref($bulk_result) ne 'HASH';
+    for my $item (@{ $bulk_result->{uploads} || [] }) {
+        print "Remote path for " . basename($item->{local_path} || '') . " is $item->{remote_path}\n";
     }
 }
 
@@ -3242,9 +3259,27 @@ if (($execution_file || ($execution_code && $execution_code !~ /^\s*$/))
 #Put the download part after running the code, so that users can specify the dataset to be downloaded in the code if needed. 
 #For example, users can create a dataset in the code and then specify that dataset to be downloaded.
 if (@download_files) {
+    print "Bulk download manifest: " . scalar(@download_files) . " file(s); using one SASPy session.\n";
+    my @items;
     for my $i (0 .. $#download_files) {
-        my $resolved_local_download = resolve_download_local_path($i, $download_files[$i]);
-        download_one_file($download_files[$i], $resolved_local_download);
+        push @items, {
+            remote_path => $download_files[$i],
+            local_path  => resolve_download_local_path($i, $download_files[$i]),
+        };
+    }
+    my $bulk_result = run_with_possible_fallback(
+        'bulk download',
+        sub {
+            my ($active_runner) = @_;
+            return $active_runner->transfer_many({ uploads => [], downloads => \@items });
+        },
+    );
+    die "Bulk download failed: " . (defined($bulk_result) ? $bulk_result : 'unknown error') . "\n"
+      if !ref($bulk_result) || ref($bulk_result) ne 'HASH';
+    for my $item (@{ $bulk_result->{downloads} || [] }) {
+        my $local_path = File::Spec->rel2abs($item->{local_path} || '');
+        die "Bulk download did not create expected local file: $local_path\n" unless -s $local_path;
+        print "The file is saved as $local_path\n";
     }
 }
 

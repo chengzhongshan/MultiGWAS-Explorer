@@ -275,6 +275,7 @@ fi
 stamp="$(date +%Y%m%d_%H%M%S)"
 HTML_OUT="${WORKDIR}/${OUTPUT_HTML_BASENAME}"
 CSV_OUT="${WORKDIR}/${LOCAL_TOP_HITS_CSV_BASENAME}"
+LOCAL_TOP_HITS_CSV_PREGENERATED=0
 LD_AUDIT_OUT="${WORKDIR}/${TOP_HIT_LD_AUDIT_BASENAME}"
 TOP_HIT_LD_CACHE_BASENAME=""
 if [[ -n "${TOP_HIT_LD_CACHE_TSV}" ]]; then
@@ -518,14 +519,17 @@ clear_stale_remote_expected_outputs() {
     echo "[cleanup] Skipping pre-submit remote local-GTF output cleanup because SKIP_PRECLEAR_REMOTE_GTF_OUTPUTS=${SKIP_PRECLEAR_REMOTE_GTF_OUTPUTS}."
     return 0
   fi
+  local -a delete_args=(
+    --delete-file "${OUTPUT_HTML_BASENAME}"
+    --delete-file "${OUTPUT_HTML_BASENAME%.html}.prep.html"
+  )
   echo "[cleanup] Clearing stale remote local-GTF outputs before submit..."
-  oda_delete_many "preclear_local_hits_with_gtf_output_main_html_${stamp}" --delete-file "${OUTPUT_HTML_BASENAME}" || true
   if [[ -n "${LOCAL_TOP_HITS_INPUT_CSV_BASENAME:-}" && "${LOCAL_TOP_HITS_INPUT_CSV_BASENAME}" == "${LOCAL_TOP_HITS_CSV_BASENAME}" ]]; then
     echo "[cleanup] Preserving remote requested top-hit CSV before submit because it is also the active local-GTF input: ${LOCAL_TOP_HITS_CSV_BASENAME}"
   else
-    oda_delete_many "preclear_local_hits_with_gtf_output_main_csv_${stamp}" --delete-file "${LOCAL_TOP_HITS_CSV_BASENAME}" || true
+    delete_args+=(--delete-file "${LOCAL_TOP_HITS_CSV_BASENAME}")
   fi
-  oda_delete_many "preclear_local_hits_with_gtf_output_prep_html_${stamp}" --delete-file "${OUTPUT_HTML_BASENAME%.html}.prep.html" || true
+  oda_delete_many "preclear_local_hits_with_gtf_outputs_${stamp}" "${delete_args[@]}" || true
 }
 
 cleanup_remote_local_gtf_subset() {
@@ -891,7 +895,9 @@ build_completed_html_from_png_assets_if_available() {
   fi
   [[ -s "${html_path}" ]] || return 0
 
-  cp -f "${html_path}" "${raw_html_path}"
+  # The raw SAS HTML is only an input to recovery. Do not retain a final
+  # .sasraw.html sidecar when a standalone PNG is available.
+  rm -f "${raw_html_path}"
   {
     echo '<!DOCTYPE html>'
     echo "<html lang=\"en\"><head><meta charset=\"utf-8\"><title>${figure_title}</title></head><body style=\"font-family:Arial,Helvetica,sans-serif;margin:24px\">"
@@ -905,7 +911,6 @@ build_completed_html_from_png_assets_if_available() {
     if [[ -n "${csv_path}" && -s "${csv_path}" ]]; then
       echo "<p><a href=\"$(basename "${csv_path}")\">Top-hit CSV</a></p>"
     fi
-    echo "<p><a href=\"$(basename "${raw_html_path}")\">Raw SAS HTML output</a></p>"
     echo '</body></html>'
   } > "${html_path}"
   echo "[recover] Replaced the opened HTML with a figure-first wrapper because a final PNG was generated: ${html_path}"
@@ -1268,6 +1273,20 @@ augment_data_gz_with_missing_target_snps() {
 
 augment_data_gz_with_missing_target_snps
 
+# Region selection must use the explicit target list, not a stale or
+# genome-wide common-association verifier. Generate the target/top-hit CSV
+# before deriving GTF intervals so first-time single-SNP runs remain local.
+if [[ -n "${TARGET_SNP_LIST}" ]]; then
+  if generate_requested_top_hits_csv_locally && [[ -s "${CSV_OUT}" ]]; then
+    LOCAL_TOP_HITS_CSV_PREGENERATED=1
+    echo "[prep] Generated explicit-target CSV before local GTF region extraction: ${CSV_OUT}"
+  else
+    echo "ERROR: Could not generate the explicit-target CSV needed for local GTF region extraction: ${TARGET_SNP_LIST}" >&2
+    echo "ERROR: Refusing to fall back to the genome-wide common-association verifier for an explicit target run." >&2
+    exit 1
+  fi
+fi
+
 perl "${SCHEMA_INCLUDE_HELPER}" \
   --config "${SCHEMA_CONFIG_JSON}" \
   --dataset scz_mh \
@@ -1313,6 +1332,9 @@ if [[ -s "${CSV_OUT}" ]]; then
       close $fh;
     ' "${CSV_OUT}" "${LOCAL_GTF_WINDOW_BP}"
   )
+elif [[ -n "${TARGET_SNP_LIST}" ]]; then
+  echo "ERROR: Explicit target SNPs were requested but their target CSV is unavailable: ${TARGET_SNP_LIST}" >&2
+  exit 1
 elif [[ -n "${VERIFY_TOP_HITS_TSV}" && -s "${VERIFY_TOP_HITS_TSV}" ]]; then
   gtf_region_source="${VERIFY_TOP_HITS_TSV}"
   mapfile -t gtf_region_args < <(
@@ -1498,7 +1520,7 @@ render_gtf_runner \
   "${LOCAL_TOP_HITS_INPUT_CSV_BASENAME}" \
   "0"
 
-if ! generate_requested_top_hits_csv_locally; then
+if [[ "${LOCAL_TOP_HITS_CSV_PREGENERATED}" != "1" ]] && ! generate_requested_top_hits_csv_locally; then
   echo "WARNING: Local MAF-aware top-hit CSV generation did not succeed. The wrapper will fall back to the prep-only SAS export path if needed." >&2
 fi
 if [[ "${TOP_HIT_SELECTION_METHOD^^}" == "LD" && -z "${TARGET_SNP_LIST}" && -s "${CSV_OUT}" ]]; then
@@ -1706,6 +1728,87 @@ write_batched_html_index() {
   echo '</body></html>' >> "${HTML_OUT}"
 }
 
+# Build the complete upload inventory locally before opening SASPy. The ODA
+# helper processes repeated --upload-file arguments through one SAS session,
+# including same-size reuse checks and post-upload size verification.
+declare -a bulk_upload_args=()
+declare -a bulk_upload_alias_paths=()
+queue_bulk_oda_upload() {
+  local local_path="$1"
+  local remote_basename="$2"
+  local label="$3"
+  local upload_path="${local_path}"
+  [[ -s "${local_path}" ]] || return 0
+  if [[ "$(basename "${local_path}")" != "${remote_basename}" ]]; then
+    mkdir -p "${WORKDIR}/.oda_upload_aliases"
+    upload_path="${WORKDIR}/.oda_upload_aliases/${remote_basename}"
+    cp -f "${local_path}" "${upload_path}"
+    bulk_upload_alias_paths+=("${upload_path}")
+  fi
+  bulk_upload_args+=(--upload-file "${upload_path}")
+  echo "[manifest] ${label}: $(basename "${local_path}") -> ${remote_basename}"
+}
+
+if [[ "${ASSUME_REMOTE_GTF_SUPPORT_READY}" == "1" ]]; then
+  echo "[manifest] Static local-GTF support macros are declared ready remotely."
+else
+  [[ -f "${SNP_LOCAL_MACRO_SAS}" ]] &&
+    queue_bulk_oda_upload "${SNP_LOCAL_MACRO_SAS}" "$(basename "${SNP_LOCAL_MACRO_SAS}")" "static support"
+  [[ -f "${MAP_GRP_ASSOC_MACRO_SAS}" ]] &&
+    queue_bulk_oda_upload "${MAP_GRP_ASSOC_MACRO_SAS}" "$(basename "${MAP_GRP_ASSOC_MACRO_SAS}")" "static support"
+  [[ -f "${MULT_GSCATTER_GENE_MACRO_SAS}" ]] &&
+    queue_bulk_oda_upload "${MULT_GSCATTER_GENE_MACRO_SAS}" "$(basename "${MULT_GSCATTER_GENE_MACRO_SAS}")" "static support"
+  [[ -f "${ADJ_CLOSE_GENE_GRP_MACRO_SAS}" ]] &&
+    queue_bulk_oda_upload "${ADJ_CLOSE_GENE_GRP_MACRO_SAS}" "$(basename "${ADJ_CLOSE_GENE_GRP_MACRO_SAS}")" "static support"
+  queue_bulk_oda_upload "${PATCHED_LATTICE_MACRO_SAS}" "$(basename "${PATCHED_LATTICE_MACRO_SAS}")" "static support"
+  queue_bulk_oda_upload "${TOP_HIT_DIST_MACRO_SAS}" "$(basename "${TOP_HIT_DIST_MACRO_SAS}")" "static support"
+  queue_bulk_oda_upload "${TOP_HIT_LD_MACRO_SAS}" "$(basename "${TOP_HIT_LD_MACRO_SAS}")" "static support"
+  queue_bulk_oda_upload "${HAPLOREG_LD_QUERY_MACRO_SAS}" "$(basename "${HAPLOREG_LD_QUERY_MACRO_SAS}")" "static support"
+  [[ -n "${TOP_HIT_LD_CACHE_TSV}" ]] &&
+    queue_bulk_oda_upload "${TOP_HIT_LD_CACHE_TSV}" "${TOP_HIT_LD_CACHE_BASENAME}" "LD cache"
+fi
+
+if [[ "${ASSUME_REMOTE_GTF_DYNAMIC_INPUTS_READY}" == "1" ]]; then
+  echo "[manifest] Dynamic local-GTF inputs are declared ready remotely."
+else
+  if [[ -s "${CSV_OUT}" && -n "${LOCAL_TOP_HITS_INPUT_CSV_BASENAME:-}" ]]; then
+    queue_bulk_oda_upload "${CSV_OUT}" "${LOCAL_TOP_HITS_INPUT_CSV_BASENAME}" "target/top-hit CSV"
+  fi
+  queue_bulk_oda_upload "${GET_GTF_MACRO_UPLOAD}" "${GET_GTF_MACRO_BASENAME}" "GTF import macro"
+  queue_bulk_oda_upload "${LOCAL_GTF_SUBSET_GZ}" "${REMOTE_GTF_BASENAME}" "indexed local GTF subset"
+fi
+
+if [[ "${SKIP_DATA_UPLOAD}" == "1" ]]; then
+  echo "[manifest] GWAS subset is declared ready remotely: ${REMOTE_DATA_BASENAME}"
+else
+  queue_bulk_oda_upload "${DATA_GZ}" "${REMOTE_DATA_BASENAME}" "GWAS plotting subset"
+fi
+
+if [[ "${ODA_TRANSFER_MANIFEST_ONLY:-0}" == "1" ]]; then
+  echo "[manifest] ODA_TRANSFER_MANIFEST_ONLY=1; planned $(( ${#bulk_upload_args[@]} / 2 )) upload file(s) and will not connect to SAS ODA."
+  if [[ "${#bulk_upload_alias_paths[@]}" -gt 0 ]]; then
+    rm -f "${bulk_upload_alias_paths[@]}"
+  fi
+  exit 0
+fi
+
+if [[ "${#bulk_upload_args[@]}" -gt 0 ]]; then
+  echo "[1-3/5] Upload manifest contains $(("${#bulk_upload_args[@]}" / 2)) file(s); transferring/reusing them in one SASPy connection..."
+  bulk_reuse_arg="--skip-upload-if-same"
+  if [[ "${platform_is_linux}" == "1" && "${FORCE_DYNAMIC_GTF_SUPPORT_UPLOADS_ON_LINUX}" == "1" ]]; then
+    bulk_reuse_arg="--no-skip-upload-if-same"
+  fi
+  oda_upload_many "upload_local_hits_with_gtf_manifest_${stamp}"     "${bulk_upload_args[@]}" "${bulk_reuse_arg}"
+else
+  echo "[1-3/5] Upload manifest is empty; all inputs were explicitly declared ready remotely."
+fi
+if [[ "${#bulk_upload_alias_paths[@]}" -gt 0 ]]; then
+  rm -f "${bulk_upload_alias_paths[@]}"
+fi
+
+# Retain the former per-file implementation below as a compatibility reference,
+# but do not execute it; the manifest path above replaces it.
+if [[ "0" == "1" ]]; then
 support_uploads_performed=0
 upload_support_file_if_needed() {
   local local_path="$1"
@@ -1858,6 +1961,8 @@ else
   upload_data_with_integrity_check
 fi
 
+fi
+
 BATCH_SIZE="${LOCAL_MAX_HITS_PER_FIG:-4}"
 if [[ "${TOP_HIT_SELECTION_METHOD^^}" == "LD" && -z "${TARGET_SNP_LIST}" ]]; then
   echo "[prep] Running LD clumping before local-GTF batching."
@@ -1873,6 +1978,22 @@ if [[ -f "${CSV_OUT}" && -s "${CSV_OUT}" ]]; then
     mkdir -p "${RUN_LOG_DIR}"
     rm -f "${RUN_LOG_DIR}"/hits_part_*
     tail -n +2 "${CSV_OUT}" | split -l "${BATCH_SIZE}" - "${RUN_LOG_DIR}/hits_part_"
+
+    batch_upload_args=()
+    part=1
+    for partfile in "${RUN_LOG_DIR}"/hits_part_*; do
+      [[ -f "${partfile}" ]] || continue
+      batch_remote_csv="${LOCAL_TOP_HITS_CSV_BASENAME%.csv}_part${part}.csv"
+      batch_csv="${WORKDIR}/${batch_remote_csv}"
+      printf '%s\n' "${header_line}" > "${batch_csv}"
+      cat "${partfile}" >> "${batch_csv}"
+      batch_upload_args+=(--upload-file "${batch_csv}")
+      part=$((part + 1))
+    done
+    if [[ "${#batch_upload_args[@]}" -gt 0 ]]; then
+      echo "[batch manifest] Uploading/reusing $(( ${#batch_upload_args[@]} / 2 )) batch CSV file(s) in one SASPy connection..."
+      oda_upload_many "upload_top_hits_batches_${stamp}" "${batch_upload_args[@]}"
+    fi
 
     part=1
     for partfile in "${RUN_LOG_DIR}"/hits_part_*; do
@@ -1898,11 +2019,7 @@ if [[ -f "${CSV_OUT}" && -s "${CSV_OUT}" ]]; then
       printf '%s\n' "${header_line}" > "${batch_csv}"
       cat "${partfile}" >> "${batch_csv}"
 
-      upload_home_file_if_needed \
-        "[batch ${part}]" \
-        "${batch_csv}" \
-        "${batch_remote_csv}" \
-        "upload_top_hits_batch_${stamp}_${part}"
+      echo "[batch ${part}] Batch CSV was included in the precomputed bulk upload manifest: ${batch_remote_csv}"
 
       render_gtf_runner \
         "${batch_run_sas_rendered}" \
@@ -1931,14 +2048,13 @@ if [[ -f "${CSV_OUT}" && -s "${CSV_OUT}" ]]; then
           fi
           exit 1
         fi
-        next_attempt=$((batch_submit_attempt + 1))
         if [[ "${batch_submit_rc}" -ne 0 ]]; then
-          echo "[batch ${part}] GTF SAS submit attempt ${batch_submit_attempt} failed or timed out; retrying attempt ${next_attempt}/${GTF_SUBMIT_MAX_ATTEMPTS} after ${GTF_SUBMIT_RETRY_SLEEP_SECONDS}s..."
+          echo "[batch ${part}] GTF SAS submit attempt ${batch_submit_attempt} failed or timed out; retrying attempt $((batch_submit_attempt + 1))/${GTF_SUBMIT_MAX_ATTEMPTS} after ${GTF_SUBMIT_RETRY_SLEEP_SECONDS}s..."
         else
-          echo "[batch ${part}] GTF SAS submit attempt ${batch_submit_attempt} looked incomplete; retrying attempt ${next_attempt}/${GTF_SUBMIT_MAX_ATTEMPTS} after ${GTF_SUBMIT_RETRY_SLEEP_SECONDS}s..."
+          echo "[batch ${part}] GTF SAS submit attempt ${batch_submit_attempt} looked incomplete; retrying attempt $((batch_submit_attempt + 1))/${GTF_SUBMIT_MAX_ATTEMPTS} after ${GTF_SUBMIT_RETRY_SLEEP_SECONDS}s..."
         fi
         sleep "${GTF_SUBMIT_RETRY_SLEEP_SECONDS}"
-        batch_submit_attempt=$next_attempt
+        batch_submit_attempt=$((batch_submit_attempt + 1))
       done
 
       if gtf_log_has_terminal_failure "${batch_run_log_file}"; then
@@ -1947,21 +2063,29 @@ if [[ -f "${CSV_OUT}" && -s "${CSV_OUT}" ]]; then
       fi
 
       recover_html_from_submit_artifacts_for_logdir "${batch_run_log_dir}" "${batch_output_html}" || true
+      batch_remote_png_path="$(extract_remote_png_path_from_log_file "${batch_run_log_file}" || true)"
+      batch_download_args=()
       if [[ ! -s "${batch_output_html}" ]]; then
+        batch_download_args+=(--download-file "~/${batch_output_html_basename}" --download-local-path "${batch_output_html}")
+      fi
+      if [[ -n "${batch_remote_png_path}" ]]; then
+        batch_download_args+=(--download-file "${batch_remote_png_path}" --download-local-path "${batch_png}")
+      fi
+      if [[ "${#batch_download_args[@]}" -gt 0 ]]; then
         oda_download_many_with_timeout \
           "${ODA_RESULT_DOWNLOAD_TIMEOUT_SECONDS}" \
           "${ODA_RESULT_DOWNLOAD_TIMEOUT_GRACE_SECONDS}" \
-          "download_local_hits_with_gtf_html_${stamp}_part${part}" \
-          --download-file "~/${batch_output_html_basename}" \
-          --download-local-path "${batch_output_html}" || true
+          "download_local_hits_with_gtf_results_${stamp}_part${part}" \
+          "${batch_download_args[@]}" || true
       fi
 
       recover_html_from_submit_artifacts_for_logdir "${batch_run_log_dir}" "${batch_output_html}" || true
-      batch_remote_png_path="$(extract_remote_png_path_from_log_file "${batch_run_log_file}" || true)"
-      download_remote_png_to_path_if_reported \
-        "${batch_remote_png_path}" \
-        "${batch_png}" \
-        "download_local_hits_with_gtf_png_${stamp}_part${part}" || true
+      if [[ ! -s "${batch_png}" ]]; then
+        download_remote_png_to_path_if_reported \
+          "${batch_remote_png_path}" \
+          "${batch_png}" \
+          "download_local_hits_with_gtf_png_${stamp}_part${part}" || true
+      fi
       build_completed_html_from_png_assets_if_available \
         "${batch_output_html}" \
         "${batch_png}" \
@@ -2044,14 +2168,13 @@ while :; do
     fi
     exit 1
   fi
-  next_attempt=$((gtf_submit_attempt + 1))
   if [[ "${gtf_submit_rc}" -ne 0 ]]; then
-    echo "[4b/5] GTF SAS submit attempt ${gtf_submit_attempt} failed or timed out; retrying attempt ${next_attempt}/${GTF_SUBMIT_MAX_ATTEMPTS} after ${GTF_SUBMIT_RETRY_SLEEP_SECONDS}s..."
+    echo "[4b/5] GTF SAS submit attempt ${gtf_submit_attempt} failed or timed out; retrying attempt $((gtf_submit_attempt + 1))/${GTF_SUBMIT_MAX_ATTEMPTS} after ${GTF_SUBMIT_RETRY_SLEEP_SECONDS}s..."
   else
-    echo "[4b/5] GTF SAS submit attempt ${gtf_submit_attempt} looked incomplete; retrying attempt ${next_attempt}/${GTF_SUBMIT_MAX_ATTEMPTS} after ${GTF_SUBMIT_RETRY_SLEEP_SECONDS}s..."
+    echo "[4b/5] GTF SAS submit attempt ${gtf_submit_attempt} looked incomplete; retrying attempt $((gtf_submit_attempt + 1))/${GTF_SUBMIT_MAX_ATTEMPTS} after ${GTF_SUBMIT_RETRY_SLEEP_SECONDS}s..."
   fi
   sleep "${GTF_SUBMIT_RETRY_SLEEP_SECONDS}"
-  gtf_submit_attempt="${next_attempt}"
+  gtf_submit_attempt=$((gtf_submit_attempt + 1))
 done
 
 if gtf_log_has_terminal_failure "${RUN_LOG_FILE}"; then
@@ -2070,6 +2193,7 @@ if [[ -s "${HTML_OUT}" ]]; then
 fi
 recover_csv_from_existing_local_copy || true
 download_outputs_args=()
+remote_png_path="$(extract_remote_png_path_from_run_log || true)"
 if [[ ! -s "${HTML_OUT}" ]]; then
   download_outputs_args+=(--download-file "~/${OUTPUT_HTML_BASENAME}" --download-local-path "${HTML_OUT}")
 fi
@@ -2079,7 +2203,11 @@ fi
 if [[ "${TOP_HIT_SELECTION_METHOD^^}" == "LD" && ! -s "${LD_AUDIT_OUT}" ]]; then
   download_outputs_args+=(--download-file "~/${TOP_HIT_LD_AUDIT_BASENAME}" --download-local-path "${LD_AUDIT_OUT}")
 fi
+if [[ -n "${remote_png_path}" && ! -s "${PNG_OUT}" ]]; then
+  download_outputs_args+=(--download-file "${remote_png_path}" --download-local-path "${PNG_OUT}")
+fi
 if [[ ${#download_outputs_args[@]} -gt 0 ]]; then
+  echo "[manifest] Downloading $(( ${#download_outputs_args[@]} / 4 )) file(s) in one SASPy connection."
   oda_download_many_with_timeout \
     "${ODA_RESULT_DOWNLOAD_TIMEOUT_SECONDS}" \
     "${ODA_RESULT_DOWNLOAD_TIMEOUT_GRACE_SECONDS}" \
@@ -2095,7 +2223,8 @@ recover_csv_from_existing_local_copy || true
 if delivered_gtf_artifact_ready; then
   echo "[recover] Final delivered local-GTF artifact is already available locally; skipping remote PNG recovery."
 else
-  remote_png_path="$(extract_remote_png_path_from_run_log || true)"
+  # This is only a path-fallback retry. The normal absolute PNG path was
+  # already included in the combined download manifest above.
   download_remote_png_if_reported "${remote_png_path}" || true
   build_completed_html_from_png_if_available || true
 fi

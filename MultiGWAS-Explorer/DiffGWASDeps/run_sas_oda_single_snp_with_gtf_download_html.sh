@@ -587,6 +587,12 @@ build_completed_html_from_single_snp_assets_if_available() {
   fi
   [[ -s "${raw_html_path}" ]] || return 0
 
+  if [[ "${use_iframe}" -eq 1 ]]; then
+    cp -f "${raw_html_path}" "${final_html_path}"
+    echo "[recover] Kept the downloaded SAS HTML as the final HTML because no standalone PNG could be extracted: ${final_html_path}"
+    return 0
+  fi
+
   {
     echo '<!DOCTYPE html>'
     echo "<html lang=\"en\"><head><meta charset=\"utf-8\"><title>${figure_title}</title></head><body style=\"font-family:Arial,Helvetica,sans-serif;margin:24px\">"
@@ -595,20 +601,11 @@ build_completed_html_from_single_snp_assets_if_available() {
     if [[ "${VISIBLE_YLABEL_ENABLED}" == "1" ]]; then
       echo "<div style=\"writing-mode:vertical-rl;transform:rotate(180deg);font-size:20px;font-weight:600;color:${VISIBLE_YLABEL_FILL};line-height:1\">${GTF_YAXIS_LABEL}</div>"
     fi
-    if [[ "${use_iframe}" -eq 1 ]]; then
-      echo "<div style=\"flex:1;min-width:0\"><iframe src=\"$(basename "${raw_html_path}")\" title=\"${image_alt}\" style=\"width:100%;height:1700px;border:1px solid #ccc;background:#fff\"></iframe></div>"
-    else
-      echo "<div><img src=\"${image_src}\" alt=\"${image_alt}\" style=\"max-width:100%;height:auto;border:1px solid #ccc\"></div>"
-    fi
+    echo "<div><img src=\"${image_src}\" alt=\"${image_alt}\" style=\"max-width:100%;height:auto;border:1px solid #ccc\"></div>"
     echo '</div>'
-    echo "<p><a href=\"$(basename "${raw_html_path}")\">Raw SAS HTML output</a></p>"
     echo '</body></html>'
   } > "${final_html_path}"
-  if [[ "${use_iframe}" -eq 1 ]]; then
-    echo "[recover] Wrapped the raw single-SNP SAS HTML with a visible y-axis label because no standalone PNG could be extracted: ${final_html_path}"
-  else
-    echo "[recover] Replaced the opened HTML with a figure-first wrapper because a final PNG was generated: ${final_html_path}"
-  fi
+  echo "[recover] Replaced the opened HTML with a figure-first wrapper because a final PNG was generated: ${final_html_path}"
 }
 
 single_snp_submit_needs_retry() {
@@ -844,28 +841,7 @@ fi
 oda_upload_many \
   "upload_single_snp_with_gtf_support_${stamp}" \
   "${upload_support_args[@]}"
-
-if ! remote_home_file_matches_local_size "${DATA_GZ}" "${REMOTE_DATA_BASENAME}"; then
-  echo "[1b/6] Remote GWAS subset size check failed after bulk upload. Re-uploading ${REMOTE_DATA_BASENAME}..."
-  delete_partial_remote_home_file "${REMOTE_DATA_BASENAME}"
-  run_oda_helper --upload-file "${DATA_GZ}" --output-prefix "reupload_single_snp_gwas_subset_${stamp}"
-  if ! remote_home_file_matches_local_size "${DATA_GZ}" "${REMOTE_DATA_BASENAME}"; then
-    echo "ERROR: Remote GWAS subset size mismatch for ${REMOTE_DATA_BASENAME} after re-upload." >&2
-    exit 1
-  fi
-fi
-echo "[1b/6] Verified remote GWAS subset upload: ${REMOTE_DATA_BASENAME} ($(remote_home_file_size_bytes "${REMOTE_DATA_BASENAME}") bytes)."
-
-if ! remote_home_file_matches_local_size "${LOCAL_GTF_SUBSET_GZ}" "${REMOTE_GTF_BASENAME}"; then
-  echo "[1c/6] Remote local-GTF subset size check failed after bulk upload. Re-uploading ${REMOTE_GTF_BASENAME}..."
-  delete_partial_remote_home_file "${REMOTE_GTF_BASENAME}"
-  run_oda_helper --upload-file "${LOCAL_GTF_SUBSET_GZ}" --output-prefix "reupload_single_snp_local_gtf_subset_${stamp}"
-  if ! remote_home_file_matches_local_size "${LOCAL_GTF_SUBSET_GZ}" "${REMOTE_GTF_BASENAME}"; then
-    echo "ERROR: Remote local-GTF subset size mismatch for ${REMOTE_GTF_BASENAME} after re-upload." >&2
-    exit 1
-  fi
-fi
-echo "[1c/6] Verified remote local-GTF subset upload: ${REMOTE_GTF_BASENAME} ($(remote_home_file_size_bytes "${REMOTE_GTF_BASENAME}") bytes)."
+echo "[1b/6] Bulk upload helper verified remote sizes for the complete upload manifest in the same SASPy connection."
 
 echo "[5/6] Running SAS single-SNP local Manhattan gene-track plot..."
 SINGLE_SNP_GTF_SUBMIT_MAX_ATTEMPTS="${SINGLE_SNP_GTF_SUBMIT_MAX_ATTEMPTS:-2}"
@@ -905,22 +881,31 @@ while :; do
     fi
     exit 1
   fi
-  next_attempt=$((single_snp_submit_attempt + 1))
   if [[ "${single_snp_submit_rc}" -ne 0 ]]; then
-    echo "[5b/6] Single-SNP GTF SAS submit attempt ${single_snp_submit_attempt} failed or timed out; retrying attempt ${next_attempt}/${SINGLE_SNP_GTF_SUBMIT_MAX_ATTEMPTS} after ${SINGLE_SNP_GTF_SUBMIT_RETRY_SLEEP_SECONDS}s..."
+    echo "[5b/6] Single-SNP GTF SAS submit attempt ${single_snp_submit_attempt} failed or timed out; retrying attempt $((single_snp_submit_attempt + 1))/${SINGLE_SNP_GTF_SUBMIT_MAX_ATTEMPTS} after ${SINGLE_SNP_GTF_SUBMIT_RETRY_SLEEP_SECONDS}s..."
   else
-    echo "[5b/6] Single-SNP GTF SAS submit attempt ${single_snp_submit_attempt} looked incomplete; retrying attempt ${next_attempt}/${SINGLE_SNP_GTF_SUBMIT_MAX_ATTEMPTS} after ${SINGLE_SNP_GTF_SUBMIT_RETRY_SLEEP_SECONDS}s..."
+    echo "[5b/6] Single-SNP GTF SAS submit attempt ${single_snp_submit_attempt} looked incomplete; retrying attempt $((single_snp_submit_attempt + 1))/${SINGLE_SNP_GTF_SUBMIT_MAX_ATTEMPTS} after ${SINGLE_SNP_GTF_SUBMIT_RETRY_SLEEP_SECONDS}s..."
   fi
   sleep "${SINGLE_SNP_GTF_SUBMIT_RETRY_SLEEP_SECONDS}"
-  single_snp_submit_attempt="${next_attempt}"
+  single_snp_submit_attempt=$((single_snp_submit_attempt + 1))
 done
 
 echo "[6/6] Downloading HTML result..."
 rm -f "${HTML_OUT}" "${RAW_HTML_OUT}" "${PNG_OUT}"
+remote_png_path="$(
+  perl -ne 'if(/The final figure is put here:/){$want=1; next} if($want && m{(/home/\S+\.(?:png|jpg|jpeg|svg))}){print $1; exit}' "${RUN_LOG_FILE}" 2>/dev/null || true
+)"
+download_manifest=(
+  --download-file "~/${OUTPUT_HTML_BASENAME}"
+  --download-local-path "${RAW_HTML_OUT}"
+)
+if [[ -n "${remote_png_path}" ]]; then
+  download_manifest+=(--download-file "${remote_png_path}" --download-local-path "${PNG_OUT}")
+fi
+echo "[6/6] Downloading $(( ${#download_manifest[@]} / 4 )) result file(s) in one SASPy connection..."
 oda_download_many \
-  "download_single_snp_with_gtf_html_${stamp}" \
-  --download-file "~/${OUTPUT_HTML_BASENAME}" \
-  --download-local-path "${RAW_HTML_OUT}" || true
+  "download_single_snp_with_gtf_results_${stamp}" \
+  "${download_manifest[@]}" || true
 
 if [[ ! -s "${RAW_HTML_OUT}" ]]; then
   fallback_raw_html="$(
@@ -937,18 +922,6 @@ if [[ ! -s "${RAW_HTML_OUT}" ]]; then
   exit 1
 fi
 
-remote_png_path="$(
-  perl -ne 'if(/The final figure is put here:/){$want=1; next} if($want && m{(/home/\S+\.(?:png|jpg|jpeg|svg))}){print $1; exit}' "${RUN_LOG_FILE}" 2>/dev/null || true
-)"
-if [[ -n "${remote_png_path}" ]]; then
-  echo "[6b/6] Downloading generated local plot PNG..."
-  rm -f "${PNG_OUT}"
-  run_oda_helper \
-    --download-file "${remote_png_path}" \
-    --download-local-path "${PNG_OUT}" \
-    --output-prefix "download_single_snp_with_gtf_png_${stamp}" || true
-fi
-
 build_completed_html_from_single_snp_assets_if_available \
   "${RAW_HTML_OUT}" \
   "${PNG_OUT}" \
@@ -959,6 +932,7 @@ build_completed_html_from_single_snp_assets_if_available \
 if [[ ! -s "${HTML_OUT}" ]]; then
   cp "${RAW_HTML_OUT}" "${HTML_OUT}"
 fi
+rm -f "${RAW_HTML_OUT}"
 
 echo "Verified HTML: ${HTML_OUT} ($(wc -c < "${HTML_OUT}") bytes)"
 if [[ -s "${PNG_OUT}" ]]; then

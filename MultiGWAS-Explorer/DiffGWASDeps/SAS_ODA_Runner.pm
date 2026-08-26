@@ -2443,6 +2443,15 @@ sub _normalize_python_action_args {
         next unless exists $normalized{$key};
         $normalized{$key} = _normalize_local_path_for_python($normalized{$key});
     }
+    for my $list_key (qw(uploads downloads)) {
+        next unless ref($normalized{$list_key}) eq 'ARRAY';
+        $normalized{$list_key} = [ map {
+            my %item = ref($_) eq 'HASH' ? %{$_} : ();
+            $item{local_path} = _normalize_local_path_for_python($item{local_path})
+              if exists $item{local_path};
+            \%item;
+        } @{ $normalized{$list_key} } ];
+    }
     return \%normalized;
 }
 
@@ -2591,6 +2600,28 @@ def _endsas_safely(session_obj):
 
 def _action_dispatch(action, payload):
     session_obj = None
+    if action == 'bulk_transfer':
+        results = {'uploads': [], 'downloads': []}
+        for item in list(payload.get('uploads') or []):
+            value, session_obj = upload_file(
+                str(item.get('local_path', '') or ''),
+                session_obj,
+                item.get('progress_label'),
+                bool(item.get('skip_if_same', True)),
+            )
+            if value is None or (isinstance(value, str) and value.startswith('PYTHON ERROR:')):
+                raise RuntimeError(str(value or 'unknown bulk upload failure'))
+            results['uploads'].append({'local_path': item.get('local_path', ''), 'remote_path': value})
+        for item in list(payload.get('downloads') or []):
+            value, session_obj = download_file(
+                str(item.get('remote_path', '') or ''),
+                str(item.get('local_path', '') or ''),
+                session_obj,
+            )
+            if value is None or (isinstance(value, str) and value.startswith('PYTHON ERROR:')):
+                raise RuntimeError(str(value or 'unknown bulk download failure'))
+            results['downloads'].append({'remote_path': item.get('remote_path', ''), 'local_path': value})
+        return results, session_obj
     if action == 'fileinfo':
         return remote_file_info(str(payload.get('remote_path', '') or ''), session_obj)
     if action == 'download':
@@ -3380,6 +3411,32 @@ sub download {
     );
     return $resp->{value} if $resp && ($resp->{status} // '') eq 'ok';
     return "PYTHON ERROR: " . ($resp->{error} // 'nonpersistent download error');
+}
+
+sub transfer_many {
+    my ($self, $payload) = @_;
+    $payload = {} unless ref($payload) eq 'HASH';
+    if ($self->{persistent} && $self->{session_id}) {
+        my @uploads;
+        for my $item (@{ $payload->{uploads} || [] }) {
+            my $value = $self->upload($item->{local_path}, {
+                progress_label => $item->{progress_label},
+                skip_if_same   => exists($item->{skip_if_same}) ? $item->{skip_if_same} : 1,
+            });
+            return $value if !defined($value) || $value =~ /^PYTHON ERROR:/;
+            push @uploads, { %{$item}, remote_path => $value };
+        }
+        my @downloads;
+        for my $item (@{ $payload->{downloads} || [] }) {
+            my $value = $self->download($item->{remote_path}, $item->{local_path});
+            return $value if !defined($value) || $value =~ /^PYTHON ERROR:/;
+            push @downloads, { %{$item}, local_path => $value };
+        }
+        return { uploads => \@uploads, downloads => \@downloads };
+    }
+    my $resp = _run_nonpersistent_python_action('bulk_transfer', $payload);
+    return $resp->{value} if $resp && ($resp->{status} // '') eq 'ok';
+    return "PYTHON ERROR: " . ($resp->{error} // 'nonpersistent bulk transfer error');
 }
 
 sub delete {

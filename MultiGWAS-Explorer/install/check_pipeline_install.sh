@@ -14,6 +14,8 @@ need_cmd() {
 activate_perl_env
 activate_python_env
 prepend_path "${PIPELINE_LOCAL_DIR}/bin"
+prepend_path "${PIPELINE_ROOT}"
+prepend_path "${PIPELINE_ROOT}/DiffGWASDeps"
 
 need_cmd bash
 need_cmd perl
@@ -22,11 +24,11 @@ log "perl archname: $(perl -MConfig -e 'print $Config{archname}')"
 log "gnuplot on PATH: $(command -v gnuplot)"
 log "gnuplot version: $(gnuplot --version | head -n 1)"
 
-if ! command_exists bgzip && [ ! -x "${PIPELINE_LOCAL_DIR}/bin/bgzip.exe" ]; then
-  die "bgzip not found on PATH or under local/bin"
+if ! command_exists bgzip; then
+  die "bgzip not found in DiffGWASDeps, the pipeline root, local/bin, or PATH"
 fi
-if ! command_exists tabix && [ ! -x "${PIPELINE_LOCAL_DIR}/bin/tabix.exe" ]; then
-  die "tabix not found on PATH or under local/bin"
+if ! command_exists tabix; then
+  die "tabix not found in DiffGWASDeps, the pipeline root, local/bin, or PATH"
 fi
 if ! command_exists magick && ! command_exists convert; then
   die "ImageMagick executable not found as magick or convert"

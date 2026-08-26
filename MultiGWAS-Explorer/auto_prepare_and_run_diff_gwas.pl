@@ -442,6 +442,36 @@ write_json_if_defined($generated->{diff_config}, $diff_cfg) if $diff_cfg;
 write_json_if_defined($generated->{preset_config}, $preset_cfg);
 write_json_if_defined($generated->{runner_config}, $runner_cfg);
 
+# The local-GTF output names are intentionally stable, so output existence by
+# itself cannot prove that the files belong to the current target SNP request.
+# Record a canonical digest of the complete rendered runner configuration and
+# only reuse those outputs when the digest matches.
+my $local_gtf_request_key = md5_hex(
+    'plot_local_gtf\0' . JSON::PP->new->canonical(1)->encode($runner_cfg)
+);
+my $local_gtf_request_cache_file = "$Bin/"
+  . ($runner_cfg->{OUTPUT_HTML_BASENAME} || "${project_tag}_SAS_local_top_hits_with_gtf.html")
+  . '.request.md5';
+my $local_gtf_expected_csv_basename = $runner_cfg->{LOCAL_TOP_HITS_CSV_BASENAME}
+  || (($runner_cfg->{LOCAL_OUTPUT_PREFIX} || "${project_tag}_SAS_local_top_hits_manhattan") . "_top_hits.csv");
+if (defined($runner_cfg->{TARGET_SNP_LIST}) && length($runner_cfg->{TARGET_SNP_LIST})) {
+    my @target_snps = grep { length($_) } map {
+        my $snp = $_;
+        $snp =~ s/^\s+|\s+$//g;
+        $snp;
+    } split /,/, $runner_cfg->{TARGET_SNP_LIST};
+    my $target_tag;
+    if (@target_snps == 1) {
+        $target_tag = $target_snps[0];
+        $target_tag =~ s/[^A-Za-z0-9._-]/_/g;
+    }
+    else {
+        $target_tag = 'targets_' . substr(md5_hex($runner_cfg->{TARGET_SNP_LIST}), 0, 12);
+    }
+    $local_gtf_expected_csv_basename =~ s/\.csv$//i;
+    $local_gtf_expected_csv_basename .= "_${target_tag}.csv";
+}
+
 my %summary = (
     spec_file => $spec_file,
     mode => $mode,
@@ -585,8 +615,10 @@ if (!$skip_plots) {
         command     => qq{"$bash_path" -lc 'cd "$workdir" && RUNNER_CONFIG_JSON="$generated->{runner_config}" SESSION_ID="$runner_session" OPEN_RESULT="$open_result" CLEAN_ODA_INPUT="$plot_clean_oda_input" SKIP_DATA_UPLOAD="$plot_skip_upload" KEEP_REMOTE_PLOT_DATA="$keep_remote_plot_data" EMIT_LOCAL_SAS_DEBUG="$emit_local_sas_scripts" LOCAL_SAS_DEBUG_ONLY="$local_sas_only" "$deps_dir/run_sas_oda_local_top_hits_with_gtf_download_html.sh"'},
         outputs     => $local_sas_only ? [] : [
             "$Bin/" . ($runner_cfg->{OUTPUT_HTML_BASENAME} || "${project_tag}_SAS_local_top_hits_with_gtf.html"),
-            "$Bin/" . ($runner_cfg->{LOCAL_TOP_HITS_CSV_BASENAME} || (($runner_cfg->{LOCAL_OUTPUT_PREFIX} || "${project_tag}_SAS_local_top_hits_manhattan") . "_top_hits.csv")),
+            "$Bin/$local_gtf_expected_csv_basename",
         ],
+        cache_key   => $local_sas_only ? '' : $local_gtf_request_key,
+        cache_file  => $local_sas_only ? '' : $local_gtf_request_cache_file,
         enabled     => $wanted{local_gtf} ? 1 : 0,
       },
       {
@@ -645,6 +677,8 @@ for my $step (@step_defs) {
         command => $step->{command},
         outputs => $step->{outputs} || [],
         force   => exists $step->{force} ? $step->{force} : $force,
+        cache_key  => $step->{cache_key} || '',
+        cache_file => $step->{cache_file} || '',
     );
 }
 
@@ -3070,14 +3104,32 @@ sub run_step {
     my $command = $args{command};
     my $outputs = $args{outputs} || [];
     my $force = $args{force} || 0;
+    my $cache_key = $args{cache_key} || '';
+    my $cache_file = $args{cache_file} || '';
     my $step_started = time();
     unless ($force) {
-        my $all_exist = 1;
+        # Steps with no declared outputs (for example --local-sas-only debug
+        # renders) must run; an empty list is not evidence of cached success.
+        my $all_exist = @{$outputs} ? 1 : 0;
         for my $out (@{$outputs}) {
             my $win = cygpath_to_win($out);
             if (!defined $out || !length $out || !-s $win) {
                 $all_exist = 0;
                 last;
+            }
+        }
+        if ($all_exist && length($cache_key)) {
+            my $cached_key = '';
+            my $cache_file_win = cygpath_to_win($cache_file);
+            if (defined($cache_file_win) && length($cache_file_win)
+                && open my $cache_fh, '<', $cache_file_win) {
+                $cached_key = <$cache_fh> // '';
+                close $cache_fh;
+                $cached_key =~ s/\s+\z//;
+            }
+            if ($cached_key ne $cache_key) {
+                $all_exist = 0;
+                print "[info] $name outputs belong to a different or unrecorded request; rerunning without requiring --force\n";
             }
         }
         if ($all_exist) {
@@ -3111,6 +3163,14 @@ sub run_step {
         die $msg;
     }
     unlink $stderr_path if defined $stderr_path && -f $stderr_path;
+    if (length($cache_key) && length($cache_file)) {
+        my $cache_file_win = cygpath_to_win($cache_file);
+        open my $cache_fh, '>', $cache_file_win
+          or die "Cannot write request cache marker $cache_file: $!\n";
+        print {$cache_fh} "$cache_key\n";
+        close $cache_fh
+          or die "Cannot close request cache marker $cache_file: $!\n";
+    }
     print "[done] $name finished in " . format_elapsed_seconds(time() - $step_started) . "\n";
 }
 
