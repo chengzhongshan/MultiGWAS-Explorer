@@ -314,6 +314,30 @@ oda_delete_many() {
     "$@" --output-prefix "${output_prefix}"
 }
 
+declare -a ODA_DELETE_MANIFEST=()
+queue_oda_delete() {
+  local remote_file="$1"
+  local queued
+  [[ -n "${remote_file}" ]] || return 0
+  for queued in "${ODA_DELETE_MANIFEST[@]:-}"; do
+    [[ "${queued}" == "${remote_file}" ]] && return 0
+  done
+  ODA_DELETE_MANIFEST+=("${remote_file}")
+}
+
+flush_oda_delete_manifest() {
+  local remote_file
+  local -a delete_args=()
+  [[ "${#ODA_DELETE_MANIFEST[@]}" -gt 0 ]] || return 0
+  echo "[cleanup manifest] Deleting ${#ODA_DELETE_MANIFEST[@]} SAS ODA file(s) in one session:"
+  for remote_file in "${ODA_DELETE_MANIFEST[@]}"; do
+    echo "  - ${remote_file}"
+    delete_args+=(--delete-file "${remote_file}")
+  done
+  oda_delete_many "cleanup_local_hits_manhattan_manifest_${stamp}" "${delete_args[@]}" || true
+  ODA_DELETE_MANIFEST=()
+}
+
 manhattan_submit_needs_retry() {
   [[ ! -s "${RUN_LOG_FILE}" ]] && return 0
   if grep -Eiq 'We failed in getConnection|The application could not log on to the server|server configuration is invalid|SAS process has terminated unexpectedly|SAS submit timed out' "${RUN_LOG_FILE}"; then
@@ -350,11 +374,11 @@ cleanup_remote_generated_outputs() {
 
   local remote_png seen
   seen=""
-  echo "[cleanup] Removing generated remote Manhattan outputs from SAS ODA..."
-  oda_delete_many "cleanup_local_hits_manhattan_output_html_${stamp}" --delete-file "${LOCAL_OUTPUT_PREFIX}.html" || true
-  oda_delete_many "cleanup_local_hits_manhattan_output_csv_${stamp}" --delete-file "${LOCAL_TOP_HITS_CSV_BASENAME}" || true
-  oda_delete_many "cleanup_local_hits_manhattan_input_csv_${stamp}" --delete-file "${REQUESTED_TOP_HITS_CSV_BASENAME}" || true
-  oda_delete_many "cleanup_local_hits_manhattan_output_ld_audit_${stamp}" --delete-file "${TOP_HIT_LD_AUDIT_BASENAME}" || true
+  echo "[cleanup] Queueing generated remote Manhattan outputs for one SAS ODA cleanup manifest..."
+  queue_oda_delete "${LOCAL_OUTPUT_PREFIX}.html"
+  queue_oda_delete "${LOCAL_TOP_HITS_CSV_BASENAME}"
+  queue_oda_delete "${REQUESTED_TOP_HITS_CSV_BASENAME}"
+  queue_oda_delete "${TOP_HIT_LD_AUDIT_BASENAME}"
 
   while IFS= read -r remote_png; do
     [[ -z "${remote_png}" ]] && continue
@@ -363,7 +387,7 @@ cleanup_remote_generated_outputs() {
       *"|${remote_png}|"*) continue ;;
     esac
     seen="${seen}|${remote_png}"
-    oda_delete_many "cleanup_local_hits_manhattan_output_png_${stamp}" --delete-file "${remote_png}" || true
+    queue_oda_delete "${remote_png}"
   done <<EOF
 ${remote_pngs:-}
 EOF
@@ -1038,13 +1062,13 @@ cleanup_remote_generated_outputs
 if [[ "${KEEP_REMOTE_PLOT_DATA}" == "1" ]]; then
   echo "[5/5] Keeping uploaded gz input in SAS ODA because KEEP_REMOTE_PLOT_DATA=${KEEP_REMOTE_PLOT_DATA}."
 elif [[ "${CLEAN_ODA_INPUT}" == "1" ]]; then
-  echo "[5/5] Removing uploaded gz input from SAS ODA to save space..."
-  oda_delete_many \
-    "cleanup_local_hits_manhattan_input_${stamp}" \
-    --delete-file "${REMOTE_DATA_BASENAME}"
+  echo "[5/5] Queueing uploaded gz input for SAS ODA cleanup..."
+  queue_oda_delete "${REMOTE_DATA_BASENAME}"
 else
   echo "[5/5] Keeping uploaded gz input in SAS ODA because CLEAN_ODA_INPUT=${CLEAN_ODA_INPUT}."
 fi
+
+flush_oda_delete_manifest
 
 echo "Done."
 echo "Downloaded PNG:  ${PNG_OUT}"

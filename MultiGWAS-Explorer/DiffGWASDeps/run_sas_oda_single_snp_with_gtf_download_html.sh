@@ -332,6 +332,30 @@ oda_delete_many() {
     "$@" --output-prefix "${output_prefix}"
 }
 
+declare -a ODA_DELETE_MANIFEST=()
+queue_oda_delete() {
+  local remote_file="$1"
+  local queued
+  [[ -n "${remote_file}" ]] || return 0
+  for queued in "${ODA_DELETE_MANIFEST[@]:-}"; do
+    [[ "${queued}" == "${remote_file}" ]] && return 0
+  done
+  ODA_DELETE_MANIFEST+=("${remote_file}")
+}
+
+flush_oda_delete_manifest() {
+  local remote_file
+  local -a delete_args=()
+  [[ "${#ODA_DELETE_MANIFEST[@]}" -gt 0 ]] || return 0
+  echo "[cleanup manifest] Deleting ${#ODA_DELETE_MANIFEST[@]} SAS ODA file(s) in one session:"
+  for remote_file in "${ODA_DELETE_MANIFEST[@]}"; do
+    echo "  - ${remote_file}"
+    delete_args+=(--delete-file "${remote_file}")
+  done
+  oda_delete_many "cleanup_single_snp_with_gtf_manifest_${stamp}" "${delete_args[@]}" || true
+  ODA_DELETE_MANIFEST=()
+}
+
 remote_home_file_size_bytes() {
   local remote_basename="$1"
   local info_output
@@ -643,12 +667,12 @@ cleanup_remote_generated_outputs() {
   fi
 
   local remote_png_base=""
-  echo "[cleanup] Removing generated remote single-SNP GTF outputs from SAS ODA..."
-  oda_delete_many "cleanup_single_snp_with_gtf_output_html_${stamp}" --delete-file "${OUTPUT_HTML_BASENAME}" || true
+  echo "[cleanup] Queueing generated remote single-SNP GTF outputs for one SAS ODA cleanup manifest..."
+  queue_oda_delete "${OUTPUT_HTML_BASENAME}"
   if [[ -n "${remote_png_path:-}" ]]; then
     remote_png_base="$(basename "${remote_png_path}")"
     if [[ -n "${remote_png_base}" ]]; then
-      oda_delete_many "cleanup_single_snp_with_gtf_output_png_${stamp}" --delete-file "${remote_png_base}" || true
+      queue_oda_delete "${remote_png_base}"
     fi
   fi
 }
@@ -946,11 +970,9 @@ if [[ "${LOCAL_WIDE_AUTOGEN}" == "1" ]]; then
 fi
 
 if [[ "${CLEAN_ODA_INPUT}" == "1" ]]; then
-  echo "[cleanup] Removing uploaded GWAS and local GTF subsets from SAS ODA..."
-  oda_delete_many \
-    "cleanup_single_snp_with_gtf_inputs_${stamp}" \
-    --delete-file "${REMOTE_DATA_BASENAME}" \
-    --delete-file "${REMOTE_GTF_BASENAME}"
+  echo "[cleanup] Queueing uploaded GWAS and local GTF subsets for SAS ODA cleanup..."
+  queue_oda_delete "${REMOTE_DATA_BASENAME}"
+  queue_oda_delete "${REMOTE_GTF_BASENAME}"
 else
   echo "[cleanup] Keeping uploaded GWAS and local GTF subsets because CLEAN_ODA_INPUT=${CLEAN_ODA_INPUT}."
 fi
@@ -958,26 +980,26 @@ fi
 cleanup_remote_generated_outputs
 
 if [[ "${CLEAN_ODA_MACROS}" == "1" ]]; then
-  echo "[cleanup] Removing uploaded SAS helper files from SAS ODA..."
-  delete_macro_args=(--delete-file "$(basename "${PATCHED_LATTICE_MACRO_SAS}")" --delete-file "${RENDERED_SAS_BASENAME}")
+  echo "[cleanup] Queueing uploaded SAS helper files for SAS ODA cleanup..."
+  queue_oda_delete "$(basename "${PATCHED_LATTICE_MACRO_SAS}")"
+  queue_oda_delete "${RENDERED_SAS_BASENAME}"
   if [[ -f "${MAP_GRP_ASSOC_MACRO_SAS}" ]]; then
-    delete_macro_args=(--delete-file "$(basename "${MAP_GRP_ASSOC_MACRO_SAS}")" "${delete_macro_args[@]}")
+    queue_oda_delete "$(basename "${MAP_GRP_ASSOC_MACRO_SAS}")"
   fi
   if [[ -f "${MULT_GSCATTER_GENE_MACRO_SAS}" ]]; then
-    delete_macro_args=(--delete-file "$(basename "${MULT_GSCATTER_GENE_MACRO_SAS}")" "${delete_macro_args[@]}")
+    queue_oda_delete "$(basename "${MULT_GSCATTER_GENE_MACRO_SAS}")"
   fi
   if [[ -f "${ADJ_CLOSE_GENE_GRP_MACRO_SAS}" ]]; then
-    delete_macro_args=(--delete-file "$(basename "${ADJ_CLOSE_GENE_GRP_MACRO_SAS}")" "${delete_macro_args[@]}")
+    queue_oda_delete "$(basename "${ADJ_CLOSE_GENE_GRP_MACRO_SAS}")"
   fi
   if [[ -f "${SNP_LOCAL_MACRO_SAS}" ]]; then
-    delete_macro_args=(--delete-file "$(basename "${SNP_LOCAL_MACRO_SAS}")" "${delete_macro_args[@]}")
+    queue_oda_delete "$(basename "${SNP_LOCAL_MACRO_SAS}")"
   fi
-  oda_delete_many \
-    "cleanup_single_snp_macros_${stamp}" \
-    "${delete_macro_args[@]}"
 else
   echo "[cleanup] Keeping uploaded SAS helper files because CLEAN_ODA_MACROS=${CLEAN_ODA_MACROS}."
 fi
+
+flush_oda_delete_manifest
 
 echo "Done."
 echo "Downloaded HTML: ${HTML_OUT}"

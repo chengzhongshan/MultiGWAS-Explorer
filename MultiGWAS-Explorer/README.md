@@ -379,6 +379,12 @@ bundled tools cannot be used:
 installer downloads the expected upstream htslib release before building
 `local/bin/bgzip.exe` and `local/bin/tabix.exe`.
 
+When `bgzip_tabix_diff_gwas.pl` runs under Cygwin with those Windows
+executables, it now resolves the `.exe` files explicitly, omits the unsupported
+`bgzip -@ 4` option, and converts the BGZF path to native Windows form with
+`cygpath -w` before invoking `tabix.exe`. Native Cygwin/Linux htslib tools
+continue to receive POSIX paths and retain threaded bgzip compression.
+
 If the machine sits behind TLS interception and Cygwin `curl` reports a
 self-signed certificate chain while bootstrapping `cpanm` or htslib, rerun with
 the explicit insecure-download opt-in:
@@ -1410,6 +1416,17 @@ The helper supports bulk file operations in a single invocation. Repeated upload
 downloads are dispatched through one SASPy/ODA session, including the existing
 size-based upload reuse and post-transfer verification. This avoids opening a
 new ODA connection for every file.
+
+When a manifest contains two or more uploads or downloads, the helper now also
+uses one ZIP archive by default. Uploads are compressed locally, transferred
+once, extracted into SAS HOME with binary `FCOPY`, and verified against the
+original byte sizes. Downloads are staged under collision-resistant names,
+packed with SAS `ODS PACKAGE`, transferred once, safely extracted to the
+requested local paths, and byte-size verified. Temporary ZIP and staging files
+are deleted automatically on both sides, including failure paths. If an ODA ZIP
+operation fails, the same run falls back to verified individual transfers.
+Use `--no-archive-transfers` or `SAS_ODA_ARCHIVE_TRANSFERS=0` for diagnostic
+comparison with the individual-transfer path.
 
 The local-GTF wrapper builds its complete upload inventory before opening
 SASPy. Static SAS support files, the target/top-hit CSV, the compact GTF

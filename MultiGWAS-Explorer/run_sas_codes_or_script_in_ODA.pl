@@ -141,6 +141,9 @@ my ($sas_oda_account, $sas_oda_password, $force_sas_oda_auth_prompt,
 my ($cli_sas_run_timeout_seconds, $cli_sas_run_timeout_grace_seconds, $disable_run_timeout);
 our $python_bin;
 my $skip_upload_if_same = 1;
+my $archive_transfers = exists $ENV{SAS_ODA_ARCHIVE_TRANSFERS}
+    ? ($ENV{SAS_ODA_ARCHIVE_TRANSFERS} =~ /^(?:1|true|yes|y|on)$/i ? 1 : 0)
+    : 1;
 my $cleanup_empty_output_dir = 1;
 my $delete_dir = '~';
 my $created_output_dir = 0;
@@ -440,6 +443,7 @@ GetOptions(
     'session-id|s=s' => \$session_id,
     'upload-file|u=s@' => \@upload_files,
     'skip-upload-if-same!' => \$skip_upload_if_same,
+    'archive-transfers!' => \$archive_transfers,
     'download-file|d=s@' => \@download_files,
     'download-local-path=s@' => \@download_local_paths,
     'delete-file|k=s@' => \@delete_files,
@@ -938,6 +942,10 @@ Options:
                              once via importallmacros_ue. Reused sessions do not rerun that import.
   -u, --upload-file <file>   Upload a file to remote SAS ODA HOME directory.
                              Repeat this option to upload multiple files in one run.
+      --archive-transfers    Bundle two or more uploads/downloads into one ZIP transfer,
+                             extract it automatically, validate every file, and remove
+                             the temporary ZIP locally and in SAS ODA (default: on).
+                             Pass --no-archive-transfers for individual transfers.
       --skip-upload-if-same  Reuse an existing remote file with the same basename
                              when size and timestamp already match (default: on).
                              Pass --no-skip-upload-if-same to force a fresh upload.
@@ -2837,7 +2845,11 @@ if(@upload_files){
         'bulk upload',
         sub {
             my ($active_runner) = @_;
-            return $active_runner->transfer_many({ uploads => \@items, downloads => [] });
+            return $active_runner->transfer_many({
+                uploads => \@items,
+                downloads => [],
+                archive_transfers => $archive_transfers ? 1 : 0,
+            });
         },
     );
     die "Bulk upload failed: " . (defined($bulk_result) ? $bulk_result : 'unknown error') . "\n"
@@ -3271,7 +3283,11 @@ if (@download_files) {
         'bulk download',
         sub {
             my ($active_runner) = @_;
-            return $active_runner->transfer_many({ uploads => [], downloads => \@items });
+            return $active_runner->transfer_many({
+                uploads => [],
+                downloads => \@items,
+                archive_transfers => $archive_transfers ? 1 : 0,
+            });
         },
     );
     die "Bulk download failed: " . (defined($bulk_result) ? $bulk_result : 'unknown error') . "\n"

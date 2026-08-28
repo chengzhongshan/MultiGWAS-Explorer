@@ -2,6 +2,8 @@
 use strict;
 use warnings;
 use Getopt::Long qw(GetOptions);
+use FindBin qw($Bin);
+use File::Spec;
 
 my $input =
   '/mnt/e/LongCOVID_HGI_GWAS/PGC_Large_GWASs/PGC_SCZ_Sex_Stratified_GWASs/PGC_SCZ_female_vs_male_diff_effects.tsv.gz';
@@ -22,13 +24,14 @@ GetOptions(
     'end=i'    => \$end_col,
 ) or die usage();
 
-my $bgzip = -x "$htsbin/bgzip" ? "$htsbin/bgzip" : 'bgzip';
-my $tabix = -x "$htsbin/tabix" ? "$htsbin/tabix" : 'tabix';
+my $bgzip = resolve_hts_tool('bgzip', $htsbin);
+my $tabix = resolve_hts_tool('tabix', $htsbin);
 
 die "Input file not found: $input\n" unless -s $input;
 
 open my $in, '-|', "zcat '$input'" or die "Cannot read $input with zcat: $!\n";
-open my $out, '|-', "'$bgzip' -@ 4 -c > '$output'"
+my $bgzip_args = $bgzip =~ /\.exe$/i ? '-c' : '-@ 4 -c';
+open my $out, '|-', "'$bgzip' $bgzip_args > '$output'"
   or die "Cannot write bgzip output $output: $!\n";
 
 my $header = <$in>;
@@ -47,13 +50,52 @@ while (my $line = <$in>) {
 close $in;
 close $out or die "Failed closing bgzip output $output: $!\n";
 
-system($tabix, '-f', '-s', $seq_col, '-b', $start_col, '-e', $end_col, '-S', 1, $output) == 0
+my $tabix_output_arg = path_for_tool($tabix, $output);
+system($tabix, '-f', '-s', $seq_col, '-b', $start_col, '-e', $end_col, '-S', 1, $tabix_output_arg) == 0
   or die "tabix failed for $output\n";
+
+die "tabix did not create the expected index: $output.tbi\n" unless -s "$output.tbi";
 
 print "Input:  $input\n";
 print "Output: $output\n";
 print "Index:  $output.tbi\n";
 print "Rows:   $rows\n";
+print "bgzip:  $bgzip\n";
+print "tabix:  $tabix\n";
+
+sub resolve_hts_tool {
+    my ($name, $requested_dir) = @_;
+    my @dirs = grep { defined($_) && length($_) } (
+        $requested_dir,
+        File::Spec->catdir($Bin, 'DiffGWASDeps'),
+    );
+    my %seen;
+    for my $dir (@dirs) {
+        next if $seen{$dir}++;
+        my @tool_names = $^O eq 'cygwin' ? ("$name.exe", $name) : ($name, "$name.exe");
+        for my $tool_name (@tool_names) {
+            my $candidate = File::Spec->catfile($dir, $tool_name);
+            return $candidate if -f $candidate
+              && (-x $candidate || ($^O eq 'cygwin' && $candidate =~ /\.exe$/i));
+        }
+    }
+    return $name;
+}
+
+sub path_for_tool {
+    my ($tool, $path) = @_;
+    return $path unless $^O eq 'cygwin' && $tool =~ /\.exe$/i;
+
+    open my $cygpath, '-|', 'cygpath', '-w', $path
+      or die "Cannot convert Cygwin path for Windows executable $tool: $!\n";
+    my $windows_path = <$cygpath>;
+    close $cygpath
+      or die "cygpath failed while converting $path for $tool\n";
+    die "cygpath returned no Windows path for $path\n"
+      unless defined($windows_path) && length($windows_path);
+    $windows_path =~ s/[\r\n]+\z//;
+    return $windows_path;
+}
 
 sub usage {
     return <<"USAGE";

@@ -471,6 +471,30 @@ oda_delete_many() {
     "$@" --output-prefix "${output_prefix}"
 }
 
+declare -a ODA_DELETE_MANIFEST=()
+queue_oda_delete() {
+  local remote_file="$1"
+  local queued
+  [[ -n "${remote_file}" ]] || return 0
+  for queued in "${ODA_DELETE_MANIFEST[@]:-}"; do
+    [[ "${queued}" == "${remote_file}" ]] && return 0
+  done
+  ODA_DELETE_MANIFEST+=("${remote_file}")
+}
+
+flush_oda_delete_manifest() {
+  local remote_file
+  local -a delete_args=()
+  [[ "${#ODA_DELETE_MANIFEST[@]}" -gt 0 ]] || return 0
+  echo "[cleanup manifest] Deleting ${#ODA_DELETE_MANIFEST[@]} SAS ODA file(s) in one session:"
+  for remote_file in "${ODA_DELETE_MANIFEST[@]}"; do
+    echo "  - ${remote_file}"
+    delete_args+=(--delete-file "${remote_file}")
+  done
+  oda_delete_many "cleanup_local_hits_with_gtf_manifest_${stamp}" "${delete_args[@]}" || true
+  ODA_DELETE_MANIFEST=()
+}
+
 cleanup_remote_generated_outputs() {
   if [[ "${CLEAN_ODA_OUTPUT}" != "1" ]]; then
     echo "[cleanup] Keeping generated remote local-GTF outputs because CLEAN_ODA_OUTPUT=${CLEAN_ODA_OUTPUT}."
@@ -484,23 +508,23 @@ cleanup_remote_generated_outputs() {
       --output-prefix "list_local_hits_with_gtf_outputs_${stamp}" 2>&1 || true
   )"
 
-  echo "[cleanup] Removing generated remote local-GTF outputs from SAS ODA..."
-  oda_delete_many "cleanup_local_hits_with_gtf_output_main_html_${stamp}" --delete-file "${OUTPUT_HTML_BASENAME}" || true
+  echo "[cleanup] Queueing generated remote local-GTF outputs for one SAS ODA cleanup manifest..."
+  queue_oda_delete "${OUTPUT_HTML_BASENAME}"
   if [[ -n "${LOCAL_TOP_HITS_INPUT_CSV_BASENAME:-}" && "${LOCAL_TOP_HITS_INPUT_CSV_BASENAME}" == "${LOCAL_TOP_HITS_CSV_BASENAME}" ]]; then
     echo "[cleanup] Preserving remote requested top-hit CSV because it is also the active local-GTF input: ${LOCAL_TOP_HITS_CSV_BASENAME}"
   else
-    oda_delete_many "cleanup_local_hits_with_gtf_output_main_csv_${stamp}" --delete-file "${LOCAL_TOP_HITS_CSV_BASENAME}" || true
+    queue_oda_delete "${LOCAL_TOP_HITS_CSV_BASENAME}"
   fi
-  oda_delete_many "cleanup_local_hits_with_gtf_output_prep_html_${stamp}" --delete-file "${OUTPUT_HTML_BASENAME%.html}.prep.html" || true
-  oda_delete_many "cleanup_local_hits_with_gtf_output_ld_audit_${stamp}" --delete-file "${TOP_HIT_LD_AUDIT_BASENAME}" || true
+  queue_oda_delete "${OUTPUT_HTML_BASENAME%.html}.prep.html"
+  queue_oda_delete "${TOP_HIT_LD_AUDIT_BASENAME}"
 
   while IFS= read -r remote_name; do
     [[ -z "${remote_name}" ]] && continue
     if [[ "${remote_name}" =~ ^${OUTPUT_HTML_BASENAME%.html}_part[0-9]+\.html$ ]]; then
-      oda_delete_many "cleanup_local_hits_with_gtf_part_html_${stamp}" --delete-file "${remote_name}" || true
+      queue_oda_delete "${remote_name}"
     fi
     if [[ "${remote_name}" =~ ^${LOCAL_TOP_HITS_CSV_BASENAME%.csv}_part[0-9]+\.csv$ ]]; then
-      oda_delete_many "cleanup_local_hits_with_gtf_part_csv_${stamp}" --delete-file "${remote_name}" || true
+      queue_oda_delete "${remote_name}"
     fi
   done <<EOF
 ${remote_listing}
@@ -509,7 +533,7 @@ EOF
   if [[ -n "${remote_png_path:-}" ]]; then
     remote_png_base="$(basename "${remote_png_path}")"
     if [[ -n "${remote_png_base}" ]]; then
-      oda_delete_many "cleanup_local_hits_with_gtf_output_png_${stamp}" --delete-file "${remote_png_base}" || true
+      queue_oda_delete "${remote_png_base}"
     fi
   fi
 }
@@ -540,10 +564,8 @@ cleanup_remote_local_gtf_subset() {
     echo "[cleanup] Keeping uploaded local GTF subset in SAS ODA because CLEAN_ODA_INPUT=${CLEAN_ODA_INPUT}."
     return 0
   fi
-  echo "[cleanup] Removing uploaded local GTF subset from SAS ODA..."
-  oda_delete_many \
-    "cleanup_local_hits_with_gtf_subset_${stamp}" \
-    --delete-file "${REMOTE_GTF_BASENAME}" || true
+  echo "[cleanup] Queueing uploaded local GTF subset for SAS ODA cleanup..."
+  queue_oda_delete "${REMOTE_GTF_BASENAME}"
 }
 
 gtf_submit_needs_retry() {
@@ -2108,9 +2130,7 @@ if [[ -f "${CSV_OUT}" && -s "${CSV_OUT}" ]]; then
       echo "[batch ${part}] Wrote batch HTML: ${batch_output_html}"
 
       if [[ "${CLEAN_ODA_INPUT}" == "1" ]]; then
-        run_oda_helper \
-          --delete-file "${batch_remote_csv}" \
-          --output-prefix "cleanup_top_hits_batch_${stamp}_${part}" >/dev/null 2>&1 || true
+        queue_oda_delete "${batch_remote_csv}"
       fi
 
       part=$((part+1))
@@ -2122,16 +2142,15 @@ if [[ -f "${CSV_OUT}" && -s "${CSV_OUT}" ]]; then
     if [[ "${KEEP_REMOTE_PLOT_DATA}" == "1" ]]; then
       echo "[cleanup] Keeping uploaded gz input in SAS ODA because KEEP_REMOTE_PLOT_DATA=${KEEP_REMOTE_PLOT_DATA}."
     elif [[ "${CLEAN_ODA_INPUT}" == "1" ]]; then
-      echo "[cleanup] Removing uploaded gz input from SAS ODA to save space..."
-      oda_delete_many \
-        "cleanup_local_hits_with_gtf_input_${stamp}" \
-        --delete-file "${REMOTE_DATA_BASENAME}" || true
+      echo "[cleanup] Queueing uploaded gz input for SAS ODA cleanup..."
+      queue_oda_delete "${REMOTE_DATA_BASENAME}"
     else
       echo "[cleanup] Keeping uploaded gz input in SAS ODA because CLEAN_ODA_INPUT=${CLEAN_ODA_INPUT}."
     fi
 
     cleanup_remote_generated_outputs
     cleanup_remote_local_gtf_subset
+    flush_oda_delete_manifest
     echo "Done."
     echo "Downloaded HTML index: ${HTML_OUT}"
     if [[ "${OPEN_RESULT}" == "1" ]]; then
@@ -2250,15 +2269,14 @@ cleanup_remote_generated_outputs
 if [[ "${KEEP_REMOTE_PLOT_DATA}" == "1" ]]; then
   echo "[cleanup] Keeping uploaded gz input in SAS ODA because KEEP_REMOTE_PLOT_DATA=${KEEP_REMOTE_PLOT_DATA}."
 elif [[ "${CLEAN_ODA_INPUT}" == "1" ]]; then
-  echo "[cleanup] Removing uploaded gz input from SAS ODA to save space..."
-  oda_delete_many \
-    "cleanup_local_hits_with_gtf_input_${stamp}" \
-    --delete-file "${REMOTE_DATA_BASENAME}"
+  echo "[cleanup] Queueing uploaded gz input for SAS ODA cleanup..."
+  queue_oda_delete "${REMOTE_DATA_BASENAME}"
 else
   echo "[cleanup] Keeping uploaded gz input in SAS ODA because CLEAN_ODA_INPUT=${CLEAN_ODA_INPUT}."
 fi
 
 cleanup_remote_local_gtf_subset
+flush_oda_delete_manifest
 
 echo "Done."
 echo "Downloaded HTML: ${HTML_OUT}"

@@ -151,6 +151,30 @@ oda_delete_many() {
   run_oda_helper "$@" --output-prefix "${output_prefix}"
 }
 
+declare -a ODA_DELETE_MANIFEST=()
+queue_oda_delete() {
+  local remote_file="$1"
+  local queued
+  [[ -n "${remote_file}" ]] || return 0
+  for queued in "${ODA_DELETE_MANIFEST[@]:-}"; do
+    [[ "${queued}" == "${remote_file}" ]] && return 0
+  done
+  ODA_DELETE_MANIFEST+=("${remote_file}")
+}
+
+flush_oda_delete_manifest() {
+  local remote_file
+  local -a delete_args=()
+  [[ "${#ODA_DELETE_MANIFEST[@]}" -gt 0 ]] || return 0
+  echo "[cleanup manifest] Deleting ${#ODA_DELETE_MANIFEST[@]} SAS ODA file(s) in one session:"
+  for remote_file in "${ODA_DELETE_MANIFEST[@]}"; do
+    echo "  - ${remote_file}"
+    delete_args+=(--delete-file "${remote_file}")
+  done
+  oda_delete_many "cleanup_top_hits_forest_manifest_${stamp}" "${delete_args[@]}" || true
+  ODA_DELETE_MANIFEST=()
+}
+
 to_local_sas_path() {
   local p="$1"
   if command -v cygpath >/dev/null 2>&1; then
@@ -291,8 +315,8 @@ render_forest_template() {
 }
 
 cleanup_remote_generated_outputs() {
-  delete_remote_file_quiet "${REMOTE_HTML_BASENAME}"
-  delete_remote_file_quiet "${REMOTE_MANIFEST_BASENAME}"
+  queue_oda_delete "${REMOTE_HTML_BASENAME}"
+  queue_oda_delete "${REMOTE_MANIFEST_BASENAME}"
   local remote_pngs
   remote_pngs="$(
     run_oda_helper \
@@ -302,7 +326,7 @@ cleanup_remote_generated_outputs() {
   while IFS= read -r remote_png; do
     [[ -z "${remote_png}" ]] && continue
     [[ "${remote_png}" =~ ^${FOREST_OUTPUT_PREFIX}_.+\.png$ ]] || continue
-    delete_remote_file_quiet "${remote_png}"
+    queue_oda_delete "${remote_png}"
   done <<< "${remote_pngs}"
 }
 
@@ -501,16 +525,16 @@ if [[ "${KEEP_REMOTE_PLOT_DATA}" == "1" ]]; then
 elif [[ "${CLEAN_ODA_INPUT}" == "1" ]]; then
   echo "[5/5] Removing remote forest outputs and uploaded inputs from SAS ODA to save space..."
   cleanup_remote_generated_outputs
-  oda_delete_many \
-    "cleanup_top_hits_forest_inputs_${stamp}" \
-    --delete-file "${REMOTE_TOP_HITS_BASENAME}" \
-    --delete-file "RandBetween.sas" \
-    --delete-file "mkfmt4grps_by_var.sas" \
-    --delete-file "beta2OR_forest_plot.sas" || true
+  queue_oda_delete "${REMOTE_TOP_HITS_BASENAME}"
+  queue_oda_delete "RandBetween.sas"
+  queue_oda_delete "mkfmt4grps_by_var.sas"
+  queue_oda_delete "beta2OR_forest_plot.sas"
 else
   echo "[5/5] Keeping uploaded forest inputs in SAS ODA because CLEAN_ODA_INPUT=${CLEAN_ODA_INPUT}."
   cleanup_remote_generated_outputs
 fi
+
+flush_oda_delete_manifest
 
 echo "Done."
 echo "Downloaded forest HTML: ${HTML_OUT}"

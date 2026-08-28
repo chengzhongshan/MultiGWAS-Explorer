@@ -762,20 +762,20 @@ def handle_client(conn, addr):
                 resp = {'status':'error','error':str(e)}
                 log_event(f"upload error session_id={session_id} local_path={local_path} err={e}")
         elif cmd == 'download':
-            remote_path = req.get('remote_path', '')
+            requested_remote_path = str(req.get('remote_path', '') or '')
             local_path = req.get('local_path', '')
             try:
                 def _download(sess):
-                    log_event(f"download start session_id={session_id} remote_path={remote_path} local_path={local_path}")
-                    out_path = local_path or os.path.basename(remote_path)
+                    log_event(f"download start session_id={session_id} remote_path={requested_remote_path} local_path={local_path}")
+                    out_path = local_path or os.path.basename(requested_remote_path)
                     out_path = os.path.abspath(out_path)
                     out_dir = os.path.dirname(out_path)
                     if out_dir and not os.path.exists(out_dir):
                         os.makedirs(out_dir, exist_ok=True)
-                    remote_info = run_fileinfo(sess, remote_path)
+                    remote_info = run_fileinfo(sess, requested_remote_path)
                     if not isinstance(remote_info, dict) or not remote_info.get('exists'):
-                        raise FileNotFoundError(f"Remote file does not exist in SAS ODA: {remote_path}")
-                    resolved_remote_path = remote_info.get('path') or remote_path
+                        raise FileNotFoundError(f"Remote file does not exist in SAS ODA: {requested_remote_path}")
+                    resolved_remote_path = remote_info.get('path') or requested_remote_path
                     remote_size = remote_info.get('size') or 0
                     print(
                         f"Download step [{session_id}]: {resolved_remote_path} -> {out_path} ({remote_size:,} bytes)",
@@ -815,7 +815,7 @@ def handle_client(conn, addr):
                 resp = {'status':'ok','local_path':saved_path}
             except Exception as e:
                 resp = {'status':'error','error':str(e)}
-                log_event(f"download error session_id={session_id} remote_path={remote_path} err={e}")
+                log_event(f"download error session_id={session_id} remote_path={requested_remote_path} err={e}")
         elif cmd == 'delete':
             remote_file = req.get('remote_file', '')
             remote_dir = req.get('remote_dir', '')
