@@ -280,16 +280,6 @@ if ($requested{plot_local_manhattan} || $requested{plot_local_gtf}) {
         @hits = grep { !is_chr_x($_->{CHR}) } @hits;
     }
     die "No local top hits were selected.\n" unless @hits;
-    write_top_hits_csv(
-        path       => File::Spec->catfile(
-            $output_dir_local,
-            gunplotize_name($runner->{LOCAL_TOP_HITS_CSV_BASENAME} || 'gunplot_top_hits.csv'),
-        ),
-        hits       => \@hits,
-        batch_size => ($local_max_hits_per_fig_override || ($runner->{LOCAL_MAX_HITS_PER_FIG} || 15)),
-        runner     => $runner,
-        wide_data  => $wide_data_local,
-    );
 }
 
 if ($requested{plot_local_manhattan}) {
@@ -793,6 +783,14 @@ sub plot_local_series {
     my $cache_dir = File::Spec->catfile($args{output_dir}, '.gunplot_gtf_cache');
     make_path($cache_dir) unless -d $cache_dir;
     my $n_hits = scalar @{ $args{hits} };
+    my $locus_sources = prepare_locus_wide_sources(
+        hits          => $args{hits},
+        output_dir    => $args{output_dir},
+        window_bp     => $args{window_bp},
+        source_long   => $args{source_long},
+        preset_config => $args{preset_config},
+        force         => $args{force},
+    );
 
     write_top_hits_csv(
         path       => File::Spec->catfile($args{output_dir}, $args{top_csv_name}),
@@ -800,6 +798,7 @@ sub plot_local_series {
         batch_size => $batch_size,
         runner     => $runner,
         wide_data  => $args{wide_data},
+        locus_sources => $locus_sources,
     );
 
     for my $hit_idx (0 .. $#{ $args{hits} }) {
@@ -816,6 +815,15 @@ sub plot_local_series {
         my $batch_pos = $hit_idx - $batch_start;
         my $batch_col = $batch_pos % $batch_cols;
         my $locus_prefix = File::Spec->catfile($args{output_dir}, $base_name . '_' . $safe_snp);
+        my $existing_locus_manifest = $locus_prefix . '.manifest.tsv';
+        if (-s $existing_locus_manifest && (!defined $hit->{CHR} || !defined $hit->{BP})) {
+            my $prior_metrics = read_manifest_tsv($existing_locus_manifest);
+            my $prior_snp = $prior_metrics->{snp} // '';
+            if (lc($prior_snp) eq lc($hit->{SNP})) {
+                $hit->{CHR} = $prior_metrics->{chr} if !defined($hit->{CHR}) && defined($prior_metrics->{chr});
+                $hit->{BP}  = $prior_metrics->{bp}  if !defined($hit->{BP})  && defined($prior_metrics->{bp});
+            }
+        }
         my @required_locus_outputs = (
             $locus_prefix . '.png',
             $locus_prefix . '.plot.tsv',
@@ -824,7 +832,42 @@ sub plot_local_series {
         if ($args{with_gtf} || $batch_annotation_mode eq 'gtf') {
             push @required_locus_outputs, $locus_prefix . '.genes.tsv';
         }
-        my $need_locus_render = $args{force} || !all_nonempty_files(@required_locus_outputs);
+        my $expected_gtf_file = infer_cached_locus_gtf_path(
+            output_dir => $args{output_dir},
+            snp        => $hit->{SNP},
+            window_bp  => $args{window_bp},
+            runner     => $runner,
+        );
+        my $expected_has_gtf = ($args{with_gtf} || $batch_annotation_mode eq 'gtf') ? 1 : 0;
+        my $expected_bottom_gene = '';
+        if ($args{kind} eq 'local_manhattan' && !$expected_has_gtf) {
+            $expected_bottom_gene = $hit->{gene} || '';
+            $expected_bottom_gene = extract_gene_from_snp_gene($hit->{snp_gene}) if !length($expected_bottom_gene);
+            $expected_bottom_gene = '' if $expected_bottom_gene =~ /^(?:NA|N\/A|null|\.)$/i;
+        }
+        my ($cache_reusable, $cache_reason) = local_locus_cache_is_reusable(
+            required          => \@required_locus_outputs,
+            manifest          => $existing_locus_manifest,
+            png               => $locus_prefix . '.png',
+            renderer          => File::Spec->catfile($Bin, 'DiffGWASDeps', 'gunplot', 'pdl_gunplot_local_locus.pl'),
+            snp               => $hit->{SNP},
+            window_bp         => $args{window_bp},
+            pcols             => join(',', @{ $args{pcols} }),
+            zcols             => join(',', @{ $args{zcols} || [] }),
+            labels            => join('|', @{ $args{labels} }),
+            title             => sprintf('%s: %s (%s:%s)', $args{html_title}, $hit->{SNP}, ($hit->{CHR} // ''), ($hit->{BP} // '')),
+            height            => $args{height},
+            sig               => ($runner->{TOP_HIT_SIGNAL_THRSHD} || '1e-6'),
+            has_gtf           => $expected_has_gtf,
+            gtf_file          => $expected_gtf_file,
+            hide_y_axis       => ($args{kind} eq 'local_manhattan' && $batch_col > 0) ? 1 : 0,
+            bottom_snp_label  => ($args{kind} eq 'local_manhattan' && !$expected_has_gtf) ? $hit->{SNP} : '',
+            bottom_gene_label => $expected_bottom_gene,
+        );
+        my $need_locus_render = $args{force} || !$cache_reusable;
+        if ($need_locus_render && !$args{force} && all_nonempty_files(@required_locus_outputs)) {
+            print "[cache] regenerating gunplot $args{kind} locus artifacts for $hit->{SNP}: $cache_reason\n";
+        }
 
         if (!$need_locus_render) {
             my $manifest_metrics = read_manifest_tsv($locus_prefix . '.manifest.tsv');
@@ -832,16 +875,10 @@ sub plot_local_series {
                 if ($manifest_metrics->{TARGET_CHR} || $manifest_metrics->{target_chr} || $manifest_metrics->{CHR} || $manifest_metrics->{chr});
             $hit->{BP}  = $manifest_metrics->{TARGET_BP} || $manifest_metrics->{target_bp} || $manifest_metrics->{BP} || $manifest_metrics->{bp}
                 if ($manifest_metrics->{TARGET_BP} || $manifest_metrics->{target_bp} || $manifest_metrics->{BP} || $manifest_metrics->{bp});
-            my $reused_gtf_file = infer_cached_locus_gtf_path(
-                output_dir => $args{output_dir},
-                snp        => $hit->{SNP},
-                window_bp  => $args{window_bp},
-                runner     => $runner,
-            );
             ensure_genes_tsv_from_gtf(
-                gtf_file  => $reused_gtf_file,
+                gtf_file  => $expected_gtf_file,
                 gene_tsv  => $locus_prefix . '.genes.tsv',
-            ) if $reused_gtf_file;
+            ) if $expected_gtf_file;
             print "[skip] reusing existing gunplot $args{kind} locus artifacts for $hit->{SNP}\n";
             push @images, {
                 slot_index=> $batch_pos,
@@ -852,7 +889,7 @@ sub plot_local_series {
                 snp_gene => ($hit->{snp_gene} || ''),
                 image    => $locus_prefix . '.png',
                 plot_tsv => $locus_prefix . '.plot.tsv',
-                gtf_file => $reused_gtf_file,
+                gtf_file => $expected_gtf_file,
                 manifest => $locus_prefix . '.manifest.tsv',
             };
             next;
@@ -1141,6 +1178,70 @@ sub all_nonempty_files {
         return 0 unless defined $path && -s $path;
     }
     return 1;
+}
+
+sub local_locus_cache_is_reusable {
+    my (%args) = @_;
+    return (0, 'one or more expected output files are absent or empty')
+        unless all_nonempty_files(@{ $args{required} || [] });
+
+    my $manifest = $args{manifest};
+    return (0, 'plot manifest is absent or empty') unless defined $manifest && -s $manifest;
+    my $metrics = read_manifest_tsv($manifest);
+    return (0, 'legacy plot manifest has no cache schema')
+        unless defined $metrics->{cache_schema} && $metrics->{cache_schema} =~ /^\d+$/ && $metrics->{cache_schema} >= 2;
+
+    my @checks = (
+        ['snp',               ($args{snp} // '')],
+        ['pcols',             ($args{pcols} // '')],
+        ['zcols',             ($args{zcols} // '')],
+        ['labels',            ($args{labels} // '')],
+        ['title',             ($args{title} // '')],
+        ['height',            ($args{height} // '')],
+        ['sig',               ($args{sig} // '')],
+        ['has_gtf',           ($args{has_gtf} ? 1 : 0)],
+        ['hide_y_axis',       ($args{hide_y_axis} ? 1 : 0)],
+        ['bottom_snp_label',  ($args{bottom_snp_label} // '')],
+        ['bottom_gene_label', ($args{bottom_gene_label} // '')],
+    );
+    for my $check (@checks) {
+        my ($key, $expected) = @$check;
+        my $actual = defined $metrics->{$key} ? $metrics->{$key} : '';
+        return (0, "plot setting '$key' changed") unless $actual eq "$expected";
+    }
+
+    my $actual_window = $metrics->{window_bp};
+    return (0, 'plot window is missing from manifest') unless defined $actual_window && $actual_window ne '';
+    return (0, 'plot window changed') unless (0 + $actual_window) == (0 + $args{window_bp});
+
+    if ($args{has_gtf}) {
+        return (0, 'current target/window GTF subset is absent') unless $args{gtf_file} && -s $args{gtf_file};
+        return (0, 'GTF subset path changed') unless cache_paths_equal($metrics->{gtf}, $args{gtf_file});
+    }
+    elsif (defined $metrics->{gtf} && length $metrics->{gtf}) {
+        return (0, 'cached plot unexpectedly contains GTF annotation');
+    }
+
+    my @dependencies = grep { defined && length } (
+        $metrics->{input},
+        ($args{has_gtf} ? $args{gtf_file} : ''),
+        $args{renderer},
+    );
+    return (0, 'a plot input is absent or newer than the cached PNG')
+        unless target_is_newer_than_inputs($args{png}, @dependencies);
+    return (1, 'cache provenance and dependencies match');
+}
+
+sub cache_paths_equal {
+    my ($left, $right) = @_;
+    return 0 unless defined $left && defined $right && length $left && length $right;
+    for ($left, $right) {
+        s{\\}{/}g;
+        s{/+}{/}g;
+        s{/$}{};
+        $_ = lc($_) if $^O =~ /(?:cygwin|MSWin32)/i || /^[A-Za-z]:/;
+    }
+    return $left eq $right;
 }
 
 sub target_is_newer_than_inputs {
@@ -1617,6 +1718,121 @@ sub render_combined_local_manhattan_gtf_batch {
         or die "gnuplot failed for combined local Manhattan GTF batch $gp_file\n";
 }
 
+sub prepare_locus_wide_sources {
+    my (%args) = @_;
+    my %sources;
+    my $safe_window = safe_name($args{window_bp});
+
+    for my $hit (@{ $args{hits} || [] }) {
+        my $snp = $hit->{SNP} || '';
+        next unless length $snp;
+        my $safe_snp = safe_name($snp);
+        if (!defined($hit->{CHR}) || !defined($hit->{BP})) {
+            for my $coordinate_manifest (glob(File::Spec->catfile($args{output_dir}, '*' . $safe_snp . '*.manifest.tsv'))) {
+                next unless -s $coordinate_manifest;
+                my $coordinate_metrics = read_manifest_tsv($coordinate_manifest);
+                my $coordinate_snp = $coordinate_metrics->{target_snp} // $coordinate_metrics->{snp} // '';
+                next unless lc($coordinate_snp) eq lc($snp);
+                my $coordinate_chr = $coordinate_metrics->{target_chr} // $coordinate_metrics->{chr};
+                my $coordinate_bp  = $coordinate_metrics->{target_bp}  // $coordinate_metrics->{bp};
+                next unless defined $coordinate_chr && $coordinate_chr ne '' && defined $coordinate_bp && $coordinate_bp ne '';
+                $hit->{CHR} = $coordinate_chr if !defined $hit->{CHR};
+                $hit->{BP}  = $coordinate_bp  if !defined $hit->{BP};
+                last;
+            }
+        }
+        my $data = File::Spec->catfile(
+            $args{output_dir},
+            "gunplot_locus_${safe_snp}_window_${safe_window}.wide.tsv.gz",
+        );
+        my $manifest = File::Spec->catfile(
+            $args{output_dir},
+            "gunplot_locus_${safe_snp}_window_${safe_window}.wide.manifest.tsv",
+        );
+        my ($valid, $metrics) = locus_wide_cache_matches(
+            data       => $data,
+            manifest   => $manifest,
+            snp        => $snp,
+            window_bp  => $args{window_bp},
+            exact_window => 1,
+        );
+
+        if (($args{force} || !$valid)
+            && $args{source_long} && -s $args{source_long}
+            && $args{preset_config} && -f $args{preset_config}) {
+            my @extract_cmd = (
+                $^X,
+                File::Spec->catfile($Bin, 'DiffGWASDeps', 'extract_single_snp_wide_diff_gwas.pl'),
+                '--config', $args{preset_config},
+                '--input', $args{source_long},
+                '--target-snp', $snp,
+                '--window-bp', $args{window_bp},
+                '--output', $data,
+                '--manifest', $manifest,
+                '--output-dir', $args{output_dir},
+            );
+            push @extract_cmd, ('--target-chr', $hit->{CHR}) if defined $hit->{CHR} && $hit->{CHR} ne '';
+            push @extract_cmd, ('--target-bp',  $hit->{BP})  if defined $hit->{BP}  && $hit->{BP}  ne '';
+            run_cmd(\@extract_cmd, "tabix-backed metadata locus for $snp");
+            ($valid, $metrics) = locus_wide_cache_matches(
+                data       => $data,
+                manifest   => $manifest,
+                snp        => $snp,
+                window_bp  => $args{window_bp},
+                exact_window => 1,
+            );
+            die "Target-locus extraction did not produce a valid cache for $snp\n" unless $valid;
+        }
+
+        if (!$valid) {
+            my @compatible;
+            for my $candidate (glob(File::Spec->catfile($args{output_dir}, '*' . $safe_snp . '.wide.tsv.gz'))) {
+                (my $candidate_manifest = $candidate) =~ s/\.wide\.tsv\.gz$/.wide.manifest.tsv/;
+                my ($candidate_valid, $candidate_metrics) = locus_wide_cache_matches(
+                    data       => $candidate,
+                    manifest   => $candidate_manifest,
+                    snp        => $snp,
+                    window_bp  => $args{window_bp},
+                    exact_window => 0,
+                );
+                next unless $candidate_valid;
+                push @compatible, [$candidate, $candidate_manifest, $candidate_metrics];
+            }
+            if (@compatible) {
+                @compatible = sort {
+                    (0 + ($a->[2]{window_bp} || 9e99)) <=> (0 + ($b->[2]{window_bp} || 9e99))
+                } @compatible;
+                ($data, $manifest, $metrics) = @{ $compatible[0] };
+                $valid = 1;
+            }
+        }
+
+        next unless $valid;
+        $hit->{CHR} = $metrics->{target_chr} if !defined($hit->{CHR}) && defined($metrics->{target_chr});
+        $hit->{BP}  = $metrics->{target_bp}  if !defined($hit->{BP})  && defined($metrics->{target_bp});
+        $sources{uc($snp)} = {
+            data     => $data,
+            manifest => $manifest,
+        };
+        print "[prep] Using compact target-locus metadata source for $snp: $data\n";
+    }
+    return \%sources;
+}
+
+sub locus_wide_cache_matches {
+    my (%args) = @_;
+    return (0, {}) unless $args{data} && -s $args{data} && $args{manifest} && -s $args{manifest};
+    my $metrics = read_manifest_tsv($args{manifest});
+    my $manifest_snp = $metrics->{target_snp} // $metrics->{snp} // '';
+    return (0, $metrics) unless lc($manifest_snp) eq lc($args{snp} || '');
+    my $manifest_window = $metrics->{window_bp};
+    return (0, $metrics) unless defined $manifest_window && $manifest_window ne '';
+    my $window_ok = $args{exact_window}
+        ? ((0 + $manifest_window) == (0 + $args{window_bp}))
+        : ((0 + $manifest_window) >= (0 + $args{window_bp}));
+    return ($window_ok ? 1 : 0, $metrics);
+}
+
 sub write_top_hits_csv {
     my (%args) = @_;
     my ($existing_header, $existing_rows) = extract_existing_sas_style_top_hits_csv_rows(
@@ -1628,6 +1844,7 @@ sub write_top_hits_csv {
             runner    => $args{runner},
             wide_data => $args{wide_data},
             hits      => $args{hits},
+            locus_sources => $args{locus_sources},
           )
         : (undef, undef);
     my @header = $existing_header ? @{$existing_header} : @{$fallback_header || []};
@@ -1707,28 +1924,47 @@ sub build_sas_style_top_hits_from_wide {
     my %rows_by_snp;
     my @wide_cols;
     my %idx;
-    my $fh = IO::Uncompress::Gunzip->new($wide_data)
-        or die "Cannot read $wide_data: $GunzipError\n";
-    my $header = <$fh>;
-    if (defined $header) {
-        chomp $header;
-        $header =~ s/\r$//;
-        @wide_cols = split /\t/, $header, -1;
-        %idx = map { $wide_cols[$_] => $_ } 0 .. $#wide_cols;
+    my $locus_sources = $args{locus_sources} || {};
+    for my $snp (sort keys %targets) {
+        my $source = $locus_sources->{$snp};
+        next unless $source && $source->{data} && -s $source->{data};
+        my ($cols, $row) = read_target_row_from_wide($source->{data}, $snp);
+        next unless $cols && $row;
+        @wide_cols = @$cols unless @wide_cols;
+        $rows_by_snp{$snp} = $row;
     }
-    while (my $line = <$fh>) {
-        chomp $line;
-        $line =~ s/\r$//;
-        next unless length $line;
-        my @f = split /\t/, $line, -1;
-        my $snp = uc($f[$idx{SNP}] // '');
-        next unless $targets{$snp};
-        my %row;
-        @row{@wide_cols} = @f;
-        $rows_by_snp{$snp} = \%row;
-        last if scalar(keys %rows_by_snp) == scalar(keys %targets);
+
+    my %missing = map { $_ => 1 } grep { !exists $rows_by_snp{$_} } keys %targets;
+    if (%missing) {
+        print "[prep] Compact locus metadata unavailable for " . scalar(keys %missing)
+            . " target(s); scanning the full wide table as fallback.\n";
+        my $fh = IO::Uncompress::Gunzip->new($wide_data)
+            or die "Cannot read $wide_data: $GunzipError\n";
+        my $header = <$fh>;
+        if (defined $header) {
+            chomp $header;
+            $header =~ s/\r$//;
+            @wide_cols = split /\t/, $header, -1;
+            %idx = map { $wide_cols[$_] => $_ } 0 .. $#wide_cols;
+        }
+        while (my $line = <$fh>) {
+            chomp $line;
+            $line =~ s/\r$//;
+            next unless length $line;
+            my @f = split /\t/, $line, -1;
+            my $snp = uc($f[$idx{SNP}] // '');
+            next unless $missing{$snp};
+            my %row;
+            @row{@wide_cols} = @f;
+            $rows_by_snp{$snp} = \%row;
+            delete $missing{$snp};
+            last unless %missing;
+        }
+        close $fh;
     }
-    close $fh;
+    else {
+        print "[prep] Top-hit CSV metadata loaded from compact target-locus data; full wide-table scan skipped.\n";
+    }
 
     my @header = (
         qw(hit_order panel_index CHR BP SNP EFFECT_ALLELE OTHER_ALLELE REFERENCE_ALLELE ALTERNATIVE_ALLELE gene snp_gene focus_signal selected_maf maf_source gwas_group1_maf gwas_group2_maf gwas_pair_maf_min gnomad_maf gnomad_pops maf_filter_decision maf_filter_reason)
@@ -1776,6 +2012,37 @@ sub build_sas_style_top_hits_from_wide {
         $export_rows{$snp} = \%row;
     }
     return (\@header, \%export_rows);
+}
+
+sub read_target_row_from_wide {
+    my ($path, $target_snp) = @_;
+    return unless $path && -s $path && defined $target_snp && length $target_snp;
+    my $fh = IO::Uncompress::Gunzip->new($path)
+        or die "Cannot read $path: $GunzipError\n";
+    my $header = <$fh>;
+    return unless defined $header;
+    chomp $header;
+    $header =~ s/\r$//;
+    my @cols = split /\t/, $header, -1;
+    my %idx = map { $cols[$_] => $_ } 0 .. $#cols;
+    unless (exists $idx{SNP}) {
+        close $fh;
+        return;
+    }
+    my $wanted = uc($target_snp);
+    while (my $line = <$fh>) {
+        chomp $line;
+        $line =~ s/\r$//;
+        next unless length $line;
+        my @f = split /\t/, $line, -1;
+        next unless uc($f[$idx{SNP}] // '') eq $wanted;
+        my %row;
+        @row{@cols} = @f;
+        close $fh;
+        return (\@cols, \%row);
+    }
+    close $fh;
+    return;
 }
 
 sub parse_csv_line {
@@ -2035,13 +2302,25 @@ sub ensure_tabix_ready_long_source {
 
     my $source_basename = basename($source_long);
     $source_basename =~ s/\.(?:gz|bgz|bgzip)$//i;
+    my @indexed_candidates;
+    if ($source_basename =~ /\.tsv$/i) {
+        (my $legacy_basename = $source_basename) =~ s/\.tsv$//i;
+        push @indexed_candidates, File::Spec->catfile(
+            $args{output_dir},
+            $legacy_basename . '.tabix_ready.tsv.gz',
+        );
+    }
     my $indexed_local = File::Spec->catfile(
         $args{output_dir},
         $source_basename . '.tabix_ready.tsv.gz',
     );
-    if (!$args{force} && -s $indexed_local && has_tabix_index_wrapper($indexed_local)) {
-        print "[skip] reusing indexed long GWAS source $indexed_local\n";
-        return $indexed_local;
+    push @indexed_candidates, $indexed_local;
+    if (!$args{force}) {
+        for my $candidate (@indexed_candidates) {
+            next unless -s $candidate && has_tabix_index_wrapper($candidate);
+            print "[skip] reusing indexed long GWAS source $candidate\n";
+            return $candidate;
+        }
     }
 
     my @cmd = (
@@ -2061,11 +2340,18 @@ sub ensure_tabix_ready_long_source {
 
 sub has_tabix_index_wrapper {
     my ($path) = @_;
-    return 0 unless $path;
-    return 1 if -e "$path.tbi" || -e "$path.csi";
+    return 0 unless $path && -s $path;
+    my $data_mtime = (stat($path))[9] || 0;
+    for my $index_path ("$path.tbi", "$path.csi") {
+        next unless -s $index_path;
+        return 1 if ((stat($index_path))[9] || 0) >= $data_mtime;
+    }
     if ($path =~ /\.(?:gz|bgz|bgzip)$/i) {
         (my $stem = $path) =~ s/\.(?:gz|bgz|bgzip)$//i;
-        return 1 if -e "$stem.tbi" || -e "$stem.csi";
+        for my $index_path ("$stem.tbi", "$stem.csi") {
+            next unless -s $index_path;
+            return 1 if ((stat($index_path))[9] || 0) >= $data_mtime;
+        }
     }
     return 0;
 }

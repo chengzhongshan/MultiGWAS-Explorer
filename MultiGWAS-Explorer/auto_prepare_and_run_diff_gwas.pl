@@ -284,6 +284,21 @@ my $bash_path = normalize_unix_path(cfg_or(
 
 validate_spec($spec);
 
+# Explicit target SNPs and common-association discovery are alternative locus
+# selection modes.  A target list is more specific, so make that precedence
+# effective before runner filters or verifier work are configured.
+my $configured_target_snps = length($target_snps_override)
+    ? $target_snps_override
+    : cfg_or($spec, 'target_snps', '');
+my $effective_get_common_associations = defined($get_common_associations)
+    ? ($get_common_associations ? 1 : 0)
+    : (cfg_or($spec, 'get_common_associations', 0) ? 1 : 0);
+if ($effective_get_common_associations && length($configured_target_snps)) {
+    print "[info] Explicit target SNPs take precedence over common-association discovery; "
+        . "ignoring --get-common-associations for this run: $configured_target_snps\n";
+    $effective_get_common_associations = 0;
+}
+
 my $artifact_stem = cfg_or($spec, 'artifact_stem', cfg_or($spec, 'project_tag', 'diff_gwas'));
 my $project_tag = cfg_or($spec, 'project_tag', $artifact_stem);
 my $input_dir = normalize_unix_path(cfg_or($spec, 'input_dir', ''));
@@ -425,11 +440,7 @@ my $runner_cfg = build_runner_config(
     local_gtf_label_layout_override => $local_gtf_label_layout_override,
     local_gtf_yaxis_offset4max_override => $local_gtf_yaxis_offset4max_override,
     local_gtf_yoffset4textlabels_override => $local_gtf_yoffset4textlabels_override,
-    get_common_associations => (
-        defined($get_common_associations)
-          ? ($get_common_associations ? 1 : 0)
-          : cfg_or($spec, 'get_common_associations', 0)
-    ),
+    get_common_associations => $effective_get_common_associations,
     common_assoc_top_hit_threshold_override => (
         length($common_assoc_top_hit_threshold_override)
         ? $common_assoc_top_hit_threshold_override
@@ -454,6 +465,7 @@ my $local_gtf_request_cache_file = "$Bin/"
   . '.request.md5';
 my $local_gtf_expected_csv_basename = $runner_cfg->{LOCAL_TOP_HITS_CSV_BASENAME}
   || (($runner_cfg->{LOCAL_OUTPUT_PREFIX} || "${project_tag}_SAS_local_top_hits_manhattan") . "_top_hits.csv");
+my $single_target_gtf_snp = '';
 if (defined($runner_cfg->{TARGET_SNP_LIST}) && length($runner_cfg->{TARGET_SNP_LIST})) {
     my @target_snps = grep { length($_) } map {
         my $snp = $_;
@@ -462,6 +474,8 @@ if (defined($runner_cfg->{TARGET_SNP_LIST}) && length($runner_cfg->{TARGET_SNP_L
     } split /,/, $runner_cfg->{TARGET_SNP_LIST};
     my $target_tag;
     if (@target_snps == 1) {
+        $single_target_gtf_snp = $target_snps[0]
+          if $target_snps[0] =~ /^[A-Za-z0-9_.:-]+$/;
         $target_tag = $target_snps[0];
         $target_tag =~ s/[^A-Za-z0-9._-]/_/g;
     }
@@ -507,8 +521,18 @@ if (defined $env_skip_data_upload) {
     $plot_skip_upload = $env_skip_data_upload;
 }
 my @step_defs;
+my $local_gtf_command = qq{"$bash_path" -lc 'cd "$workdir" && RUNNER_CONFIG_JSON="$generated->{runner_config}" SESSION_ID="$runner_session" OPEN_RESULT="$open_result" CLEAN_ODA_INPUT="$plot_clean_oda_input" SKIP_DATA_UPLOAD="$plot_skip_upload" KEEP_REMOTE_PLOT_DATA="$keep_remote_plot_data" EMIT_LOCAL_SAS_DEBUG="$emit_local_sas_scripts" LOCAL_SAS_DEBUG_ONLY="$local_sas_only" "$deps_dir/run_sas_oda_local_top_hits_with_gtf_download_html.sh"'};
+my $local_gtf_description = 'Run the local GTF-backed SAS ODA plot';
+if (length($single_target_gtf_snp) && !$local_sas_only) {
+    my $single_window = $runner_cfg->{LOCAL_GTF_WINDOW_BP} || $runner_cfg->{LOCAL_WINDOW_BP} || '1e7';
+    my $single_html = $runner_cfg->{OUTPUT_HTML_BASENAME} || "${project_tag}_SAS_local_top_hits_with_gtf.html";
+    $local_gtf_command = qq{"$bash_path" -lc 'cd "$workdir" && RUNNER_CONFIG_JSON="$generated->{runner_config}" SESSION_ID="$runner_session" TARGET_SNP="$single_target_gtf_snp" LOCAL_WINDOW_BP="$single_window" OUTPUT_HTML_BASENAME="$single_html" SINGLE_SNP_ALLOW_GENERIC_OUTPUT_BASENAME=1 SINGLE_SNP_TOP_HITS_CSV_BASENAME="$local_gtf_expected_csv_basename" OPEN_RESULT="$open_result" CLEAN_ODA_INPUT="$clean_oda_input" CLEAN_ODA_MACROS=0 "$deps_dir/run_sas_oda_single_snp_with_gtf_download_html.sh"'};
+    $local_gtf_description = 'Run the fast single-target GTF-backed SAS ODA plot';
+    print "[info] Using fast single-SNP SAS ODA local-GTF runner for $single_target_gtf_snp.\n";
+}
 
 if ($source_mode eq 'raw_pgc_vcf_sumstats') {
+
     push @step_defs,
       {
         name        => 'merge_raw',
@@ -611,8 +635,8 @@ if (!$skip_plots) {
       },
       {
         name        => 'plot_local_gtf',
-        description => 'Run the local GTF-backed SAS ODA plot',
-        command     => qq{"$bash_path" -lc 'cd "$workdir" && RUNNER_CONFIG_JSON="$generated->{runner_config}" SESSION_ID="$runner_session" OPEN_RESULT="$open_result" CLEAN_ODA_INPUT="$plot_clean_oda_input" SKIP_DATA_UPLOAD="$plot_skip_upload" KEEP_REMOTE_PLOT_DATA="$keep_remote_plot_data" EMIT_LOCAL_SAS_DEBUG="$emit_local_sas_scripts" LOCAL_SAS_DEBUG_ONLY="$local_sas_only" "$deps_dir/run_sas_oda_local_top_hits_with_gtf_download_html.sh"'},
+        description => $local_gtf_description,
+        command     => $local_gtf_command,
         outputs     => $local_sas_only ? [] : [
             "$Bin/" . ($runner_cfg->{OUTPUT_HTML_BASENAME} || "${project_tag}_SAS_local_top_hits_with_gtf.html"),
             "$Bin/$local_gtf_expected_csv_basename",
@@ -3663,6 +3687,8 @@ Options:
                        Select local top hits from replicable single-GWAS
                        associations that also show nominal association in
                        another GWAS with the same effect direction.
+                       Ignored when --target-snps (or spec target_snps) supplies
+                       an explicit locus list; explicit targets take precedence.
                        Optional THR sets the starting common-association
                        top-hit threshold for any single-GWAS association P;
                        default ladder starts at 5e-8.
@@ -3758,6 +3784,8 @@ sub full_help {
     $text .= "  - use --get-common-associations when you want local top hits driven by\n";
     $text .= "    strong single-GWAS association first, then retained only when another GWAS\n";
     $text .= "    shows nominal association with the same effect direction\n";
+    $text .= "  - do not combine it with --target-snps unless you intentionally want the\n";
+    $text .= "    explicit target list to take precedence and common discovery to be skipped\n";
     $text .= "  - you can optionally pass a starting threshold, for example\n";
     $text .= "    --get-common-associations=5e-8; this applies to single-GWAS association P,\n";
     $text .= "    and the ladder still relaxes automatically if needed\n";

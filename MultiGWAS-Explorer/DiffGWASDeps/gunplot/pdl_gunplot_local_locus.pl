@@ -258,14 +258,28 @@ system($opt{gnuplot}, $gp_file) == 0
 
 open my $mf, '>', $manifest or die "Cannot write $manifest: $!\n";
 print {$mf} join("\t", qw(METRIC VALUE)), "\n";
+print {$mf} join("\t", 'cache_schema', 2), "\n";
 print {$mf} join("\t", 'input', $opt{data}), "\n";
 print {$mf} join("\t", 'png', $png_file), "\n";
 print {$mf} join("\t", 'plot_tsv', $plot_tsv), "\n";
 print {$mf} join("\t", 'gene_tsv', ($has_gtf ? $gene_tsv : '')), "\n";
+print {$mf} join("\t", 'gtf', ($has_gtf ? $opt{gtf} : '')), "\n";
+print {$mf} join("\t", 'has_gtf', ($has_gtf ? 1 : 0)), "\n";
 print {$mf} join("\t", 'snp', $opt{snp}), "\n";
 print {$mf} join("\t", 'chr', $target_chr), "\n";
 print {$mf} join("\t", 'bp', $target_bp), "\n";
 print {$mf} join("\t", 'window_bp', $window_bp), "\n";
+print {$mf} join("\t", 'pcols', join(',', @pcols)), "\n";
+print {$mf} join("\t", 'zcols', join(',', @zcols)), "\n";
+print {$mf} join("\t", 'labels', ($opt{labels} // '')), "\n";
+print {$mf} join("\t", 'title', ($opt{title} // '')), "\n";
+print {$mf} join("\t", 'width', $opt{width}), "\n";
+print {$mf} join("\t", 'height', $opt{height}), "\n";
+print {$mf} join("\t", 'top_logp', $opt{top_logp}), "\n";
+print {$mf} join("\t", 'sig', $opt{sig}), "\n";
+print {$mf} join("\t", 'hide_y_axis', ($opt{hide_y_axis} ? 1 : 0)), "\n";
+print {$mf} join("\t", 'bottom_snp_label', ($opt{bottom_snp_label} // '')), "\n";
+print {$mf} join("\t", 'bottom_gene_label', ($opt{bottom_gene_label} // '')), "\n";
 print {$mf} join("\t", 'rows_in_window', scalar(@locus)), "\n";
 print {$mf} join("\t", 'points_plotted', $kept_points), "\n";
 print {$mf} join("\t", 'gene_rows', $gene_rows), "\n";

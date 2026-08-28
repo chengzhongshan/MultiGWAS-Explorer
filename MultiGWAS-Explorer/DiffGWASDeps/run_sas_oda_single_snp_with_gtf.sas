@@ -17,6 +17,7 @@ This script draws a local Manhattan plot with gene tracks for a single target SN
 %let local_window_bp=__LOCAL_WINDOW_BP__;
 %let gtf_label_snps=__GTF_LABEL_SNPS__;
 %let html_outfile=__OUTPUT_HTML__;
+%let done_outfile=__OUTPUT_DONE__;
 %let gwas_dsd=__GWAS_DATASET__;
 %let target_hit_dsd=__TARGET_HIT_DATASET__;
 %let target_local_dsd=__TARGET_LOCAL_DATASET__;
@@ -278,3 +279,14 @@ quit;
 );
 
 ods html5 close;
+
+/* The HTML file is created when ODS opens, so its existence alone does not
+   prove that the plot finished. Write this marker only after ODS closes. */
+filename _plotdone "~/&done_outfile" encoding="utf-8";
+data _null_;
+  file _plotdone;
+  put "status=complete";
+  put "target_snp=&target_snp";
+  put "html=&html_outfile";
+run;
+filename _plotdone clear;

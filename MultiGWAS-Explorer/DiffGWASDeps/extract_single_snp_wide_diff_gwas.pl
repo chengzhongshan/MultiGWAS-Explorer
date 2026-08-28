@@ -410,6 +410,7 @@ sub open_writer {
 sub prefer_shell_gzip {
     my ($path) = @_;
     return 1 if defined $path && $path =~ m{^/mnt/};
+    return 1 if $^O =~ /cygwin/i;
     return 0;
 }
 

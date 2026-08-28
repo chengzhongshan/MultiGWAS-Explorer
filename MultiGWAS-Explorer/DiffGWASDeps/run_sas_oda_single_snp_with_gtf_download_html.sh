@@ -43,6 +43,7 @@ PROJECT_TAG="${PROJECT_TAG:-PGC_SCZ}"
 DEFAULT_SOURCE_LONG_GZ="/mnt/e/LongCOVID_HGI_GWAS/PGC_Large_GWASs/PGC_SCZ_Sex_Stratified_GWASs/PGC_SCZ_female_vs_male_diff_effects.stdized.tsv.gz"
 SOURCE_LONG_GZ="${SOURCE_LONG_GZ:-${DEFAULT_SOURCE_LONG_GZ}}"
 DATA_GZ="${DATA_GZ:-}"
+GENOME_WIDE_DATA_GZ_FOR_LOOKUP="${DATA_GZ}"
 REMOTE_DATA_BASENAME="${REMOTE_DATA_BASENAME:-}"
 LOCAL_WIDE_HELPER="${LOCAL_WIDE_HELPER:-${DEPS_DIR}/extract_single_snp_wide_diff_gwas.pl}"
 EXTRACTOR_CONFIG_JSON="${EXTRACTOR_CONFIG_JSON:-}"
@@ -53,6 +54,7 @@ GTF_SUBSET_HELPER="${GTF_SUBSET_HELPER:-${DEPS_DIR}/extract_gencode_gtf_subset.p
 RENDER_SAS_HELPER="${RENDER_SAS_HELPER:-${DEPS_DIR}/render_sas_template.pl}"
 LOCAL_WIDE_MANIFEST=""
 LOCAL_WIDE_AUTOGEN=0
+LOCAL_WIDE_CACHE_MANAGED=0
 
 TARGET_SNP="${TARGET_SNP:-}"
 if [[ -z "${TARGET_SNP}" ]]; then
@@ -71,8 +73,9 @@ GTF_LABEL_SNPS="${GTF_LABEL_SNPS//,/ }"
 if [[ -n "${DATA_GZ}" && "$(basename "${DATA_GZ}")" == *.stdized.wide_beta_se_p_p_lt_0p05.final.tsv.gz ]]; then
   echo "[prep] Ignoring generic DATA_GZ from runner config for single-SNP mode: ${DATA_GZ}"
   DATA_GZ=""
+  REMOTE_DATA_BASENAME=""
 fi
-if [[ -n "${OUTPUT_HTML_BASENAME}" && "${OUTPUT_HTML_BASENAME}" == *_local_top_hits_with_gtf*.html ]]; then
+if [[ "${SINGLE_SNP_ALLOW_GENERIC_OUTPUT_BASENAME:-0}" != "1" && -n "${OUTPUT_HTML_BASENAME}" && "${OUTPUT_HTML_BASENAME}" == *_local_top_hits_with_gtf*.html ]]; then
   echo "[prep] Ignoring generic OUTPUT_HTML_BASENAME from runner config for single-SNP mode: ${OUTPUT_HTML_BASENAME}"
   OUTPUT_HTML_BASENAME=""
 fi
@@ -115,6 +118,40 @@ MAP_GRP_ASSOC_MACRO_SAS="${MAP_GRP_ASSOC_MACRO_SAS:-${DEPS_DIR}/map_grp_assoc2ge
 MULT_GSCATTER_GENE_MACRO_SAS="${MULT_GSCATTER_GENE_MACRO_SAS:-${DEPS_DIR}/Multgscatter_with_gene_exons.sas}"
 ADJ_CLOSE_GENE_GRP_MACRO_SAS="${ADJ_CLOSE_GENE_GRP_MACRO_SAS:-${DEPS_DIR}/adj_grpnum4close_gene_bed_regs.sas}"
 GTF_CACHE_DIR="${GTF_CACHE_DIR:-${WORKDIR}/cache/gtf}"
+LOCAL_GTF_REUSE_CACHE_DIR="${LOCAL_GTF_REUSE_CACHE_DIR:-${WORKDIR}/cache/local_gtf_reuse}"
+LOCAL_TOP_HITS_CSV_HELPER="${LOCAL_TOP_HITS_CSV_HELPER:-${DEPS_DIR}/generate_requested_top_hits_csv.pl}"
+SINGLE_SNP_TOP_HITS_CSV_BASENAME="${SINGLE_SNP_TOP_HITS_CSV_BASENAME:-}"
+
+fresh_tabix_index_exists() {
+  local data_path="$1"
+  local index_path
+  [[ -s "${data_path}" ]] || return 1
+  for index_path in "${data_path}.tbi" "${data_path}.csi"; do
+    [[ -s "${index_path}" ]] || continue
+    [[ ! "${data_path}" -nt "${index_path}" ]] && return 0
+  done
+  return 1
+}
+
+resolve_existing_tabix_source() {
+  local source_path="$1"
+  local stem candidate
+  fresh_tabix_index_exists "${source_path}" && { printf '%s' "${source_path}"; return 0; }
+  stem="${source_path%.gz}"
+  for candidate in \
+    "${stem%.tsv}.tabix_ready.tsv.gz" \
+    "${stem}.tabix_ready.tsv.gz"; do
+    fresh_tabix_index_exists "${candidate}" || continue
+    printf '%s' "${candidate}"
+    return 0
+  done
+  printf '%s' "${source_path}"
+}
+
+SOURCE_LONG_GZ="$(resolve_existing_tabix_source "${SOURCE_LONG_GZ}")"
+if fresh_tabix_index_exists "${SOURCE_LONG_GZ}"; then
+  echo "[prep] Using indexed long GWAS source for single-SNP extraction: ${SOURCE_LONG_GZ}"
+fi
 
 GTF_ASSOC_PVARS="${GTF_ASSOC_PVARS:-ALL_DIFF_P ASN_DIFF_P EUR_DIFF_P}"
 GTF_ZSCORE_VARS="${GTF_ZSCORE_VARS:-ALL_DIFF_Z ASN_DIFF_Z EUR_DIFF_Z}"
@@ -205,6 +242,7 @@ CLEAN_ODA_OUTPUT="${CLEAN_ODA_OUTPUT:-1}"
 CLEAN_ODA_MACROS="${CLEAN_ODA_MACROS:-1}"
 CLEAN_LOCAL_AUTOGEN="${CLEAN_LOCAL_AUTOGEN:-1}"
 OPEN_RESULT="${OPEN_RESULT:-1}"
+SINGLE_SNP_PREP_ONLY="${SINGLE_SNP_PREP_ONLY:-0}"
 platform_is_linux=0
 platform_is_cygwin=0
 if [[ "$(uname -s)" == "Linux" ]]; then
@@ -243,9 +281,11 @@ if [[ -z "${ODA_DELETE_TIMEOUT_GRACE_SECONDS:-}" ]]; then
   ODA_DELETE_TIMEOUT_GRACE_SECONDS=20
 fi
 INCLUDE_PREFLIGHT_STANDALONE_DEBUG="${INCLUDE_PREFLIGHT_STANDALONE_DEBUG:-0}"
+INCLUDE_PREFLIGHT_REFRESH_REMOTE="${INCLUDE_PREFLIGHT_REFRESH_REMOTE:-0}"
 export SAS_ODA_RUN_TIMEOUT_SECONDS="${SAS_ODA_RUN_TIMEOUT_SECONDS:-${SINGLE_SNP_GTF_SUBMIT_TIMEOUT_SECONDS}}"
 export SAS_ODA_RUN_TIMEOUT_GRACE_SECONDS="${SAS_ODA_RUN_TIMEOUT_GRACE_SECONDS:-${SINGLE_SNP_GTF_SUBMIT_TIMEOUT_GRACE_SECONDS}}"
 export STANDALONE_INCLUDE_TARGET_DEBUG="${INCLUDE_PREFLIGHT_STANDALONE_DEBUG}"
+export INCLUDE_PREFLIGHT_REFRESH_REMOTE
 
 cd "${WORKDIR}"
 
@@ -262,6 +302,7 @@ else
 fi
 
 echo "[helper] Include preflight standalone target debug: ${STANDALONE_INCLUDE_TARGET_DEBUG}"
+echo "[helper] Include preflight remote refresh: ${INCLUDE_PREFLIGHT_REFRESH_REMOTE} (support files are uploaded and size-verified before submit)"
 
 stamp="$(date +%Y%m%d_%H%M%S)"
 if [[ -z "${GTF_LOCAL_DSD}" ]]; then
@@ -277,6 +318,7 @@ IMPORT_BLOCK_RENDERED="${WORKDIR}/auto_wide_import_single_snp.${stamp}.sas"
 GTF_IMPORT_BLOCK_RENDERED="${WORKDIR}/auto_gtf_import_single_snp.${stamp}.sas"
 LOCAL_GTF_SUBSET="${WORKDIR}/local_gtf_subset_${SAFE_TARGET_SNP}_${stamp}.tsv"
 LOCAL_GTF_SUBSET_GZ="${LOCAL_GTF_SUBSET}.gz"
+LOCAL_GTF_SUBSET_CACHE_MANAGED=0
 REMOTE_GTF_BASENAME="$(basename "${LOCAL_GTF_SUBSET_GZ}")"
 PNG_OUT=""
 RAW_HTML_OUT=""
@@ -286,10 +328,10 @@ RUN_LOG_FILE="${RUN_LOG_DIR}/output.html.info.txt"
 
 cleanup_local_artifacts() {
   rm -f "${RUN_SAS_RENDERED}" "${IMPORT_BLOCK_RENDERED}" "${GTF_IMPORT_BLOCK_RENDERED}"
-  if [[ "${CLEAN_LOCAL_AUTOGEN}" == "1" ]]; then
+  if [[ "${CLEAN_LOCAL_AUTOGEN}" == "1" && "${LOCAL_GTF_SUBSET_CACHE_MANAGED}" != "1" ]]; then
     rm -f "${LOCAL_GTF_SUBSET}" "${LOCAL_GTF_SUBSET_GZ}"
   fi
-  if [[ "${LOCAL_WIDE_AUTOGEN}" == "1" && "${CLEAN_LOCAL_AUTOGEN}" == "1" ]]; then
+  if [[ "${LOCAL_WIDE_AUTOGEN}" == "1" && "${LOCAL_WIDE_CACHE_MANAGED}" != "1" && "${CLEAN_LOCAL_AUTOGEN}" == "1" ]]; then
     [[ -n "${DATA_GZ}" ]] && rm -f "${DATA_GZ}"
     [[ -n "${LOCAL_WIDE_MANIFEST}" ]] && rm -f "${LOCAL_WIDE_MANIFEST}"
   fi
@@ -669,6 +711,7 @@ cleanup_remote_generated_outputs() {
   local remote_png_base=""
   echo "[cleanup] Queueing generated remote single-SNP GTF outputs for one SAS ODA cleanup manifest..."
   queue_oda_delete "${OUTPUT_HTML_BASENAME}"
+  queue_oda_delete "${OUTPUT_DONE_BASENAME}"
   if [[ -n "${remote_png_path:-}" ]]; then
     remote_png_base="$(basename "${remote_png_path}")"
     if [[ -n "${remote_png_base}" ]]; then
@@ -679,6 +722,42 @@ cleanup_remote_generated_outputs() {
 
 TARGET_CHR=""
 TARGET_BP=""
+
+mkdir -p "${LOCAL_GTF_REUSE_CACHE_DIR}"
+SAFE_LOCAL_WINDOW_BP="$(printf '%s' "${LOCAL_WINDOW_BP}" | tr -c 'A-Za-z0-9._-' '_')"
+if [[ -z "${DATA_GZ}" && -n "${GENOME_WIDE_DATA_GZ_FOR_LOOKUP}" ]]; then
+  shared_locus_dir="$(dirname "${GENOME_WIDE_DATA_GZ_FOR_LOOKUP}")"
+  shared_locus_data="${shared_locus_dir}/gunplot_locus_${SAFE_TARGET_SNP}_window_${SAFE_LOCAL_WINDOW_BP}.wide.tsv.gz"
+  shared_locus_manifest="${shared_locus_dir}/gunplot_locus_${SAFE_TARGET_SNP}_window_${SAFE_LOCAL_WINDOW_BP}.wide.manifest.tsv"
+  if [[ -s "${shared_locus_data}" && -s "${shared_locus_manifest}" ]]; then
+    shared_target_snp="$(manifest_metric_value target_snp "${shared_locus_manifest}" || true)"
+    shared_window_bp="$(manifest_metric_value window_bp "${shared_locus_manifest}" || true)"
+    if [[ "${shared_target_snp}" == "${TARGET_SNP}" ]] && perl -e 'exit((0+$ARGV[0])==(0+$ARGV[1]) ? 0 : 1)' "${shared_window_bp:-0}" "${LOCAL_WINDOW_BP}"; then
+      DATA_GZ="${shared_locus_data}"
+      LOCAL_WIDE_MANIFEST="${shared_locus_manifest}"
+      TARGET_CHR="$(manifest_metric_value target_chr "${LOCAL_WIDE_MANIFEST}" || true)"
+      TARGET_BP="$(manifest_metric_value target_bp "${LOCAL_WIDE_MANIFEST}" || true)"
+      LOCAL_WIDE_CACHE_MANAGED=1
+      echo "[prep] Reusing shared tabix-extracted target locus from the gnuplot cache: ${DATA_GZ}"
+    fi
+  fi
+fi
+
+if [[ -z "${DATA_GZ}" ]]; then
+  single_cache_base="${LOCAL_GTF_REUSE_CACHE_DIR}/single_snp_wide_${PROJECT_TAG}_${SAFE_TARGET_SNP}_window_${SAFE_LOCAL_WINDOW_BP}"
+  if [[ -s "${single_cache_base}.tsv.gz" && -s "${single_cache_base}.manifest.tsv" ]]; then
+    cached_target_snp="$(manifest_metric_value target_snp "${single_cache_base}.manifest.tsv" || true)"
+    cached_window_bp="$(manifest_metric_value window_bp "${single_cache_base}.manifest.tsv" || true)"
+    if [[ "${cached_target_snp}" == "${TARGET_SNP}" ]] && perl -e 'exit((0+$ARGV[0])==(0+$ARGV[1]) ? 0 : 1)' "${cached_window_bp:-0}" "${LOCAL_WINDOW_BP}"; then
+      DATA_GZ="${single_cache_base}.tsv.gz"
+      LOCAL_WIDE_MANIFEST="${single_cache_base}.manifest.tsv"
+      TARGET_CHR="$(manifest_metric_value target_chr "${LOCAL_WIDE_MANIFEST}" || true)"
+      TARGET_BP="$(manifest_metric_value target_bp "${LOCAL_WIDE_MANIFEST}" || true)"
+      LOCAL_WIDE_CACHE_MANAGED=1
+      echo "[prep] Reusing cached single-SNP wide locus: ${DATA_GZ}"
+    fi
+  fi
+fi
 
 if [[ -z "${DATA_GZ}" ]]; then
   if [[ -z "${EXTRACTOR_CONFIG_JSON}" && ! -s "${SOURCE_LONG_GZ}" ]]; then
@@ -691,11 +770,10 @@ if [[ -z "${DATA_GZ}" ]]; then
   fi
 
   echo "[prep] Building a single-SNP wide local subset from the long standardized GWAS..."
-  helper_cmd=(perl "${LOCAL_WIDE_HELPER}" --target-snp "${TARGET_SNP}" --window-bp "${LOCAL_WINDOW_BP}" --output-dir "${WORKDIR}")
-  if [[ -n "${EXTRACTOR_CONFIG_JSON}" ]]; then
-    helper_cmd+=(--config "${EXTRACTOR_CONFIG_JSON}")
-  else
-    helper_cmd+=(--input "${SOURCE_LONG_GZ}")
+  single_cache_base="${LOCAL_GTF_REUSE_CACHE_DIR}/single_snp_wide_${PROJECT_TAG}_${SAFE_TARGET_SNP}_window_${SAFE_LOCAL_WINDOW_BP}"
+  helper_cmd=(perl "${LOCAL_WIDE_HELPER}" --target-snp "${TARGET_SNP}" --window-bp "${LOCAL_WINDOW_BP}" --output-dir "${WORKDIR}" --input "${SOURCE_LONG_GZ}" --output "${single_cache_base}.tsv.gz" --manifest "${single_cache_base}.manifest.tsv")
+  if [[ -s "${SCHEMA_CONFIG_JSON}" ]]; then
+    helper_cmd+=(--config "${SCHEMA_CONFIG_JSON}")
   fi
   helper_out="$("${helper_cmd[@]}")"
 
@@ -704,6 +782,7 @@ if [[ -z "${DATA_GZ}" ]]; then
   TARGET_CHR="$(printf '%s\n' "${helper_out}" | awk -F '\t' '$1=="TARGET_CHR"{print $2}')"
   TARGET_BP="$(printf '%s\n' "${helper_out}" | awk -F '\t' '$1=="TARGET_BP"{print $2}')"
   LOCAL_WIDE_AUTOGEN=1
+  LOCAL_WIDE_CACHE_MANAGED=1
 
   if [[ -z "${DATA_GZ}" || ! -s "${DATA_GZ}" ]]; then
     echo "ERROR: Helper did not produce a valid local wide subset." >&2
@@ -732,6 +811,62 @@ if [[ -z "${local_target_row}" ]]; then
 fi
 echo "[prep] Verified that the local single-SNP wide subset contains ${TARGET_SNP}."
 log_local_subset_target_summary_if_available
+
+if [[ -n "${SINGLE_SNP_TOP_HITS_CSV_BASENAME}" ]]; then
+  SINGLE_SNP_TOP_HITS_CSV_OUT="${WORKDIR}/${SINGLE_SNP_TOP_HITS_CSV_BASENAME}"
+  perl -MIO::Uncompress::Gunzip=gunzip,\$GunzipError -e '
+    use strict;
+    use warnings;
+    my ($input, $output, $target, $gene_map) = @ARGV;
+    my %gene_for;
+    for my $item (split /,/, ($gene_map // q{})) {
+      my ($snp, $gene) = split /:/, $item, 2;
+      $gene_for{$snp} = $gene if defined $snp && length $snp && defined $gene;
+    }
+    my $fh = IO::Uncompress::Gunzip->new($input) or die "Cannot open $input: $GunzipError\n";
+    my $header = <$fh>;
+    die "Missing header in $input\n" unless defined $header;
+    chomp $header;
+    $header =~ s/\r$//;
+    my @cols = split /\t/, $header, -1;
+    my %idx = map { $cols[$_] => $_ } 0 .. $#cols;
+    die "Missing SNP/CHR/BP columns in $input\n" unless exists $idx{SNP} && exists $idx{CHR} && exists $idx{BP};
+    my @row;
+    while (my $line = <$fh>) {
+      chomp $line;
+      $line =~ s/\r$//;
+      my @f = split /\t/, $line, -1;
+      next unless ($f[$idx{SNP}] // q{}) eq $target;
+      @row = @f;
+      last;
+    }
+    close $fh;
+    die "Target $target was not found in $input\n" unless @row;
+    my $gene = $gene_for{$target} // q{};
+    my @extra = grep { $_ ne q{CHR} && $_ ne q{BP} && $_ ne q{SNP} } @cols;
+    my @out_cols = (qw(hit_order panel_index CHR BP SNP gene snp_gene gene_source), @extra);
+    my %values;
+    @values{@cols} = @row;
+    @values{qw(hit_order panel_index CHR BP SNP gene snp_gene gene_source)} = (
+      1, 1, $row[$idx{CHR}], $row[$idx{BP}], $target, $gene,
+      $target . q{:} . (length($gene) ? $gene : q{NA}),
+      (length($gene) ? q{USER} : q{NA}),
+    );
+    my $csv = sub {
+      my ($value) = @_;
+      $value = q{} unless defined $value;
+      $value =~ s/"/""/g;
+      return qq{"$value"} if $value =~ /[",\r\n]/;
+      return $value;
+    };
+    open my $out, q{>}, $output or die "Cannot write $output: $!\n";
+    print {$out} join(q{,}, map { $csv->($_) } @out_cols), "\n";
+    print {$out} join(q{,}, map { $csv->($values{$_}) } @out_cols), "\n";
+    close $out or die "Cannot close $output: $!\n";
+  ' "${DATA_GZ}" "${SINGLE_SNP_TOP_HITS_CSV_OUT}" "${TARGET_SNP}" "${TARGET_SNP_GENES:-}"
+  [[ -s "${SINGLE_SNP_TOP_HITS_CSV_OUT}" ]] || { echo "ERROR: Failed to generate ${SINGLE_SNP_TOP_HITS_CSV_OUT}" >&2; exit 1; }
+  echo "[prep] Generated target-SNP metadata CSV from the compact locus: ${SINGLE_SNP_TOP_HITS_CSV_OUT}"
+fi
 
 REMOTE_DATA_BASENAME="${REMOTE_DATA_BASENAME:-$(basename "${DATA_GZ}")}"
 
@@ -764,6 +899,7 @@ fi
 if [[ -z "${OUTPUT_HTML_BASENAME}" ]]; then
   OUTPUT_HTML_BASENAME="${PROJECT_TAG}_SAS_single_snp_with_gtf_${SAFE_TARGET_SNP}_chr${TARGET_CHR}_bp${TARGET_BP}.html"
 fi
+OUTPUT_DONE_BASENAME="${OUTPUT_HTML_BASENAME}.complete.tsv"
 HTML_OUT="${WORKDIR}/${OUTPUT_HTML_BASENAME}"
 PNG_OUT="${WORKDIR}/${OUTPUT_HTML_BASENAME%.html}.png"
 RAW_HTML_OUT="${WORKDIR}/${OUTPUT_HTML_BASENAME%.html}.sasraw.html"
@@ -782,25 +918,43 @@ REGION_END="$(
     "${TARGET_BP}" "${LOCAL_WINDOW_BP}"
 )"
 
-echo "[prep] Building local GTF subset for ${TARGET_SNP} at chr${TARGET_CHR}:${REGION_START}-${REGION_END}..."
-gtf_helper_out="$(
-  perl "${GTF_SUBSET_HELPER}" \
-    --gtf-url "${GTF_GZ_URL}" \
-    --cache-dir "${GTF_CACHE_DIR}" \
-    --output "${LOCAL_GTF_SUBSET}" \
-    --region "${TARGET_CHR}:${REGION_START}:${REGION_END}" \
-    $( [[ "${LOCAL_GTF_INCLUDE_NON_PROTEIN_CODING_GENES}" == "1" ]] && printf '%s' "--include-non-protein-coding" || printf '%s' "--no-include-non-protein-coding" )
-)"
-if [[ ! -s "${LOCAL_GTF_SUBSET}" ]]; then
-  echo "ERROR: Failed to build local GTF subset for ${TARGET_SNP}." >&2
-  printf '%s\n' "${gtf_helper_out}" >&2
-  exit 1
+single_gtf_cache_base="${LOCAL_GTF_REUSE_CACHE_DIR}/single_snp_gtf_${REFERENCE_BUILD}_${SAFE_TARGET_SNP}_chr${TARGET_CHR}_${REGION_START}_${REGION_END}_npc${LOCAL_GTF_INCLUDE_NON_PROTEIN_CODING_GENES}"
+if [[ -s "${single_gtf_cache_base}.tsv.gz" ]]; then
+  LOCAL_GTF_SUBSET="${single_gtf_cache_base}.tsv"
+  LOCAL_GTF_SUBSET_GZ="${single_gtf_cache_base}.tsv.gz"
+  LOCAL_GTF_SUBSET_CACHE_MANAGED=1
+  echo "[prep] Reusing cached local GTF subset for ${TARGET_SNP}: ${LOCAL_GTF_SUBSET_GZ}"
+else
+  shared_gtf_path="$(dirname "${DATA_GZ}")/gunplot_locus_${SAFE_TARGET_SNP}_window_${SAFE_LOCAL_WINDOW_BP}_npc${LOCAL_GTF_INCLUDE_NON_PROTEIN_CODING_GENES}.gtf.tsv"
+  if [[ -s "${shared_gtf_path}" ]]; then
+    echo "[prep] Reusing the gnuplot target/window GTF subset for SAS ODA: ${shared_gtf_path}"
+    gzip -c "${shared_gtf_path}" > "${single_gtf_cache_base}.tsv.gz"
+  else
+    echo "[prep] Building local GTF subset for ${TARGET_SNP} at chr${TARGET_CHR}:${REGION_START}-${REGION_END}..."
+    gtf_helper_out="$(
+      perl "${GTF_SUBSET_HELPER}" \
+        --gtf-url "${GTF_GZ_URL}" \
+        --cache-dir "${GTF_CACHE_DIR}" \
+        --output "${single_gtf_cache_base}.tsv" \
+        --region "${TARGET_CHR}:${REGION_START}:${REGION_END}" \
+        $( [[ "${LOCAL_GTF_INCLUDE_NON_PROTEIN_CODING_GENES}" == "1" ]] && printf '%s' "--include-non-protein-coding" || printf '%s' "--no-include-non-protein-coding" )
+    )"
+    if [[ ! -s "${single_gtf_cache_base}.tsv" ]]; then
+      echo "ERROR: Failed to build local GTF subset for ${TARGET_SNP}." >&2
+      printf '%s\n' "${gtf_helper_out}" >&2
+      exit 1
+    fi
+    gzip -c "${single_gtf_cache_base}.tsv" > "${single_gtf_cache_base}.tsv.gz"
+  fi
+  LOCAL_GTF_SUBSET="${single_gtf_cache_base}.tsv"
+  LOCAL_GTF_SUBSET_GZ="${single_gtf_cache_base}.tsv.gz"
+  LOCAL_GTF_SUBSET_CACHE_MANAGED=1
 fi
-gzip -c "${LOCAL_GTF_SUBSET}" > "${LOCAL_GTF_SUBSET_GZ}"
 if [[ ! -s "${LOCAL_GTF_SUBSET_GZ}" ]]; then
   echo "ERROR: Failed to gzip local GTF subset for ${TARGET_SNP}." >&2
   exit 1
 fi
+REMOTE_GTF_BASENAME="$(basename "${LOCAL_GTF_SUBSET_GZ}")"
 
 perl "${SCHEMA_INCLUDE_HELPER}" \
   --config "${SCHEMA_CONFIG_JSON}" \
@@ -819,6 +973,7 @@ perl "${RENDER_SAS_HELPER}" \
   --replace "LOCAL_WINDOW_BP=${LOCAL_WINDOW_BP}" \
   --replace "GTF_LABEL_SNPS=${GTF_LABEL_SNPS}" \
   --replace "OUTPUT_HTML=${OUTPUT_HTML_BASENAME}" \
+  --replace "OUTPUT_DONE=${OUTPUT_DONE_BASENAME}" \
   --replace "GWAS_DATASET=${GWAS_DATASET}" \
   --replace "TARGET_HIT_DATASET=${TARGET_HIT_DATASET}" \
   --replace "TARGET_LOCAL_DATASET=${TARGET_LOCAL_DATASET}" \
@@ -843,6 +998,14 @@ perl "${RENDER_SAS_HELPER}" \
   --replace-file "WIDE_IMPORT_BLOCK=${IMPORT_BLOCK_RENDERED}" \
   --replace-file "GTF_IMPORT_BLOCK=${GTF_IMPORT_BLOCK_RENDERED}"
 
+if [[ "${SINGLE_SNP_PREP_ONLY}" == "1" ]]; then
+  echo "[prep-only] Single-SNP SAS ODA inputs are ready; upload, submit, download, and remote cleanup were skipped."
+  echo "[prep-only] GWAS locus: ${DATA_GZ}"
+  echo "[prep-only] GTF subset: ${LOCAL_GTF_SUBSET_GZ}"
+  [[ -n "${SINGLE_SNP_TOP_HITS_CSV_BASENAME}" ]] && echo "[prep-only] Target CSV: ${WORKDIR}/${SINGLE_SNP_TOP_HITS_CSV_BASENAME}"
+  exit 0
+fi
+
 rm -f "${HTML_OUT}"
 
 upload_support_args=(--upload-file "${PATCHED_LATTICE_MACRO_SAS}" --upload-file "${LOCAL_GTF_SUBSET_GZ}" --upload-file "${DATA_GZ}")
@@ -864,8 +1027,12 @@ else
 fi
 oda_upload_many \
   "upload_single_snp_with_gtf_support_${stamp}" \
-  "${upload_support_args[@]}"
+  "${upload_support_args[@]}" \
+  --skip-upload-if-same \
+  --delete-file "${OUTPUT_HTML_BASENAME}" \
+  --delete-file "${OUTPUT_DONE_BASENAME}"
 echo "[1b/6] Bulk upload helper verified remote sizes for the complete upload manifest in the same SASPy connection."
+echo "[1c/6] Removed any previous remote HTML with the same basename before SAS submit."
 
 echo "[5/6] Running SAS single-SNP local Manhattan gene-track plot..."
 SINGLE_SNP_GTF_SUBMIT_MAX_ATTEMPTS="${SINGLE_SNP_GTF_SUBMIT_MAX_ATTEMPTS:-2}"
@@ -883,8 +1050,8 @@ while :; do
   if [[ "${single_snp_submit_rc}" -eq 0 ]] && ! single_snp_submit_needs_retry; then
     break
   fi
-  if [[ "${single_snp_submit_rc}" -ne 0 ]] && remote_home_file_exists "${OUTPUT_HTML_BASENAME}"; then
-    echo "[recover] The SAS helper exited with status ${single_snp_submit_rc}, but the remote HTML ${OUTPUT_HTML_BASENAME} already exists. Continuing with download and local recovery."
+  if [[ "${single_snp_submit_rc}" -ne 0 ]] && remote_home_file_exists "${OUTPUT_DONE_BASENAME}"; then
+    echo "[recover] The SAS helper exited with status ${single_snp_submit_rc}, but the current run wrote its completion marker ${OUTPUT_DONE_BASENAME}. Continuing with download and local recovery."
     break
   fi
   if [[ "${single_snp_submit_rc}" -ne 0 ]] && run_log_reports_missing_target_snp; then
@@ -943,6 +1110,10 @@ fi
 
 if [[ ! -s "${RAW_HTML_OUT}" ]]; then
   echo "ERROR: Expected downloaded HTML was not created or is empty: ${RAW_HTML_OUT}" >&2
+  exit 1
+fi
+if ! grep -Eiq '<(img|svg)([[:space:]>])' "${RAW_HTML_OUT}"; then
+  echo "ERROR: Downloaded SAS HTML has no rendered img/svg figure and will not be accepted: ${RAW_HTML_OUT}" >&2
   exit 1
 fi
 
