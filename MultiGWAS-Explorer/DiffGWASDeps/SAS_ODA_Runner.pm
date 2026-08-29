@@ -730,6 +730,52 @@ def delete_file(remote_file,remote_dir,session_obj):
     except Exception as e:
         return f"PYTHON ERROR : {str(e)}", session_obj
 
+def delete_files_bulk(items, session_obj):
+    """Delete and verify a manifest in one SASPy session and one SAS submit."""
+    session, session_obj = get_session(session_obj)
+    normalized = []
+    for index, item in enumerate(list(items or []), start=1):
+        remote_file = str(item.get('remote_file', '') or '')
+        remote_dir = str(item.get('remote_dir', '') or '')
+        remote_file, remote_dir = normalize_delete_target(remote_file, remote_dir, session_obj)
+        remote_path = join_remote_path(remote_dir, remote_file)
+        fileref = f"d{index:07d}"
+        normalized.append((fileref, remote_path))
+
+    if not normalized:
+        return [], session_obj
+
+    lines = []
+    for fileref, remote_path in normalized:
+        safe_path = remote_path.replace('"', '""')
+        lines.append(f'filename {fileref} "{safe_path}";')
+    lines.append('data _null_;')
+    for index, (fileref, _remote_path) in enumerate(normalized, start=1):
+        lines.append(f'  rc=fdelete("{fileref}");')
+        lines.append(f'  call symputx("_bulk_del_exists_{index}", fexist("{fileref}"), "G");')
+        lines.append(f'  call symputx("_bulk_del_rc_{index}", rc, "G");')
+    lines.append('run;')
+    for fileref, _remote_path in normalized:
+        lines.append(f'filename {fileref} clear;')
+
+    res = session.submit("\n".join(lines))
+    log = str((res or {}).get('LOG', ''))
+    results = []
+    still_present = []
+    for index, (_fileref, remote_path) in enumerate(normalized, start=1):
+        exists_text = str(session.symget(f'_bulk_del_exists_{index}') or '').strip()
+        rc_text = str(session.symget(f'_bulk_del_rc_{index}') or '').strip()
+        exists = exists_text not in ('', '0', '0.0', 'false', 'False', 'FALSE')
+        results.append({'remote_path': remote_path, 'exists': exists, 'delete_rc': rc_text})
+        if exists:
+            still_present.append(remote_path)
+    if still_present:
+        raise IOError(
+            'Remote file(s) still exist after bulk delete: ' + ', '.join(still_present)
+            + ('\n' + log if log else '')
+        )
+    return results, session_obj
+
 def resolve_remote_path(remote_filepath, session_obj):
     if remote_filepath.startswith('~/'):
         home = get_sas_home(session_obj)[0]
@@ -2984,6 +3030,8 @@ def _action_dispatch(action, payload):
             str(payload.get('remote_dir', '') or ''),
             session_obj,
         )
+    if action == 'bulk_delete':
+        return delete_files_bulk(list(payload.get('targets') or []), session_obj)
     if action == 'gethome':
         return get_sas_home(session_obj)
     raise RuntimeError(f"Unsupported nonpersistent action: {action}")
@@ -3798,6 +3846,26 @@ sub delete {
     );
     return $resp->{value} if $resp && ($resp->{status} // '') eq 'ok';
     return "PYTHON ERROR: " . ($resp->{error} // 'nonpersistent delete error');
+}
+
+sub delete_many {
+    my ($self, $targets) = @_;
+    $targets = [] unless ref($targets) eq 'ARRAY';
+    if ($self->{persistent} && $self->{session_id}) {
+        my @results;
+        for my $item (@{$targets}) {
+            $item = {} unless ref($item) eq 'HASH';
+            my $remote_file = $item->{remote_file} // '';
+            my $remote_dir  = $item->{remote_dir} // '';
+            my $msg = $self->delete($remote_file, $remote_dir);
+            return $msg if !defined($msg) || $msg =~ /^PYTHON ERROR:/;
+            push @results, { remote_file => $remote_file, remote_dir => $remote_dir };
+        }
+        return \@results;
+    }
+    my $resp = _run_nonpersistent_python_action('bulk_delete', { targets => $targets });
+    return $resp->{value} if $resp && ($resp->{status} // '') eq 'ok';
+    return "PYTHON ERROR: " . ($resp->{error} // 'nonpersistent bulk delete error');
 }
 
 sub get_sas_home_path {

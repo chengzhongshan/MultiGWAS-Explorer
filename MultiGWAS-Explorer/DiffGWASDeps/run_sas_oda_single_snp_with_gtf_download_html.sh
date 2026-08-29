@@ -282,19 +282,39 @@ if [[ -z "${ODA_DELETE_TIMEOUT_GRACE_SECONDS:-}" ]]; then
 fi
 INCLUDE_PREFLIGHT_STANDALONE_DEBUG="${INCLUDE_PREFLIGHT_STANDALONE_DEBUG:-0}"
 INCLUDE_PREFLIGHT_REFRESH_REMOTE="${INCLUDE_PREFLIGHT_REFRESH_REMOTE:-0}"
+# This fast runner uploads and explicitly includes its complete plotting macro
+# set. Avoid the unrelated global ~/Macros bootstrap unless a caller opts in.
+SAS_ODA_AUTOLOAD_MACROS="${SAS_ODA_AUTOLOAD_MACROS:-0}"
 export SAS_ODA_RUN_TIMEOUT_SECONDS="${SAS_ODA_RUN_TIMEOUT_SECONDS:-${SINGLE_SNP_GTF_SUBMIT_TIMEOUT_SECONDS}}"
 export SAS_ODA_RUN_TIMEOUT_GRACE_SECONDS="${SAS_ODA_RUN_TIMEOUT_GRACE_SECONDS:-${SINGLE_SNP_GTF_SUBMIT_TIMEOUT_GRACE_SECONDS}}"
+export SAS_ODA_AUTOLOAD_MACROS
 export STANDALONE_INCLUDE_TARGET_DEBUG="${INCLUDE_PREFLIGHT_STANDALONE_DEBUG}"
 export INCLUDE_PREFLIGHT_REFRESH_REMOTE
 
 cd "${WORKDIR}"
 
-ODA_HELPER_SCRIPT="${ODA_HELPER_SCRIPT:-${DEPS_DIR}/run_sas_codes_or_script_in_ODA.pl}"
-if [[ -f "${ODA_HELPER_SCRIPT}" ]]; then
-  ODA_PERL_BASE=(perl "${ODA_HELPER_SCRIPT}")
-else
-  ODA_PERL_BASE=(perl -S run_sas_codes_or_script_in_ODA.pl)
+if [[ -z "${ODA_HELPER_SCRIPT:-}" ]]; then
+  # The helper is installed at the pipeline root, not inside DiffGWASDeps.
+  # Never fall back to `perl -S` here: a different, older helper elsewhere in
+  # PATH can silently change session/transport behavior for a long ODA job.
+  for helper_candidate in \
+    "${WORKDIR}/run_sas_codes_or_script_in_ODA.pl" \
+    "${DEPS_DIR}/../run_sas_codes_or_script_in_ODA.pl"
+  do
+    if [[ -f "${helper_candidate}" ]]; then
+      ODA_HELPER_SCRIPT="${helper_candidate}"
+      break
+    fi
+  done
 fi
+if [[ -z "${ODA_HELPER_SCRIPT:-}" || ! -f "${ODA_HELPER_SCRIPT}" ]]; then
+  echo "ERROR: Cannot find the pipeline SAS ODA helper run_sas_codes_or_script_in_ODA.pl." >&2
+  echo "Set ODA_HELPER_SCRIPT to its absolute path; PATH fallback is intentionally disabled." >&2
+  exit 2
+fi
+ODA_PERL_BASE=(perl "${ODA_HELPER_SCRIPT}")
+echo "[helper] SAS ODA command helper: ${ODA_HELPER_SCRIPT}"
+echo "[helper] Global SAS macro bootstrap: ${SAS_ODA_AUTOLOAD_MACROS} (fast runner explicitly uploads/includes its required macros)"
 if [[ "${USE_PERSISTENT_SESSION}" == "1" ]]; then
   ODA_PERL=("${ODA_PERL_BASE[@]}" --persistent --session-id "${SESSION_ID}")
 else
@@ -473,6 +493,36 @@ manifest_metric_value() {
   awk -F '\t' -v key="${metric}" '$1==key{print $2; exit}' "${manifest_path}"
 }
 
+target_locus_from_csv() {
+  local csv_path="$1"
+  local target_snp="$2"
+  [[ -s "${csv_path}" ]] || return 1
+  perl -MText::ParseWords=parse_line -e '
+    use strict;
+    use warnings;
+    my ($path, $target) = @ARGV;
+    open my $fh, q{<}, $path or exit 1;
+    my $header = <$fh>;
+    exit 1 unless defined $header;
+    chomp $header;
+    $header =~ s/\r$//;
+    my @cols = parse_line(q{,}, 0, $header);
+    my %idx = map { $cols[$_] => $_ } 0 .. $#cols;
+    exit 1 unless exists $idx{SNP} && exists $idx{CHR} && exists $idx{BP};
+    while (my $line = <$fh>) {
+      chomp $line;
+      $line =~ s/\r$//;
+      my @f = parse_line(q{,}, 0, $line);
+      next unless defined $f[$idx{SNP}] && $f[$idx{SNP}] eq $target;
+      next unless defined $f[$idx{CHR}] && length $f[$idx{CHR}]
+               && defined $f[$idx{BP}] && $f[$idx{BP}] =~ /^\d+(?:\.0+)?$/;
+      print $f[$idx{CHR}], qq{\t}, $f[$idx{BP}], qq{\n};
+      exit 0;
+    }
+    exit 1;
+  ' "${csv_path}" "${target_snp}"
+}
+
 log_local_subset_target_summary_if_available() {
   [[ -n "${LOCAL_WIDE_MANIFEST:-}" && -s "${LOCAL_WIDE_MANIFEST}" ]] || return 0
   local found present missing count all_prefixes
@@ -490,7 +540,9 @@ log_local_subset_target_summary_if_available() {
 
 run_log_reports_missing_target_snp() {
   [[ -s "${RUN_LOG_FILE}" ]] || return 1
-  grep -Fq 'Target SNP &target_snp was not found in the uploaded GWAS subset.' "${RUN_LOG_FILE}"
+  # The submitted source is echoed into the SAS log, including the dormant
+  # %put statement. Only an unnumbered ERROR line proves that branch executed.
+  grep -Eiq '^ERROR:[[:space:]]+Target SNP .+ was not found in the uploaded GWAS subset\.' "${RUN_LOG_FILE}"
 }
 
 resolve_magick_bin() {
@@ -723,7 +775,8 @@ cleanup_remote_generated_outputs() {
 TARGET_CHR=""
 TARGET_BP=""
 
-mkdir -p "${LOCAL_GTF_REUSE_CACHE_DIR}"
+mkdir -p "${GTF_CACHE_DIR}" "${LOCAL_GTF_REUSE_CACHE_DIR}"
+echo "[prep] Shared full-GTF BGZF/tabix cache: ${GTF_CACHE_DIR}"
 SAFE_LOCAL_WINDOW_BP="$(printf '%s' "${LOCAL_WINDOW_BP}" | tr -c 'A-Za-z0-9._-' '_')"
 if [[ -z "${DATA_GZ}" && -n "${GENOME_WIDE_DATA_GZ_FOR_LOOKUP}" ]]; then
   shared_locus_dir="$(dirname "${GENOME_WIDE_DATA_GZ_FOR_LOOKUP}")"
@@ -759,6 +812,16 @@ if [[ -z "${DATA_GZ}" ]]; then
   fi
 fi
 
+if [[ -z "${DATA_GZ}" && (-z "${TARGET_CHR}" || -z "${TARGET_BP}") && -n "${SINGLE_SNP_TOP_HITS_CSV_BASENAME}" ]]; then
+  existing_target_csv="${WORKDIR}/${SINGLE_SNP_TOP_HITS_CSV_BASENAME}"
+  existing_target_locus="$(target_locus_from_csv "${existing_target_csv}" "${TARGET_SNP}" || true)"
+  if [[ -n "${existing_target_locus}" ]]; then
+    TARGET_CHR="$(printf '%s\n' "${existing_target_locus}" | awk -F '\t' 'NR==1{print $1}')"
+    TARGET_BP="$(printf '%s\n' "${existing_target_locus}" | awk -F '\t' 'NR==1{print $2}')"
+    echo "[prep] Recovered target coordinates from the existing target-SNP CSV; full SNP lookup scan skipped: ${TARGET_SNP} chr${TARGET_CHR}:${TARGET_BP}"
+  fi
+fi
+
 if [[ -z "${DATA_GZ}" ]]; then
   if [[ -z "${EXTRACTOR_CONFIG_JSON}" && ! -s "${SOURCE_LONG_GZ}" ]]; then
     echo "ERROR: SOURCE_LONG_GZ does not exist or is empty: ${SOURCE_LONG_GZ}" >&2
@@ -774,6 +837,9 @@ if [[ -z "${DATA_GZ}" ]]; then
   helper_cmd=(perl "${LOCAL_WIDE_HELPER}" --target-snp "${TARGET_SNP}" --window-bp "${LOCAL_WINDOW_BP}" --output-dir "${WORKDIR}" --input "${SOURCE_LONG_GZ}" --output "${single_cache_base}.tsv.gz" --manifest "${single_cache_base}.manifest.tsv")
   if [[ -s "${SCHEMA_CONFIG_JSON}" ]]; then
     helper_cmd+=(--config "${SCHEMA_CONFIG_JSON}")
+  fi
+  if [[ -n "${TARGET_CHR}" && -n "${TARGET_BP}" ]]; then
+    helper_cmd+=(--target-chr "${TARGET_CHR}" --target-bp "${TARGET_BP}")
   fi
   helper_out="$("${helper_cmd[@]}")"
 
@@ -918,7 +984,8 @@ REGION_END="$(
     "${TARGET_BP}" "${LOCAL_WINDOW_BP}"
 )"
 
-single_gtf_cache_base="${LOCAL_GTF_REUSE_CACHE_DIR}/single_snp_gtf_${REFERENCE_BUILD}_${SAFE_TARGET_SNP}_chr${TARGET_CHR}_${REGION_START}_${REGION_END}_npc${LOCAL_GTF_INCLUDE_NON_PROTEIN_CODING_GENES}"
+GTF_SOURCE_CACHE_TAG="$(perl -MDigest::MD5=md5_hex -e 'print substr(md5_hex($ARGV[0]), 0, 12)' "${REFERENCE_BUILD}|${GTF_GZ_URL}")"
+single_gtf_cache_base="${LOCAL_GTF_REUSE_CACHE_DIR}/single_snp_gtf_${REFERENCE_BUILD}_src${GTF_SOURCE_CACHE_TAG}_${SAFE_TARGET_SNP}_chr${TARGET_CHR}_${REGION_START}_${REGION_END}_npc${LOCAL_GTF_INCLUDE_NON_PROTEIN_CODING_GENES}"
 if [[ -s "${single_gtf_cache_base}.tsv.gz" ]]; then
   LOCAL_GTF_SUBSET="${single_gtf_cache_base}.tsv"
   LOCAL_GTF_SUBSET_GZ="${single_gtf_cache_base}.tsv.gz"

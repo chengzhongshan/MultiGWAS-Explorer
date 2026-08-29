@@ -340,12 +340,18 @@ sub chromosome_sort {
 sub prepare_bgzf_gtf {
     my (%args) = @_;
     my $source = $args{source};
-    return $source if -s "$source.tbi";
+    if (-s "$source.tbi") {
+        my $source_mtime = (stat($source))[9] // 0;
+        my $source_index_mtime = (stat("$source.tbi"))[9] // 0;
+        if ($source_index_mtime >= $source_mtime) {
+            print STDERR "[tabix] Reusing indexed source GTF: $source\n";
+            return $source;
+        }
+    }
 
     my $indexed = $source;
     $indexed =~ s/\.gz$/.bgz/i;
     $indexed .= '.bgz' if $indexed eq $source;
-    print STDERR "[tabix] Preparing BGZF GTF cache and index: $indexed, compared it with $source\n";
     my $lock_path = "$indexed.lock";
     open my $lock, '>>', $lock_path
       or die "[tabix] Cannot open index lock $lock_path: $!\n";
@@ -357,6 +363,7 @@ sub prepare_bgzf_gtf {
     my $index_mtime = -s "$indexed.tbi" ? ((stat("$indexed.tbi"))[9] // 0) : 0;
     if (-s $indexed && -s "$indexed.tbi"
         && $indexed_mtime >= $source_mtime && $index_mtime >= $indexed_mtime) {
+        print STDERR "[tabix] Reusing BGZF GTF cache and index: $indexed\n";
         close $lock;
         return $indexed;
     }
@@ -365,7 +372,7 @@ sub prepare_bgzf_gtf {
     my $tmp_tbi = "$tmp_bgz.tbi";
     unlink $tmp_bgz if -e $tmp_bgz;
     unlink $tmp_tbi if -e $tmp_tbi;
-    print STDERR "[tabix] Building one-time BGZF GTF cache and index: $indexed\n";
+    print STDERR "[tabix] Building one-time BGZF GTF cache and index: $indexed (source: $source)\n";
 
     # Some GTFs (notably GENCODE's "liftXX" builds) preserve the line order
     # of the genome build they were lifted FROM, so they are not sorted by

@@ -150,9 +150,13 @@ my $artifact_stem = $spec->{artifact_stem} || $spec->{project_tag} || 'diff_gwas
 my $workdir_local = resolve_portable_workdir($spec->{workdir} || $Bin, $Bin);
 my $configs_dir_local = File::Spec->catdir($workdir_local, 'configs');
 my $output_dir_local = localize_path($spec->{output_dir} || $spec->{input_dir} || $Bin);
+my $shared_gtf_cache_local = localize_path(
+    $spec->{gtf_cache_dir} || File::Spec->catdir($workdir_local, 'cache', 'gtf')
+);
 
 make_path($configs_dir_local) unless -d $configs_dir_local;
 make_path($output_dir_local) unless -d $output_dir_local;
+make_path($shared_gtf_cache_local) unless -d $shared_gtf_cache_local;
 
 my $runner_config_local = File::Spec->catfile($configs_dir_local, "auto_${artifact_stem}_runner.json");
 my $preset_config_local = File::Spec->catfile($configs_dir_local, "auto_${artifact_stem}_preset.json");
@@ -308,6 +312,7 @@ if ($requested{plot_local_manhattan}) {
             with_gtf     => 0,
             source_long  => ($indexed_source_long_local || localize_path($runner->{SOURCE_LONG_GZ} || '')),
             preset_config=> $preset_config_local,
+            gtf_cache_dir => $shared_gtf_cache_local,
             top_csv_name => gunplotize_name($runner->{LOCAL_TOP_HITS_CSV_BASENAME} || 'gunplot_top_hits.csv'),
             force       => $force,
         ),
@@ -338,6 +343,7 @@ if ($requested{plot_local_gtf}) {
             with_gtf     => 1,
             source_long  => ($indexed_source_long_local || localize_path($runner->{SOURCE_LONG_GZ} || '')),
             preset_config=> $preset_config_local,
+            gtf_cache_dir => $shared_gtf_cache_local,
             top_csv_name => gunplotize_name($runner->{LOCAL_TOP_HITS_CSV_BASENAME} || 'gunplot_top_hits.csv'),
             force       => $force,
         ),
@@ -780,7 +786,8 @@ sub plot_local_series {
     my @parts;
     my $batch_size = $args{batch_size} || scalar(@{ $args{hits} }) || 1;
     my $panel_columns = $args{panel_columns} || 0;
-    my $cache_dir = File::Spec->catfile($args{output_dir}, '.gunplot_gtf_cache');
+    my $cache_dir = $args{gtf_cache_dir}
+        || File::Spec->catfile($args{output_dir}, '.gunplot_gtf_cache');
     make_path($cache_dir) unless -d $cache_dir;
     my $n_hits = scalar @{ $args{hits} };
     my $locus_sources = prepare_locus_wide_sources(

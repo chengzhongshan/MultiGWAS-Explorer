@@ -399,7 +399,8 @@ export SAS_ODA_RUN_TIMEOUT_GRACE_SECONDS="${SAS_ODA_RUN_TIMEOUT_GRACE_SECONDS:-$
 export STANDALONE_INCLUDE_TARGET_DEBUG="${INCLUDE_PREFLIGHT_STANDALONE_DEBUG}"
 export INCLUDE_PREFLIGHT_REFRESH_REMOTE="${INCLUDE_PREFLIGHT_REFRESH_REMOTE}"
 
-mkdir -p "${LOCAL_GTF_REUSE_CACHE_DIR}"
+mkdir -p "${GTF_CACHE_DIR}" "${LOCAL_GTF_REUSE_CACHE_DIR}"
+echo "[prep] Shared full-GTF BGZF/tabix cache: ${GTF_CACHE_DIR}"
 
 LOCAL_GTF_SUBSET_CACHE_MANAGED=0
 TARGET_SNP_AUG_CACHE_MANAGED=0
@@ -1395,29 +1396,22 @@ elif [[ -n "${VERIFY_TOP_HITS_TSV}" && -s "${VERIFY_TOP_HITS_TSV}" ]]; then
 fi
 
 if [[ ${#gtf_region_args[@]} -gt 0 ]]; then
-  local_gft_region_hash_input_file=""
-  if [[ -n "${gtf_region_source}" && -s "${gtf_region_source}" ]]; then
-    local_gft_region_hash_input_file="${gtf_region_source}"
-  fi
-  if [[ -n "${local_gft_region_hash_input_file}" ]]; then
-    gtf_region_key="$(
-      stable_hash_text \
-        "${PROJECT_TAG}" \
-        "${LOCAL_GTF_WINDOW_BP}" \
-        "${LOCAL_GTF_INCLUDE_NON_PROTEIN_CODING_GENES}" \
-        "${GTF_GZ_URL}" \
-        "$(stable_hash_file "${local_gft_region_hash_input_file}")"
-    )"
-  else
-    gtf_region_key="$(
-      stable_hash_text \
-        "${PROJECT_TAG}" \
-        "${LOCAL_GTF_WINDOW_BP}" \
-        "${LOCAL_GTF_INCLUDE_NON_PROTEIN_CODING_GENES}" \
-        "${GTF_GZ_URL}" \
-        "${gtf_region_args[*]}"
-    )"
-  fi
+  canonical_gtf_regions="$(
+    for ((gtf_arg_i=0; gtf_arg_i<${#gtf_region_args[@]}; gtf_arg_i++)); do
+      if [[ "${gtf_region_args[$gtf_arg_i]}" == "--region" && $((gtf_arg_i + 1)) -lt ${#gtf_region_args[@]} ]]; then
+        printf '%s\n' "${gtf_region_args[$((gtf_arg_i + 1))]}"
+      fi
+    done | sort -u
+  )"
+  gtf_region_key="$(
+    stable_hash_text \
+      "${PROJECT_TAG}" \
+      "${REFERENCE_BUILD}" \
+      "${LOCAL_GTF_WINDOW_BP}" \
+      "${LOCAL_GTF_INCLUDE_NON_PROTEIN_CODING_GENES}" \
+      "${GTF_GZ_URL}" \
+      "${canonical_gtf_regions}"
+  )"
   gtf_subset_cache_base="${LOCAL_GTF_REUSE_CACHE_DIR}/local_gtf_subset_${SAFE_PROJECT_TAG}_${gtf_region_key}"
   if [[ -s "${gtf_subset_cache_base}.tsv.gz" ]]; then
     LOCAL_GTF_SUBSET="${gtf_subset_cache_base}.tsv"

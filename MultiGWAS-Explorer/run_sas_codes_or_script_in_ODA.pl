@@ -3301,7 +3301,7 @@ if (@download_files) {
 
 if (@delete_files || @delete_file_rgxs) {
     my @all_delete_targets = @delete_files;
-    my $delete_runner = (!$persistent && (@delete_file_rgxs || @all_delete_targets > 1))
+    my $delete_runner = (!$persistent && @delete_file_rgxs)
       ? transient_batch_fileops_runner()
       : undef;
     if (@delete_file_rgxs) {
@@ -3340,8 +3340,26 @@ if (@delete_files || @delete_file_rgxs) {
         }
         @all_delete_targets = sort keys %selected;
     }
-    for my $target (@all_delete_targets) {
-        delete_one_file($target, $delete_dir, $delete_runner);
+    print "Bulk delete manifest: " . scalar(@all_delete_targets) . " file(s); using one SASPy session and one SAS submit.\n";
+    my @delete_items = map {
+        +{ remote_file => $_, remote_dir => $delete_dir }
+    } @all_delete_targets;
+    my $delete_results = run_with_possible_fallback(
+        'bulk delete',
+        sub {
+            my ($active_runner) = @_;
+            return $active_runner->delete_many(\@delete_items);
+        },
+    );
+    if (!ref($delete_results) || ref($delete_results) ne 'ARRAY') {
+        my $msg = defined($delete_results) ? $delete_results : 'unknown bulk delete error';
+        die "Bulk delete failed: $msg\n";
+    }
+    for my $item (@{$delete_results}) {
+        my $path = ref($item) eq 'HASH'
+          ? ($item->{remote_path} // $item->{remote_file} // '')
+          : '';
+        print "Deleted/verified remote file: $path\n" if length $path;
     }
 }
 

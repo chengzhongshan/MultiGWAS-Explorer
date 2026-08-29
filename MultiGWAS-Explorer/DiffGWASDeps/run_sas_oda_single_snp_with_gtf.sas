@@ -282,11 +282,12 @@ ods html5 close;
 
 /* The HTML file is created when ODS opens, so its existence alone does not
    prove that the plot finished. Write this marker only after ODS closes. */
-filename _plotdone "~/&done_outfile" encoding="utf-8";
+/* SAS filerefs are limited to eight characters. */
+filename _pdone "~/&done_outfile" encoding="utf-8";
 data _null_;
-  file _plotdone;
+  file _pdone;
   put "status=complete";
   put "target_snp=&target_snp";
   put "html=&html_outfile";
 run;
-filename _plotdone clear;
+filename _pdone clear;
