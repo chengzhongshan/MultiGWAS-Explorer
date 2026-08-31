@@ -115,6 +115,10 @@ machine-readable run results, preflight metadata, scoring limitations, and the
 failed-prompt audit. It excludes UK Biobank requests and the time-consuming
 F03 forced-preprocessing family.
 
+The mapping from these versioned artifacts to Supplementary Tables S1-S12,
+Supplementary File S1, and Supplementary Figures S1-S3 is recorded in
+`RESUBMISSION_DOCUMENT_MAP.md`.
+
 ## LD-clumped top-hit selection
 
 The revised SAS top-hit stage ranks MAF-passing candidates by their applicable
