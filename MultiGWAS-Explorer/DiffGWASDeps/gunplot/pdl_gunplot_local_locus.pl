@@ -17,6 +17,13 @@ Options:
   --pcols A,B,C            Required.
   --zcols A,B,C            Optional z-score columns for color mapping.
   --labels A|B|C           Optional display labels.
+  --label-snps A,B,C       Ordered SNPs to mark and label at the top. The first
+                           SNP remains the locus center supplied by --snp.
+  --ld-snps A,B,C          Optional SNPs in LD with the query SNP(s). Matching
+                           scatter points are overlaid with the selected marker.
+  --ld-marker-symbol NAME  star, plus, cross, circle, square, triangle, diamond
+                           (default: star).
+  --ld-marker-color COLOR  Named or #RRGGBB color (default: black).
   --title TEXT             Optional title.
   --gtf FILE.tsv           Optional extracted GTF subset TSV.
   --width N                Default: 1500
@@ -38,6 +45,8 @@ my %opt = (
     gnuplot  => 'gnuplot',
     title    => '',
     hide_y_axis => 0,
+    ld_marker_symbol => 'star',
+    ld_marker_color  => 'black',
 );
 
 GetOptions(
@@ -48,6 +57,10 @@ GetOptions(
     'pcols=s'      => \$opt{pcols},
     'zcols=s'      => \$opt{zcols},
     'labels=s'     => \$opt{labels},
+    'label-snps=s' => \$opt{label_snps},
+    'ld-snps=s'    => \$opt{ld_snps},
+    'ld-marker-symbol=s' => \$opt{ld_marker_symbol},
+    'ld-marker-color=s'  => \$opt{ld_marker_color},
     'title=s'      => \$opt{title},
     'gtf=s'        => \$opt{gtf},
     'width=i'      => \$opt{width},
@@ -62,11 +75,35 @@ GetOptions(
 
 die usage() unless $opt{data} && $opt{snp} && $opt{out_prefix} && $opt{window_bp} && $opt{pcols};
 die "Input file not found: $opt{data}\n" unless -s $opt{data};
+my $ld_point_type = ld_marker_point_type($opt{ld_marker_symbol});
+die "--ld-marker-color must be a named color or #RRGGBB\n"
+    unless $opt{ld_marker_color} =~ /^(?:#[0-9A-Fa-f]{6}|[A-Za-z][A-Za-z0-9_-]*)$/;
 
 my @pcols = grep { length } map { trim($_) } split /,/, $opt{pcols};
 my @zcols = grep { length } map { trim($_) } split /,/, ($opt{zcols} // '');
 my @labels = map { nice_label(trim($_)) } split /\|/, ($opt{labels} // '');
 @labels = map { nice_label($_) } @pcols unless @labels == @pcols;
+my @label_snps;
+my %seen_label_snp;
+for my $snp (split /,/, ($opt{label_snps} // $opt{snp})) {
+    $snp = trim($snp);
+    next unless length $snp;
+    next if $seen_label_snp{lc $snp}++;
+    push @label_snps, $snp;
+}
+@label_snps = ($opt{snp}) unless @label_snps;
+unshift @label_snps, $opt{snp}
+    unless grep { lc($_) eq lc($opt{snp}) } @label_snps;
+my %is_label_snp = map { lc($_) => 1 } @label_snps;
+my @ld_snps;
+my %is_ld_snp;
+for my $snp (split /,/, ($opt{ld_snps} // '')) {
+    $snp = trim($snp);
+    next unless length $snp;
+    next if $is_label_snp{lc $snp};
+    next if $is_ld_snp{lc $snp}++;
+    push @ld_snps, $snp;
+}
 my $has_gtf = $opt{gtf} && -s $opt{gtf};
 
 my $plot_tsv = "$opt{out_prefix}.plot.tsv";
@@ -99,6 +136,7 @@ for my $need ('CHR', 'BP', 'SNP') {
 }
 
 my ($target_chr, $target_bp, @window_rows);
+my %requested_snp_position;
 while (my $line = <$fh>) {
     chomp $line;
     $line =~ s/\r$//;
@@ -108,9 +146,12 @@ while (my $line = <$fh>) {
     my $bp  = numeric($f[ $idx{BP} ]);
     my $snp = $f[ $idx{SNP} ] // '';
     next unless length($chr) && defined $bp && length($snp);
-    if (!defined $target_chr && $snp eq $opt{snp}) {
+    if (!defined $target_chr && lc($snp) eq lc($opt{snp})) {
         $target_chr = $chr;
         $target_bp  = $bp;
+    }
+    if ($is_label_snp{lc $snp} && !exists $requested_snp_position{lc $snp}) {
+        $requested_snp_position{lc $snp} = { snp => $snp, chr => $chr, bp => $bp };
     }
     push @window_rows, \@f;
 }
@@ -132,10 +173,20 @@ my @locus = grep {
     numeric($_->[ $idx{BP} ]) <= $end
 } @window_rows;
 die "No rows found in locus window for $opt{snp}\n" unless @locus;
+my @target_markers;
+for my $requested (@label_snps) {
+    my $marker = $requested_snp_position{lc $requested};
+    die "Label SNP $requested was not found in $opt{data}\n" unless $marker;
+    die "Label SNP $requested is outside the plotted chromosome/window centered on $opt{snp}\n"
+        unless $marker->{chr} eq $target_chr && $marker->{bp} >= $start && $marker->{bp} <= $end;
+    push @target_markers, { snp => $requested, bp => $marker->{bp} };
+}
 
 open my $pt, '>', $plot_tsv or die "Cannot write $plot_tsv: $!\n";
-print {$pt} join("\t", qw(BP Y TRACK LOGP IS_TARGET SNP COLORVAL)), "\n";
+print {$pt} join("\t", qw(BP Y TRACK LOGP IS_TARGET SNP COLORVAL IS_LD)), "\n";
 my $kept_points = 0;
+my $ld_points = 0;
+my %found_ld_snp;
 my $has_zcols = @resolved_zcols == @resolved_pcols ? 1 : 0;
 for my $row (@locus) {
     my $bp  = numeric($row->[ $idx{BP} ]);
@@ -147,13 +198,18 @@ for my $row (@locus) {
         next unless defined $logp;
         my $capped = $logp > $opt{top_logp} ? $opt{top_logp} : $logp;
         my $y = $track_i * $opt{top_logp} + $capped;
-        my $is_target = ($snp eq $opt{snp}) ? 1 : 0;
+        my $is_target = $is_label_snp{lc $snp} ? 1 : 0;
+        my $is_ld = $is_ld_snp{lc $snp} ? 1 : 0;
+        if ($is_ld) {
+            $ld_points++;
+            $found_ld_snp{lc $snp} = $snp;
+        }
         my $colorval = $track_i + 1;
         if ($has_zcols) {
             my $z = extract_requested_numeric($resolved_zcols[$track_i], $row, \%idx);
             $colorval = defined $z ? cap_num($z, -8, 8) : 0;
         }
-        print {$pt} join("\t", $bp, sprintf('%.4f', $y), $track_i, sprintf('%.6f', $logp), $is_target, $snp, sprintf('%.4f', $colorval)), "\n";
+        print {$pt} join("\t", $bp, sprintf('%.4f', $y), $track_i, sprintf('%.6f', $logp), $is_target, $snp, sprintf('%.4f', $colorval), $is_ld), "\n";
         $kept_points++;
     }
 }
@@ -248,6 +304,11 @@ write_gnuplot(
     snp         => $opt{snp},
     target_chr  => $target_chr,
     target_bp   => $target_bp,
+    target_markers => \@target_markers,
+    ld_points    => $ld_points,
+    ld_marker_symbol => lc($opt{ld_marker_symbol}),
+    ld_marker_point_type => $ld_point_type,
+    ld_marker_color => $opt{ld_marker_color},
     gene_height => $gene_height,
     use_zcolors => ($has_gtf && $has_zcols ? 1 : 0),
     colorbar_label => infer_effect_metric_label_from_cols(@resolved_zcols),
@@ -258,7 +319,7 @@ system($opt{gnuplot}, $gp_file) == 0
 
 open my $mf, '>', $manifest or die "Cannot write $manifest: $!\n";
 print {$mf} join("\t", qw(METRIC VALUE)), "\n";
-print {$mf} join("\t", 'cache_schema', 2), "\n";
+print {$mf} join("\t", 'cache_schema', 3), "\n";
 print {$mf} join("\t", 'input', $opt{data}), "\n";
 print {$mf} join("\t", 'png', $png_file), "\n";
 print {$mf} join("\t", 'plot_tsv', $plot_tsv), "\n";
@@ -266,6 +327,13 @@ print {$mf} join("\t", 'gene_tsv', ($has_gtf ? $gene_tsv : '')), "\n";
 print {$mf} join("\t", 'gtf', ($has_gtf ? $opt{gtf} : '')), "\n";
 print {$mf} join("\t", 'has_gtf', ($has_gtf ? 1 : 0)), "\n";
 print {$mf} join("\t", 'snp', $opt{snp}), "\n";
+print {$mf} join("\t", 'label_snps', join(',', @label_snps)), "\n";
+print {$mf} join("\t", 'label_snp_positions', join(',', map { $_->{snp} . ':' . $_->{bp} } @target_markers)), "\n";
+print {$mf} join("\t", 'ld_snps', join(',', @ld_snps)), "\n";
+print {$mf} join("\t", 'ld_snps_found', join(',', map { $found_ld_snp{$_} } sort keys %found_ld_snp)), "\n";
+print {$mf} join("\t", 'ld_points_plotted', $ld_points), "\n";
+print {$mf} join("\t", 'ld_marker_symbol', lc($opt{ld_marker_symbol})), "\n";
+print {$mf} join("\t", 'ld_marker_color', $opt{ld_marker_color}), "\n";
 print {$mf} join("\t", 'chr', $target_chr), "\n";
 print {$mf} join("\t", 'bp', $target_bp), "\n";
 print {$mf} join("\t", 'window_bp', $window_bp), "\n";
@@ -321,7 +389,11 @@ sub write_gnuplot {
         print {$gp} "set mytics 2\n";
     }
     my $refline_ymax = ($args{gene_tsv} && -s $args{gene_tsv}) ? $ymax : 0;
-    print {$gp} "set arrow 1 from $args{target_bp},$ymin to $args{target_bp},$refline_ymax nohead lc rgb '#a0a0a0' dt 2 lw 1\n";
+    my $target_arrow_id = 1;
+    for my $marker (@{ $args{target_markers} || [{ snp => $args{snp}, bp => $args{target_bp} }] }) {
+        print {$gp} "set arrow $target_arrow_id from $marker->{bp},$ymin to $marker->{bp},$refline_ymax nohead lc rgb '#a0a0a0' dt 2 lw 1\n";
+        $target_arrow_id++;
+    }
 
     my $arrow_id = 10;
     for my $i (0 .. $#{ $args{labels} }) {
@@ -331,6 +403,9 @@ sub write_gnuplot {
         next unless $i > 0;
         print {$gp} "set arrow $arrow_id from $args{start},$base to $args{end},$base nohead lc rgb '#bbbbbb' lw 1\n";
         $arrow_id++;
+    }
+    if ($args{ld_points}) {
+        print {$gp} "set label 900 '" . escape_gp("LD-linked SNP (" . $args{ld_marker_symbol} . ")") . "' at graph 0.015,0.985 left front tc rgb '" . escape_gp($args{ld_marker_color}) . "' font ',9'\n";
     }
     for my $i (0 .. $#{ $args{labels} }) {
         my $base = $i * $args{top_logp};
@@ -393,8 +468,40 @@ sub write_gnuplot {
     }
 
     if ($args{gene_tsv} && -s $args{gene_tsv}) {
-        my $label_y = $ymax - 0.4;
-        print {$gp} "set label 1 \"" . escape_gp($args{snp}) . "\" at $args{target_bp},$label_y center font ',10'\n";
+        my @markers = sort { $a->{bp} <=> $b->{bp} } @{ $args{target_markers} || [{ snp => $args{snp}, bp => $args{target_bp} }] };
+        my $plot_span = $args{end} - $args{start};
+        my $edge_pad = $plot_span * 0.06;
+        my $min_gap = $plot_span * 0.12;
+        if (@markers > 1) {
+            my $fit_gap = ($plot_span - 2 * $edge_pad) / (@markers - 1);
+            $min_gap = $fit_gap if $fit_gap < $min_gap;
+        }
+        my @label_x = map { $_->{bp} } @markers;
+        for my $i (1 .. $#label_x) {
+            my $needed = $label_x[$i - 1] + $min_gap;
+            $label_x[$i] = $needed if $label_x[$i] < $needed;
+        }
+        my $right_limit = $args{end} - $edge_pad;
+        if (@label_x && $label_x[-1] > $right_limit) {
+            $label_x[-1] = $right_limit;
+            for (my $i = $#label_x - 1; $i >= 0; $i--) {
+                my $needed = $label_x[$i + 1] - $min_gap;
+                $label_x[$i] = $needed if $label_x[$i] > $needed;
+            }
+        }
+        my $left_limit = $args{start} + $edge_pad;
+        if (@label_x && $label_x[0] < $left_limit) {
+            my $shift = $left_limit - $label_x[0];
+            $_ += $shift for @label_x;
+        }
+        my $label_y = $ymax - 0.22;
+        my $leader_y = $ymax - 0.85;
+        for my $i (0 .. $#markers) {
+            my $label_id = 1 + $i;
+            my $leader_id = 500 + $i;
+            print {$gp} "set arrow $leader_id from $markers[$i]{bp},$leader_y to $label_x[$i]," . ($label_y - 0.12) . " nohead lc rgb '#777777' dt 3 lw 1 front\n";
+            print {$gp} "set label $label_id \"" . escape_gp($markers[$i]{snp}) . "\" at $label_x[$i],$label_y center font ',10' front\n";
+        }
         print {$gp} "set xlabel 'Chromosome " . escape_gp($args{target_chr}) . "'\n";
         if ($args{use_zcolors}) {
             print {$gp} "set cbrange [-8:8]\n";
@@ -402,14 +509,18 @@ sub write_gnuplot {
             print {$gp} "set cblabel '" . escape_gp($args{colorbar_label} || 'Effect metric') . "'\n";
             print {$gp} "set colorbox vertical user origin 0.94,0.12 size 0.02,0.76\n";
             print {$gp} "set palette defined (-8 '#63d67f', -4 '#63d8d2', 0 '#ffbf00', 4 '#ff5b00', 8 '#df1f2d')\n";
-            print {$gp} "plot '" . escape_gp($args{plot_tsv}) . "' using 1:2:7 with points pt 7 ps 0.72 lc palette\n";
+            my @plots = ("'" . escape_gp($args{plot_tsv}) . "' using 1:2:7 with points pt 7 ps 0.72 lc palette");
+            push @plots, "'" . escape_gp($args{plot_tsv}) . "' using ((\$8==1)?\$1:1/0):2 with points pt $args{ld_marker_point_type} ps 1.8 lw 2 lc rgb '" . escape_gp($args{ld_marker_color}) . "'" if $args{ld_points};
+            print {$gp} "plot " . join(', ', @plots) . "\n";
         }
         else {
             my @palette = sas_chr_palette();
             print {$gp} "set palette maxcolors " . scalar(@palette) . " defined (" .
                 join(', ', map { sprintf('%d "%s"', $_ + 1, $palette[$_]) } 0 .. $#palette) . ")\n";
             print {$gp} "unset colorbox\n";
-            print {$gp} "plot '" . escape_gp($args{plot_tsv}) . "' using 1:2:(\$3+1) with points pt 7 ps 0.72 lc palette\n";
+            my @plots = ("'" . escape_gp($args{plot_tsv}) . "' using 1:2:(\$3+1) with points pt 7 ps 0.72 lc palette");
+            push @plots, "'" . escape_gp($args{plot_tsv}) . "' using ((\$8==1)?\$1:1/0):2 with points pt $args{ld_marker_point_type} ps 1.8 lw 2 lc rgb '" . escape_gp($args{ld_marker_color}) . "'" if $args{ld_points};
+            print {$gp} "plot " . join(', ', @plots) . "\n";
         }
     }
     else {
@@ -424,7 +535,9 @@ sub write_gnuplot {
             print {$gp} "set label 2 \"" . escape_gp($gene_label) . "\" at " . ($args{target_bp} + $label_dx) . ",$label_y center rotate by 90 font '" . italic_font_spec_gp(11) . "'\n";
         }
         print {$gp} "unset colorbox\n";
-        print {$gp} "plot '" . escape_gp($args{plot_tsv}) . "' using 1:2 with points pt 7 ps 0.9 lc rgb '" . escape_gp($chr_color) . "'\n";
+        my @plots = ("'" . escape_gp($args{plot_tsv}) . "' using 1:2 with points pt 7 ps 0.9 lc rgb '" . escape_gp($chr_color) . "'");
+        push @plots, "'" . escape_gp($args{plot_tsv}) . "' using ((\$8==1)?\$1:1/0):2 with points pt $args{ld_marker_point_type} ps 1.8 lw 2 lc rgb '" . escape_gp($args{ld_marker_color}) . "'" if $args{ld_points};
+        print {$gp} "plot " . join(', ', @plots) . "\n";
     }
     close $gp or die "Cannot close $args{gp_file}: $!\n";
 }
@@ -649,6 +762,35 @@ sub safe_neglog10 {
     my $num = numeric($value);
     return undef unless defined $num && $num > 0;
     return -log($num) / log(10);
+}
+
+sub ld_marker_point_type {
+    my ($name) = @_;
+    $name = lc(trim($name || 'star'));
+    my %point_type = (
+        plus     => 1,
+        cross    => 2,
+        star     => 3,
+        square   => 5,
+        circle   => 7,
+        triangle => 9,
+        diamond  => 13,
+    );
+    die "Unsupported --ld-marker-symbol '$name'; use star, plus, cross, circle, square, triangle, or diamond\n"
+        unless exists $point_type{$name};
+    return $point_type{$name};
+}
+
+sub ld_marker_legend_text {
+    my ($name) = @_;
+    $name = lc($name || 'star');
+    return '+' if $name eq 'plus';
+    return 'x' if $name eq 'cross';
+    return 'o' if $name eq 'circle';
+    return 's' if $name eq 'square';
+    return '^' if $name eq 'triangle';
+    return 'd' if $name eq 'diamond';
+    return '*';
 }
 
 sub nice_label {

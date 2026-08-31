@@ -3,6 +3,13 @@ set -euo pipefail
 
 DEPS_DIR="${DEPS_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)}"
 WORKDIR="${WORKDIR:-$(cd "${DEPS_DIR}/.." && pwd -P)}"
+SAS_ODA_FAILURE_GUARD="${SAS_ODA_FAILURE_GUARD:-${DEPS_DIR}/sas_oda_failure_guard.sh}"
+if [[ ! -r "${SAS_ODA_FAILURE_GUARD}" ]]; then
+  echo "ERROR: Required SAS ODA failure guard is unavailable: ${SAS_ODA_FAILURE_GUARD}" >&2
+  exit 2
+fi
+# shellcheck source=sas_oda_failure_guard.sh
+source "${SAS_ODA_FAILURE_GUARD}"
 RUNNER_CONFIG_JSON="${RUNNER_CONFIG_JSON:-}"
 CALLER_LOCAL_GTF_WINDOW_BP="${LOCAL_GTF_WINDOW_BP-__UNSET__}"
 CALLER_LOCAL_GTF_INCLUDE_NON_PROTEIN_CODING_GENES="${LOCAL_GTF_INCLUDE_NON_PROTEIN_CODING_GENES-__UNSET__}"
@@ -218,6 +225,24 @@ GTF_YAXIS_OFFSET4MAX="${GTF_YAXIS_OFFSET4MAX:-}"
 GTF_YOFFSET4TEXTLABELS="${GTF_YOFFSET4TEXTLABELS:-2.5}"
 GTF_YOFFSET4MAX_DRAWMARKERSONTOP="${GTF_YOFFSET4MAX_DRAWMARKERSONTOP:-0.25}"
 GTF_LABEL_SNPS="${GTF_LABEL_SNPS:-}"
+GTF_LD_SNPS="${GTF_LD_SNPS:-}"
+GTF_LD_MARKER_SYMBOL="${GTF_LD_MARKER_SYMBOL:-star}"
+GTF_LD_MARKER_COLOR="${GTF_LD_MARKER_COLOR:-black}"
+case "${GTF_LD_MARKER_SYMBOL,,}" in
+  star) GTF_LD_MARKER_CHAR='%str(*)' ;;
+  plus) GTF_LD_MARKER_CHAR='+' ;;
+  cross) GTF_LD_MARKER_CHAR='x' ;;
+  circle) GTF_LD_MARKER_CHAR='o' ;;
+  square) GTF_LD_MARKER_CHAR='#' ;;
+  triangle) GTF_LD_MARKER_CHAR='^' ;;
+  diamond) GTF_LD_MARKER_CHAR='<>' ;;
+  *) echo "ERROR: Unsupported GTF_LD_MARKER_SYMBOL=${GTF_LD_MARKER_SYMBOL}" >&2; exit 2 ;;
+esac
+if [[ "${GTF_LD_MARKER_COLOR}" =~ ^#[0-9A-Fa-f]{6}$ ]]; then
+  GTF_LD_MARKER_SAS_COLOR="CX${GTF_LD_MARKER_COLOR#\#}"
+else
+  GTF_LD_MARKER_SAS_COLOR="${GTF_LD_MARKER_COLOR}"
+fi
 GTF_LABEL_LAYOUT="${GTF_LABEL_LAYOUT:-auto}"
 LOCAL_GTF_INCLUDE_NON_PROTEIN_CODING_GENES="${LOCAL_GTF_INCLUDE_NON_PROTEIN_CODING_GENES:-0}"
 LOCAL_GTF_MAX_HITS_PER_FIG="${LOCAL_GTF_MAX_HITS_PER_FIG:-${LOCAL_MAX_HITS_PER_FIG:-1}}"
@@ -273,6 +298,7 @@ else
 fi
 
 stamp="$(date +%Y%m%d_%H%M%S)"
+ODA_UPLOAD_ALIAS_DIR="${WORKDIR}/.oda_upload_aliases/${stamp}_$$"
 HTML_OUT="${WORKDIR}/${OUTPUT_HTML_BASENAME}"
 CSV_OUT="${WORKDIR}/${LOCAL_TOP_HITS_CSV_BASENAME}"
 LOCAL_TOP_HITS_CSV_PREGENERATED=0
@@ -381,18 +407,14 @@ if [[ -z "${ODA_REMOTE_INFO_TIMEOUT_GRACE_SECONDS:-}" ]]; then
   ODA_REMOTE_INFO_TIMEOUT_GRACE_SECONDS=15
 fi
 if [[ -z "${FORCE_DYNAMIC_GTF_SUPPORT_UPLOADS_ON_LINUX:-}" ]]; then
-  if [[ "${platform_is_linux}" == "1" ]]; then
-    FORCE_DYNAMIC_GTF_SUPPORT_UPLOADS_ON_LINUX=1
-  else
-    FORCE_DYNAMIC_GTF_SUPPORT_UPLOADS_ON_LINUX=0
-  fi
+  FORCE_DYNAMIC_GTF_SUPPORT_UPLOADS_ON_LINUX=0
 fi
 INCLUDE_PREFLIGHT_STANDALONE_DEBUG="${INCLUDE_PREFLIGHT_STANDALONE_DEBUG:-0}"
 INCLUDE_PREFLIGHT_REFRESH_REMOTE="${INCLUDE_PREFLIGHT_REFRESH_REMOTE:-0}"
 BATCH_INCLUDE_PREFLIGHT_REFRESH_REMOTE="${BATCH_INCLUDE_PREFLIGHT_REFRESH_REMOTE:-0}"
-BATCH1_INCLUDE_PREFLIGHT_REFRESH_REMOTE="${BATCH1_INCLUDE_PREFLIGHT_REFRESH_REMOTE:-1}"
+BATCH1_INCLUDE_PREFLIGHT_REFRESH_REMOTE="${BATCH1_INCLUDE_PREFLIGHT_REFRESH_REMOTE:-0}"
 BATCH_INCLUDE_PREFLIGHT_ENABLED="${BATCH_INCLUDE_PREFLIGHT_ENABLED:-0}"
-BATCH1_INCLUDE_PREFLIGHT_ENABLED="${BATCH1_INCLUDE_PREFLIGHT_ENABLED:-1}"
+BATCH1_INCLUDE_PREFLIGHT_ENABLED="${BATCH1_INCLUDE_PREFLIGHT_ENABLED:-0}"
 KEEP_RENDERED_DEBUG_FILES="${KEEP_RENDERED_DEBUG_FILES:-0}"
 export SAS_ODA_RUN_TIMEOUT_SECONDS="${SAS_ODA_RUN_TIMEOUT_SECONDS:-${GTF_SUBMIT_TIMEOUT_SECONDS}}"
 export SAS_ODA_RUN_TIMEOUT_GRACE_SECONDS="${SAS_ODA_RUN_TIMEOUT_GRACE_SECONDS:-${GTF_SUBMIT_TIMEOUT_GRACE_SECONDS}}"
@@ -414,9 +436,9 @@ cleanup_generated_artifacts() {
     if [[ "${TARGET_SNP_AUG_CACHE_MANAGED}" != "1" ]]; then
       rm -f "${TARGET_SNP_AUG_GZ}"
     fi
-    rm -rf "${GET_GTF_MACRO_UPLOAD_DIR}" "${WORKDIR}/.oda_upload_aliases" "${TARGET_SNP_AUG_DIR}"
+    rm -rf "${GET_GTF_MACRO_UPLOAD_DIR}" "${ODA_UPLOAD_ALIAS_DIR}" "${TARGET_SNP_AUG_DIR}"
   else
-    rm -rf "${WORKDIR}/.oda_upload_aliases"
+    rm -rf "${ODA_UPLOAD_ALIAS_DIR}"
   fi
 }
 
@@ -603,7 +625,7 @@ gtf_log_has_terminal_failure() {
   [[ -s "${logfile}" ]] || return 1
   # Match real SAS error records, but not numbered source lines echoed in the
   # log (for example, "123  ERROR: ..." inside submitted source text).
-  if grep -Eq '^[[:space:]]*ERROR:' "${logfile}"; then
+  if sas_oda_log_has_terminal_sas_error "${logfile}"; then
     return 0
   fi
   if grep -Eiq 'ERROR: Insufficient space in file WORK\.|ERROR: File WORK\..* is damaged|ERROR: Sort initialization failure|We failed in getConnection|The application could not log on to the server|server configuration is invalid|No SAS process attached|SAS process has terminated unexpectedly|ERROR: The SAS job likely failed before producing the final figure' "${logfile}"; then
@@ -1068,8 +1090,8 @@ upload_home_file_if_needed() {
   fi
   echo "${step_label} Uploading $(basename "${local_path}") to SAS ODA home as ${remote_basename}..."
   if [[ "$(basename "${local_path}")" != "${remote_basename}" ]]; then
-    mkdir -p "${WORKDIR}/.oda_upload_aliases"
-    upload_path="${WORKDIR}/.oda_upload_aliases/${remote_basename}"
+    mkdir -p "${ODA_UPLOAD_ALIAS_DIR}"
+    upload_path="${ODA_UPLOAD_ALIAS_DIR}/${remote_basename}"
     cp -f "${local_path}" "${upload_path}"
   fi
   run_oda_helper \
@@ -1120,6 +1142,48 @@ generate_requested_top_hits_csv_locally() {
   "${cmd[@]}"
 }
 
+explicit_target_csv_matches_request() {
+  [[ -n "${TARGET_SNP_LIST}" && -s "${CSV_OUT}" ]] || return 1
+  # A target CSV derived from an older compact GWAS subset must be rebuilt.
+  [[ ! "${DATA_GZ}" -nt "${CSV_OUT}" ]] || return 1
+  perl -e '
+    use strict;
+    use warnings;
+    my ($csv, $target_text, $gene_text) = @ARGV;
+    open my $fh, q{<}, $csv or exit 1;
+    my $header = <$fh>;
+    defined $header or exit 1;
+    chomp $header;
+    $header =~ s/\r$//;
+    my @h = split /,/, $header, -1;
+    my %idx = map { $h[$_] => $_ } 0 .. $#h;
+    exit 1 unless exists $idx{SNP} && exists $idx{CHR} && exists $idx{BP};
+    my (%seen, %gene);
+    while (my $line = <$fh>) {
+      chomp $line;
+      $line =~ s/\r$//;
+      next unless length $line;
+      my @f = split /,/, $line, -1;
+      my $snp = uc($f[$idx{SNP}] // q{});
+      next unless length $snp;
+      next unless length($f[$idx{CHR}] // q{}) && length($f[$idx{BP}] // q{});
+      $seen{$snp}=1;
+      $gene{$snp}=$f[$idx{gene}] if exists $idx{gene};
+    }
+    close $fh;
+    my @targets = grep { length } map { my $v=$_; $v =~ s/^\s+|\s+$//g; uc($v) } split /,/, $target_text;
+    exit 1 unless @targets && !grep { !$seen{$_} } @targets;
+    for my $pair (grep { length } split /,/, ($gene_text // q{})) {
+      next unless $pair =~ /^\s*([^:]+):(.+?)\s*$/;
+      my ($snp, $expected) = (uc($1), $2);
+      $expected =~ s/^\s+|\s+$//g;
+      next unless length $expected;
+      exit 1 unless defined($gene{$snp}) && uc($gene{$snp}) eq uc($expected);
+    }
+    exit 0;
+  ' "${CSV_OUT}" "${TARGET_SNP_LIST}" "${TARGET_SNP_GENES}"
+}
+
 stage_alias_upload_if_needed() {
   local local_path="$1"
   local remote_basename="$2"
@@ -1127,8 +1191,8 @@ stage_alias_upload_if_needed() {
     echo "[bulk] Reusing existing remote file in SAS ODA home: ${remote_basename}"
     return 1
   fi
-  mkdir -p "${WORKDIR}/.oda_upload_aliases"
-  local upload_path="${WORKDIR}/.oda_upload_aliases/${remote_basename}"
+  mkdir -p "${ODA_UPLOAD_ALIAS_DIR}"
+  local upload_path="${ODA_UPLOAD_ALIAS_DIR}/${remote_basename}"
   cp -f "${local_path}" "${upload_path}"
   bulk_upload_args+=(--upload-file "${upload_path}")
   return 0
@@ -1300,7 +1364,10 @@ augment_data_gz_with_missing_target_snps
 # genome-wide common-association verifier. Generate the target/top-hit CSV
 # before deriving GTF intervals so first-time single-SNP runs remain local.
 if [[ -n "${TARGET_SNP_LIST}" ]]; then
-  if generate_requested_top_hits_csv_locally && [[ -s "${CSV_OUT}" ]]; then
+  if explicit_target_csv_matches_request; then
+    LOCAL_TOP_HITS_CSV_PREGENERATED=1
+    echo "[prep] Reusing target CSV validated against the requested SNP list and compact GWAS subset: ${CSV_OUT}"
+  elif generate_requested_top_hits_csv_locally && [[ -s "${CSV_OUT}" ]]; then
     LOCAL_TOP_HITS_CSV_PREGENERATED=1
     echo "[prep] Generated explicit-target CSV before local GTF region extraction: ${CSV_OUT}"
   else
@@ -1458,6 +1525,7 @@ render_gtf_runner() {
   local input_csv_basename="${4:-}"
   local prep_only="${5:-0}"
   local label_snps="${GTF_LABEL_SNPS}"
+  local ld_snps="${GTF_LD_SNPS//,/ }"
   local label_text_rotate_angle=""
 
   label_snps="${label_snps//,/ }"
@@ -1521,6 +1589,9 @@ render_gtf_runner() {
     --replace "GTF_YOFFSET4TEXTLABELS=${GTF_YOFFSET4TEXTLABELS}" \
     --replace "GTF_YOFFSET4MAX_DRAWMARKERSONTOP=${GTF_YOFFSET4MAX_DRAWMARKERSONTOP}" \
     --replace "GTF_LABEL_SNPS=${label_snps}" \
+    --replace "GTF_LD_SNPS=${ld_snps}" \
+    --replace "GTF_LD_MARKER_SYMBOL=${GTF_LD_MARKER_CHAR}" \
+    --replace "GTF_LD_MARKER_COLOR=${GTF_LD_MARKER_SAS_COLOR}" \
     --replace "GTF_LABEL_TEXT_ROTATE_ANGLE=${label_text_rotate_angle}" \
     --replace "GTF_INCLUDE_NON_PROTEIN_CODING=${LOCAL_GTF_INCLUDE_NON_PROTEIN_CODING_GENES}" \
     --replace "GET_GTF_MACRO_BASENAME=${GET_GTF_MACRO_BASENAME}" \
@@ -1756,8 +1827,8 @@ queue_bulk_oda_upload() {
   local upload_path="${local_path}"
   [[ -s "${local_path}" ]] || return 0
   if [[ "$(basename "${local_path}")" != "${remote_basename}" ]]; then
-    mkdir -p "${WORKDIR}/.oda_upload_aliases"
-    upload_path="${WORKDIR}/.oda_upload_aliases/${remote_basename}"
+    mkdir -p "${ODA_UPLOAD_ALIAS_DIR}"
+    upload_path="${ODA_UPLOAD_ALIAS_DIR}/${remote_basename}"
     cp -f "${local_path}" "${upload_path}"
     bulk_upload_alias_paths+=("${upload_path}")
   fi
@@ -1841,8 +1912,8 @@ upload_support_file_if_needed() {
     echo "${label} Linux portable mode: uploading $(basename "${local_path}") to SAS ODA home as ${remote_basename} without remote size preflight..."
     upload_path="${local_path}"
     if [[ "$(basename "${local_path}")" != "${remote_basename}" ]]; then
-      mkdir -p "${WORKDIR}/.oda_upload_aliases"
-      upload_path="${WORKDIR}/.oda_upload_aliases/${remote_basename}"
+      mkdir -p "${ODA_UPLOAD_ALIAS_DIR}"
+      upload_path="${ODA_UPLOAD_ALIAS_DIR}/${remote_basename}"
       cp -f "${local_path}" "${upload_path}"
     fi
     run_oda_helper \
@@ -1884,8 +1955,8 @@ upload_dynamic_local_gtf_inputs_if_needed() {
       [[ -s "${local_path}" ]] || return 0
       echo "[dynamic] Linux portable mode: queueing $(basename "${local_path}") for upload to SAS ODA home as ${remote_basename}..."
       if [[ "$(basename "${local_path}")" != "${remote_basename}" ]]; then
-        mkdir -p "${WORKDIR}/.oda_upload_aliases"
-        upload_path="${WORKDIR}/.oda_upload_aliases/${remote_basename}"
+        mkdir -p "${ODA_UPLOAD_ALIAS_DIR}"
+        upload_path="${ODA_UPLOAD_ALIAS_DIR}/${remote_basename}"
         cp -f "${local_path}" "${upload_path}"
         dynamic_alias_paths+=("${upload_path}")
       fi
@@ -1979,6 +2050,8 @@ fi
 
 fi
 
+GTF_SUBMIT_MAX_ATTEMPTS="${GTF_SUBMIT_MAX_ATTEMPTS:-5}"
+GTF_SUBMIT_RETRY_SLEEP_SECONDS="${GTF_SUBMIT_RETRY_SLEEP_SECONDS:-10}"
 BATCH_SIZE="${LOCAL_MAX_HITS_PER_FIG:-4}"
 if [[ "${TOP_HIT_SELECTION_METHOD^^}" == "LD" && -z "${TARGET_SNP_LIST}" ]]; then
   echo "[prep] Running LD clumping before local-GTF batching."
@@ -1993,7 +2066,86 @@ if [[ -f "${CSV_OUT}" && -s "${CSV_OUT}" ]]; then
     header_line="$(head -n1 "${CSV_OUT}")"
     mkdir -p "${RUN_LOG_DIR}"
     rm -f "${RUN_LOG_DIR}"/hits_part_*
-    tail -n +2 "${CSV_OUT}" | split -l "${BATCH_SIZE}" - "${RUN_LOG_DIR}/hits_part_"
+    if [[ -n "${TARGET_SNP_LIST}" ]]; then
+      echo "[batch] Packing explicit targets by overlapping locus; a locus will not be split across figures."
+      perl -e '
+        use strict;
+        use warnings;
+        my ($csv, $prefix, $batch_size, $window_bp) = @ARGV;
+        $batch_size = int($batch_size || 1);
+        $batch_size = 1 if $batch_size < 1;
+        $window_bp = 0 + ($window_bp || 0);
+        open my $fh, q{<}, $csv or die "Cannot open $csv: $!\n";
+        my $header = <$fh>;
+        defined $header or exit 0;
+        chomp $header;
+        $header =~ s/\r$//;
+        my @h = split /,/, $header, -1;
+        my %idx = map { $h[$_] => $_ } 0 .. $#h;
+        die "Target CSV is missing CHR/BP columns\n" unless exists $idx{CHR} && exists $idx{BP};
+        my @rows;
+        my $input_order = 0;
+        while (my $line = <$fh>) {
+          chomp $line;
+          $line =~ s/\r$//;
+          next unless length $line;
+          my @f = split /,/, $line, -1;
+          next unless defined($f[$idx{CHR}]) && defined($f[$idx{BP}]);
+          next unless length($f[$idx{CHR}]) && $f[$idx{BP}] =~ /^\d+(?:\.\d+)?$/;
+          push @rows, {
+            line => $line,
+            chr => $f[$idx{CHR}],
+            bp => 0 + $f[$idx{BP}],
+            input_order => $input_order++,
+          };
+        }
+        close $fh;
+        exit 0 unless @rows;
+        my @sorted = sort {
+          my $chr_cmp = ($a->{chr} =~ /^\d+$/ && $b->{chr} =~ /^\d+$/)
+            ? ($a->{chr} <=> $b->{chr})
+            : ($a->{chr} cmp $b->{chr});
+          $chr_cmp || $a->{bp} <=> $b->{bp} || $a->{input_order} <=> $b->{input_order}
+        } @rows;
+        my @loci;
+        for my $row (@sorted) {
+          if (!@loci
+              || $loci[-1]{chr} ne $row->{chr}
+              || ($row->{bp} - $window_bp) > $loci[-1]{window_end}) {
+            push @loci, {
+              chr => $row->{chr},
+              window_end => $row->{bp} + $window_bp,
+              first_order => $row->{input_order},
+              rows => [],
+            };
+          }
+          push @{ $loci[-1]{rows} }, $row;
+          my $row_end = $row->{bp} + $window_bp;
+          $loci[-1]{window_end} = $row_end if $row_end > $loci[-1]{window_end};
+          $loci[-1]{first_order} = $row->{input_order}
+            if $row->{input_order} < $loci[-1]{first_order};
+        }
+        @loci = sort { $a->{first_order} <=> $b->{first_order} } @loci;
+        my (@batches, @current);
+        for my $locus (@loci) {
+          my @locus_rows = sort { $a->{input_order} <=> $b->{input_order} } @{ $locus->{rows} };
+          if (@current && @current + @locus_rows > $batch_size) {
+            push @batches, [@current];
+            @current = ();
+          }
+          push @current, @locus_rows;
+        }
+        push @batches, [@current] if @current;
+        for my $i (0 .. $#batches) {
+          my $path = $prefix . sprintf(q{%04d}, $i + 1);
+          open my $out, q{>}, $path or die "Cannot write $path: $!\n";
+          print {$out} $_->{line}, "\n" for @{ $batches[$i] };
+          close $out;
+        }
+      ' "${CSV_OUT}" "${RUN_LOG_DIR}/hits_part_" "${BATCH_SIZE}" "${LOCAL_GTF_WINDOW_BP}"
+    else
+      tail -n +2 "${CSV_OUT}" | split -l "${BATCH_SIZE}" - "${RUN_LOG_DIR}/hits_part_"
+    fi
 
     batch_upload_args=()
     part=1
@@ -2007,7 +2159,9 @@ if [[ -f "${CSV_OUT}" && -s "${CSV_OUT}" ]]; then
       part=$((part + 1))
     done
     if [[ "${#batch_upload_args[@]}" -gt 0 ]]; then
-      echo "[batch manifest] Uploading/reusing $(( ${#batch_upload_args[@]} / 2 )) batch CSV file(s) in one SASPy connection..."
+      batch_upload_count="${#batch_upload_args[@]}"
+      batch_upload_count=$((batch_upload_count / 2))
+      echo "[batch manifest] Uploading/reusing ${batch_upload_count} batch CSV file(s) in one SASPy connection..."
       oda_upload_many "upload_top_hits_batches_${stamp}" "${batch_upload_args[@]}"
     fi
 
@@ -2052,6 +2206,16 @@ if [[ -f "${CSV_OUT}" && -s "${CSV_OUT}" ]]; then
         else
           batch_submit_rc=$?
           echo "[batch ${part}] GTF SAS submit attempt ${batch_submit_attempt} exited with status ${batch_submit_rc}."
+        fi
+        if sas_oda_report_space_exhaustion "${batch_run_log_file}" "local-GTF batch ${part} submit attempt ${batch_submit_attempt}"; then
+          exit "${SAS_ODA_SPACE_EXHAUSTION_EXIT_CODE:-73}"
+        fi
+        if sas_oda_report_native_abort "${batch_submit_rc}" "${batch_run_log_dir}/output.run.status.json" "local-GTF batch ${part} submit attempt ${batch_submit_attempt}"; then
+          exit 134
+        fi
+        if gtf_log_has_terminal_failure "${batch_run_log_file}"; then
+          echo "ERROR: Batch ${part} SAS log contains a deterministic terminal error; preserving the log and not retrying: ${batch_run_log_file}" >&2
+          exit 1
         fi
         if [[ "${batch_submit_rc}" -eq 0 ]] && ! gtf_submit_needs_retry_for_log "${batch_run_log_file}"; then
           break
@@ -2158,8 +2322,6 @@ fi
 
 echo "[4/5] Running SAS local top-hits gene-track plot..."
 clear_stale_remote_expected_outputs
-GTF_SUBMIT_MAX_ATTEMPTS="${GTF_SUBMIT_MAX_ATTEMPTS:-5}"
-GTF_SUBMIT_RETRY_SLEEP_SECONDS="${GTF_SUBMIT_RETRY_SLEEP_SECONDS:-10}"
 gtf_submit_attempt=1
 while :; do
   rm -f "${RUN_LOG_FILE}"
@@ -2169,6 +2331,16 @@ while :; do
   else
     gtf_submit_rc=$?
     echo "[4b/5] GTF SAS submit attempt ${gtf_submit_attempt} exited with status ${gtf_submit_rc}."
+  fi
+  if sas_oda_report_space_exhaustion "${RUN_LOG_FILE}" "local-GTF SAS submit attempt ${gtf_submit_attempt}"; then
+    exit "${SAS_ODA_SPACE_EXHAUSTION_EXIT_CODE:-73}"
+  fi
+  if sas_oda_report_native_abort "${gtf_submit_rc}" "${RUN_LOG_DIR}/output.run.status.json" "local-GTF SAS submit attempt ${gtf_submit_attempt}"; then
+    exit 134
+  fi
+  if gtf_log_has_terminal_failure "${RUN_LOG_FILE}"; then
+    echo "ERROR: SAS log contains a deterministic terminal error; preserving the log and not retrying: ${RUN_LOG_FILE}" >&2
+    exit 1
   fi
   if [[ "${gtf_submit_rc}" -eq 0 ]] && ! gtf_submit_needs_retry; then
     break

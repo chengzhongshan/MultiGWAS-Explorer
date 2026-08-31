@@ -53,6 +53,9 @@ Note:
 %let gtf_yoffset4textlabels=__GTF_YOFFSET4TEXTLABELS__;
 %let gtf_yoffset4maxdrawmarkersontop=__GTF_YOFFSET4MAX_DRAWMARKERSONTOP__;
 %let gtf_label_snps=__GTF_LABEL_SNPS__;
+%let gtf_ld_snps=__GTF_LD_SNPS__;
+%let gtf_ld_marker_symbol=__GTF_LD_MARKER_SYMBOL__;
+%let gtf_ld_marker_color=__GTF_LD_MARKER_COLOR__;
 %let gtf_label_text_rotate_angle=__GTF_LABEL_TEXT_ROTATE_ANGLE__;
 %let gtf_include_non_protein_coding=__GTF_INCLUDE_NON_PROTEIN_CODING__;
 
@@ -199,6 +202,7 @@ __GTF_IMPORT_BLOCK__
   %_find_first_column(lib=WORK,mem=%upcase(&outdsd),outvar=req_bp_var,candidates=BP POS position);
   %_find_first_column(lib=WORK,mem=%upcase(&outdsd),outvar=req_snp_var,candidates=SNP rsid markername MarkerName);
   %_find_first_column(lib=WORK,mem=%upcase(&outdsd),outvar=req_hit_order_var,candidates=hit_order panel_order order);
+  %_find_first_column(lib=WORK,mem=%upcase(&outdsd),outvar=req_gene_var,candidates=gene gene_name genesymbol gene_symbol snp_gene);
 
   %if %superq(req_chr_var)= or %superq(req_bp_var)= or %superq(req_snp_var)= %then %do;
     %put WARNING: Requested top-hit CSV lacks resolvable CHR/BP/SNP columns, so it will be ignored.;
@@ -207,7 +211,7 @@ __GTF_IMPORT_BLOCK__
   %end;
 
   data &outdsd;
-    length SNP $128 _chr_text _bp_text _snp_text _hit_order_text $256;
+    length SNP $128 gene $256 _chr_text _bp_text _snp_text _hit_order_text _gene_text $256;
     set &outdsd;
     _chr_text=strip(vvaluex("&req_chr_var"));
     _bp_text=strip(vvaluex("&req_bp_var"));
@@ -218,6 +222,12 @@ __GTF_IMPORT_BLOCK__
     %else %do;
     _hit_order_text='';
     %end;
+    %if %superq(req_gene_var) ne %then %do;
+    _gene_text=strip(vvaluex("&req_gene_var"));
+    %end;
+    %else %do;
+    _gene_text='';
+    %end;
 
     if upcase(_chr_text)='X' then CHR=23;
     else if upcase(_chr_text)='Y' then CHR=24;
@@ -225,10 +235,13 @@ __GTF_IMPORT_BLOCK__
     else CHR=input(_chr_text,best32.);
     BP=input(_bp_text,best32.);
     SNP=_snp_text;
+    gene=_gene_text;
+    if index(gene, ':') > 0 and prxmatch('/^rs[0-9]+:/i', gene) then gene=strip(substr(gene,index(gene,':')+1));
+    if upcase(gene) in ('NA','N/A','NULL','.') then gene='';
     hit_order=input(_hit_order_text,best32.);
     if missing(hit_order) then hit_order=_n_;
     if missing(CHR) or missing(BP) or missing(SNP) then delete;
-    keep hit_order CHR BP SNP;
+    keep hit_order CHR BP SNP gene;
   run;
 
   proc sort data=&outdsd nodupkey;
@@ -560,12 +573,24 @@ proc sort data=scz_mh;
   by CHR BP;
 run;
 
-%if %upcase(&top_hit_mode)=COMMON_ASSOCIATION %then %do;
-data scz_mh;
-  set scz_mh;
-  COMMON_ASSOC_P=min(of &common_assoc_pvars);
-run;
-%end;
+/*
+  COMMON_ASSOC_P is derived lazily.  Renaming the imported table is a metadata
+  operation, and the DATA-step view avoids rewriting the complete GWAS subset
+  in the size-limited SAS ODA WORK directory.
+*/
+%macro _prepare_common_assoc_view;
+  %if %upcase(&top_hit_mode)=COMMON_ASSOCIATION %then %do;
+    proc datasets library=work nolist;
+      change scz_mh=_scz_mh_common_base;
+    quit;
+    data scz_mh / view=scz_mh;
+      set _scz_mh_common_base;
+      COMMON_ASSOC_P=min(of &common_assoc_pvars);
+    run;
+    %put NOTE: COMMON_ASSOC_P is supplied through a DATA-step view to conserve SAS ODA WORK space.;
+  %end;
+%mend;
+%_prepare_common_assoc_view;
 
 %_load_requested_target_snps(outdsd=requested_target_snps);
 
@@ -639,6 +664,14 @@ run;
 
 %_load_req_top_hits_csv(outdsd=requested_top_hits_csv);
 
+%if not %sysfunc(exist(WORK.REQUESTED_TOP_HITS_CSV)) %then %do;
+  data requested_top_hits_csv;
+    length SNP $128 gene $256;
+    hit_order=.; CHR=.; BP=.;
+    stop;
+  run;
+%end;
+
 %if %sysevalf(&requested_top_hits_loaded,boolean) %then %do;
 proc sql;
   create table top_hit4diffp_raw as
@@ -666,11 +699,27 @@ quit;
   %abort 255;
 %end;
 
-%QueryHaploreg(
-  rsids=&top_snps,
-  dsdout=snps2genes,
-  print_html=0
-);
+/*
+  Explicit target runs already carry their requested SNPs and, when known,
+  genes in the compact CSV.  Avoid an ODA-side web request to HaploReg here:
+  it is redundant with the local resolver/GTF fallback and can leave the
+  SASPy client waiting for many minutes when the remote service is slow.
+*/
+%if not %sysevalf(&requested_top_hits_loaded,boolean)
+    and not %sysevalf(&requested_target_snps_loaded,boolean) %then %do;
+  %QueryHaploreg(
+    rsids=&top_snps,
+    dsdout=snps2genes,
+    print_html=0
+  );
+%end;
+%else %do;
+  data snps2genes;
+    length rsid $40 gene $256;
+    stop;
+  run;
+  %put NOTE: Skipping ODA-side HaploReg web query for explicit targets, using the prepared target CSV and local GTF annotation instead.;
+%end;
 
 %if %sysfunc(exist(WORK.SNPS2GENES)) %then %do;
   data snps2genes_clean;
@@ -709,17 +758,20 @@ quit;
 proc sql;
   create table top_hit4diffp as
   select a.*,
-         coalescec(u.gene, b.gene, c.gtf_gene) as gene length=256,
+         coalescec(u.gene, q.gene, b.gene, c.gtf_gene) as gene length=256,
          case
            when not missing(u.gene) then 'USER'
+           when not missing(q.gene) then 'INPUT_CSV'
            when not missing(b.gene) then 'HaploReg'
            when not missing(c.gtf_gene) then 'GTF'
            else 'NA'
          end as gene_source length=16,
-         catx(':', a.SNP, coalescec(u.gene, b.gene, c.gtf_gene, 'NA')) as snp_gene length=128
+         catx(':', a.SNP, coalescec(u.gene, q.gene, b.gene, c.gtf_gene, 'NA')) as snp_gene length=128
   from top_hit4diffp_raw as a
   left join requested_target_snp_genes as u
     on upcase(strip(a.SNP))=upcase(strip(u.SNP))
+  left join requested_top_hits_csv as q
+    on upcase(strip(a.SNP))=upcase(strip(q.SNP))
   left join snps2genes_clean as b
     on a.SNP=b.rsid
   left join snps2genes_gtf_fallback as c
@@ -753,11 +805,21 @@ proc sql;
       where prxmatch('/^rs[0-9]+$/i', strip(SNP)) > 0
       ;
 
+  /*
+    Build the union of all requested windows without duplicating variants in
+    overlapping windows.  The former many-to-many join emitted one copy per
+    target SNP, which doubled WORK usage for nearby targets and could exhaust
+    the SAS ODA temporary quota before the original plotting macro completed.
+  */
   create table top_local_signals as
-  select a.*, catx(':', b.SNP, coalescec(b.gene,'NA')) as snp_gene length=128
-  from scz_mh as a, top_hit4diffp_gtf_ready as b
-  where a.CHR=b.CHR
-    and a.BP between (b.BP-&local_window_bp) and (b.BP+&local_window_bp)
+  select a.*
+  from scz_mh as a
+  where exists (
+    select 1
+    from top_hit4diffp_gtf_ready as b
+    where a.CHR=b.CHR
+      and a.BP between (b.BP-&local_window_bp) and (b.BP+&local_window_bp)
+  )
   ;
 quit;
 
@@ -824,6 +886,8 @@ run;
 
 %macro _emit_or_plot_local_gtf;
   %global top_snps effective_gtf_label_snps;
+  %local query_snp_labels;
+  %let query_snp_labels=;
   %if %sysevalf(&prep_only,boolean) %then %do;
     data _null_;
       file "~/__OUTPUT_HTML__" lrecl=32767;
@@ -835,34 +899,107 @@ run;
       put '</body></html>';
     run;
     ods html5 close;
-    %put NOTE: Prep-only mode complete; exported local top-hit CSV and skipped GTF plotting.;
+    %put NOTE: Prep-only mode complete, exported local top-hit CSV, and skipped GTF plotting.;
     %return;
   %end;
 
-  proc sql noprint;
-    select SNP into: top_snps separated by ' '
+  /*
+    Plot overlapping target windows as one locus.  The GTF extractor already
+    merges overlapping regions, but SNP_Local_Manhattan_With_GTF normally
+    opens one figure for every value in SNP_IDs.  Represent a multi-SNP locus
+    as chr:first_bp:last_bp so the plotting macro emits one panel whose x-axis
+    is the union of the requested SNP-centred windows.  All original rsIDs stay
+    in effective_gtf_label_snps and are therefore still highlighted/labeled.
+  */
+  proc sql;
+    create table _local_gtf_target_points as
+    select t.CHR,
+           t.BP,
+           t.SNP,
+           min(g.hit_order) as hit_order
     from top_hit4diffp_gtf_ready as t
     inner join top_hit_groups as g
       on t.snp_gene=g.snp_gene
-    order by g.hit_order, t.CHR, t.BP;
+    group by t.CHR, t.BP, t.SNP
+    order by t.CHR, t.BP, calculated hit_order, t.SNP;
   quit;
 
+  /*
+    Keep the original query rsIDs separate from the merged region queries.
+    SNP_IDs controls the extraction/display window, whereas
+    SNPs2label_scatterplot_dots controls which variants receive labels.
+  */
+  proc sql noprint;
+    select SNP into: query_snp_labels separated by ' '
+    from _local_gtf_target_points
+    order by hit_order, CHR, BP, SNP;
+  quit;
+
+  data _local_gtf_target_clusters;
+    set _local_gtf_target_points;
+    by CHR BP;
+    retain locus_cluster locus_window_end;
+    if first.CHR then do;
+      locus_cluster=1;
+      locus_window_end=BP+&local_window_bp;
+    end;
+    else do;
+      /* Adjacent SNP-centred windows belong to the same displayed locus. */
+      if (BP-&local_window_bp) > locus_window_end then locus_cluster+1;
+      locus_window_end=max(locus_window_end,BP+&local_window_bp);
+    end;
+  run;
+
+  proc sql;
+    create table _local_gtf_plot_queries as
+    select CHR,
+           locus_cluster,
+           min(BP) as locus_min_bp,
+           max(BP) as locus_max_bp,
+           min(SNP) as singleton_snp length=64,
+           count(distinct SNP) as target_count,
+           min(hit_order) as first_hit_order
+    from _local_gtf_target_clusters
+    group by CHR, locus_cluster
+    order by calculated first_hit_order, CHR, calculated locus_min_bp;
+  quit;
+
+  data _local_gtf_plot_queries;
+    set _local_gtf_plot_queries;
+    length plot_query $128;
+    if target_count=1 then plot_query=strip(singleton_snp);
+    else plot_query=cats(
+      strip(put(CHR,best32.)), ':',
+      strip(put(locus_min_bp,best32.)), ':',
+      strip(put(locus_max_bp,best32.))
+    );
+  run;
+
+  proc sql noprint;
+    select plot_query into: top_snps separated by ' '
+    from _local_gtf_plot_queries
+    order by first_hit_order, CHR, locus_min_bp;
+  quit;
+
+  %put NOTE: Local-GTF plot queries after merging overlapping target windows: &top_snps;
+  %put NOTE: Original query SNP labels retained for the merged plot: &query_snp_labels;
+
   %if %superq(top_snps)= %then %do;
-    %put ERROR: No rsID-style top SNPs remain after filtering invalid local GTF targets.;
+    %put ERROR: No valid local-GTF plot queries remain after filtering invalid targets.;
     data _null_;
       file "~/__OUTPUT_HTML__" lrecl=32767;
       put '<!doctype html>';
       put '<html><head><meta charset="utf-8"><title>Local Top-Hit GTF Error</title></head>';
       put '<body style="font-family:Arial,Helvetica,sans-serif;margin:24px">';
       put '<h1 style="font-size:20px">Local top-hit GTF plotting failed</h1>';
-      put '<p>No rsID-style top SNPs remained after filtering invalid local GTF targets.</p>';
+      put '<p>No valid local-GTF plot queries remained after filtering invalid targets.</p>';
       put '</body></html>';
     run;
     ods html5 close;
     %return;
   %end;
 
-  %let effective_gtf_label_snps=&top_snps;
+  %let effective_gtf_label_snps=&query_snp_labels;
   %if %superq(gtf_label_snps) ne %then %let effective_gtf_label_snps=&gtf_label_snps;
 
   %SNP_Local_Manhattan_With_GTF(
@@ -892,6 +1029,9 @@ run;
     makedotheatmap=1,
     makeheatmapdotintooneline=0,
     SNPs2label_scatterplot_dots=&effective_gtf_label_snps,
+    LD_SNPs2mark_scatterplot_dots=&gtf_ld_snps,
+    LD_marker_symbol=&gtf_ld_marker_symbol,
+    LD_marker_color=&gtf_ld_marker_color,
     text_rotate_angle=&gtf_label_text_rotate_angle,
     yoffset4max_drawmarkersontop=&gtf_yoffset4maxdrawmarkersontop,
     Yoffset4textlabels=&gtf_yoffset4textlabels,

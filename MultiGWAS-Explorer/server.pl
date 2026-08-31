@@ -61,7 +61,7 @@ BEGIN {
     open(STDOUT, ">&STDERR") or die "Could not redirect STDOUT: $!";
     select(STDERR); $| = 1; # Unbuffer STDERR for real-time logging
     $ENV{MOJO_LOG_LEVEL} //= 'error'; # Mute Mojolicious info logs
-    select(STDERR); $| = 1;
+    #select(STDERR); $| = 1;
 }
 use strict;
 use warnings;
@@ -76,12 +76,54 @@ use HTTP::Tiny; # Core module - always available
 use File::Temp qw(tempfile tempdir);
 use File::Basename;
 use File::Path qw(make_path);
+use File::Spec;
 use File::Which qw(which); # Ensure this is installed, or use the backtick version below
 use Mojo::Util   qw(md5_sum);
 use JSON::MaybeXS qw(encode_json decode_json);
 use Digest::SHA qw(sha256_hex);
 
 my $MCP_SERVER_DIR = File::Basename::dirname(abs_path(__FILE__) || __FILE__);
+
+sub resolve_mcp_bash_executable {
+    my @candidates;
+    my $windows_like = $^O eq 'MSWin32' || $^O eq 'cygwin';
+    push @candidates, $ENV{MULTIGWAS_BASH} if $ENV{MULTIGWAS_BASH};
+    if ($windows_like) {
+        my $where = `where.exe bash.exe 2>NUL`;
+        push @candidates, grep { length } map { s/[\r\n]+\z//r } split /\r?\n/, ($where || '');
+        if ($ENV{USERPROFILE}) {
+            push @candidates, glob(File::Spec->catfile(
+                $ENV{USERPROFILE}, 'Downloads', 'cygwin-portable*',
+                'cygwin-portable', 'App', 'cygwin', 'bin', 'bash.exe'
+            ));
+        }
+        push @candidates,
+          'C:/Program Files/Git/bin/bash.exe',
+          'C:/Program Files/Git/usr/bin/bash.exe';
+    }
+    else {
+        push @candidates, which('bash') || (), '/bin/bash', '/usr/bin/bash';
+    }
+    my %seen;
+    for my $candidate (@candidates) {
+        next unless defined $candidate && length $candidate;
+        $candidate =~ s{\\}{/}g;
+        if ($^O eq 'cygwin' && $candidate =~ m{^[A-Za-z]:/}) {
+            if (open(my $cph, '-|', 'cygpath', '-u', $candidate)) {
+                my $converted = <$cph> // '';
+                close $cph;
+                $converted =~ s/[\r\n]+\z//;
+                $candidate = $converted if length $converted;
+            }
+        }
+        next if $seen{lc $candidate}++;
+        # Windows System32/WindowsApps bash.exe is the WSL launcher, not a
+        # usable POSIX shell when WSL is absent or misconfigured.
+        next if $windows_like && $candidate =~ m{/(?:Windows/System32|Microsoft/WindowsApps)/bash(?:\.exe)?\z}i;
+        return $candidate if -f $candidate;
+    }
+    return $windows_like ? '' : 'bash';
+}
 
 sub resolve_repo_script_path {
     my ($script_name) = @_;
@@ -207,7 +249,7 @@ $server->tool(
                                description => 'Optional PID to check status of a previous query (when run the tool again with the same perl_or_bash_codes_or_file)' },
             tmp_perl_or_bash_file     => { type => 'string',
                                description => 'Optional internal use only: temporary perl_or_bash file path to store the perl_or_bash codes when the input perl_or_bash codes contain' . 
-                               'special characters that may cause issues with passing the perl_or_bash codes as a command line argument to the python function. '. 
+                               'special characters that may cause issues when passing the perl_or_bash codes as a command line argument to the python function. '.
                                'The tool will save the perl_or_bash codes into this temporary perl_or_bash file and run the query with the temporary perl_or_bash file, and then ' . 
                                'delete the temporary perl_or_bash file after running the query.' }                   
         },
@@ -248,16 +290,30 @@ $server->tool(
             }
         }
         
-        if ($run_it_with_bash){
-               if ($perl_or_bash_codes=~/^\.\/\S+\.sh/){
-                $perl_or_bash_codes="bash $perl_or_bash_codes";
-               }else{
-                $perl_or_bash_codes="bash -c \"$perl_or_bash_codes\" ";
-               }
-              
-            }else{
-                $perl_or_bash_codes="perl -S ".'\"'.$perl_or_bash_codes.'\"';
-         }
+        my @job_command;
+        if ($run_it_with_bash) {
+            my $bash_exe = resolve_mcp_bash_executable();
+            die "No usable POSIX bash was found. Set MULTIGWAS_BASH to Cygwin or Git Bash; the Windows System32 WSL launcher is not used.\n"
+              unless length $bash_exe;
+            if (-f $perl_or_bash_codes) {
+                @job_command = ($bash_exe, $perl_or_bash_codes);
+            }
+            else {
+                # Do not use a login shell here: portable Cygwin login shells
+                # change to HOME and lose the MCP server repository cwd.
+                # Also put the selected shell's bin directory first so an
+                # input such as "bash script.sh" cannot resolve recursively
+                # to the Windows System32 WSL launcher.
+                my $bash_bin_dir = File::Basename::dirname($bash_exe);
+                my $bash_payload = 'PATH=' . shell_quote_single($bash_bin_dir)
+                  . ':$PATH; export PATH; ' . $perl_or_bash_codes_or_file;
+                @job_command = ($bash_exe, '-c', $bash_payload);
+            }
+        }
+        else {
+            @job_command = ($^X, '-S', $perl_or_bash_codes);
+        }
+        my $display_command = join(' ', map { shell_quote_single($_) } @job_command);
         #This output filename if provided with the previous pid, the tool will check the status of the previous query
         #and return the results in this file when the job is finished. If not provided, the tool will save the results 
         #in a default file named "tmp{timestamp}/haploreg_{query_snp}.tsv" as demonstrated in the later part of the code;
@@ -313,13 +369,25 @@ $server->tool(
                             close $fh;
                         }
                         
+                        my $status_file = $pf;
+                        $status_file =~ s/\.pid$/.status/;
+                        my $exit_code = '';
+                        if (-f $status_file && open(my $sfh, '<', $status_file)) {
+                            $exit_code = <$sfh> // '';
+                            close $sfh;
+                            $exit_code =~ s/\s+\z//;
+                        }
+                        my $terminal_status = length($exit_code) && $exit_code =~ /^\d+$/ && $exit_code != 0
+                          ? "FAILED (exit code $exit_code)"
+                          : "COMPLETE";
+                        unlink $status_file if -f $status_file;
                         unlink $pf;
                         cleanup_generated_tmpdir_if_empty($pf);
                         
                         return {
                             content => [{
                                 type => "text",
-                                text => "STATUS: COMPLETE (PID $pid_arg)\n\nperl_or_bash log for debugging saved to: $out_file\n\n" . $content
+                                text => "STATUS: $terminal_status (PID $pid_arg)\n\nperl_or_bash log for debugging saved to: $out_file\n\n" . $content
                             }]
                         };
                     }
@@ -360,10 +428,19 @@ $server->tool(
             return { content => [{ type => "text", text => "ERROR: Could not fork." }] } unless defined $pid;
 
             if ($pid == 0) {
-                my $cmd = "$perl_or_bash_codes >$out_file";
-                print STDERR "Executing command in background: $cmd\n";
-                exec "$cmd 2>&1";
-                exit(1);
+                my $status_file = $pid_file;
+                $status_file =~ s/\.pid$/.status/;
+                print STDERR "Executing command in background: $display_command\n";
+                open(STDIN, '<', File::Spec->devnull()) or exit(126);
+                open(STDOUT, '>', $out_file) or exit(126);
+                open(STDERR, '>&STDOUT') or exit(126);
+                my $job_rc = system { $job_command[0] } @job_command;
+                my $job_exit = $job_rc == -1 ? 127 : ($job_rc >> 8);
+                if (open(my $sfh, '>', $status_file)) {
+                    print {$sfh} "$job_exit\n";
+                    close $sfh;
+                }
+                exit($job_exit);
             }
 
             open(my $pfh, '>', $pid_file);
@@ -376,7 +453,7 @@ $server->tool(
               return {
                 content => [{
                     type => "text",
-                    text => "QUERYING: perl_or_bash ODA for $perl_or_bash_codes\nPID: $pid\nOutput file: $out_file\n" .
+                    text => "QUERYING: perl_or_bash job for $display_command\nPID: $pid\nOutput file: $out_file\n" .
                            "Ask the AI agent to check status with: {\"perl_or_bash_codes\": \"$tmp_perl_or_bash_file\", \"pid\": $pid}\n" . 
 "The loop should be no more than 3 times with an interval of 30 seconds to avoid excessive checking.\n"
                 }]
@@ -919,6 +996,7 @@ $server->tool(
     'For local GTF plots, it can forward a dedicated local GTF window override that now controls both the extracted GTF subset and the displayed local gene-track window. ' .
     'The batched and single-SNP SAS local-GTF wrappers now also share the same more readable baseline figure defaults, starting from GTF_PCT4NEG_Y=1.4 and a practical 1000-pixel local-GTF design height before any per-locus auto-tuning. ' .
     'Large-window local GTF reruns now use a gzip-compressed pre-extracted GTF subset for SAS ODA upload, which is much more reliable than constructing the full region inside SAS WORK. ' .
+    'If a SAS ODA plotting stage is classified as non-retryable WORK/storage exhaustion, the automation defaults to the equivalent local gnuplot stage, reports the SAS failure log plus a fallback status JSON, and returns the generated gnuplot artifacts instead of resubmitting the same SAS job. This fallback can be disabled explicitly. ' .
     'The local GTF path now also prefers the repository copy of SNP_Local_Manhattan_With_GTF.sas and forces the final displayed x-axis back to the observed association-signal span, which helps avoid chr plots that incorrectly start at 0 after aggressive gene-track expansion. ' .
     'If a long local GTF submit finishes remotely but the expected HTML download path is flaky, the wrapper can now recover from the helper-saved sas_res_*.html artifact and the PNG path reported in the SAS log. When that PNG exists, the opened result now prefers a small figure-first final HTML wrapper and keeps the raw SAS HTML as a sidecar. ' .
     'On the first SAS-backed run, the vendored SAS ODA helper now prompts for missing credentials or accepts optional account/password fields, validates them with proc setinit;run;, and saves the successful login for later reuse. ' .
@@ -928,13 +1006,19 @@ $server->tool(
     'It now also supports Nextflow-like targeted reruns: list available step names, run only one named stage, or rerun a step range without recomputing the whole workflow. ' .
     'The repo now prefers vendored helper scripts plus repo-local Perl and Python runtimes when present, including platform-specific local Perl trees such as local/perl5-cygwin and local/perl5-linux so Windows portable Cygwin does not accidentally load Linux GD or zlib modules. ' .
     'When one automation call requests multiple plot stages that consume the same wide gz subset, the pipeline now uploads that data file to SAS ODA once, reuses it across the requested plot runners, and deletes it once at the end if cleanup is enabled. ' .
+    'For configuration-only requests using an existing spec_file, set mode=configs; generate_spec_only is only for inferring a new spec from gwas_dir and is not a synonym for mode=configs. ' .
+    'Two bundled PGC schizophrenia examples have different scientific scopes: configs/spec_pgc_scz_sex_common_automation.json is the sex-stratified/common-association profile, whereas configs/spec_pgc_scz_ancestry_diff_automation.json is the ancestry-differential profile. Use list_bundled_specs=true when the request does not identify which profile is intended; never guess or silently substitute one. ' .
     'The same tool can be called again with a PID to check status and retrieve the final log/output summary.',
     input_schema => {
         type => 'object',
         properties => {
             spec_file => {
                 type => 'string',
-                description => 'Optional comparison spec JSON file path. The spec describes source_mode, input/output locations, groups, pairs, and optional plotting settings.'
+                description => 'Optional comparison spec JSON file path. Use configs/spec_pgc_scz_sex_common_automation.json for the bundled PGC schizophrenia sex-stratified/common-association workflow, or configs/spec_pgc_scz_ancestry_diff_automation.json for the distinct ancestry-differential workflow. If the user did not distinguish these profiles, call list_bundled_specs=true and ask rather than guessing.'
+            },
+            list_bundled_specs => {
+                type => 'string',
+                description => 'Optional truthy read-only discovery flag. Returns the bundled spec catalog and exits without launching a pipeline job. Use this when a request says only "the PGC schizophrenia spec" or ambiguously says "sex/ancestry".'
             },
             gwas_dir => {
                 type => 'string',
@@ -950,7 +1034,7 @@ $server->tool(
             },
             generate_spec_only => {
                 type => 'string',
-                description => 'Optional truthy flag to stop after generating or previewing the inferred spec. This is especially useful for merged-wide GWAS tables when users want to inspect the inferred source_mode, cohort blocks, and output paths before running plots.'
+                description => 'Optional truthy flag used only with gwas_dir to stop after generating or previewing a newly inferred spec. Do not use this with spec_file and do not use it for configuration-only execution of an existing spec; use mode=configs for that.'
             },
             preview_spec => {
                 type => 'string',
@@ -966,7 +1050,8 @@ $server->tool(
             },
             mode => {
                 type => 'string',
-                description => 'Optional mode for auto_prepare_and_run_diff_gwas.pl. Typical values: full or configs. Default: full.'
+                enum => ['full', 'configs'],
+                description => 'Execution mode. Set configs for every request that says configuration-only, derived configs only, preparation-only, or stop before analysis; this writes the derived configuration artifacts and exits before preprocessing/analysis/plots. full is the default and may run analysis stages.'
             },
             plots => {
                 type => 'string',
@@ -974,7 +1059,7 @@ $server->tool(
             },
             skip_plots => {
                 type => 'string',
-                description => 'Optional truthy flag to skip SAS ODA plotting. Accepts values like 1, true, yes.'
+                description => 'Optional truthy flag to skip plotting while otherwise allowing preprocessing/analysis. This is not configuration-only mode; use mode=configs when the user requests no analysis.'
             },
             force => {
                 type => 'string',
@@ -1104,6 +1189,14 @@ $server->tool(
                 type => 'string',
                 description => 'Optional comma-separated SNP:GENE overrides, for example: rs17425819:JAK2,rs185665940:FANCL'
             },
+            local_ld_snps => {
+                type => 'string',
+                description => 'Optional comma-separated SNPs in LD with the local query SNP(s). SAS ODA and gnuplot overlay these variants with asterisk symbols on every association track; the same list is retained if SAS space exhaustion triggers gnuplot fallback.'
+            },
+            local_ld_audit_file => {
+                type => 'string',
+                description => 'Optional local LD audit TSV. During gnuplot fallback, PRUNED_LD candidate_snp rows whose lead_snp matches a query SNP are automatically overlaid with asterisks.'
+            },
             sas_oda_account => {
                 type => 'string',
                 description => 'Optional SAS ODA account/email for noninteractive first-run login bootstrap.'
@@ -1128,6 +1221,10 @@ $server->tool(
                 type => 'string',
                 description => 'Legacy truthy convenience flag for --exclude-non-protein-coding-genes-in-local-gtf. Local GTF plots are protein-coding-only by default; set include_non_protein_coding_genes_in_local_gtf=1 in the spec JSON when non-coding genes should be included.'
             },
+            gnuplot_fallback_on_sas_space => {
+                type => 'string',
+                description => 'Controls the automatic local gnuplot fallback after a SAS ODA plotting job is specifically classified as non-retryable WORK/storage exhaustion. Default: true. Set false to surface the SAS failure without running the fallback. Other SAS failures are never silently rerouted.'
+            },
             cleanup_shared_plot_data => {
                 type => 'string',
                 description => 'Optional truthy convenience flag for --cleanup-shared-plot-data'
@@ -1147,14 +1244,17 @@ $server->tool(
                 description => 'When checking a PID, wait server-side for up to this many seconds for a terminal result. Default and maximum: 25, kept below common 30-second HTTP transport timeouts.'
             }
         },
-        # Either spec_file or gwas_dir is accepted. Enforce this alternative
-        # requirement in the handler because MCP clients vary in JSON Schema support.
+        # Either spec_file or gwas_dir is accepted.  JSON Schema draft support
+        # varies between MCP clients, so enforce this mutually alternative
+        # requirement in the handler below instead of incorrectly requiring
+        # spec_file here and making the documented discovery mode unusable.
         required => []
     },
     code => sub ($tool, $args) {
         cleanup_all_generated_empty_tmpdirs();
         my $spec_file = $args->{spec_file} // '';
         my $gwas_dir = $args->{gwas_dir} // '';
+        my $list_bundled_specs = $args->{list_bundled_specs} // '';
         my $spec_out = $args->{spec_out} // '';
         my $raw_column_alias_config = $args->{raw_column_alias_config} // '';
         my $generate_spec_only = $args->{generate_spec_only} // '';
@@ -1187,12 +1287,15 @@ $server->tool(
         my $display_gwas = $args->{display_gwas} // '';
         my $target_snps = $args->{target_snps} // '';
         my $target_snp_genes = $args->{target_snp_genes} // '';
+        my $local_ld_snps = $args->{local_ld_snps} // '';
+        my $local_ld_audit_file = $args->{local_ld_audit_file} // '';
         my $sas_oda_account = $args->{sas_oda_account} // '';
         my $sas_oda_password = $args->{sas_oda_password} // '';
         my $prompt_sas_oda_auth = $args->{prompt_sas_oda_auth} // '';
         my $emit_local_sas_scripts = $args->{emit_local_sas_scripts} // '';
         my $local_sas_only = $args->{local_sas_only} // '';
         my $exclude_non_protein_coding_genes_in_local_gtf = $args->{exclude_non_protein_coding_genes_in_local_gtf} // '';
+        my $gnuplot_fallback_on_sas_space = $args->{gnuplot_fallback_on_sas_space};
         my $output_file = $args->{output_file};
         my $pid_arg = $args->{pid};
         my $wait_seconds = defined($args->{wait_seconds}) && $args->{wait_seconds} =~ /^\d+$/
@@ -1233,6 +1336,8 @@ $server->tool(
                     select(undef, undef, undef, 0.5);
                 }
 
+                # A process can disappear a fraction of a second before the
+                # durable runner atomically promotes its status JSON.
                 if (!pid_is_running($pid_arg) && $stored_status_file && !-s $stored_status_file) {
                     my $status_grace_deadline = time() + 3;
                     while (time() < $status_grace_deadline && !-s $stored_status_file) {
@@ -1307,7 +1412,25 @@ $server->tool(
             };
         }
 
-        die "Either spec_file or gwas_dir is required\n" unless length($spec_file) || length($gwas_dir);
+        if (defined $list_bundled_specs && $list_bundled_specs =~ /^(?:1|true|yes|y)$/i) {
+            return {
+                content => [{
+                    type => 'text',
+                    text => "BUNDLED SPEC CATALOG (read-only; no job launched)\n" .
+                            "- pgc_scz_sex_common: configs/spec_pgc_scz_sex_common_automation.json\n" .
+                            "  PGC schizophrenia sex-stratified female-versus-male comparisons and common-association workflows.\n" .
+                            "- pgc_scz_ancestry_diff: configs/spec_pgc_scz_ancestry_diff_automation.json\n" .
+                            "  PGC schizophrenia ancestry-differential comparisons.\n" .
+                            "For an existing-spec configuration-only request, call again with the exact spec_file and mode=configs. Do not use generate_spec_only."
+                }]
+            };
+        }
+
+        die "Either spec_file or gwas_dir is required (or use list_bundled_specs=true)\n"
+          unless length($spec_file) || length($gwas_dir);
+        die "generate_spec_only is only valid with gwas_dir; for an existing spec_file configuration-only request use mode=configs\n"
+          if length($spec_file) && defined $generate_spec_only
+             && $generate_spec_only =~ /^(?:1|true|yes|y)$/i;
 
         my $tmpdir = tempdir('tmp_auto_XXXXXXXX', DIR => '.', CLEANUP => 0);
 
@@ -1385,6 +1508,10 @@ $server->tool(
               if defined $target_snps && length $target_snps;
             push @cmd, ('--target-snp-genes', $target_snp_genes)
               if defined $target_snp_genes && length $target_snp_genes;
+            push @cmd, ('--local-ld-snps', $local_ld_snps)
+              if defined $local_ld_snps && length $local_ld_snps;
+            push @cmd, ('--local-ld-audit-file', $local_ld_audit_file)
+              if defined $local_ld_audit_file && length $local_ld_audit_file;
             push @cmd, '--emit-local-sas-scripts'
               if defined $emit_local_sas_scripts && $emit_local_sas_scripts =~ /^(?:1|true|yes|y)$/i;
             push @cmd, '--local-sas-only'
@@ -1392,6 +1519,17 @@ $server->tool(
             push @cmd, '--exclude-non-protein-coding-genes-in-local-gtf'
               if defined $exclude_non_protein_coding_genes_in_local_gtf
                  && $exclude_non_protein_coding_genes_in_local_gtf =~ /^(?:1|true|yes|y)$/i;
+            if (defined $gnuplot_fallback_on_sas_space && length $gnuplot_fallback_on_sas_space) {
+                if ($gnuplot_fallback_on_sas_space =~ /^(?:0|false|no|n)$/i) {
+                    push @cmd, '--no-gnuplot-fallback-on-sas-space';
+                }
+                elsif ($gnuplot_fallback_on_sas_space =~ /^(?:1|true|yes|y)$/i) {
+                    push @cmd, '--gnuplot-fallback-on-sas-space';
+                }
+                else {
+                    die "gnuplot_fallback_on_sas_space must be true or false\n";
+                }
+            }
             for my $step_flag (
                 [merge_raw => '--merge-raw'],
                 [sort_long => '--sort-long'],
@@ -1409,7 +1547,10 @@ $server->tool(
                 push @cmd, $cli_flag if defined $val && $val =~ /^(?:1|true|yes|y)$/i;
             }
 
-            # Attach identical concurrent requests to one backend process.
+            # Identical active workflows must share one backend process. This
+            # avoids concurrent force-rebuilds and SAS ODA jobs racing over
+            # the same local/remote artifacts when several AI sessions issue
+            # the same request.
             my $job_signature = sha256_hex(join("\0", @cmd));
             for my $existing_request (glob('tmp*/auto_prepare_and_run_diff_gwas.request')) {
                 next unless -f $existing_request;
@@ -1553,6 +1694,8 @@ $server->tool(
             display_gwas => { type => 'string', description => 'Optional comma-separated displayed GWAS tracks. Use pair prefixes such as ALL,EUR,ASN for differential tracks and GWAS labels such as ALL_FEMALE or EUR_MALE for single-GWAS tracks.' },
             target_snps => { type => 'string', description => 'Optional comma-separated inquiry SNP list for local Manhattan / local GTF plots. This is also the preferred fast-validation path for Ubuntu Docker runs.' },
             target_snp_genes => { type => 'string', description => 'Optional comma-separated SNP:GENE overrides, for example: rs17425819:JAK2,rs185665940:FANCL' },
+            ld_snps => { type => 'string', description => 'Optional comma-separated LD-linked SNPs to overlay with asterisk symbols on local scatter panels.' },
+            ld_audit_file => { type => 'string', description => 'Optional LD audit TSV. PRUNED_LD candidates linked to the plotted query lead SNP(s) are marked automatically.' },
             get_common_associations => { type => 'string', description => 'Optional flag or threshold for common-association local-hit mode, for example: true or 5e-8.' },
             common_association_top_hit_threshold => { type => 'string', description => 'Optional explicit starting threshold for common-association local-hit mode.' },
             reference_build => { type => 'string', description => 'Optional reference genome build override for build-aware local GTF annotation, for example: hg19, hg38, or t2t. If omitted, the pipeline tries explicit spec fields first, then header/path tokens, and otherwise falls back to hg38.' },
@@ -1575,6 +1718,8 @@ $server->tool(
         my $display_gwas = $args->{display_gwas} // '';
         my $target_snps = $args->{target_snps} // '';
         my $target_snp_genes = $args->{target_snp_genes} // '';
+        my $ld_snps = $args->{ld_snps} // '';
+        my $ld_audit_file = $args->{ld_audit_file} // '';
         my $get_common_associations = $args->{get_common_associations} // '';
         my $common_association_top_hit_threshold = $args->{common_association_top_hit_threshold} // '';
         my $reference_build = $args->{reference_build} // '';
@@ -1657,6 +1802,8 @@ $server->tool(
         push @cmd, ('--display-gwas', $display_gwas) if length $display_gwas;
         push @cmd, ('--target-snps', $target_snps) if length $target_snps;
         push @cmd, ('--target-snp-genes', $target_snp_genes) if length $target_snp_genes;
+        push @cmd, ('--ld-snps', $ld_snps) if length $ld_snps;
+        push @cmd, ('--ld-audit-file', $ld_audit_file) if length $ld_audit_file;
         if (length $get_common_associations) {
             if ($get_common_associations =~ /^(?:1|true|yes|y)$/i) {
                 push @cmd, '--get-common-associations';
@@ -2651,6 +2798,8 @@ any '/mcp' => sub ($c) {
     # --------------------------------------------------
     if ($method eq 'notifications/initialized') {
         #warn "[MCP] Received initialized notification\n";
+        # JSON-RPC notifications never receive a JSON-RPC response.  For the
+        # Streamable HTTP transport, acknowledge them with an empty 202.
         return $c->rendered(202);
     }
 
@@ -2720,6 +2869,12 @@ any '/mcp' => sub ($c) {
             });
         }
 
+        # Tool callbacks in this server already return the MCP CallToolResult
+        # shape ({content => [...]}) in nearly every case.  Wrapping that hash
+        # in another text content block double-encoded the response, forcing
+        # clients to deserialize JSON twice and making some Codex MCP sessions
+        # fail the protocol handshake/tool-result decoder.  Forward a valid
+        # CallToolResult directly; retain a text fallback for legacy callbacks.
         my $call_result =
             ref($result) eq 'HASH' && ref($result->{content}) eq 'ARRAY'
           ? $result

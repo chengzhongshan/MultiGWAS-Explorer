@@ -505,10 +505,40 @@ def ensure_macros_loaded(session_obj):
     session_obj._macros_loaded = True
     return session, session_obj
 
+def _session_home_value(sess):
+    cfg = getattr(getattr(sess, '_io', None), 'sascfg', None)
+    userid = str(getattr(cfg, 'omruser', '') or '').strip()
+    authkey = str(getattr(cfg, 'authkey', '') or '').strip()
+    if not userid:
+        authfile = os.path.join(os.path.expanduser('~'), '_authinfo' if os.name == 'nt' else '.authinfo')
+        try:
+            with open(authfile, 'r', encoding='utf-8') as handle:
+                for line in handle:
+                    fields = line.split()
+                    if len(fields) == 5 and (not authkey or fields[0] == authkey) and fields[1] == 'user' and fields[3] == 'password':
+                        userid = fields[2]
+                        break
+        except OSError:
+            pass
+    home_user = userid.split('@', 1)[0]
+    if home_user and home_user.lower() not in ('admin', 'root') and all(c.isalnum() or c in '._-' for c in home_user):
+        return f"/home/{home_user}"
+    sess.submit(r'''
+%global _mg_homepath;
+%let _mg_homepath=;
+%if %symexist(_USERHOME) %then %let _mg_homepath=%superq(_USERHOME);
+%if %superq(_mg_homepath)= %then %let _mg_homepath=%sysget(HOME);
+%if %superq(_mg_homepath)= %then %let _mg_homepath=%sysfunc(pathname(HOME));
+''')
+    userid = str(sess.symget('SYSUSERID') or '').strip()
+    home_user = userid.split('@', 1)[0]
+    if home_user and home_user.lower() not in ('admin', 'root') and all(c.isalnum() or c in '._-' for c in home_user):
+        return f"/home/{home_user}"
+    return str(sess.symget('_mg_homepath') or '').strip()
+
 def run_fileinfo(sess, remote_path):
     if remote_path.startswith('~/'):
-        sess.submit("%let homepath=%sysfunc(pathname(HOME));")
-        home = sess.symget('homepath')
+        home = _session_home_value(sess)
         remote_path = f"{home}/{remote_path[2:]}"
     safe_path = remote_path.replace('"', '""')
     sas_code = f"""
@@ -1098,15 +1128,26 @@ def upload_files_archive(items, session_obj):
             zin = f"zi{index + 1:06d}"[-8:]
             zout = f"zo{index + 1:06d}"[-8:]
             statements.extend([
-                f'filename {zin} ZIP "{_sas_archive_quote(remote_archive)}" member="{entry["member"]}" recfm=n;',
                 f'filename {zout} "{_sas_archive_quote(entry["remote_path"])}" recfm=n;',
                 'data _null_;',
-                f"  if fexist('{zout}') then rc_delete=fdelete('{zout}');",
-                f"  rc=fcopy('{zin}','{zout}');",
-                '  if rc ne 0 then do;',
-                "    call symputx('_mg_archive_error','1','G');",
-                f'    put "ERROR: Could not extract archive member {entry["member"]}: " rc=;',
+                f"  if fexist('{zout}') then do;",
+                f"    rc_delete=fdelete('{zout}');",
+                '    if rc_delete ne 0 then do;',
+                "      call symputx('_mg_archive_error','1','G');",
+                f'      put "ERROR: Could not replace existing archive destination {entry["remote_name"]}: " rc_delete=;',
+                '    end;',
                 '  end;',
+                'run;',
+                f'filename {zout} clear;',
+                f'filename {zin} ZIP "{_sas_archive_quote(remote_archive)}" member="{entry["member"]}";',
+                f'filename {zout} "{_sas_archive_quote(entry["remote_path"])}" recfm=n;',
+                'data _null_;',
+                f'  infile {zin} lrecl=32767 recfm=f length=_mg_len eof=_mg_eof unbuf;',
+                f'  file {zout} lrecl=32767 recfm=n;',
+                '  input;',
+                '  put _infile_ $varying32767. _mg_len;',
+                '  return;',
+                '  _mg_eof: stop;',
                 'run;',
                 f'filename {zin} clear;',
                 f'filename {zout} clear;',
@@ -1299,8 +1340,7 @@ def dirlist(remote_path, session_obj):
 
 def get_sas_home(session_obj):
     session, session_obj = get_session(session_obj)
-    sas_out = session.submit("%let homepath=%sysfunc(pathname(HOME));")
-    sashomepath = session.symget('homepath')
+    sashomepath = _session_home_value(session)
     return sashomepath, session_obj
 
 END_PYTHON
@@ -1906,8 +1946,35 @@ def ensure_session(session_id):
     return sessions[session_id]
 
 def session_home(sess):
-    sess.submit("%let homepath=%sysfunc(pathname(HOME));")
-    return sess.symget('homepath')
+    cfg = getattr(getattr(sess, '_io', None), 'sascfg', None)
+    userid = str(getattr(cfg, 'omruser', '') or '').strip()
+    authkey = str(getattr(cfg, 'authkey', '') or '').strip()
+    if not userid:
+        authfile = os.path.join(os.path.expanduser('~'), '_authinfo' if os.name == 'nt' else '.authinfo')
+        try:
+            with open(authfile, 'r', encoding='utf-8') as handle:
+                for line in handle:
+                    fields = line.split()
+                    if len(fields) == 5 and (not authkey or fields[0] == authkey) and fields[1] == 'user' and fields[3] == 'password':
+                        userid = fields[2]
+                        break
+        except OSError:
+            pass
+    home_user = userid.split('@', 1)[0]
+    if home_user and home_user.lower() not in ('admin', 'root') and all(c.isalnum() or c in '._-' for c in home_user):
+        return f"/home/{home_user}"
+    sess.submit(r'''
+%global _mg_homepath;
+%let _mg_homepath=;
+%if %symexist(_USERHOME) %then %let _mg_homepath=%superq(_USERHOME);
+%if %superq(_mg_homepath)= %then %let _mg_homepath=%sysget(HOME);
+%if %superq(_mg_homepath)= %then %let _mg_homepath=%sysfunc(pathname(HOME));
+''')
+    userid = str(sess.symget('SYSUSERID') or '').strip()
+    home_user = userid.split('@', 1)[0]
+    if home_user and home_user.lower() not in ('admin', 'root') and all(c.isalnum() or c in '._-' for c in home_user):
+        return f"/home/{home_user}"
+    return str(sess.symget('_mg_homepath') or '').strip()
 
 def resolve_remote_path(remote_path, sess):
     if remote_path.startswith('~/'):
@@ -2092,14 +2159,14 @@ def probe_session_after_empty_submit(sess):
         detail = traceback.format_exc()
         return False, f"{type(exc).__name__}: {exc}\n{detail}"
 
-def with_retry(session_id, fn):
+def with_retry(session_id, fn, retry_session_loss=True):
     try:
         sess = ensure_session(session_id)
         return fn(sess)
     except Exception as e:
         err = str(e)
         log_event(f"with_retry error session_id={session_id} err={err}")
-        if 'No SAS process attached' in err or 'SAS process has terminated' in err:
+        if retry_session_loss and ('No SAS process attached' in err or 'SAS process has terminated' in err):
             with lock:
                 log_event(f"with_retry recreating session_id={session_id}")
                 sess = create_session(session_id)
@@ -2182,7 +2249,12 @@ def handle_client(conn, addr):
                         if not alive:
                             raise RuntimeError("SAS submit returned empty output and the SAS session was no longer usable afterwards.\n" + probe_detail)
                     return res
-                res = with_retry(session_id, _submit)
+                # Never resubmit user SAS code implicitly after the ODA process
+                # dies.  A WORK-space exhaustion can terminate the process, and
+                # replaying the same code wastes time and normally fails again.
+                # The caller preserves/classifies the SAS log and decides whether
+                # a genuinely retryable submission should be started.
+                res = with_retry(session_id, _submit, retry_session_loss=False)
                 log = str(res.get('LOG',''))
                 lst = str(res.get('LST',''))
                 if macro_log and macro_warning:
@@ -3191,7 +3263,7 @@ sub _resolve_local_dependency_path {
 sub _is_builtin_macro_name {
     my ($name) = @_;
     return 1 unless defined $name && length $name;
-    return $name =~ /^(?:let|put|do|else|end|if|then|abort|window|display|str|nrstr|bquote|nrbquote|superq|sysfunc|qsysfunc|scan|substr|upcase|lowcase|length|eval|sysevalf|quote|unquote|cmpres|sysprod|sysmacroname|global|local|mend|macro|goto|return|include)$/i ? 1 : 0;
+    return $name =~ /^(?:let|put|do|else|end|if|then|abort|window|display|str|nrstr|bquote|nrbquote|superq|sysfunc|qsysfunc|sysget|symexist|scan|substr|upcase|lowcase|length|eval|sysevalf|quote|unquote|cmpres|sysprod|sysmacroname|global|local|mend|macro|goto|return|include)$/i ? 1 : 0;
 }
 
 sub _find_local_macro_file {
@@ -3472,7 +3544,10 @@ sub _process_dependencies {
 
     my $upload_dependency = sub {
         my ($cmd, $path) = @_;
-        return if $path =~ /^\/home\// || $path =~ /&/;
+        # Paths rooted in SAS HOME are already remote. Treating ~/... as a
+        # local dependency caused one SASPy connection per input/output after
+        # the same files had already been transferred by the bulk manifest.
+        return if $path =~ m{^(?:~/|/home/)} || $path =~ /&/;
         my $local_path = $self->_resolve_local_dependency_path($path);
         return unless $local_path && !$uploaded{$local_path}++;
         my $detail = $cmd;
@@ -3868,8 +3943,32 @@ sub delete_many {
     return "PYTHON ERROR: " . ($resp->{error} // 'nonpersistent bulk delete error');
 }
 
+sub _configured_oda_remote_home {
+    my $explicit = $ENV{SAS_ODA_REMOTE_HOME} // '';
+    return $explicit if $explicit =~ m{^/home/[A-Za-z0-9._-]+$};
+
+    my $local_home = $ENV{HOME} // '';
+    my $authfile = length($local_home) ? File::Spec->catfile($local_home, '.authinfo') : '';
+    if (length($authfile) && -r $authfile && open(my $fh, '<', $authfile)) {
+        while (my $line = <$fh>) {
+            my @fields = split /\s+/, $line;
+            next unless @fields == 5 && $fields[1] eq 'user' && $fields[3] eq 'password';
+            my $user = $fields[2] // '';
+            $user =~ s/\@.*$//;
+            if ($user =~ /^[A-Za-z0-9._-]+$/ && $user !~ /^(?:admin|root)$/i) {
+                close $fh;
+                return "/home/$user";
+            }
+        }
+        close $fh;
+    }
+    return '';
+}
+
 sub get_sas_home_path {
     my ($self) = @_;
+    my $configured_home = _configured_oda_remote_home();
+    return $configured_home if length $configured_home;
     if ($self->{persistent} && $self->{session_id}) {
         my $resp = $self->_call_persistent_session_server(
             { cmd => 'gethome', session_id => $self->{session_id} },

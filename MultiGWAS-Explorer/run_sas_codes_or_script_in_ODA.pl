@@ -138,6 +138,7 @@ my ($internal_runner_result_json, $internal_execution_file, $internal_execution_
 my (@upload_files, @download_files, @download_local_paths, @delete_files, @delete_file_rgxs, @file_infos);
 my ($sas_oda_account, $sas_oda_password, $force_sas_oda_auth_prompt,
     $skip_sas_oda_auth_bootstrap, $check_sas_oda_login_only);
+my $classify_sas_log;
 my ($cli_sas_run_timeout_seconds, $cli_sas_run_timeout_grace_seconds, $disable_run_timeout);
 our $python_bin;
 my $skip_upload_if_same = 1;
@@ -457,6 +458,7 @@ GetOptions(
     'prompt-sas-oda-auth!' => \$force_sas_oda_auth_prompt,
     'skip-sas-oda-auth-bootstrap!' => \$skip_sas_oda_auth_bootstrap,
     'check-sas-oda-login-only!' => \$check_sas_oda_login_only,
+    'classify-sas-log=s' => \$classify_sas_log,
     'monitor-status-file=s' => \$monitor_status_file,
     'monitor-interval-seconds=i' => \$monitor_interval_seconds,
     'kill-saspy-sessions|kill-sas-oda-sessions|kill-saspy-session-server!' => \$kill_saspy_sessions,
@@ -917,7 +919,22 @@ if ($internal_runner_result_json) {
     exit(($worker_error || (ref($worker_result) eq 'HASH' && ($worker_result->{error} // ''))) ? 1 : 0);
 }
 
-if ($help || (!$check_sas_oda_login_only && !$monitor_status_file && !$code && !$file && !@upload_files && !@download_files && !@delete_files && !@delete_file_rgxs && !$dir4listing && !@file_infos)
+if (!$help && defined($classify_sas_log) && length($classify_sas_log)) {
+    open my $classify_fh, '<:encoding(UTF-8)', $classify_sas_log
+      or die "Cannot read SAS log $classify_sas_log: $!\n";
+    local $/;
+    my $classify_text = <$classify_fh> // '';
+    close $classify_fh;
+    my $has_space_failure = sas_log_contains_space_exhaustion($classify_text) ? 1 : 0;
+    print encode_json({
+        sas_log       => $classify_sas_log,
+        failure_class => ($has_space_failure ? 'sas_oda_space_exhaustion' : ''),
+        retryable     => ($has_space_failure ? JSON::PP::false : JSON::PP::true),
+    }), "\n";
+    exit($has_space_failure ? 73 : 0);
+}
+
+if ($help || (!$check_sas_oda_login_only && !$classify_sas_log && !$monitor_status_file && !$code && !$file && !@upload_files && !@download_files && !@delete_files && !@delete_file_rgxs && !$dir4listing && !@file_infos)
    || ($code && $file) ) {
     print <<USAGE;
 Usage: $0 [OPTIONS]
@@ -976,6 +993,9 @@ Options:
   --sas-oda-password <pass>  Optional SAS ODA password for first-run credential bootstrap.
   --prompt-sas-oda-auth      Force an interactive SAS ODA credential refresh before connecting.
   --check-sas-oda-login-only Validate SAS ODA login with PROC SETINIT and exit.
+  --classify-sas-log <file>  Inspect an existing SAS log without connecting to ODA.
+                             Space exhaustion returns JSON with retryable=false
+                             and exits 73; other logs exit 0.
   --monitor-status-file <f>  Follow a live SAS ODA status JSON sidecar from another terminal.
   --monitor-interval-seconds <n>
                              Poll interval for --monitor-status-file (default: 5 seconds).
@@ -1738,7 +1758,7 @@ sub sas_submission_contains_include {
 sub is_builtin_macro_name {
     my ($name) = @_;
     return 1 unless defined $name && length $name;
-    return $name =~ /^(?:let|put|do|else|end|if|then|abort|window|display|str|nrstr|bquote|nrbquote|superq|sysfunc|qsysfunc|scan|substr|upcase|lowcase|length|eval|sysevalf|quote|unquote|cmpres|sysprod|sysmacroname|global|local|mend|macro|goto|return|include)$/i ? 1 : 0;
+    return $name =~ /^(?:let|put|do|else|end|if|then|abort|window|display|str|nrstr|bquote|nrbquote|superq|sysfunc|qsysfunc|sysget|symexist|scan|substr|upcase|lowcase|length|eval|sysevalf|quote|unquote|cmpres|sysprod|sysmacroname|global|local|mend|macro|goto|return|include)$/i ? 1 : 0;
 }
 
 sub sas_submission_uses_nonbuiltin_macro {
@@ -2263,6 +2283,31 @@ sub scan_sas_text_for_inline_data_step_cards {
     return \@findings;
 }
 
+sub scan_sas_text_for_unsafe_put_semicolons {
+    my ($text) = @_;
+    my @findings;
+    return \@findings unless defined $text && length $text;
+    my @lines = split /\r?\n/, $text, -1;
+    for my $idx (0 .. $#lines) {
+        my $line = $lines[$idx] // '';
+        next unless $line =~ /^\s*%put\b/i;
+        # A literal semicolon terminates a macro statement even when it looks
+        # like ordinary prose.  Flag trailing text unless it starts another
+        # macro statement; use a comma or macro quoting such as %str(;) when a
+        # semicolon is genuinely part of the message.
+        next unless $line =~ /^\s*%put\b.*?;\s*([^%\s][^;]*);\s*$/i;
+        my $trailing = $1 // '';
+        $trailing =~ s/^\s+|\s+$//g;
+        push @findings, {
+            line        => $idx + 1,
+            type        => 'unsafe_put_semicolon',
+            message     => "Literal semicolon terminates %put before trailing text '$trailing'; replace it with punctuation such as a comma or macro-quote the semicolon.",
+            context_ref => [ $idx + 1 ],
+        };
+    }
+    return \@findings;
+}
+
 sub scan_sas_text_for_common_macro_typos {
     my ($text) = @_;
     my @findings;
@@ -2294,6 +2339,7 @@ sub run_submission_preflight {
     my $submitted_code = $args{submitted_code} // '';
     my $display_path = $args{display_path} // '(submitted SAS program)';
     my $scan = scan_sas_text_for_unbalanced_constructs($submitted_code);
+    push @{ $scan->{findings} }, @{ scan_sas_text_for_unsafe_put_semicolons($submitted_code) };
     my @warning_findings;
     push @warning_findings, @{ scan_sas_text_for_inline_data_step_cards($submitted_code) };
     push @warning_findings, @{ scan_sas_text_for_common_macro_typos($submitted_code) };
@@ -2822,6 +2868,18 @@ sub delete_one_file {
     }
 }
 
+sub sas_log_contains_space_exhaustion {
+    my ($text) = @_;
+    return 0 unless defined $text && length $text;
+    for my $line (split /\r?\n/, $text) {
+        next if $line =~ /^\s*\d+(?:\s+|!\s*)/;
+        return 1 if $line =~ /^\s*ERROR:\s+Insufficient space in\b/i;
+        return 1 if $line =~ /^\s*ERROR:.*(?:No space left on device|Disk quota exceeded|file system is full|disk is full|quota[^\r\n]*exceed)/i;
+        return 1 if $line =~ /^\s*(?:ERROR:\s*)?UNIX errno\s*=\s*(?:28|122)(?:\D|$)/i;
+    }
+    return 0;
+}
+
 sub compose_remote_path_for_match {
     my ($remote_dir, $entry) = @_;
     return $entry if !defined $remote_dir || $remote_dir eq '' || $remote_dir eq '.';
@@ -2982,6 +3040,7 @@ if (!$skip_execution_due_to_preflight && $include_preflight && $include_prefligh
 my $result;
 my $sas_execution_failed = 0;
 my $sas_execution_error = '';
+my $sas_execution_failure_class = '';
 my $submit_text_for_autoload = $execution_file ? slurp_text_file($execution_file) : ($execution_code // '');
 my $submit_should_autoload_macros = should_autoload_macros_for_submission($submit_text_for_autoload) ? 1 : 0;
 
@@ -3151,6 +3210,18 @@ if (($execution_file || ($execution_code && $execution_code !~ /^\s*$/))
     my $first_line = first_fatal_sas_log_line($result->{log} // '');
     $sas_execution_error = 'SAS log contains fatal errors';
     $sas_execution_error .= ": $first_line" if length $first_line;
+}
+
+if (($execution_file || ($execution_code && $execution_code !~ /^\s*$/))
+    && ref($result) eq 'HASH'
+    && sas_log_contains_space_exhaustion(join("\n", $result->{error} // '', $result->{log} // ''))) {
+    $sas_execution_failed = 1;
+    $sas_execution_failure_class = 'sas_oda_space_exhaustion';
+    my $first_line = first_fatal_sas_log_line(join("\n", $result->{error} // '', $result->{log} // ''));
+    $sas_execution_error = 'NON-RETRYABLE: SAS ODA exhausted its WORK/storage space';
+    $sas_execution_error .= ": $first_line" if length $first_line;
+    $sas_execution_error .= '. Free ODA storage or reduce WORK data before rerunning; the same SAS script must not be submitted again automatically.';
+    warn "ERROR: $sas_execution_error\n";
 }
 
 if (($execution_file || ($execution_code && $execution_code !~ /^\s*$/))
@@ -3471,10 +3542,33 @@ if ($sas_execution_failed) {
         message  => $sas_execution_error,
         complete => 1,
         success  => 0,
+        (length($sas_execution_failure_class)
+          ? (failure_class => $sas_execution_failure_class, retryable => 0)
+          : ()),
     }) if ($execution_file || ($execution_code && $execution_code !~ /^\s*$/));
+    my $failure_exit_code = 1;
+    if ($sas_execution_failure_class eq 'sas_oda_space_exhaustion') {
+        my $marker_file = "$output_prefix_path.non_retryable_space_failure.txt";
+        if (open my $marker_fh, '>:encoding(UTF-8)', $marker_file) {
+            print {$marker_fh} "failure_class=sas_oda_space_exhaustion\n";
+            print {$marker_fh} "retryable=false\n";
+            print {$marker_fh} "sas_status=$status_file\n";
+            print {$marker_fh} "message=$sas_execution_error\n";
+            print {$marker_fh} "recommended_action=Free ODA storage or reduce WORK data before starting a new run.\n";
+            close $marker_fh;
+            print STDERR "ERROR: Non-retryable SAS ODA space-failure marker written to: $marker_file\n";
+        } else {
+            warn "WARNING: Could not write SAS ODA space-failure marker $marker_file: $!\n";
+        }
+        $failure_exit_code = (defined($ENV{SAS_ODA_SPACE_EXHAUSTION_EXIT_CODE})
+          && $ENV{SAS_ODA_SPACE_EXHAUSTION_EXIT_CODE} =~ /^\d+$/)
+          ? int($ENV{SAS_ODA_SPACE_EXHAUSTION_EXIT_CODE})
+          : 73;
+        print STDERR "ERROR: Stopping without retry; exit code $failure_exit_code identifies a non-retryable ODA space failure.\n";
+    }
     cleanup_empty_output_dir_if_created($output_dir);
     print "ERROR: $sas_execution_error\n";
-    exit 1;
+    exit $failure_exit_code;
 }
 
 # else{

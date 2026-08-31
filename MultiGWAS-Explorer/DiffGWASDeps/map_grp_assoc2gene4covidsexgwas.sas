@@ -123,6 +123,9 @@ Whenever  makeheatmapdotintooneline=1 or 0, it is possible to use values of the 
 label specific scatterplot dots based on the customization of the variable predifined by users for the input data set; 
 default is empty; provide a variable that include non-empty strings for specific dots in the 
 scatterplots;*/
+var4mark_ld_scatterplot_dots=, /*Optional character variable containing '*' for LD-linked variants.*/
+ld_marker_color=black,
+ld_marker_legend_symbol=*,
 text_rotate_angle=90, /*Angle to rotate text labels for these selected dots by users*/
 auto_rotate2zero=0, /*supply value 1 when less than 3 text labels, it is good to automatically set the text_rotate_angel=0*/
 pct2adj4dencluster=0.15,/*For SNP labels on the top, please try to use this parameter, which only works when 
@@ -281,6 +284,9 @@ select
      %end;
      %if %length(&var4label_scatterplot_dots)>0 %then %do;
        &var4label_scatterplot_dots,
+     %end;
+     %if %length(&var4mark_ld_scatterplot_dots)>0 %then %do;
+       &var4mark_ld_scatterplot_dots,
      %end;
      %if %length(&Variant_Length_Var)>0 %then %do;
        &Variant_Length_Var,
@@ -452,6 +458,9 @@ Whenever  makeheatmapdotintooneline=1 or 0, it is possible to use values of the 
 label specific scatterplot dots based on the customization of the variable predifined by users for the input data set; 
 default is empty; provide a variable that include non-empty strings for specific dots in the 
 scatterplots;*/
+var4mark_ld_scatterplot_dots=&var4mark_ld_scatterplot_dots,
+ld_marker_color=&ld_marker_color,
+ld_marker_legend_symbol=&ld_marker_legend_symbol,
 adj_spaces_among_top_snps=&adj_spaces_among_top_snps /*Provide value 1 to adjust spaces among top SNP labels; otherwise, give value 0 to not 
 adjust top SNPs labels if these labels are rotated 90 degree, which is helpful when the space adjusted labels are not pretty*/ 
 );

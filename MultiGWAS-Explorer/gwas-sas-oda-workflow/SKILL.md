@@ -189,6 +189,14 @@ Before running a workflow, identify:
    the SAS log for the dynamically generated PNG path and download all
    then-known results together. Use `ODA_TRANSFER_MANIFEST_ONLY=1` to audit the
    planned uploads without connecting to ODA.
+   With at least two transfers, keep the default archive mode so the manifest
+   crosses the SASPy connection as one ZIP. Verify extracted byte sizes (or
+   hashes in a smoke test) and allow the built-in individual-transfer fallback
+   only when the archive operation fails. The upload extractor uses a
+   fixed-record binary stream rather than direct ZIP-member `FCOPY`, which is
+   not reliable in SAS ODA. For email-form ODA logins, resolve SAS HOME from
+   the authenticated name before `@`, not from a transient `/home/admin`
+   service-session fileref.
 
 9. Preserve local GTF gene-track intent explicitly.
    When building local GTF plots, prefer a region-limited Gencode subset over a
@@ -235,6 +243,15 @@ Before running a workflow, identify:
    supplied target. Local-GTF output reuse must include a request key derived
    from the rendered runner configuration so a different target cannot reuse
    an unrelated generic HTML result.
+
+   Keep high-LD plot markers disabled unless the user explicitly asks for
+   them. Dense proxy sets can hide association points in a wide locus. When
+   requested, accept a population (EUR by default), r-squared threshold,
+   marker symbol, and marker color; prefer a reusable local HaploReg cache and
+   use the HaploReg web query only for cache misses. Supplying an explicit LD
+   SNP list also counts as an explicit request to enable the overlay. Verify
+   both the local-Manhattan and local-GTF outputs, and verify that an ordinary
+   run without the option contains no LD-marker layer.
 
    Use tabix for GTF interval extraction by default. On Windows/Cygwin, prefer
    the bundled `DiffGWASDeps/tabix.exe` and `DiffGWASDeps/bgzip.exe`; otherwise
@@ -402,6 +419,10 @@ For a new project, copy/adapt the script templates in this skill's `scripts/` fo
 - For an explicit target-SNP local-GTF run, confirm the requested-hit CSV is
   generated before the GTF subset and that the common-association verifier is
   skipped.
+- For two nearby inquiry SNPs, confirm their windows are merged into one locus,
+  both rsIDs are labeled once, and high-LD markers are absent by default. Then
+  run one opt-in check with a non-default symbol/color if LD display is part of
+  the requested analysis.
 - Use `ODA_TRANSFER_MANIFEST_ONLY=1` to confirm all expected uploads are known
   before ODA access. For a real two-or-more-file transfer, confirm the SASPy log
   shows one session rather than one connection per file.
@@ -420,6 +441,10 @@ For a new project, copy/adapt the script templates in this skill's `scripts/` fo
   - the full-strata mirrored CSVs were emitted
   - the row counts still match the selected common and differential loci
 - Confirm SAS ODA cleanup by listing or checking the deleted paths.
+- Before a long ODA submit, keep submission preflight enabled. It now treats a
+  literal semicolon followed by prose on the same `%put` line as a compile
+  blocker, because SAS terminates `%put` at that semicolon and otherwise
+  reports `ERROR 180-322` only after the remote job has started.
 - For `run_sas_codes_or_script_in_ODA.pl` incidents, prefer this quick AI
   debug ladder before moving into `%include` or plotting macros:
   - `perl DiffGWASDeps/run_sas_codes_or_script_in_ODA.pl --check-sas-oda-login-only`

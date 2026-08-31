@@ -78,10 +78,13 @@ When draw genome-wide Manhattan plots, it is required to assign value 1 to this 
 top_hit_thresd=,/*provide a p value threshold to only draw local Manhattan plot for the smallest 
 top hit around a specific genomic window,such as p < 1e-6 within a window of 1e7 bp*/
 dist4get_smallest_top_hit=1e7, /*Select the smallest top SNP around a genomic window of the supplied distance in bp*/
-only_get_top_hit4n_th_gwas=0 /*The parameter enables the macro to focus on top hits from specific gwas represented by 
+only_get_top_hit4n_th_gwas=0, /*The parameter enables the macro to focus on top hits from specific gwas represented by
 its order starting from 1 to n for the 1st gwas and other gwass inferred by their supplied P variables; the default value 0 means
 to query all gwas top hits; if only want to query top hits from the 1 gwas, please supply value 1, and this applicable to 
 other gwass if the correct numeric order for the gwas is supplied here!*/
+LD_SNPs2mark_scatterplot_dots=, /*Space-delimited high-LD rsIDs overlaid on every GWAS track.*/
+LD_marker_symbol=*,
+LD_marker_color=black
 );
 
 %local n_other_pvars n_gwas_pvars;
@@ -744,6 +747,12 @@ axis2 label=(angle=90 "-Log10(p)" f=Arial h=&y_axis_label_size)
 
 data manhattan;
 set manhattan;
+length _LD_SNP_MARK_ $8;
+_LD_SNP_MARK_='';
+%if %length(&LD_SNPs2mark_scatterplot_dots)>0 %then %do;
+if findw(upcase("&LD_SNPs2mark_scatterplot_dots"),upcase(strip(&snp_var)),' ')>0
+  then _LD_SNP_MARK_="&LD_marker_symbol";
+%end;
 *Further remove signals with logP<1.3, which will save space and prevent the reference lines covered by these signals with logP<1.3;
 if logP<&rm_signals_with_logP_lt then logP=.;
 if logp>&_logP_topval then logp=&_logP_topval;
@@ -761,6 +770,31 @@ if logp&_mi_^=. then logp&_mi_=logp&_mi_+&_logP_topval*&_mi_;
 %end;
 
 run;
+
+%if %length(&LD_SNPs2mark_scatterplot_dots)>0 %then %do;
+data _ld_snp_anno;
+  set manhattan(where=(not missing(_LD_SNP_MARK_)));
+  length function $8 text $40 color $16 position $1 style $12;
+  retain xsys '2' ysys '2' function 'label' text "&LD_marker_symbol" color "&LD_marker_color"
+         position '5' style 'Arial' size 1.6;
+  x=Fake_position;
+  array _ld_logp_[*] logp logp1-logp%ntokens(&Other_P_vars);
+  do _ld_i_=1 to dim(_ld_logp_);
+    y=_ld_logp_[_ld_i_];
+    if not missing(y) then output;
+  end;
+  keep x y xsys ysys function text color position style size;
+run;
+proc append base=anno data=_ld_snp_anno force;
+run;
+data _ld_snp_legend;
+  length function $8 text $40 color $16 position $1 style $12;
+  xsys='1'; ysys='1'; x=1; y=98; function='label'; position='6';
+  text=cats("&LD_marker_symbol",' High-LD SNP'); color="&LD_marker_color"; style='Arial'; size=1.2;
+run;
+proc append base=anno data=_ld_snp_legend force;
+run;
+%end;
 
 proc transpose data=manhattan out=manhattan(rename=(col1=logP) drop=_name_);
 var logp:;

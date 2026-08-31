@@ -1419,8 +1419,10 @@ new ODA connection for every file.
 
 When a manifest contains two or more uploads or downloads, the helper now also
 uses one ZIP archive by default. Uploads are compressed locally, transferred
-once, extracted into SAS HOME with binary `FCOPY`, and verified against the
-original byte sizes. Downloads are staged under collision-resistant names,
+once, extracted into SAS HOME with a fixed-record binary stream copy, and
+verified against the original byte sizes. This avoids the SAS ODA `FCOPY`
+failure seen when a ZIP-member fileref is copied directly to an external file.
+Downloads are staged under collision-resistant names,
 packed with SAS `ODS PACKAGE`, transferred once, safely extracted to the
 requested local paths, and byte-size verified. Temporary ZIP and staging files
 are deleted automatically on both sides, including failure paths. If an ODA ZIP
@@ -1455,6 +1457,9 @@ Practical remote-path lessons from the recent SAS ODA debugging:
   literal `~` reaches the helper unchanged
 - the helper now normalizes both `~/...` and absolute SAS home paths such as
   `/home/...` consistently for download, delete, and file-info operations
+- when the ODA login is an email address, the helper derives the remote SAS
+  home from the authenticated user name before `@`; this avoids fresh sessions
+  accidentally resolving `~/...` to the service account `/home/admin`
 - delete requests now verify that the target path no longer resolves after the
   helper reports success
 
@@ -2118,6 +2123,36 @@ GTF extraction. It does not run the genome-wide common-association verifier for
 that request. This ordering prevents a one-locus request from scanning an
 unrelated large verifier table.
 
+When two or more explicit target SNPs have overlapping SNP-centered windows on
+the same chromosome, the SAS local-GTF runner now merges them into one displayed
+locus and labels every requested rsID in that plot. For example, with a `1e6`
+half-window, `rs2070788` (chr21:42841988) and `rs383510` (chr21:42858367) are
+rendered together rather than as two nearly identical figures. A previously
+generated target CSV is reused only after its SNPs, coordinates, optional gene
+overrides, and freshness relative to the compact GWAS subset are validated.
+
+High-LD marker overlays are disabled by default because dense proxies can
+obscure association points in a wide locus. Enable them only when requested:
+
+```bash
+perl auto_prepare_and_run_diff_gwas.pl \
+  --spec configs/your_spec.json \
+  --target-snps rs2070788,rs383510 \
+  --step plot_local_gtf \
+  --highlight-high-ld-snps \
+  --ld-population EUR \
+  --ld-r2-threshold 0.8 \
+  --ld-marker-symbol diamond \
+  --ld-marker-color '#6A0DAD'
+```
+
+The gnuplot entry point accepts the same highlighting, population, threshold,
+symbol, and color controls. Supplying `--ld-snps` explicitly also enables the
+overlay. Supported symbols are `star`, `plus`, `cross`, `circle`, `square`,
+`triangle`, and `diamond`; colors may be named colors or `#RRGGBB`. When
+enabled, the resolver prefers the reusable local HaploReg cache and queries
+HaploReg only for missing SNPs unless web fallback is disabled.
+
 `DiffGWASDeps/extract_gencode_gtf_subset.pl` requires indexed extraction by
 default. It locates `tabix` and `bgzip` in `DiffGWASDeps/`, the repository root,
 `local/bin/`, or `PATH`, builds a sorted BGZF GTF plus `.tbi` once when needed,
@@ -2424,10 +2459,46 @@ Important interpretation:
 - later markers such as `The final figure is put here` or
   `Lattice gscatter plot is completed!` do not prove the figure is valid after
   `WORK` overflow has already damaged the intermediate SAS datasets
+- the local-GTF and local-Manhattan wrappers inspect each saved SAS log before
+  any retry; a real
+  ODA space-exhaustion record is classified as non-retryable, reported clearly,
+  and stops the wrapper with exit code `73`
+- the wrapper preserves the SAS log and writes
+  `<log>.non_retryable_space_failure.txt` with `retryable=false`, while the
+  low-level runner records `failure_class=sas_oda_space_exhaustion` in its JSON
+  run status, writes `output.non_retryable_space_failure.txt`, and exits `73`
+- persistent-session recovery no longer silently replays user SAS code after
+  the SAS process terminates; file-transfer operations can still use their
+  normal transport recovery
+- a native SASPy/SAS process abort (exit `134` or `SIGABRT`) is also classified
+  as a non-retryable infrastructure failure instead of blindly resubmitting the
+  same plotting job
+- deterministic SAS compile records such as `ERROR 180-322:` are preserved and
+  stop immediately; they are not replayed by the bounded transport retry loop
 - in that case, reduce at least one of:
   - local GTF window size
   - local GTF loci per run or per figure
   - stacked GTF track count
+
+Do not rerun the same failed SAS script and inputs until ODA storage has been
+freed or the plotting input/WORK footprint has been reduced. The guard treats
+ordinary network timeouts as a different class, so they remain eligible for the
+existing bounded retry policy.
+
+For plotting requests, the high-level automation can run the equivalent local
+gnuplot workflow once after classified ODA storage exhaustion or native exit
+134. Disable these policies with `--no-gnuplot-fallback-on-sas-space` and
+`--no-gnuplot-fallback-on-sas-failure`. SAS syntax, data, authentication, and
+other ordinary program errors do not trigger this fallback.
+
+An existing log can be checked locally without connecting to ODA:
+
+```bash
+perl run_sas_codes_or_script_in_ODA.pl --classify-sas-log output.html.info.txt
+```
+
+The command prints JSON. A detected space failure reports `retryable:false` and
+returns exit code `73`; a log without that failure returns `0`.
 
 The new safer defaults were added specifically to reduce this failure mode:
 

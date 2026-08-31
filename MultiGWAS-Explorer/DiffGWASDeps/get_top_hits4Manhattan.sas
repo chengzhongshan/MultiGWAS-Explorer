@@ -133,7 +133,7 @@ from top_ind
 order by &snp_var;
 %put Top snps are selected: &_top_snps_;
 %if %sysevalf(%superq(_top_snp_n) > 200) %then %do;
-  %put NOTE: &_top_snp_n top SNPs passed the threshold; _top_snps_ is truncated to the first 200 names to avoid macro-length overflow.;
+  %put NOTE: &_top_snp_n top SNPs passed the threshold, and _top_snps_ is truncated to the first 200 names to avoid macro-length overflow.;
 %end;
 %else %do;
   %put They are saved into a global macro variable, _top_snps_;

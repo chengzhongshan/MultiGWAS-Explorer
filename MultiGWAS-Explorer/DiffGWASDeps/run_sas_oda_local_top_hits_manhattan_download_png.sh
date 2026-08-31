@@ -3,6 +3,13 @@ set -euo pipefail
 
 DEPS_DIR="${DEPS_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)}"
 WORKDIR="${WORKDIR:-$(cd "${DEPS_DIR}/.." && pwd -P)}"
+SAS_ODA_FAILURE_GUARD="${SAS_ODA_FAILURE_GUARD:-${DEPS_DIR}/sas_oda_failure_guard.sh}"
+if [[ ! -r "${SAS_ODA_FAILURE_GUARD}" ]]; then
+  echo "ERROR: Required SAS ODA failure guard is unavailable: ${SAS_ODA_FAILURE_GUARD}" >&2
+  exit 2
+fi
+# shellcheck source=sas_oda_failure_guard.sh
+source "${SAS_ODA_FAILURE_GUARD}"
 ODA_HELPER_SCRIPT="${ODA_HELPER_SCRIPT:-${DEPS_DIR}/run_sas_codes_or_script_in_ODA.pl}"
 if [[ ! -f "${ODA_HELPER_SCRIPT}" ]]; then
   ODA_HELPER_SCRIPT="${WORKDIR}/run_sas_codes_or_script_in_ODA.pl"
@@ -113,6 +120,24 @@ else
   DEFAULT_MANHATTAN_FIG_HEIGHT="1000"
 fi
 MANHATTAN_P_VAR="${MANHATTAN_P_VAR:-${DEFAULT_MANHATTAN_P_VAR}}"
+GTF_LD_SNPS="${GTF_LD_SNPS:-}"
+GTF_LD_MARKER_SYMBOL="${GTF_LD_MARKER_SYMBOL:-star}"
+GTF_LD_MARKER_COLOR="${GTF_LD_MARKER_COLOR:-black}"
+case "${GTF_LD_MARKER_SYMBOL,,}" in
+  star) GTF_LD_MARKER_CHAR='%str(*)' ;;
+  plus) GTF_LD_MARKER_CHAR='+' ;;
+  cross) GTF_LD_MARKER_CHAR='x' ;;
+  circle) GTF_LD_MARKER_CHAR='o' ;;
+  square) GTF_LD_MARKER_CHAR='#' ;;
+  triangle) GTF_LD_MARKER_CHAR='^' ;;
+  diamond) GTF_LD_MARKER_CHAR='<>' ;;
+  *) echo "ERROR: Unsupported GTF_LD_MARKER_SYMBOL=${GTF_LD_MARKER_SYMBOL}" >&2; exit 2 ;;
+esac
+if [[ "${GTF_LD_MARKER_COLOR}" =~ ^#[0-9A-Fa-f]{6}$ ]]; then
+  GTF_LD_MARKER_SAS_COLOR="CX${GTF_LD_MARKER_COLOR#\#}"
+else
+  GTF_LD_MARKER_SAS_COLOR="${GTF_LD_MARKER_COLOR}"
+fi
 MANHATTAN_OTHER_P_VARS="${MANHATTAN_OTHER_P_VARS:-${DEFAULT_MANHATTAN_OTHER_P_VARS}}"
 MANHATTAN_GWAS_LABEL_NAMES="${MANHATTAN_GWAS_LABEL_NAMES:-${DEFAULT_MANHATTAN_GWAS_LABEL_NAMES}}"
 DEFAULT_MANHATTAN_FIG_WIDTH="${DEFAULT_MANHATTAN_FIG_WIDTH:-1800}"
@@ -350,6 +375,10 @@ manhattan_submit_needs_retry() {
   bytes="$(wc -c < "${RUN_LOG_FILE}")"
   [[ "${bytes}" -lt 500 ]] && return 0
   return 1
+}
+
+manhattan_log_has_terminal_failure() {
+  sas_oda_log_has_terminal_sas_error "${RUN_LOG_FILE}"
 }
 
 run_manhattan_submit() {
@@ -722,6 +751,9 @@ perl "${RENDER_SAS_HELPER}" \
   --replace "TOP_HIT_LD_AUDIT_BASENAME=${TOP_HIT_LD_AUDIT_BASENAME}" \
   --replace "TARGET_SNP_LIST=${TARGET_SNP_LIST}" \
   --replace "TARGET_SNP_GENES=${TARGET_SNP_GENES}" \
+  --replace "GTF_LD_SNPS=${GTF_LD_SNPS//,/ }" \
+  --replace "GTF_LD_MARKER_SYMBOL=${GTF_LD_MARKER_CHAR}" \
+  --replace "GTF_LD_MARKER_COLOR=${GTF_LD_MARKER_SAS_COLOR}" \
   --replace "COMMON_ASSOC_P_VARS=${COMMON_ASSOC_P_VARS:-}" \
   --replace "LOCAL_WINDOW_BP=${LOCAL_WINDOW_BP}" \
   --replace "GTF_DSD=${GTF_DSD}" \
@@ -933,6 +965,16 @@ while :; do
   else
     local_mh_submit_rc=$?
     echo "[3b/5] Local Manhattan SAS submit attempt ${local_mh_submit_attempt} exited with status ${local_mh_submit_rc}."
+  fi
+  if sas_oda_report_space_exhaustion "${RUN_LOG_FILE}" "local-Manhattan SAS submit attempt ${local_mh_submit_attempt}"; then
+    exit "${SAS_ODA_SPACE_EXHAUSTION_EXIT_CODE:-73}"
+  fi
+  if sas_oda_report_native_abort "${local_mh_submit_rc}" "${RUN_LOG_DIR}/output.run.status.json" "local-Manhattan SAS submit attempt ${local_mh_submit_attempt}"; then
+    exit 134
+  fi
+  if manhattan_log_has_terminal_failure; then
+    echo "ERROR: Local Manhattan SAS log contains a deterministic terminal error; preserving the log and not retrying: ${RUN_LOG_FILE}" >&2
+    exit 1
   fi
   if [[ "${local_mh_submit_rc}" -eq 0 ]] && ! manhattan_submit_needs_retry; then
     break

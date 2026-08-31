@@ -53,6 +53,7 @@ use GD;
 use Text::ParseWords qw(parse_line);
 use File::Spec;
 use File::Basename qw(basename dirname);
+use File::Copy qw(copy);
 use File::Path qw(make_path);
 use POSIX qw(strftime ceil);
 use Time::HiRes qw(time);
@@ -76,6 +77,20 @@ Options:
                                 Default: enabled.
   --target-snps A,B,C           Override target SNP list.
   --target-snp-genes MAP        Optional SNP:GENE overrides, comma-separated. Example: rs17425819:JAK2,rs2564978:CR1
+  --ld-snps A,B,C               Optional LD-linked SNPs to overlay with asterisks.
+  --[no-]highlight-high-ld-snps Resolve and draw high-LD markers. Default: off.
+                                Supplying --ld-snps also enables highlighting.
+  --ld-marker-symbol NAME       star, plus, cross, circle, square, triangle, or diamond.
+                                Default: star when highlighting is enabled.
+  --ld-marker-color COLOR       Named or #RRGGBB marker color. Default: black.
+  --ld-cache FILE               Normalized local HaploReg TSV/SQLite LD cache.
+  --ld-population POP           HaploReg population for high-LD stars (default EUR).
+  --ld-r2-threshold N           High-LD star threshold (default 0.8).
+  --[no-]ld-web-fallback        Query HaploReg only when the local cache misses
+                                a query SNP (default enabled); successful queries
+                                are saved in cache/haploreg_ld for reuse.
+  --ld-audit-file FILE          Optional LD audit TSV; PRUNED_LD candidates linked
+                                to a query lead SNP are marked automatically.
   --get-common-associations [VALUE]
                                 Forward common-association mode to upstream preprocessing.
   --common-association-top-hit-threshold VALUE
@@ -102,6 +117,15 @@ my $force = 0;
 my $display_gwas_override = '';
 my $target_snps_override = '';
 my $target_snp_genes_override = '';
+my $ld_snps_override = '';
+my $ld_audit_file_override = '';
+my $ld_cache_override = '';
+my $ld_population_override = 'EUR';
+my $ld_r2_threshold_override = 0.8;
+my $ld_web_fallback = 1;
+my $highlight_high_ld_snps = 0;
+my $ld_marker_symbol = 'star';
+my $ld_marker_color = 'black';
 my $get_common_associations = '';
 my $common_association_top_hit_threshold = '';
 my $reference_build_override = '';
@@ -121,6 +145,15 @@ GetOptions(
     'remove-x-chr!'            => \$remove_x_chr,
     'target-snps=s'           => \$target_snps_override,
     'target-snp-genes=s'      => \$target_snp_genes_override,
+    'ld-snps=s'               => \$ld_snps_override,
+    'ld-audit-file=s'         => \$ld_audit_file_override,
+    'ld-cache=s'              => \$ld_cache_override,
+    'ld-population=s'         => \$ld_population_override,
+    'ld-r2-threshold=f'       => \$ld_r2_threshold_override,
+    'ld-web-fallback!'        => \$ld_web_fallback,
+    'highlight-high-ld-snps!' => \$highlight_high_ld_snps,
+    'ld-marker-symbol=s'      => \$ld_marker_symbol,
+    'ld-marker-color=s'       => \$ld_marker_color,
     'get-common-associations:s' => \$get_common_associations,
     'common-association-top-hit-threshold=s' => \$common_association_top_hit_threshold,
     'reference-build=s'       => \$reference_build_override,
@@ -135,6 +168,17 @@ if ($help || !$spec_file) {
     print usage();
     exit($help ? 0 : 1);
 }
+$ld_population_override = uc($ld_population_override || 'EUR');
+die "--ld-population must be AFR, AMR, ASN, or EUR\n"
+    unless $ld_population_override =~ /^(?:AFR|AMR|ASN|EUR)$/;
+die "--ld-r2-threshold must be between 0 and 1\n"
+    unless $ld_r2_threshold_override > 0 && $ld_r2_threshold_override <= 1;
+$highlight_high_ld_snps = 1 if length(trim($ld_snps_override));
+$ld_marker_symbol = lc(trim($ld_marker_symbol || 'star'));
+die "--ld-marker-symbol must be star, plus, cross, circle, square, triangle, or diamond\n"
+    unless $ld_marker_symbol =~ /^(?:star|plus|cross|circle|square|triangle|diamond)$/;
+die "--ld-marker-color must be a named color or #RRGGBB\n"
+    unless $ld_marker_color =~ /^(?:#[0-9A-Fa-f]{6}|[A-Za-z][A-Za-z0-9_-]*)$/;
 
 die "Spec file not found: $spec_file\n" unless -f $spec_file;
 
@@ -222,7 +266,9 @@ my @manhattan_pcols = (
     $runner->{MANHATTAN_P_VAR},
     @{ ref($runner->{MANHATTAN_OTHER_P_VARS}) eq 'ARRAY' ? $runner->{MANHATTAN_OTHER_P_VARS} : [] },
 );
+
 my @manhattan_labels = split /\|/, ($runner->{MANHATTAN_GWAS_LABEL_NAMES} || join('|', @manhattan_pcols));
+
 my @gtf_pcols = grep { length } split /\s+/, ($runner->{GTF_ASSOC_PVARS} || '');
 my @gtf_zcols = grep { length } split /\s+/, ($runner->{GTF_ZSCORE_VARS} || '');
 my @gtf_labels = grep { length } split /\s+/, ($runner->{GTF_LABELS} || '');
@@ -239,7 +285,8 @@ if ($requested{plot_local_manhattan} || $requested{plot_local_gtf}) {
 }
 
 my %outputs;
-
+my @new_manhattan_labels=@manhattan_labels;
+   @new_manhattan_labels=map{$_=~s/_/ /g;$_}@new_manhattan_labels;
 if ($requested{plot_manhattan}) {
     my $step_started = time();
     %outputs = (
@@ -250,7 +297,7 @@ if ($requested{plot_manhattan}) {
             wide_data  => $wide_data_local,
             gnuplot    => $gnuplot,
             pcols      => \@manhattan_pcols,
-            labels     => \@manhattan_labels,
+            labels     => \@new_manhattan_labels,
             remove_x_chr => $remove_x_chr,
             force      => $force,
         ),
@@ -314,6 +361,15 @@ if ($requested{plot_local_manhattan}) {
             preset_config=> $preset_config_local,
             gtf_cache_dir => $shared_gtf_cache_local,
             top_csv_name => gunplotize_name($runner->{LOCAL_TOP_HITS_CSV_BASENAME} || 'gunplot_top_hits.csv'),
+            ld_snps      => $ld_snps_override,
+            ld_audit_file=> $ld_audit_file_override,
+            ld_cache     => $ld_cache_override,
+            ld_population=> $ld_population_override,
+            ld_r2_threshold => $ld_r2_threshold_override,
+            ld_web_fallback => $ld_web_fallback,
+            highlight_high_ld_snps => $highlight_high_ld_snps,
+            ld_marker_symbol => $ld_marker_symbol,
+            ld_marker_color  => $ld_marker_color,
             force       => $force,
         ),
     );
@@ -345,6 +401,15 @@ if ($requested{plot_local_gtf}) {
             preset_config=> $preset_config_local,
             gtf_cache_dir => $shared_gtf_cache_local,
             top_csv_name => gunplotize_name($runner->{LOCAL_TOP_HITS_CSV_BASENAME} || 'gunplot_top_hits.csv'),
+            ld_snps      => $ld_snps_override,
+            ld_audit_file=> $ld_audit_file_override,
+            ld_cache     => $ld_cache_override,
+            ld_population=> $ld_population_override,
+            ld_r2_threshold => $ld_r2_threshold_override,
+            ld_web_fallback => $ld_web_fallback,
+            highlight_high_ld_snps => $highlight_high_ld_snps,
+            ld_marker_symbol => $ld_marker_symbol,
+            ld_marker_color  => $ld_marker_color,
             force       => $force,
         ),
     );
@@ -776,6 +841,126 @@ sub merge_hit_lists_for_gunplot {
     return @hits;
 }
 
+sub resolve_ld_snps_for_query {
+    my (%args) = @_;
+    my %query = map { lc(trim($_)) => 1 } @{ $args{query_snps} || [] };
+    my (%seen, @ld);
+    my $add = sub {
+        my ($snp) = @_;
+        $snp = trim($snp // '');
+        return unless length $snp;
+        return if $query{lc $snp};
+        return if $seen{lc $snp}++;
+        push @ld, $snp;
+    };
+    $add->($_) for split /,/, ($args{explicit} // '');
+    if (length(trim($args{explicit} // ''))) {
+        print "[prep] User-supplied LD SNP marker overlay: " . join(',', @ld) . "\n";
+        return @ld;
+    }
+
+    my $runner = $args{runner} || {};
+    my $population = uc($args{ld_population} || $runner->{LOCAL_LD_POPULATION} || 'EUR');
+    my $min_r2 = 0 + ($args{ld_r2_threshold} || $runner->{LOCAL_LD_R2_THRESHOLD} || 0.8);
+    my $audit_file = $args{audit_file} || '';
+    $audit_file = localize_path($audit_file) if length $audit_file;
+    if (!length($audit_file) && length($runner->{TOP_HIT_LD_AUDIT_BASENAME} || '')) {
+        $audit_file = File::Spec->catfile($args{output_dir}, $runner->{TOP_HIT_LD_AUDIT_BASENAME});
+    }
+    if (length($audit_file) && -s $audit_file) {
+        open my $fh, '<', $audit_file or die "Cannot read LD audit $audit_file: $!\n";
+        my $header = <$fh> // '';
+        chomp $header;
+        $header =~ s/\r$//;
+        my @cols = split /\t/, $header, -1;
+        my %idx = map { lc(trim($cols[$_])) => $_ } 0 .. $#cols;
+        if (exists $idx{candidate_snp} && exists $idx{lead_snp}) {
+            while (my $line = <$fh>) {
+                chomp $line;
+                $line =~ s/\r$//;
+                my @f = split /\t/, $line, -1;
+                my $lead = $f[$idx{lead_snp}] // '';
+                next unless $query{lc trim($lead)};
+                if (exists $idx{selection_action}) {
+                    my $action = $f[$idx{selection_action}] // '';
+                    next unless $action =~ /^(?:PRUNED_LD|LD_LINKED)$/i;
+                }
+                # A clumping audit without r2 cannot establish that a proxy
+                # meets the separate high-LD display threshold.
+                next unless exists $idx{proxy_r2};
+                my $r2 = $f[$idx{proxy_r2}] // '';
+                next unless $r2 =~ /^(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i
+                    && $r2 >= $min_r2;
+                $add->($f[$idx{candidate_snp}]);
+            }
+        }
+        close $fh;
+    }
+
+    my $cache_file = localize_path($args{ld_cache} || $runner->{LOCAL_LD_CACHE_TSV}
+        || $runner->{TOP_HIT_LD_CACHE_TSV} || '');
+    if (length($cache_file) && -s $cache_file) {
+        open my $fh, '<', $cache_file or die "Cannot read LD cache $cache_file: $!\n";
+        my $header = <$fh> // '';
+        chomp $header;
+        $header =~ s/\r$//;
+        my @cols = split /\t/, $header, -1;
+        my %idx = map { lc(trim($cols[$_])) => $_ } 0 .. $#cols;
+        if (exists $idx{query_snp} && exists $idx{proxy_snp}) {
+            while (my $line = <$fh>) {
+                chomp $line;
+                $line =~ s/\r$//;
+                my @f = split /\t/, $line, -1;
+                my $lead = $f[$idx{query_snp}] // '';
+                next unless $query{lc trim($lead)};
+                if (exists $idx{ld_population}) {
+                    next unless uc(trim($f[$idx{ld_population}] // '')) eq $population;
+                }
+                if (exists $idx{proxy_r2}) {
+                    my $r2 = $f[$idx{proxy_r2}] // '';
+                    next unless $r2 =~ /^(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i && $r2 >= $min_r2;
+                }
+                $add->($f[$idx{proxy_snp}]);
+            }
+        }
+        close $fh;
+    }
+
+    my $helper = File::Spec->catfile($Bin, 'DiffGWASDeps', 'resolve_haploreg_high_ld.pl');
+    if (-f $helper) {
+        my $web_cache = File::Spec->catfile(
+            $Bin, 'cache', 'haploreg_ld', 'high_ld_queries.tsv'
+        );
+        my @cmd = (
+            $^X, $helper,
+            '--query-snps', join(',', @{ $args{query_snps} || [] }),
+            '--population', $population,
+            '--min-r2', $min_r2,
+            '--web-cache', $web_cache,
+        );
+        push @cmd, ('--local-cache', $cache_file) if length($cache_file) && -s $cache_file;
+        push @cmd, '--no-web-fallback' unless $args{ld_web_fallback};
+        if (open my $pipe, '-|', @cmd) {
+            while (my $line = <$pipe>) {
+                chomp $line;
+                next unless $line =~ /^LD_SNPS\t(.*)$/;
+                $add->($_) for split /,/, $1;
+            }
+            my $ok = close $pipe;
+            warn "WARNING: High-LD resolver exited unsuccessfully; continuing without automatic stars.\n"
+                unless $ok;
+        }
+        else {
+            warn "WARNING: Cannot start high-LD resolver $helper: $!\n";
+        }
+    }
+    print "[prep] LD-linked SNP marker overlay for " . join(',', @{ $args{query_snps} || [] })
+        . " ($population, r2 >= $min_r2): " . join(',', @ld) . "\n" if @ld;
+    print "[warn] No high-LD proxies resolved for " . join(',', @{ $args{query_snps} || [] })
+        . " ($population, r2 >= $min_r2); no LD marker overlay will be drawn.\n" unless @ld;
+    return @ld;
+}
+
 sub plot_local_series {
     my (%args) = @_;
     my $runner = $args{runner};
@@ -789,7 +974,9 @@ sub plot_local_series {
     my $cache_dir = $args{gtf_cache_dir}
         || File::Spec->catfile($args{output_dir}, '.gunplot_gtf_cache');
     make_path($cache_dir) unless -d $cache_dir;
-    my $n_hits = scalar @{ $args{hits} };
+    # Resolve each target from the indexed GWAS source before grouping.  On a
+    # cold run the caller normally supplies only SNP names, so grouping before
+    # this step silently treated nearby targets as unrelated loci.
     my $locus_sources = prepare_locus_wide_sources(
         hits          => $args{hits},
         output_dir    => $args{output_dir},
@@ -798,6 +985,43 @@ sub plot_local_series {
         preset_config => $args{preset_config},
         force         => $args{force},
     );
+
+    my (%label_snps_for_index, %skip_hit_index);
+    if ($args{kind} eq 'local_gtf' || $args{kind} eq 'local_manhattan') {
+        my $window = 0 + $args{window_bp};
+        for my $i (0 .. $#{ $args{hits} }) {
+            next if $skip_hit_index{$i};
+            my $anchor = $args{hits}[$i];
+            my @members = ($anchor->{SNP});
+            if (defined($anchor->{CHR}) && defined($anchor->{BP})) {
+                for my $j ($i + 1 .. $#{ $args{hits} }) {
+                    next if $skip_hit_index{$j};
+                    my $candidate = $args{hits}[$j];
+                    next unless defined($candidate->{CHR}) && defined($candidate->{BP});
+                    next unless normalize_chr_label($candidate->{CHR}) eq normalize_chr_label($anchor->{CHR});
+                    next unless abs((0 + $candidate->{BP}) - (0 + $anchor->{BP})) <= $window;
+                    push @members, $candidate->{SNP};
+                    $skip_hit_index{$j} = 1;
+                }
+            }
+            $label_snps_for_index{$i} = \@members;
+            if (@members > 1) {
+                print "[prep] Combining close $args{kind} query SNPs in one shared window centered on $anchor->{SNP}: "
+                    . join(', ', @members) . "\n";
+            }
+        }
+    }
+    my $n_hits = scalar grep { !$skip_hit_index{$_} }
+        0 .. $#{ $args{hits} };
+    if ($args{kind} eq 'local_gtf' || $args{kind} eq 'local_manhattan') {
+        for my $i (keys %label_snps_for_index) {
+            my $members = $label_snps_for_index{$i};
+            next unless @{$members} > 1;
+            my $shared = $locus_sources->{uc($members->[0])};
+            next unless $shared;
+            $locus_sources->{uc($_)} = $shared for @{$members}[1 .. $#{$members}];
+        }
+    }
 
     write_top_hits_csv(
         path       => File::Spec->catfile($args{output_dir}, $args{top_csv_name}),
@@ -808,18 +1032,36 @@ sub plot_local_series {
         locus_sources => $locus_sources,
     );
 
+    my $render_idx = -1;
     for my $hit_idx (0 .. $#{ $args{hits} }) {
+        next if $skip_hit_index{$hit_idx};
+        $render_idx++;
         my $hit = $args{hits}[$hit_idx];
+        my @label_snps = @{ $label_snps_for_index{$hit_idx} || [$hit->{SNP}] };
+        my $label_snps_csv = join(',', @label_snps);
+        my $locus_title_snps = join(', ', @label_snps);
+        my @ld_snps = $args{highlight_high_ld_snps} ? resolve_ld_snps_for_query(
+            explicit   => $args{ld_snps},
+            audit_file => $args{ld_audit_file},
+            ld_cache   => $args{ld_cache},
+            ld_population => $args{ld_population},
+            ld_r2_threshold => $args{ld_r2_threshold},
+            ld_web_fallback => $args{ld_web_fallback},
+            runner     => $runner,
+            output_dir => $args{output_dir},
+            query_snps => \@label_snps,
+        ) : ();
+        my $ld_snps_csv = join(',', @ld_snps);
         my $safe_snp = safe_name($hit->{SNP});
         my $safe_window = safe_name($args{window_bp});
-        my $batch_index = int($hit_idx / $batch_size);
+        my $batch_index = int($render_idx / $batch_size);
         my $batch_start = $batch_index * $batch_size;
         my $batch_end = $batch_start + $batch_size - 1;
         $batch_end = $n_hits - 1 if $batch_end > $n_hits - 1;
         my $batch_count = $batch_end - $batch_start + 1;
         my $batch_cols = compute_panel_columns($batch_count, $panel_columns);
         my $batch_annotation_mode = normalize_local_manhattan_annotation_mode($args{annotation_mode}, $batch_count);
-        my $batch_pos = $hit_idx - $batch_start;
+        my $batch_pos = $render_idx - $batch_start;
         my $batch_col = $batch_pos % $batch_cols;
         my $locus_prefix = File::Spec->catfile($args{output_dir}, $base_name . '_' . $safe_snp);
         my $existing_locus_manifest = $locus_prefix . '.manifest.tsv';
@@ -862,7 +1104,11 @@ sub plot_local_series {
             pcols             => join(',', @{ $args{pcols} }),
             zcols             => join(',', @{ $args{zcols} || [] }),
             labels            => join('|', @{ $args{labels} }),
-            title             => sprintf('%s: %s (%s:%s)', $args{html_title}, $hit->{SNP}, ($hit->{CHR} // ''), ($hit->{BP} // '')),
+            title             => sprintf('%s: %s (%s:%s)', $args{html_title}, $locus_title_snps, ($hit->{CHR} // ''), ($hit->{BP} // '')),
+            label_snps        => $label_snps_csv,
+            ld_snps           => $ld_snps_csv,
+            ld_marker_symbol  => $args{ld_marker_symbol},
+            ld_marker_color   => $args{ld_marker_color},
             height            => $args{height},
             sig               => ($runner->{TOP_HIT_SIGNAL_THRSHD} || '1e-6'),
             has_gtf           => $expected_has_gtf,
@@ -889,7 +1135,7 @@ sub plot_local_series {
             print "[skip] reusing existing gunplot $args{kind} locus artifacts for $hit->{SNP}\n";
             push @images, {
                 slot_index=> $batch_pos,
-                snp      => $hit->{SNP},
+                snp      => $locus_title_snps,
                 chr      => $hit->{CHR},
                 bp       => $hit->{BP},
                 gene     => ($hit->{gene} || ''),
@@ -1000,15 +1246,21 @@ sub plot_local_series {
             File::Spec->catfile($Bin, 'DiffGWASDeps', 'gunplot', 'pdl_gunplot_local_locus.pl'),
             '--data', $locus_input,
             '--snp', $hit->{SNP},
+            '--label-snps', $label_snps_csv,
             '--out-prefix', $locus_prefix,
             '--window-bp', $args{window_bp},
             '--pcols', join(',', @{ $args{pcols} }),
             '--labels', join('|', @{ $args{labels} }),
-            '--title', sprintf('%s: %s (%s:%s)', $args{html_title}, $hit->{SNP}, $hit->{CHR}, $hit->{BP}),
+            '--title', sprintf('%s: %s (%s:%s)', $args{html_title}, $locus_title_snps, $hit->{CHR}, $hit->{BP}),
             '--height', $args{height},
             '--gnuplot', $args{gnuplot},
             '--sig', ($runner->{TOP_HIT_SIGNAL_THRSHD} || '1e-6'),
         );
+        push @cmd, ('--ld-snps', $ld_snps_csv) if length $ld_snps_csv;
+        if (length $ld_snps_csv) {
+            push @cmd, ('--ld-marker-symbol', ($args{ld_marker_symbol} || 'star'));
+            push @cmd, ('--ld-marker-color', ($args{ld_marker_color} || 'black'));
+        }
         if ($args{kind} eq 'local_manhattan') {
             my $bottom_gene = $hit->{gene} || '';
             $bottom_gene = extract_gene_from_snp_gene($hit->{snp_gene}) if !length($bottom_gene);
@@ -1035,7 +1287,7 @@ sub plot_local_series {
 
         push @images, {
             slot_index=> $batch_pos,
-            snp      => $hit->{SNP},
+            snp      => $locus_title_snps,
             chr      => $hit->{CHR},
             bp       => $hit->{BP},
             gene     => ($hit->{gene} || ''),
@@ -1062,6 +1314,31 @@ sub plot_local_series {
             );
             my $batch_cols = compute_panel_columns(scalar(@{ $batches[$i] }), $panel_columns);
             my $batch_annotation_mode = normalize_local_manhattan_annotation_mode($args{annotation_mode}, scalar(@{ $batches[$i] }));
+            # A group of adjacent query SNPs is already rendered as one
+            # coordinate-aware locus by pdl_gunplot_local_locus.pl.  Rebuilding
+            # that single locus through the multi-locus compositor discarded
+            # its query-SNP labels and made old two-panel output easy to reuse.
+            # Publish the authoritative locus image directly under the stable
+            # combined-output name instead.
+            if (@{ $batches[$i] } == 1) {
+                my $item = $batches[$i][0];
+                my $manifest = read_manifest_tsv($item->{manifest});
+                my $label_snps = $manifest->{label_snps} || '';
+                if ($label_snps =~ /,/) {
+                    if ($args{force}
+                        || !-s $batch_png
+                        || !target_is_newer_than_inputs($batch_png, $item->{image}, $item->{manifest})) {
+                        copy($item->{image}, $batch_png)
+                            or die "Cannot publish grouped local Manhattan image $item->{image} as $batch_png: $!\n";
+                        print "[done] published one grouped local Manhattan locus with labels $label_snps: $batch_png\n";
+                    }
+                    else {
+                        print "[skip] reusing grouped single-locus local Manhattan batch $batch_png\n";
+                    }
+                    push @batch_images, $batch_png;
+                    next;
+                }
+            }
             if ($batch_annotation_mode eq 'gtf') {
                 if (!$args{force} && -s $batch_png && target_is_newer_than_inputs($batch_png, batch_dependency_files($batches[$i], 1))) {
                     print "[skip] reusing existing combined gunplot local Manhattan GTF batch $batch_png\n";
@@ -1201,6 +1478,10 @@ sub local_locus_cache_is_reusable {
     my @checks = (
         ['snp',               ($args{snp} // '')],
         ['pcols',             ($args{pcols} // '')],
+        ['label_snps',        ($args{label_snps} // $args{snp} // '')],
+        ['ld_snps',           ($args{ld_snps} // '')],
+        ['ld_marker_symbol',  ($args{ld_marker_symbol} // 'star')],
+        ['ld_marker_color',   ($args{ld_marker_color} // 'black')],
         ['zcols',             ($args{zcols} // '')],
         ['labels',            ($args{labels} // '')],
         ['title',             ($args{title} // '')],

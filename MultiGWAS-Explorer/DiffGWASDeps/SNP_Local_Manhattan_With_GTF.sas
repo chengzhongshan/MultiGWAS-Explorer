@@ -177,6 +177,9 @@ If there are too much space on the top for these SNP labels, please manually cha
 the macro variable yoffset4max_drawmarkersontop included in the macro Lattice_gscatter_over_bed_track
  from 0.2 to a smaller value, such as 0.1;
 */
+LD_SNPs2mark_scatterplot_dots=, /*Optional space-delimited LD-linked SNPs overlaid with the selected marker on every association track.*/
+LD_marker_symbol=*, /*Marker text for LD-linked SNPs: *, +, x, o, s, ^, or d.*/
+LD_marker_color=black, /*SAS color name or CXrrggbb value for LD-linked SNP markers.*/
 text_rotate_angle=90, /*Angle to rotate text labels for these selected dots by users*/
 auto_rotate2zero=1, /*supply value 1 when there are <=3 text labels and you want them kept horizontal in the top headroom*/
 pct2adj4dencluster=2,/*Input value can be ranging from 0.0001 to 10 or even higher value!
@@ -195,6 +198,9 @@ adj_spaces_among_top_snps=1,/*Provide value 1 to adjust spaces among top SNP lab
 adjust top SNPs labels if these labels are rotated 90 degree, which is helpful when the space adjusted labels are not pretty*/ 
 verbose=0 /*Not print any notes in SAS log*/
 );
+
+%local effective_ld_marker_var;
+%let effective_ld_marker_var=;
  
 %*It is better to output these notes into the log for AI; 
 %*However, too large number of notes will slow down the pipeline dramatically;
@@ -211,6 +217,19 @@ data &gwas_dsd;
 set &gwas_dsd;
 chr=&chr_var;
 run;
+%end;
+
+*Add a compact star-overlay variable for LD-linked SNPs.;
+%if %length(&LD_SNPs2mark_scatterplot_dots)>0 %then %do;
+ %let effective_ld_marker_var=_LD_SNP_MARK_;
+ data &gwas_dsd;
+ set &gwas_dsd;
+ length _LD_SNP_MARK_ $8.;
+ _LD_SNP_MARK_="";
+ %do _li_=1 %to %ntokens(&LD_SNPs2mark_scatterplot_dots);
+   if &SNP_Var="%scan(&LD_SNPs2mark_scatterplot_dots,&_li_,%str( ))" then _LD_SNP_MARK_="&LD_marker_symbol";
+ %end;
+ run;
 %end;
 
 *Add labels for target SNPs if they exist;
@@ -419,9 +438,12 @@ Whenever  makeheatmapdotintooneline=1 or 0, it is possible to use values of the 
 label specific scatterplot dots based on the customization of the variable predifined by users for the input data set; 
 default is empty; provide a variable that include non-empty strings for specific dots in the 
 scatterplots;*/
+var4mark_ld_scatterplot_dots=&effective_ld_marker_var,
+ld_marker_color=&LD_marker_color,
+ld_marker_legend_symbol=&LD_marker_symbol,
 text_rotate_angle=&text_rotate_angle, /*Angle to rotate text labels for these selected dots by users*/
 auto_rotate2zero=&auto_rotate2zero, /*supply value 1 when there are <=3 text labels and you want them kept horizontal in the top headroom*/
-pct2adj4dencluster=&pct2adj4dencluster,/*For SNP labels on the top, please try to use this parameter, which only works when there are less than or equal to 4 top SNPs 
+pct2adj4dencluster=&pct2adj4dencluster,/*For SNP labels on the top, please try to use this parameter, which only works when there are less than or equal to 4 top SNPs
 and SNPs within a cluster are overlapped with each other or overlapped with elements from other SNP cluster, so it is feasible to 
 avoid this issue by increasing the pct or reducing it, respectively*/
 yoffset4max_drawmarkersontop=&yoffset4max_drawmarkersontop, /*If draw scatterplot marker labels on the top of track, 
@@ -458,6 +480,13 @@ adjust top SNPs labels if these labels are rotated 90 degree, which is helpful w
 data &gwas_dsd;
 set &gwas_dsd;
 drop _Target_SNP_;
+run;
+%end;
+
+%if %length(&effective_ld_marker_var)>0 %then %do;
+data &gwas_dsd;
+set &gwas_dsd;
+drop _LD_SNP_MARK_;
 run;
 %end;
 

@@ -3,11 +3,19 @@ set -euo pipefail
 
 DEPS_DIR="${DEPS_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)}"
 WORKDIR="${WORKDIR:-$(cd "${DEPS_DIR}/.." && pwd -P)}"
+SAS_ODA_FAILURE_GUARD="${SAS_ODA_FAILURE_GUARD:-${DEPS_DIR}/sas_oda_failure_guard.sh}"
+if [[ ! -r "${SAS_ODA_FAILURE_GUARD}" ]]; then
+  echo "ERROR: Required SAS ODA failure guard is unavailable: ${SAS_ODA_FAILURE_GUARD}" >&2
+  exit 2
+fi
+# shellcheck source=sas_oda_failure_guard.sh
+source "${SAS_ODA_FAILURE_GUARD}"
 RUNNER_CONFIG_JSON="${RUNNER_CONFIG_JSON:-}"
 CALLER_TARGET_SNP="${TARGET_SNP-__UNSET__}"
 CALLER_OUTPUT_HTML_BASENAME="${OUTPUT_HTML_BASENAME-__UNSET__}"
 CALLER_LOCAL_WINDOW_BP="${LOCAL_WINDOW_BP-__UNSET__}"
 CALLER_GTF_LABEL_SNPS="${GTF_LABEL_SNPS-__UNSET__}"
+CALLER_GTF_LD_SNPS="${GTF_LD_SNPS-__UNSET__}"
 CALLER_LOCAL_GTF_INCLUDE_NON_PROTEIN_CODING_GENES="${LOCAL_GTF_INCLUDE_NON_PROTEIN_CODING_GENES-__UNSET__}"
 CALLER_OPEN_RESULT="${OPEN_RESULT-__UNSET__}"
 CALLER_DATA_GZ="${DATA_GZ-__UNSET__}"
@@ -26,6 +34,9 @@ if [[ "${CALLER_LOCAL_WINDOW_BP}" != "__UNSET__" ]]; then
 fi
 if [[ "${CALLER_GTF_LABEL_SNPS}" != "__UNSET__" ]]; then
   GTF_LABEL_SNPS="${CALLER_GTF_LABEL_SNPS}"
+fi
+if [[ "${CALLER_GTF_LD_SNPS}" != "__UNSET__" ]]; then
+  GTF_LD_SNPS="${CALLER_GTF_LD_SNPS}"
 fi
 if [[ "${CALLER_LOCAL_GTF_INCLUDE_NON_PROTEIN_CODING_GENES}" != "__UNSET__" ]]; then
   LOCAL_GTF_INCLUDE_NON_PROTEIN_CODING_GENES="${CALLER_LOCAL_GTF_INCLUDE_NON_PROTEIN_CODING_GENES}"
@@ -66,6 +77,8 @@ OUTPUT_HTML_BASENAME="${OUTPUT_HTML_BASENAME:-}"
 LOCAL_WINDOW_BP="${LOCAL_WINDOW_BP:-1e7}"
 GTF_LABEL_SNPS="${GTF_LABEL_SNPS:-${TARGET_SNP}}"
 GTF_LABEL_SNPS="${GTF_LABEL_SNPS//,/ }"
+GTF_LD_SNPS="${GTF_LD_SNPS:-}"
+GTF_LD_SNPS="${GTF_LD_SNPS//,/ }"
 
 # A single-SNP context run should not silently reuse the generic genome-wide
 # wide subset or generic local-top-hits HTML basename from the multi-hit runner
@@ -282,9 +295,14 @@ if [[ -z "${ODA_DELETE_TIMEOUT_GRACE_SECONDS:-}" ]]; then
 fi
 INCLUDE_PREFLIGHT_STANDALONE_DEBUG="${INCLUDE_PREFLIGHT_STANDALONE_DEBUG:-0}"
 INCLUDE_PREFLIGHT_REFRESH_REMOTE="${INCLUDE_PREFLIGHT_REFRESH_REMOTE:-0}"
-# This fast runner uploads and explicitly includes its complete plotting macro
-# set. Avoid the unrelated global ~/Macros bootstrap unless a caller opts in.
-SAS_ODA_AUTOLOAD_MACROS="${SAS_ODA_AUTOLOAD_MACROS:-0}"
+# This fast runner uploads the plotting entry points, while their shared
+# utility dependencies are loaded from ~/Macros below.
+# The five plotting entry points below have transitive dependencies on the
+# shared ~/Macros library (for example NTOKENS, FileOrDirExist, and NUMARGS).
+# A partial explicit upload is not dependency-complete and can let SAS write a
+# misleading completion marker without producing a figure.  Persistent ODA
+# sessions cache this bootstrap, so correctness costs only the first submit.
+SAS_ODA_AUTOLOAD_MACROS="${SAS_ODA_AUTOLOAD_MACROS:-1}"
 export SAS_ODA_RUN_TIMEOUT_SECONDS="${SAS_ODA_RUN_TIMEOUT_SECONDS:-${SINGLE_SNP_GTF_SUBMIT_TIMEOUT_SECONDS}}"
 export SAS_ODA_RUN_TIMEOUT_GRACE_SECONDS="${SAS_ODA_RUN_TIMEOUT_GRACE_SECONDS:-${SINGLE_SNP_GTF_SUBMIT_TIMEOUT_GRACE_SECONDS}}"
 export SAS_ODA_AUTOLOAD_MACROS
@@ -314,7 +332,7 @@ if [[ -z "${ODA_HELPER_SCRIPT:-}" || ! -f "${ODA_HELPER_SCRIPT}" ]]; then
 fi
 ODA_PERL_BASE=(perl "${ODA_HELPER_SCRIPT}")
 echo "[helper] SAS ODA command helper: ${ODA_HELPER_SCRIPT}"
-echo "[helper] Global SAS macro bootstrap: ${SAS_ODA_AUTOLOAD_MACROS} (fast runner explicitly uploads/includes its required macros)"
+echo "[helper] Global SAS macro bootstrap: ${SAS_ODA_AUTOLOAD_MACROS} (required for transitive plotting-macro dependencies; cached by persistent sessions)"
 if [[ "${USE_PERSISTENT_SESSION}" == "1" ]]; then
   ODA_PERL=("${ODA_PERL_BASE[@]}" --persistent --session-id "${SESSION_ID}")
 else
@@ -740,6 +758,13 @@ single_snp_submit_needs_retry() {
   return 1
 }
 
+run_log_has_fatal_sas_compile_error() {
+  [[ -s "${RUN_LOG_FILE}" ]] || return 1
+  grep -Eiq \
+    'Apparent invocation of macro [A-Za-z_][A-Za-z0-9_]* not resolved|ERROR [0-9]+-[0-9]+:|ERROR: Macro [A-Za-z_][A-Za-z0-9_]* not resolved|ERROR: The macro [A-Za-z_][A-Za-z0-9_]*' \
+    "${RUN_LOG_FILE}"
+}
+
 run_single_snp_submit() {
   if [[ -x /usr/bin/timeout ]]; then
     /usr/bin/timeout --kill-after="${SINGLE_SNP_GTF_SUBMIT_TIMEOUT_GRACE_SECONDS}s" "${SINGLE_SNP_GTF_SUBMIT_TIMEOUT_SECONDS}s" \
@@ -1039,6 +1064,7 @@ perl "${RENDER_SAS_HELPER}" \
   --replace "TARGET_SNP=${TARGET_SNP}" \
   --replace "LOCAL_WINDOW_BP=${LOCAL_WINDOW_BP}" \
   --replace "GTF_LABEL_SNPS=${GTF_LABEL_SNPS}" \
+  --replace "GTF_LD_SNPS=${GTF_LD_SNPS}" \
   --replace "OUTPUT_HTML=${OUTPUT_HTML_BASENAME}" \
   --replace "OUTPUT_DONE=${OUTPUT_DONE_BASENAME}" \
   --replace "GWAS_DATASET=${GWAS_DATASET}" \
@@ -1114,12 +1140,20 @@ while :; do
     single_snp_submit_rc=$?
     echo "[5b/6] Single-SNP GTF SAS submit attempt ${single_snp_submit_attempt} exited with status ${single_snp_submit_rc}."
   fi
+  if sas_oda_report_space_exhaustion "${RUN_LOG_FILE}" "single-SNP local-GTF submit attempt ${single_snp_submit_attempt}"; then
+    exit "${SAS_ODA_SPACE_EXHAUSTION_EXIT_CODE:-73}"
+  fi
   if [[ "${single_snp_submit_rc}" -eq 0 ]] && ! single_snp_submit_needs_retry; then
     break
   fi
-  if [[ "${single_snp_submit_rc}" -ne 0 ]] && remote_home_file_exists "${OUTPUT_DONE_BASENAME}"; then
+  if [[ "${single_snp_submit_rc}" -ne 0 ]] \
+      && ! run_log_has_fatal_sas_compile_error \
+      && remote_home_file_exists "${OUTPUT_DONE_BASENAME}"; then
     echo "[recover] The SAS helper exited with status ${single_snp_submit_rc}, but the current run wrote its completion marker ${OUTPUT_DONE_BASENAME}. Continuing with download and local recovery."
     break
+  fi
+  if [[ "${single_snp_submit_rc}" -ne 0 ]] && run_log_has_fatal_sas_compile_error; then
+    echo "ERROR: SAS reported a compile or unresolved-macro failure; ignoring ${OUTPUT_DONE_BASENAME} because it does not prove that a figure was rendered." >&2
   fi
   if [[ "${single_snp_submit_rc}" -ne 0 ]] && run_log_reports_missing_target_snp; then
     if [[ -n "${local_target_row}" ]]; then

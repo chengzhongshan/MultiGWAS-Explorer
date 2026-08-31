@@ -131,6 +131,9 @@ var4label_scatterplot_dots=,/*Make sure the variable name is not grp, which is a
 Whenever  makeheatmapdotintooneline=1 or 0, it is possible to use values of the var4label_scatterplot_dots to
 label specific scatterplot dots based on the customization of the variable predifined by users for the input data set; 
 default is empty; provide a variable that include non-empty strings for specific dots in the scatterplots;*/
+var4mark_ld_scatterplot_dots=,/*Optional character variable containing the selected marker for LD-linked variants and blank otherwise.*/
+ld_marker_color=black,/*SAS color name or CXrrggbb value for LD marker text.*/
+ld_marker_legend_symbol=*,/*Text shown before LD-linked SNP in the legend.*/
 label_dots_once_on_top=1,/*Put value 1 to label each unique label once on top of scatterplot;
 provide 0 for labeling selected dots inside scatterplots;
 The script will enlarge the macro var yaxis_offset4max to be 0.1!*/
@@ -390,6 +393,14 @@ var to link each char var for making format and using them as legend in the fina
 %if %length(&HasVar1)=0 %then %do;
  %put The color_resp_var: &var4label_scatterplot_dots does not exist in the sas dsd &bed_dsd;
  %abort 255;
+%end;
+
+%if %length(&var4mark_ld_scatterplot_dots)>0 %then %do;
+ %Check_VarnamesInDsd(indsd=&bed_dsd,Rgx=&var4mark_ld_scatterplot_dots,exist_tag=HasLDMarkerVar);
+ %if %length(&HasLDMarkerVar)=0 %then %do;
+  %put ERROR: LD marker variable &var4mark_ld_scatterplot_dots does not exist in &bed_dsd.;
+  %abort 255;
+ %end;
 %end;
 
 /*%abort 255; */
@@ -704,7 +715,7 @@ where &yval_var>0 and grp_end_tag=1;
 %put fake y axis values are &fake_y_axis_vals;
 
 *Note: if these added macro vars are empty, it will not affect the data step;
-data x1(keep=old_y &Variant_Length_Var &chr_var pos &yval_var &grp_var ord &st_var &end_var &scatter_grp_var &lattice_subgrp_var &var4label_scatterplot_dots);
+data x1(keep=old_y &Variant_Length_Var &chr_var pos &yval_var &grp_var ord &st_var &end_var &scatter_grp_var &lattice_subgrp_var &var4label_scatterplot_dots &var4mark_ld_scatterplot_dots);
 set x1;
 array X{2} &st_var &end_var;
 do i=1 to 2;
@@ -1003,7 +1014,7 @@ proc print data=final(obs=50);run;
 
 data final;
 *Keep &st_var &end_var for CNV highlowplot if necessary;
-merge final x1(where=(&yval_var>=0) keep=old_y &Variant_Length_Var &st_var &end_var pos &yval_var &grp_var &scatter_grp_var &lattice_subgrp_var &var4label_scatterplot_dots);
+merge final x1(where=(&yval_var>=0) keep=old_y &Variant_Length_Var &st_var &end_var pos &yval_var &grp_var &scatter_grp_var &lattice_subgrp_var &var4label_scatterplot_dots &var4mark_ld_scatterplot_dots);
 *Add back these excluded data;
 run;
 %put NOTE: LATTICE_STAGE positive_signal_merge_complete;
@@ -1250,24 +1261,31 @@ quit;
 data final;
 set final;
 avg_pos=&_avg_pos + 0;
+*Preallocate label plotting columns during an existing rewrite so the later
+ hash update can modify only matching target rows in place.;
+newpos=pos;
+top_y4label=&max_y;
 
 run;
 
-*De-duplicate repeated label rows without dropping a singleton label by row parity.;
+*De-duplicate repeated labels without dropping a singleton label by row parity.;
+*Key only by label text: x1 expands each variant to start/end plotting positions,;
+*so a label+position key incorrectly retains the same rsID twice.;
 %if %length(&var4label_scatterplot_dots)>0 %then %do;
-proc sort data=final out=final_label_sorted;
-by &var4label_scatterplot_dots pos avg_pos;
-run;
-
 data final;
-set final_label_sorted;
-by &var4label_scatterplot_dots pos avg_pos;
-if &var4label_scatterplot_dots^="" and not first.avg_pos then &var4label_scatterplot_dots="";
+  if _n_=1 then do;
+    declare hash _seen_target_labels();
+    _seen_target_labels.defineKey("&var4label_scatterplot_dots");
+    _seen_target_labels.defineData("&var4label_scatterplot_dots");
+    _seen_target_labels.defineDone();
+  end;
+  modify final;
+  if &var4label_scatterplot_dots^="" and pos^=. then do;
+    if _seen_target_labels.check()=0 then &var4label_scatterplot_dots="";
+    else _seen_target_labels.add();
+  end;
+  replace;
 run;
-
-proc datasets nolist;
-delete final_label_sorted;
-quit;
 %end;
 
 
@@ -1413,27 +1431,30 @@ quit;
      if first.&var4label_scatterplot_dots;
      run;
 
-     data final;set final;xtag=_n_;run;
-     proc sql;
-     create table final as
-     select *
-     from final 
-     natural full join
-     _xtag_
-    order by xtag;
-     quit;
-    data final(drop=_tmp_ xtag);
-/*   data final_x;*/
-   set final;
-   if _tmp_=. then &var4label_scatterplot_dots="";
-   top_y4label=&max_y;
-   *Add label to plot update the final yaxis label used by latter scatterplot;
-/*   label top_y4label="Association signal";*/
-	 label top_y4label="&yaxis_label";
-
-  *Also to prevent the legend to include missing value of y, assign lattice_subgrp_var to one of the grps, including 0 and 1;
-   if &var4label_scatterplot_dots^="" then &lattice_subgrp_var=0;
-   run;
+     /*
+       _xtag_ contains only the requested label rows.  Update their adjusted
+       x positions directly in FINAL with a hash lookup.  The former
+       CREATE TABLE FINAL AS SELECT ... FROM FINAL required a second complete
+       438-column table plus SQL utility space and could disconnect SAS ODA
+       when WORK filled.
+     */
+     data final;
+       if _n_=1 then do;
+         declare hash _label_positions(
+           dataset:"_xtag_(keep=&var4label_scatterplot_dots pos newpos)",
+           duplicate:"r"
+         );
+         _label_positions.defineKey("&var4label_scatterplot_dots", "pos");
+         _label_positions.defineData("newpos");
+         _label_positions.defineDone();
+       end;
+       modify final;
+       if &var4label_scatterplot_dots^="" and pos^=. then do;
+         if _label_positions.find()=0 then &lattice_subgrp_var=0;
+       end;
+       label top_y4label="&yaxis_label";
+       replace;
+     run;
    *Need to enlarge the macro var yaxis_offset4max to be 0.1;
    %let yaxis_offset4max=&yoffset4max_drawmarkersontop;
    *Get the positions of these selected markers for making vertical reflines later;
@@ -1655,27 +1676,34 @@ else do;
 end;
 by &yval_var.1;
 run;
-*Now update the new lag_pos1_adj for these genes that are too close in the final data set;
-data final;
-set final;
-_ord_=_n_;
-run;
-proc sql;
-create table final as
-select a.*,b.lag_pos1_adj
-from final as a
-left join
-final_gene as b
-on a.&yval_var.1=b.&yval_var.1 and
-	 a._pos1_=b.lag_pos1
-order by _ord_;
-data final(drop=pfactor lag_pos1_adj _ord_);
-set final;
-if lag_pos1_adj^=. then _pos1_=lag_pos1_adj;
+*Update only affected gene-label positions in place.  This avoids recreating
+ the full FINAL table through a self-referential PROC SQL join.;
+data final_gene_lookup;
+  set final_gene(keep=&yval_var.1 lag_pos1 lag_pos1_adj);
+  where lag_pos1^=. and lag_pos1_adj^=.;
+  _pos1_=lag_pos1;
+  *Reuse PFActor, which already exists in FINAL, as the hash return slot.  A
+   MODIFY step cannot enlarge an existing observation with a new variable.;
+  pfactor=lag_pos1_adj;
+  keep &yval_var.1 _pos1_ pfactor;
 run;
 
-proc sql;
-drop table final_gene;
+data final;
+  if _n_=1 then do;
+    declare hash _gene_positions(dataset:"final_gene_lookup", duplicate:"r");
+    _gene_positions.defineKey("&yval_var.1", "_pos1_");
+    _gene_positions.defineData("pfactor");
+    _gene_positions.defineDone();
+  end;
+  modify final;
+  pfactor=.;
+  if _gene_positions.find()=0 and pfactor^=. then _pos1_=pfactor;
+  replace;
+run;
+
+proc datasets library=work nolist;
+  delete final_gene final_gene_lookup;
+quit;
 %end;
 %put NOTE: LATTICE_STAGE gene_label_adjust_complete;
 
@@ -2118,6 +2146,12 @@ begingraph / designwidth=&track_width designheight=&track_height
                                        symbol=&scattermarker_symbol size=&dotsize);
 %end;   
 
+ %if %length(&var4mark_ld_scatterplot_dots)>0 %then %do;
+   *Overlay LD-linked points after the ordinary association scatter layer.;
+   textplot x=pos y=&yval_var text=&var4mark_ld_scatterplot_dots /
+     position=center textattrs=(color=&ld_marker_color size=%sysevalf(&dotsize+2) weight=bold);
+ %end;
+
  /*This highlow plot is specifically designed for drawing CNV*/
 /*https://www.lexjansen.com/pharmasug-cn/2019/HW/Pharmasug-China-2019-HW06.pdf*/
 *Draw highlow lines before scatter dots, enabling the line cover these scatter data points;
@@ -2178,6 +2212,10 @@ begingraph / designwidth=&track_width designheight=&track_height
 /* 	  discretelegend "sc" %do i=1 %to &max_ord; */
 /*                           "series&i" */
 /*                          %end; */
+
+ %if %length(&var4mark_ld_scatterplot_dots)>0 %then %do;
+      entry "&ld_marker_legend_symbol LD-linked SNP" / textattrs=(color=&ld_marker_color size=&grp_font_size weight=normal);
+ %end;
 
 	  endsidebar;
    endlayout;

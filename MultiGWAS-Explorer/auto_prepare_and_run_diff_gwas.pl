@@ -15,6 +15,7 @@ use Digest::MD5 qw(md5_hex);
 use Cwd qw(abs_path);
 use File::Spec;
 use File::Basename qw(basename);
+use File::Path qw(make_path);
 use File::Temp qw(tempfile);
 use POSIX qw(strftime);
 use Time::HiRes qw(time);
@@ -85,7 +86,18 @@ my $local_gtf_label_snps_override = '';
 my $local_gtf_label_layout_override = '';
 my $local_gtf_yaxis_offset4max_override = '';
 my $local_gtf_yoffset4textlabels_override = '';
+my $local_ld_snps_override = '';
+my $local_ld_audit_file_override = '';
+my $local_ld_cache_override = '';
+my $local_ld_population_override = 'EUR';
+my $local_ld_r2_threshold_override = 0.8;
+my $local_ld_web_fallback = 1;
+my $highlight_high_ld_snps = 0;
+my $local_ld_marker_symbol = 'star';
+my $local_ld_marker_color = 'black';
 my $exclude_non_protein_coding_genes_in_local_gtf = 0;
+my $gnuplot_fallback_on_sas_space = 1;
+my $gnuplot_fallback_on_sas_failure = 1;
 my $get_common_associations;
 my $common_assoc_top_hit_threshold_override = '';
 my $EXTERNAL_GZIP = '';
@@ -169,7 +181,18 @@ GetOptions(
     'local-gtf-label-layout=s' => \$local_gtf_label_layout_override,
     'local-gtf-yaxis-offset4max=s' => \$local_gtf_yaxis_offset4max_override,
     'local-gtf-yoffset4textlabels=s' => \$local_gtf_yoffset4textlabels_override,
+    'local-ld-snps=s' => \$local_ld_snps_override,
+    'local-ld-audit-file=s' => \$local_ld_audit_file_override,
+    'local-ld-cache=s' => \$local_ld_cache_override,
+    'local-ld-population=s' => \$local_ld_population_override,
+    'local-ld-r2-threshold=f' => \$local_ld_r2_threshold_override,
+    'local-ld-web-fallback!' => \$local_ld_web_fallback,
+    'local-highlight-high-ld-snps|highlight-high-ld-snps!' => \$highlight_high_ld_snps,
+    'local-ld-marker-symbol|ld-marker-symbol=s' => \$local_ld_marker_symbol,
+    'local-ld-marker-color|ld-marker-color=s' => \$local_ld_marker_color,
     'exclude-non-protein-coding-genes-in-local-gtf!' => \$exclude_non_protein_coding_genes_in_local_gtf,
+    'gnuplot-fallback-on-sas-space!' => \$gnuplot_fallback_on_sas_space,
+    'gnuplot-fallback-on-sas-failure!' => \$gnuplot_fallback_on_sas_failure,
     'get-common-associations:s' => \$get_common_associations,
     'common-association-top-hit-threshold=s' => \$common_assoc_top_hit_threshold_override,
     'merge-raw!'                => \$step_flag{merge_raw},
@@ -219,6 +242,11 @@ if (defined $get_common_associations) {
         die "Invalid --get-common-associations value '$raw'. Use 0/1, true/false, or a p-value in (0,1).\n";
     }
 }
+$local_ld_population_override = uc($local_ld_population_override || 'EUR');
+die "--local-ld-population must be AFR, AMR, ASN, or EUR\n"
+    unless $local_ld_population_override =~ /^(?:AFR|AMR|ASN|EUR)$/;
+die "--local-ld-r2-threshold must be between 0 and 1\n"
+    unless $local_ld_r2_threshold_override > 0 && $local_ld_r2_threshold_override <= 1;
 
 my $cli_raw_column_aliases = load_alias_override_file($raw_column_alias_config);
 
@@ -396,6 +424,36 @@ my $deps_dir = normalize_unix_path(File::Spec->catdir($Bin, 'DiffGWASDeps'));
 verify_diff_gwas_deps($deps_dir);
 my $oda_helper_unix = resolve_oda_helper_unix($Bin);
 
+my $local_plot_requested =
+       $step_flag{plot_local_manhattan}
+    || $step_flag{plot_local_gtf}
+    || scalar(grep { /^(?:plot_)?local_(?:manhattan|gtf)$/ } @step_args)
+    || (!$skip_plots && ($plots || '') =~ /(?:^|,)local_(?:manhattan|gtf)(?:,|$)/);
+$highlight_high_ld_snps = 1
+    if length($local_ld_snps_override) || length(cfg_or($spec, 'local_ld_snps', ''));
+$local_ld_marker_symbol = lc(trim($local_ld_marker_symbol || 'star'));
+die "--local-ld-marker-symbol must be star, plus, cross, circle, square, triangle, or diamond\n"
+    unless $local_ld_marker_symbol =~ /^(?:star|plus|cross|circle|square|triangle|diamond)$/;
+die "--local-ld-marker-color must be a named color or #RRGGBB\n"
+    unless $local_ld_marker_color =~ /^(?:#[0-9A-Fa-f]{6}|[A-Za-z][A-Za-z0-9_-]*)$/;
+if ($highlight_high_ld_snps
+    && $local_plot_requested
+    && !$generate_spec_only
+    && length($configured_target_snps)
+    && !length($local_ld_snps_override)) {
+    my $local_ld_cache = length($local_ld_cache_override)
+        ? $local_ld_cache_override
+        : cfg_or($spec, 'local_ld_cache_tsv', $top_hit_ld_cache_tsv);
+    $local_ld_snps_override = resolve_high_ld_snps_for_plot(
+        query_snps  => $configured_target_snps,
+        population => $local_ld_population_override,
+        min_r2      => $local_ld_r2_threshold_override,
+        local_cache => $local_ld_cache,
+        web_fallback => $local_ld_web_fallback,
+        workdir     => $workdir,
+    );
+}
+
 my $pair_info = build_pair_info($spec->{pairs});
 my @prefixes = @{ $pair_info->{prefix_order} };
 my @labels = @{ $pair_info->{labels} };
@@ -437,6 +495,14 @@ my $runner_cfg = build_runner_config(
     target_snp_genes_override => $target_snp_genes_override,
     display_gwas_override => $display_gwas_override,
     local_gtf_label_snps_override => $local_gtf_label_snps_override,
+    local_ld_snps_override => $local_ld_snps_override,
+    local_ld_cache_override => $local_ld_cache_override,
+    local_ld_population_override => $local_ld_population_override,
+    local_ld_r2_threshold_override => $local_ld_r2_threshold_override,
+    local_ld_web_fallback => $local_ld_web_fallback,
+    highlight_high_ld_snps => $highlight_high_ld_snps,
+    local_ld_marker_symbol => $local_ld_marker_symbol,
+    local_ld_marker_color => $local_ld_marker_color,
     local_gtf_label_layout_override => $local_gtf_label_layout_override,
     local_gtf_yaxis_offset4max_override => $local_gtf_yaxis_offset4max_override,
     local_gtf_yoffset4textlabels_override => $local_gtf_yoffset4textlabels_override,
@@ -466,12 +532,14 @@ my $local_gtf_request_cache_file = "$Bin/"
 my $local_gtf_expected_csv_basename = $runner_cfg->{LOCAL_TOP_HITS_CSV_BASENAME}
   || (($runner_cfg->{LOCAL_OUTPUT_PREFIX} || "${project_tag}_SAS_local_top_hits_manhattan") . "_top_hits.csv");
 my $single_target_gtf_snp = '';
+my $target_gtf_snp_count = 0;
 if (defined($runner_cfg->{TARGET_SNP_LIST}) && length($runner_cfg->{TARGET_SNP_LIST})) {
     my @target_snps = grep { length($_) } map {
         my $snp = $_;
         $snp =~ s/^\s+|\s+$//g;
         $snp;
     } split /,/, $runner_cfg->{TARGET_SNP_LIST};
+    $target_gtf_snp_count = scalar @target_snps;
     my $target_tag;
     if (@target_snps == 1) {
         $single_target_gtf_snp = $target_snps[0]
@@ -529,6 +597,9 @@ if (length($single_target_gtf_snp) && !$local_sas_only) {
     $local_gtf_command = qq{"$bash_path" -lc 'cd "$workdir" && RUNNER_CONFIG_JSON="$generated->{runner_config}" SESSION_ID="$runner_session" TARGET_SNP="$single_target_gtf_snp" LOCAL_WINDOW_BP="$single_window" OUTPUT_HTML_BASENAME="$single_html" SINGLE_SNP_ALLOW_GENERIC_OUTPUT_BASENAME=1 SINGLE_SNP_TOP_HITS_CSV_BASENAME="$local_gtf_expected_csv_basename" OPEN_RESULT="$open_result" CLEAN_ODA_INPUT="$clean_oda_input" CLEAN_ODA_MACROS=0 "$deps_dir/run_sas_oda_single_snp_with_gtf_download_html.sh"'};
     $local_gtf_description = 'Run the fast single-target GTF-backed SAS ODA plot';
     print "[info] Using fast single-SNP SAS ODA local-GTF runner for $single_target_gtf_snp.\n";
+}
+elsif ($target_gtf_snp_count > 1) {
+    print "[info] Using multi-target SAS ODA local-GTF runner for $target_gtf_snp_count target SNPs; overlapping SNP-centered windows will share one locus plot.\n";
 }
 
 if ($source_mode eq 'raw_pgc_vcf_sumstats') {
@@ -2510,6 +2581,14 @@ sub build_runner_config {
     my $target_snp_genes_override = $args{target_snp_genes_override} // '';
     my $display_gwas_override = $args{display_gwas_override} // '';
     my $local_gtf_label_snps_override = $args{local_gtf_label_snps_override} // '';
+    my $local_ld_snps_override = $args{local_ld_snps_override} // '';
+    my $local_ld_cache_override = $args{local_ld_cache_override} // '';
+    my $local_ld_population_override = $args{local_ld_population_override} // 'EUR';
+    my $local_ld_r2_threshold_override = $args{local_ld_r2_threshold_override} // 0.8;
+    my $local_ld_web_fallback = $args{local_ld_web_fallback} ? 1 : 0;
+    my $highlight_high_ld_snps = $args{highlight_high_ld_snps} ? 1 : 0;
+    my $local_ld_marker_symbol = $args{local_ld_marker_symbol} // 'star';
+    my $local_ld_marker_color = $args{local_ld_marker_color} // 'black';
     my $local_gtf_label_layout_override = $args{local_gtf_label_layout_override} // '';
     my $local_gtf_yaxis_offset4max_override = $args{local_gtf_yaxis_offset4max_override} // '';
     my $local_gtf_yoffset4textlabels_override = $args{local_gtf_yoffset4textlabels_override} // '';
@@ -2799,6 +2878,23 @@ sub build_runner_config {
               ? $local_gtf_label_snps_override
               : cfg_or($spec, 'local_gtf_label_snps', '')
         ),
+        GTF_LD_SNPS => (
+            !$highlight_high_ld_snps ? ''
+            : length($local_ld_snps_override)
+              ? $local_ld_snps_override
+              : cfg_or($spec, 'local_ld_snps', '')
+        ),
+        GTF_LD_MARKER_SYMBOL => $local_ld_marker_symbol,
+        GTF_LD_MARKER_COLOR => $local_ld_marker_color,
+        HIGHLIGHT_HIGH_LD_SNPS => $highlight_high_ld_snps,
+        LOCAL_LD_CACHE_TSV => (
+            length($local_ld_cache_override)
+              ? $local_ld_cache_override
+              : cfg_or($spec, 'local_ld_cache_tsv', '')
+        ),
+        LOCAL_LD_POPULATION => $local_ld_population_override,
+        LOCAL_LD_R2_THRESHOLD => 0 + $local_ld_r2_threshold_override,
+        LOCAL_LD_WEB_FALLBACK => $local_ld_web_fallback,
         GTF_LABEL_LAYOUT => (
             length($local_gtf_label_layout_override)
               ? $local_gtf_label_layout_override
@@ -3168,6 +3264,7 @@ sub run_step {
     my $wrapped_command = qq{$command 2>"$stderr_path"};
     my $rc = system($wrapped_command);
     if ($rc != 0) {
+        my $exit_code = $rc == -1 ? -1 : ($rc >> 8);
         my $stderr_text = '';
         if (open my $err_fh, '<', $stderr_path) {
             local $/;
@@ -3184,6 +3281,36 @@ sub run_step {
         if (defined $hint && length $hint) {
             $msg .= "Latest step log hint: $hint\n";
         }
+        my $sas_space_failure = $exit_code == 73
+          || $stderr_text =~ /(?:failure_class=sas_oda_space_exhaustion|SAS ODA exhausted its WORK\/storage space)/i;
+        my $sas_infrastructure_abort = $exit_code == 134
+          || $stderr_text =~ /(?:SIGABRT|native (?:process )?abort|SASPy.*abort|SAS process has terminated unexpectedly)/i;
+        my $fallback_failure_class = $sas_space_failure
+          ? 'sas_oda_space_exhaustion'
+          : ($sas_infrastructure_abort ? 'sas_oda_infrastructure_abort' : '');
+        my $fallback_enabled = ($sas_space_failure && $gnuplot_fallback_on_sas_space)
+          || ($sas_infrastructure_abort && $gnuplot_fallback_on_sas_failure);
+        if ($fallback_enabled
+            && $name =~ /^plot_(?:manhattan|local_manhattan|local_gtf|forest)$/) {
+            if ($sas_space_failure) {
+                print STDERR "[fallback] SAS ODA space exhaustion was classified as non-retryable for $name.\n";
+            } else {
+                print STDERR "[fallback] SAS ODA/SASPy aborted with exit 134 (SIGABRT) for $name; the incomplete remote submission will not be repeated.\n";
+            }
+            print STDERR "[fallback] Running the equivalent local gnuplot stage instead of resubmitting the SAS job.\n";
+            my ($fallback_ok, $fallback_note) = run_gnuplot_space_fallback(
+                step          => $name,
+                sas_exit_code => $exit_code,
+                sas_log_hint  => $hint,
+                failure_class => $fallback_failure_class,
+            );
+            if ($fallback_ok) {
+                print "[done] $name completed via local gnuplot fallback in "
+                    . format_elapsed_seconds(time() - $step_started) . "\n";
+                return;
+            }
+            $msg .= "Gnuplot fallback also failed:\n$fallback_note\n";
+        }
         die $msg;
     }
     unlink $stderr_path if defined $stderr_path && -f $stderr_path;
@@ -3196,6 +3323,84 @@ sub run_step {
           or die "Cannot close request cache marker $cache_file: $!\n";
     }
     print "[done] $name finished in " . format_elapsed_seconds(time() - $step_started) . "\n";
+}
+
+sub run_gnuplot_space_fallback {
+    my (%args) = @_;
+    my $wrapper = File::Spec->catfile($Bin, 'auto_prepare_and_run_diff_gwas_with_gunplot.pl');
+    return (0, "Gnuplot wrapper is missing: $wrapper") unless -f $wrapper;
+
+    my @cmd = ($^X, $wrapper, '--spec', $spec_file, '--step', $args{step});
+    push @cmd, ('--display-gwas', $display_gwas_override)
+      if defined $display_gwas_override && length $display_gwas_override;
+    my $fallback_target_snps = $target_snps_override || '';
+    if ($args{step} eq 'plot_local_gtf' && length($local_gtf_label_snps_override || '')) {
+        my %seen;
+        my @combined = grep { length && !$seen{lc $_}++ }
+          map { my $x = $_; $x =~ s/^\s+|\s+$//g; $x }
+          split /,/, join(',', $fallback_target_snps, $local_gtf_label_snps_override);
+        $fallback_target_snps = join(',', @combined);
+    }
+    push @cmd, ('--target-snps', $fallback_target_snps) if length $fallback_target_snps;
+    push @cmd, ('--target-snp-genes', $target_snp_genes_override)
+      if defined $target_snp_genes_override && length $target_snp_genes_override;
+    push @cmd, ('--ld-snps', $local_ld_snps_override)
+      if defined $local_ld_snps_override && length $local_ld_snps_override;
+    if ($highlight_high_ld_snps) {
+        push @cmd, '--highlight-high-ld-snps';
+        push @cmd, ('--ld-marker-symbol', $local_ld_marker_symbol);
+        push @cmd, ('--ld-marker-color', $local_ld_marker_color);
+    }
+    push @cmd, ('--ld-audit-file', $local_ld_audit_file_override)
+      if defined $local_ld_audit_file_override && length $local_ld_audit_file_override;
+    push @cmd, ('--reference-build', $reference_build_override)
+      if defined $reference_build_override && length $reference_build_override;
+    push @cmd, ('--local-gtf-window-bp', $local_gtf_window_bp_override)
+      if defined $local_gtf_window_bp_override && length $local_gtf_window_bp_override;
+    push @cmd, ('--local-max-hits-per-fig', $local_max_hits_per_fig_override)
+      if defined $local_max_hits_per_fig_override && $local_max_hits_per_fig_override > 0;
+    if (defined $get_common_associations && $get_common_associations) {
+        my $threshold = length($common_assoc_top_hit_threshold_override || '')
+          ? $common_assoc_top_hit_threshold_override
+          : (length($common_association_cli_threshold || '') ? $common_association_cli_threshold : 1);
+        push @cmd, "--get-common-associations=$threshold";
+    }
+    push @cmd, '--force' if $force;
+
+    print "[fallback command] " . join(' ', map { shell_quote_for_display($_) } @cmd) . "\n";
+    my $fallback_rc = system(@cmd);
+    my $fallback_exit = $fallback_rc == -1 ? -1 : ($fallback_rc >> 8);
+    my $status_path = File::Spec->catfile(
+        $Bin,
+        'gnuplot_fallback_' . strftime('%Y%m%d_%H%M%S', localtime()) . '.status.json',
+    );
+    if (open my $status_fh, '>', $status_path) {
+        print {$status_fh} JSON::PP->new->canonical(1)->pretty(1)->encode({
+            failure_class       => ($args{failure_class} || 'sas_oda_space_exhaustion'),
+            sas_retryable       => JSON::PP::false,
+            sas_exit_code       => $args{sas_exit_code},
+            sas_log_hint        => ($args{sas_log_hint} || ''),
+            fallback_backend    => 'gnuplot',
+            fallback_step       => $args{step},
+            fallback_command    => \@cmd,
+            fallback_exit_code  => $fallback_exit,
+            fallback_success    => $fallback_exit == 0 ? JSON::PP::true : JSON::PP::false,
+            created_at          => strftime('%Y-%m-%dT%H:%M:%S%z', localtime()),
+        });
+        close $status_fh;
+        print "[fallback status] $status_path\n";
+    }
+    return $fallback_exit == 0
+      ? (1, "local gnuplot fallback succeeded")
+      : (0, "command exited with status $fallback_exit; status file: $status_path");
+}
+
+sub shell_quote_for_display {
+    my ($text) = @_;
+    $text //= '';
+    return $text if $text =~ m{^[A-Za-z0-9_./:=,+-]+$};
+    $text =~ s/'/'"'"'/g;
+    return "'$text'";
 }
 
 sub latest_step_log_hint {
@@ -3539,6 +3744,49 @@ sub cygpath_to_win {
     return $win;
 }
 
+sub resolve_high_ld_snps_for_plot {
+    my (%args) = @_;
+    my $helper = File::Spec->catfile($Bin, 'DiffGWASDeps', 'resolve_haploreg_high_ld.pl');
+    unless (-f $helper) {
+        warn "[warn] High-LD resolver is missing: $helper\n";
+        return '';
+    }
+    my $cache_dir = File::Spec->catdir($Bin, 'cache', 'haploreg_ld');
+    make_path($cache_dir) unless -d $cache_dir;
+    my $web_cache = File::Spec->catfile($cache_dir, 'high_ld_queries.tsv');
+    my @cmd = (
+        $^X, $helper,
+        '--query-snps', $args{query_snps},
+        '--population', $args{population},
+        '--min-r2', $args{min_r2},
+        '--web-cache', $web_cache,
+    );
+    my $local_cache = normalize_unix_path($args{local_cache} || '');
+    push @cmd, ('--local-cache', $local_cache)
+        if length($local_cache) && -s $local_cache;
+    push @cmd, '--no-web-fallback' unless $args{web_fallback};
+    my $ld_snps = '';
+    if (open my $pipe, '-|', @cmd) {
+        while (my $line = <$pipe>) {
+            chomp $line;
+            $ld_snps = $1 if $line =~ /^LD_SNPS\t(.*)$/;
+        }
+        my $ok = close $pipe;
+        warn "[warn] High-LD resolver failed; SAS plots will continue without LD marker overlays.\n"
+            unless $ok;
+    }
+    else {
+        warn "[warn] Cannot start high-LD resolver $helper: $!\n";
+    }
+    if (length($ld_snps)) {
+        print "[prep] SAS/gnuplot high-LD marker set ($args{population}, r2 >= $args{min_r2}): $ld_snps\n";
+    }
+    else {
+        print "[warn] No high-LD proxies resolved for $args{query_snps}; no LD marker overlay will be drawn.\n";
+    }
+    return $ld_snps;
+}
+
 sub usage {
     return <<"USAGE";
 Usage:
@@ -3668,6 +3916,44 @@ Options:
   --local-gtf-window-bp BP
                        Override the genomic half-window used only for the local
                        GTF plot stage. This does not change local Manhattan.
+  --local-ld-snps rs1,rs2
+                       Explicit LD-linked variants to mark in SAS ODA and
+                       gnuplot local plots. Supplying this option enables LD
+                       highlighting.
+  --[no-]highlight-high-ld-snps
+                       Resolve and draw high-LD markers. Default: disabled to
+                       avoid clutter in wide local windows.
+  --ld-marker-symbol NAME
+                       star|plus|cross|circle|square|triangle|diamond.
+                       Default: star when LD highlighting is enabled.
+  --ld-marker-color COLOR
+                       Named or #RRGGBB LD marker color. Default: black.
+  --local-ld-cache FILE
+                       Normalized HaploReg TSV/SQLite cache queried before any
+                       network request.
+  --local-ld-population POP
+                       HaploReg population for optional high-LD markers.
+                       Default: EUR.
+                       Accepted values: AFR, AMR, ASN, EUR.
+  --local-ld-r2-threshold N
+                       High-LD marker threshold. Default: 0.8.
+  --[no-]local-ld-web-fallback
+                       Query HaploReg only when the local cache misses a target
+                       (default enabled), then persist the result for reuse.
+  --local-ld-audit-file FILE
+                       Optional LD audit TSV used by gnuplot fallback. Rows
+                       classified as PRUNED_LD/LD_LINKED and connected to the
+                       requested lead SNPs are marked automatically.
+  --[no-]gnuplot-fallback-on-sas-space
+                       On by default. If a SAS plotting stage exits with the
+                       non-retryable WORK/storage-exhaustion classification,
+                       run its equivalent local gnuplot stage once.
+  --[no-]gnuplot-fallback-on-sas-failure
+                       On by default. When SAS ODA/SASPy terminates with native exit 134
+                       (SIGABRT), do not resubmit the incomplete remote job;
+                       run the equivalent local gnuplot stage once. Ordinary
+                       SAS program errors are still reported without fallback.
+                       errors are not rerouted.
   --local-gtf-yaxis-offset4max N
                        Set the starting local-GTF top headroom fraction passed
                        to the lattice macro as yaxis_offset4max. This matters

@@ -38,6 +38,9 @@ companion runner/script pair:
 %let requested_top_hits_csv_basename=__REQUESTED_TOP_HITS_CSV_BASENAME__;
 %let target_snp_list=__TARGET_SNP_LIST__;
 %let target_snp_gene_map=__TARGET_SNP_GENES__;
+%let local_ld_snps=__GTF_LD_SNPS__;
+%let local_ld_marker_symbol=__GTF_LD_MARKER_SYMBOL__;
+%let local_ld_marker_color=__GTF_LD_MARKER_COLOR__;
 %let common_assoc_pvars=__COMMON_ASSOC_P_VARS__;
 %let lmh_angle4xaxis_label=__LOCAL_MANHATTAN_ANGLE4XAXIS_LABEL__;
 %let lmh_xgrp_y_pos=__LOCAL_MANHATTAN_XGRP_Y_POS__;
@@ -462,7 +465,7 @@ run;
 
 %macro _select_computed_top_hits(candidate_dsd=,outdsd=);
   %if %upcase(&top_hit_selection_method)=LD %then %do;
-    %put NOTE: Selecting LD-clumped top hits (r2 >= &top_hit_ld_r2_threshold; populations=&top_hit_ld_populations; rule=&top_hit_ld_population_rule).;
+    %put NOTE: Selecting LD-clumped top hits (r2 >= &top_hit_ld_r2_threshold, populations=&top_hit_ld_populations, rule=&top_hit_ld_population_rule).;
     %get_top_signal_with_ld(
       dsdin=&candidate_dsd,
       snp_var=SNP,
@@ -546,7 +549,7 @@ run;
   proc sort data=top_hit4diffp_raw;
     by requested_hit_order CHR BP SNP;
   run;
-  %put NOTE: The uploaded MAF-filtered CSV supplied LD-clumping candidates; only LD-independent leads are retained.;
+  %put NOTE: The uploaded MAF-filtered CSV supplied LD-clumping candidates, and only LD-independent leads are retained.;
 %end;
 %else %do;
   %_pick_top_hits_by_thr(candidate_dsd=top_hit_candidates);
@@ -934,6 +937,9 @@ run;
       snp_var=SNP,
       snp_gene_splitter=:,
       target_SNPs=&batch_snp_gene_label,
+      LD_SNPs2mark_scatterplot_dots=&local_ld_snps,
+      LD_marker_symbol=&local_ld_marker_symbol,
+      LD_marker_color=&local_ld_marker_color,
       Keep_order_of_target_SNPs=1
     );
   %end;

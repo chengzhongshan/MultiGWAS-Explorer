@@ -11,6 +11,7 @@ CANDIDATES=""
 OUTPUT=""
 POPULATIONS="EUR ASN"
 MIN_R2="0.2"
+RETAIN_ALL_PROXIES=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -18,8 +19,9 @@ while [[ $# -gt 0 ]]; do
     --output) OUTPUT="$2"; shift 2 ;;
     --populations) POPULATIONS="$2"; shift 2 ;;
     --min-r2) MIN_R2="$2"; shift 2 ;;
+    --retain-all-proxies) RETAIN_ALL_PROXIES=1; shift ;;
     -h|--help)
-      echo "Usage: $0 --candidates FILE --output FILE [--populations 'EUR ASN'] [--min-r2 0.2]"
+      echo "Usage: $0 --candidates FILE --output FILE [--populations 'EUR ASN'] [--min-r2 0.2] [--retain-all-proxies]"
       echo "Set HAPLOREG_LD_ARCHIVE_DIR to reuse downloaded LD_POP.tsv.gz files."
       exit 0
       ;;
@@ -55,6 +57,10 @@ for population in ${POPULATIONS}; do
   population_cache="${tmp_dir}/candidate_ld_${population}.tsv"
   population_summary="${OUTPUT}.${population}.summary.json"
   cache_files+=("${population_cache}")
+  extractor_proxy_args=()
+  if [[ "${RETAIN_ALL_PROXIES}" == "1" ]]; then
+    extractor_proxy_args+=(--no-candidate-proxies-only)
+  fi
 
   if [[ -n "${HAPLOREG_LD_ARCHIVE_DIR}" ]]; then
     archive="${HAPLOREG_LD_ARCHIVE_DIR}/LD_${population}.tsv.gz"
@@ -62,7 +68,8 @@ for population in ${POPULATIONS}; do
     perl "${EXTRACTOR}" \
       --candidates "${CANDIDATES}" --population "${population}" \
       --input "${archive}" --output "${population_cache}" \
-      --summary "${population_summary}" --min-r2 "${MIN_R2}" &
+      --summary "${population_summary}" --min-r2 "${MIN_R2}" \
+      "${extractor_proxy_args[@]}" &
   else
     (
       set -o pipefail
@@ -72,7 +79,8 @@ for population in ${POPULATIONS}; do
         perl "${EXTRACTOR}" \
           --candidates "${CANDIDATES}" --population "${population}" \
           --input - --output "${population_cache}" \
-          --summary "${population_summary}" --min-r2 "${MIN_R2}"
+          --summary "${population_summary}" --min-r2 "${MIN_R2}" \
+          "${extractor_proxy_args[@]}"
     ) &
   fi
   pids+=("$!")
