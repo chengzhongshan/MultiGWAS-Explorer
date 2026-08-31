@@ -1,0 +1,6 @@
+family_id,family_name,agent,n_runs,task_match,scored_success,failures,median_latency,expected_status,preferred_interface
+F01,"Environment smoke test",codex,4,4,4,0,54.8643970489502,success,native
+F02,"PGC configuration-only generation",codex,4,2,2,2,43.3445190191269,success,mcp
+F13,"MAF safeguard regression test",codex,4,4,4,0,27.0292059183121,success,native
+F21,"Missing spec safe failure",codex,4,3,3,1,24.2943490743638,safe_failure,mcp
+F25,"Contradictory backend request",codex,4,4,4,0,5.39798152446747,clarify,clarify

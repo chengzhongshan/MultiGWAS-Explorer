@@ -2560,6 +2560,10 @@ Typical outputs include:
 
 ## Additional Documentation
 
+- [benchmark/ai_interface_natural_language_20/README.md](./benchmark/ai_interface_natural_language_20/README.md)
+  Preregistered 20-prompt natural-language Codex evaluation, matched
+  post-remediation results, explicit-spec diagnostics, and machine-readable
+  audit files.
 - [GENERALIZE_DIFF_GWAS_PIPELINE.md](./GENERALIZE_DIFF_GWAS_PIPELINE.md)
   Deeper notes on the generalized pipeline contract, plotting behavior, and MCP
   wrapper behavior.

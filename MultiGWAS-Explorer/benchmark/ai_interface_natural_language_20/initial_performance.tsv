@@ -1,0 +1,2 @@
+Agent	Runs	"All criteria met"	"Overall success rate (95% CI)"	"Positive tasks completed"	"Completion rate (95% CI)"	"Task/invocation concordance (95% CI)"	"Repeated-run consistency"	"Paraphrase consistency"	"Safe-failure detection (95% CI)"	"Clarification handling (95% CI)"	"Canonical artifact parity"	"Median latency (IQR), s"	"95th percentile latency, s"
+codex	20	17/20	"85.0% (64.0-94.8%)"	10/12	"83.3% (55.2-95.3%)"	"85.0% (64.0-94.8%)"	"not assessed"	3/5	"75.0% (30.1-95.4%)"	"100.0% (51.0-100.0%)"	2/2	"29.088 (23.309-45.484)"	59.223

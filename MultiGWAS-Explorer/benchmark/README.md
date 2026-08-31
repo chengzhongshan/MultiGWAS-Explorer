@@ -105,6 +105,16 @@ and MCP-interface results are documented in `HAPLOREG_LD_SUMMARY.md`,
 tool calls, not free-form questions submitted to an LLM. Exact expanded
 requests are in `agent_interface/AI_Interface_Evaluation_Requests.jsonl`.
 
+A separate natural-language Codex evaluation is versioned under
+`ai_interface_natural_language_20/`. Its initial preregistered run met all
+criteria for 17/20 prompts, and its matched post-remediation run met 19/20.
+The only remaining underspecified request elicited clarification; two
+separately reported explicit-spec diagnostics passed 2/2 and each reproduced
+all four canonical CLI artifacts. The directory includes exact prompts,
+machine-readable run results, preflight metadata, scoring limitations, and the
+failed-prompt audit. It excludes UK Biobank requests and the time-consuming
+F03 forced-preprocessing family.
+
 ## LD-clumped top-hit selection
 
 The revised SAS top-hit stage ranks MAF-passing candidates by their applicable
