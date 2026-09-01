@@ -5,7 +5,9 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$OutputXlsx,
 
-    [string]$SheetName = "Table_S1_Common_Loci"
+    [string]$SheetName = "Table_S1_Common_Loci",
+
+    [switch]$IncludeLdMetadata
 )
 
 $ErrorActionPreference = "Stop"
@@ -82,7 +84,7 @@ if (-not $rows -or $rows.Count -eq 0) {
     throw "CSV has no data rows: $CsvPath"
 }
 
-$columns = @(
+$associationColumns = @(
     "CHR","BP","SNP","gene","Smallest_ASSOC_P",
     "ALL_STD_DIFF_P","EUR_STD_DIFF_P","ASN_STD_DIFF_P",
     "ALL_FEMALE_BETA","ALL_FEMALE_SE","ALL_FEMALE_P",
@@ -96,7 +98,7 @@ $columns = @(
     "ASN_DIFF_BETA","ASN_DIFF_SE","ASN_DIFF_P"
 )
 
-$headerRow2 = @(
+$associationHeaderRow2 = @(
     "CHR","BP","SNP","Gene","Smallest_ASSOC_P",
     "ALL_STD_DIFF_P","EUR_STD_DIFF_P","ASN_STD_DIFF_P",
     "BETA","SE","P",
@@ -110,21 +112,7 @@ $headerRow2 = @(
     "BETA","SE","P"
 )
 
-$groupHeaders = @(
-    @{ Start = 1; End = 5; Label = "Locus summary" },
-    @{ Start = 6; End = 8; Label = "Standardized differential association" },
-    @{ Start = 9; End = 11; Label = "ALL_FEMALE" },
-    @{ Start = 12; End = 14; Label = "ALL_MALE" },
-    @{ Start = 15; End = 17; Label = "ALL_DIFF" },
-    @{ Start = 18; End = 20; Label = "EUR_FEMALE" },
-    @{ Start = 21; End = 23; Label = "EUR_MALE" },
-    @{ Start = 24; End = 26; Label = "EUR_DIFF" },
-    @{ Start = 27; End = 29; Label = "ASN_FEMALE" },
-    @{ Start = 30; End = 32; Label = "ASN_MALE" },
-    @{ Start = 33; End = 35; Label = "ASN_DIFF" }
-)
-
-$columnWidths = @(
+$associationColumnWidths = @(
     8,12,16,18,16,
     16,16,16,
     13,13,13,
@@ -136,6 +124,56 @@ $columnWidths = @(
     13,13,13,
     13,13,13
 )
+
+$metadataColumns = @(
+    "LD_LEAD_RANK","INDEPENDENCE_METHOD","LD_POPULATIONS",
+    "LD_POPULATION_RULE","LD_QUERY_STATUS","LD_R2_THRESHOLD",
+    "LD_FALLBACK_BP","selected_maf","maf_source"
+)
+$metadataHeaderRow2 = @(
+    "Lead rank","Method","Populations","Population rule","Query status",
+    "r-squared threshold","Fallback bp","Selected MAF","MAF source"
+)
+$metadataColumnWidths = @(11,20,16,16,18,16,14,14,14)
+
+if ($IncludeLdMetadata) {
+    $columns = @($metadataColumns + $associationColumns)
+    $headerRow2 = @($metadataHeaderRow2 + $associationHeaderRow2)
+    $columnWidths = @($metadataColumnWidths + $associationColumnWidths)
+    $offset = $metadataColumns.Count
+    $groupHeaders = @(
+        @{ Start = 1; End = $offset; Label = "LD-pruning metadata" },
+        @{ Start = 1 + $offset; End = 5 + $offset; Label = "Locus summary" },
+        @{ Start = 6 + $offset; End = 8 + $offset; Label = "Standardized differential association" },
+        @{ Start = 9 + $offset; End = 11 + $offset; Label = "ALL_FEMALE" },
+        @{ Start = 12 + $offset; End = 14 + $offset; Label = "ALL_MALE" },
+        @{ Start = 15 + $offset; End = 17 + $offset; Label = "ALL_DIFF" },
+        @{ Start = 18 + $offset; End = 20 + $offset; Label = "EUR_FEMALE" },
+        @{ Start = 21 + $offset; End = 23 + $offset; Label = "EUR_MALE" },
+        @{ Start = 24 + $offset; End = 26 + $offset; Label = "EUR_DIFF" },
+        @{ Start = 27 + $offset; End = 29 + $offset; Label = "ASN_FEMALE" },
+        @{ Start = 30 + $offset; End = 32 + $offset; Label = "ASN_MALE" },
+        @{ Start = 33 + $offset; End = 35 + $offset; Label = "ASN_DIFF" }
+    )
+}
+else {
+    $columns = $associationColumns
+    $headerRow2 = $associationHeaderRow2
+    $columnWidths = $associationColumnWidths
+    $groupHeaders = @(
+        @{ Start = 1; End = 5; Label = "Locus summary" },
+        @{ Start = 6; End = 8; Label = "Standardized differential association" },
+        @{ Start = 9; End = 11; Label = "ALL_FEMALE" },
+        @{ Start = 12; End = 14; Label = "ALL_MALE" },
+        @{ Start = 15; End = 17; Label = "ALL_DIFF" },
+        @{ Start = 18; End = 20; Label = "EUR_FEMALE" },
+        @{ Start = 21; End = 23; Label = "EUR_MALE" },
+        @{ Start = 24; End = 26; Label = "EUR_DIFF" },
+        @{ Start = 27; End = 29; Label = "ASN_FEMALE" },
+        @{ Start = 30; End = 32; Label = "ASN_MALE" },
+        @{ Start = 33; End = 35; Label = "ASN_DIFF" }
+    )
+}
 
 $sheetData = New-Object System.Collections.Generic.List[string]
 
@@ -158,8 +196,11 @@ for ($c = 1; $c -le $headerRow2.Count; $c++) {
 }
 $sheetData.Add("<row r=`"2`" ht=`"22`" customHeight=`"1`">$($row2Cells -join '')</row>")
 
-$textColumns = @("SNP", "gene")
-$integerColumns = @("CHR", "BP")
+$textColumns = @(
+    "SNP", "gene", "INDEPENDENCE_METHOD", "LD_POPULATIONS",
+    "LD_POPULATION_RULE", "LD_QUERY_STATUS", "maf_source"
+)
+$integerColumns = @("CHR", "BP", "LD_LEAD_RANK", "LD_FALLBACK_BP")
 
 $excelRow = 3
 foreach ($row in $rows) {
@@ -183,10 +224,10 @@ foreach ($row in $rows) {
 
 $lastRow = $excelRow - 1
 $lastCol = ConvertTo-ExcelColumn $columns.Count
-$mergeRefs = @(
-    "A1:E1","F1:H1","I1:K1","L1:N1","O1:Q1","R1:T1",
-    "U1:W1","X1:Z1","AA1:AC1","AD1:AF1","AG1:AI1"
-)
+$mergeRefs = @()
+foreach ($group in $groupHeaders) {
+    $mergeRefs += "$(ConvertTo-ExcelColumn $group.Start)1:$(ConvertTo-ExcelColumn $group.End)1"
+}
 $mergeXml = ($mergeRefs | ForEach-Object { "<mergeCell ref=`"$_`"/>" }) -join ""
 
 $colsXml = New-Object System.Collections.Generic.List[string]
