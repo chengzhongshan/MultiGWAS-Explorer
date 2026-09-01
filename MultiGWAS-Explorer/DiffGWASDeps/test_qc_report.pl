@@ -15,11 +15,11 @@ for my $i (1..2000) {
 close $d;
 open my $c, '>', "$dir/spec.json" or die $!;
 print {$c} '{"pairs":[{"prefix":"ALL"}]}'; close $c;
-my $script = "$Bin/reviewer_qc_report.pl";
+my $script = "$Bin/qc_report.pl";
 system($^X, $script, '--input', "$dir/in.tsv", '--config', "$dir/spec.json", '--output-dir', "$dir/out", '--nominated-snps', 'rsTest', '--reservoir-size', 1000) == 0 or die "QC command failed\n";
-open my $j, '<', "$dir/out/reviewer_qc_summary.json" or die $!; local $/; my $x = decode_json(<$j>); close $j;
+open my $j, '<', "$dir/out/qc_summary.json" or die $!; local $/; my $x = decode_json(<$j>); close $j;
 die "row count mismatch\n" unless $x->{rows_scanned} == 2000;
 open my $h, '<', "$dir/out/nominated_variants.tsv" or die $!; my $txt = do { local $/; <$h> }; close $h;
 die "expected MAF flag absent in:\n$txt\n" unless $txt =~ /MAF_AT_OR_BELOW_0\.01/;
 die "expected INFO flag absent\n" unless $txt =~ /INFO_BELOW_0\.8/;
-print "reviewer_qc_report synthetic test: PASS\n";
+print "qc_report synthetic test: PASS\n";

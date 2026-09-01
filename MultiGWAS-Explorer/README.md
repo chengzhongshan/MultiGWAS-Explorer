@@ -219,7 +219,7 @@ cache therefore requires an LD threshold of at least 0.2; lower cutoffs remain
 available through live HaploReg queries. Cache misses use the web path by
 default and may instead be configured to fail explicitly.
 
-Reviewer-requested comparator, QC, power, LD, and MCP-interface commands are
+Focused comparator, QC, power, LD, and MCP-interface commands are
 collected in:
 
 ```bash
@@ -2576,5 +2576,5 @@ Typical outputs include:
   Workflow guidance for Codex or other agents using this repository.
 
 Journal manuscripts, response letters, supplementary tables/files, and
-reviewer-facing benchmark reports are maintained in the separate submission
+submission-facing benchmark reports are maintained in the separate submission
 package and are intentionally not versioned in this source repository.

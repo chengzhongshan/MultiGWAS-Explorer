@@ -15,10 +15,10 @@
   dsd4LD_SNPs=LD_SNPs_ASN
 );
 
-proc export data=LD_SNPs_EUR outfile="~/reviewer_haploreg_ld_eur_r2ge0p5.tsv"
+proc export data=LD_SNPs_EUR outfile="~/haploreg_ld_eur_r2ge0p5.tsv"
   dbms=tab replace;
 run;
-proc export data=LD_SNPs_ASN outfile="~/reviewer_haploreg_ld_asn_r2ge0p5.tsv"
+proc export data=LD_SNPs_ASN outfile="~/haploreg_ld_asn_r2ge0p5.tsv"
   dbms=tab replace;
 run;
 

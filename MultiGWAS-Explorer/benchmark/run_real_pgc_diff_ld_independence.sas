@@ -29,11 +29,11 @@ run;
 );
 
 proc export data=pgc_diff_ld_leads
-  outfile="~/reviewer_pgc_diff_ld_independent_leads.tsv"
+  outfile="~/pgc_diff_ld_independent_leads.tsv"
   dbms=tab replace;
 run;
 proc export data=pgc_diff_ld_audit
-  outfile="~/reviewer_pgc_diff_ld_audit.tsv"
+  outfile="~/pgc_diff_ld_audit.tsv"
   dbms=tab replace;
 run;
 

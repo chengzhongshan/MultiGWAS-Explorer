@@ -1,7 +1,7 @@
 /*
 Repository-local HaploReg v4 LD query macro.
 
-This is a hardened version of the project macro used by the reviewer
+This is a hardened version of the project macro used by the benchmark
 benchmark.  It preserves the original output shape and also publishes two
 status macro variables so callers can distinguish an HTTP/import failure from
 a successful LD response:

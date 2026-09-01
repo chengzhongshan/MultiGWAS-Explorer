@@ -39,10 +39,10 @@ RUNNER_CONFIG="${RUNNER_CONFIG:-${PROJECT_ROOT}/configs/auto_PGC_SCZ_female_vs_m
 
 COMPARATOR_IMAGE="${COMPARATOR_IMAGE:-multigwas-comparators:20260819}"
 GNU_TIME="${GNU_TIME:-/usr/bin/time}"
-SAS_SESSION_ID="${SAS_SESSION_ID:-reviewer_revision_benchmark}"
+SAS_SESSION_ID="${SAS_SESSION_ID:-pipeline_revision_benchmark}"
 SAS_RUNNER="${SAS_RUNNER:-${PROJECT_ROOT}/run_sas_codes_or_script_in_ODA.pl}"
 QUERY_LD_MACRO="${QUERY_LD_MACRO:-${DEPS_DIR}/QueryLD_SNPs_at_Haploreg4.sas}"
-# Repository copy of the exact multi-SNP macro requested by the reviewer.
+# Repository copy of the multi-SNP macro used by this benchmark.
 QUERY_MULTI_LD_MACRO="${QUERY_MULTI_LD_MACRO:-${DEPS_DIR}/QueryMulti_LD_SNPs_at_Haploreg4.sas}"
 GET_TOP_SIGNAL_LD_MACRO="${GET_TOP_SIGNAL_LD_MACRO:-${DEPS_DIR}/get_top_signal_with_ld.sas}"
 GET_TOP_SIGNAL_DISTANCE_MACRO="${GET_TOP_SIGNAL_DISTANCE_MACRO:-${DEPS_DIR}/get_top_signal_within_dist.sas}"
@@ -309,7 +309,7 @@ run_full_qc() {
 
   log "Running the pre-exclusion unfiltered QC sensitivity scan."
   "${GNU_TIME}" -v -o "${RUN_ROOT}/unfiltered_qc.time.txt" \
-    perl "${DEPS_DIR}/reviewer_qc_long_report.pl" \
+    perl "${DEPS_DIR}/qc_long_report.pl" \
       --input "${qc_input}" \
       --outdir "${RUN_ROOT}/unfiltered_qc" \
       --candidate-p 1e-5 \
@@ -318,7 +318,7 @@ run_full_qc() {
 
   log "Running the harmonization-filtered unfiltered QC scan used in the revision."
   "${GNU_TIME}" -v -o "${RUN_ROOT}/unfiltered_qc_harmonized.time.txt" \
-    perl "${DEPS_DIR}/reviewer_qc_long_report.pl" \
+    perl "${DEPS_DIR}/qc_long_report.pl" \
       --input "${qc_input}" \
       --outdir "${RUN_ROOT}/unfiltered_qc_harmonized" \
       --candidate-p 1e-5 \
@@ -482,8 +482,8 @@ run_archive_ld() {
       --population-rule ANY \
       --fallback-distance-bp 1000000 \
       --rebuild-sqlite \
-      --output-leads "${RUN_ROOT}/reviewer_pgc_common_ld_cached_r2ge0p2_leads_local.csv" \
-      --output-audit "${RUN_ROOT}/reviewer_pgc_common_ld_cached_r2ge0p2_audit_local.tsv" \
+      --output-leads "${RUN_ROOT}/pgc_common_ld_cached_r2ge0p2_leads_local.csv" \
+      --output-audit "${RUN_ROOT}/pgc_common_ld_cached_r2ge0p2_audit_local.tsv" \
       > "${RUN_ROOT}/archive_clump_first.stdout.txt"
 
   local repeat
@@ -499,22 +499,22 @@ run_archive_ld() {
         --r2-threshold 0.2 \
         --population-rule ANY \
         --fallback-distance-bp 1000000 \
-        --output-leads "${RUN_ROOT}/reviewer_pgc_common_ld_cached_r2ge0p2_leads_local_reuse${repeat}.csv" \
-        --output-audit "${RUN_ROOT}/reviewer_pgc_common_ld_cached_r2ge0p2_audit_local_reuse${repeat}.tsv" \
+        --output-leads "${RUN_ROOT}/pgc_common_ld_cached_r2ge0p2_leads_local_reuse${repeat}.csv" \
+        --output-audit "${RUN_ROOT}/pgc_common_ld_cached_r2ge0p2_audit_local_reuse${repeat}.tsv" \
         > "${RUN_ROOT}/archive_clump_reuse${repeat}.stdout.txt"
   done
 
   sha256sum \
-    "${RUN_ROOT}/reviewer_pgc_common_ld_cached_r2ge0p2_leads_local"*.csv \
-    "${RUN_ROOT}/reviewer_pgc_common_ld_cached_r2ge0p2_audit_local"*.tsv \
+    "${RUN_ROOT}/pgc_common_ld_cached_r2ge0p2_leads_local"*.csv \
+    "${RUN_ROOT}/pgc_common_ld_cached_r2ge0p2_audit_local"*.tsv \
     > "${RUN_ROOT}/archive_clump_sha256.txt"
   cmp -s \
-    "${RUN_ROOT}/reviewer_pgc_common_ld_cached_r2ge0p2_leads_local.csv" \
-    "${RUN_ROOT}/reviewer_pgc_common_ld_cached_r2ge0p2_leads_local_reuse1.csv" \
+    "${RUN_ROOT}/pgc_common_ld_cached_r2ge0p2_leads_local.csv" \
+    "${RUN_ROOT}/pgc_common_ld_cached_r2ge0p2_leads_local_reuse1.csv" \
     || die "First indexed lead rerun was not byte-identical."
   cmp -s \
-    "${RUN_ROOT}/reviewer_pgc_common_ld_cached_r2ge0p2_audit_local.tsv" \
-    "${RUN_ROOT}/reviewer_pgc_common_ld_cached_r2ge0p2_audit_local_reuse1.tsv" \
+    "${RUN_ROOT}/pgc_common_ld_cached_r2ge0p2_audit_local.tsv" \
+    "${RUN_ROOT}/pgc_common_ld_cached_r2ge0p2_audit_local_reuse1.tsv" \
     || die "First indexed audit rerun was not byte-identical."
   log "Archive/cache benchmark complete."
 }
@@ -549,23 +549,23 @@ run_sas_ld() {
     --persistent --session-id "${SAS_SESSION_ID}" \
     --output-prefix "${RUN_ROOT}/sas_query_multi_upload/output"
 
-  oda --file "${SCRIPT_DIR}/run_haploreg_ld_reviewers.sas" \
+  oda --file "${SCRIPT_DIR}/run_haploreg_ld_benchmark.sas" \
     --persistent --session-id "${SAS_SESSION_ID}" --run-timeout-seconds 3600 \
     --output-prefix "${RUN_ROOT}/sas_haploreg_high_ld/output"
   oda \
-    --download-file '~/reviewer_haploreg_ld_eur_r2ge0p5.tsv' \
-    --download-file '~/reviewer_haploreg_ld_asn_r2ge0p5.tsv' \
-    --download-local-path "${RUN_ROOT}/reviewer_haploreg_ld_eur_r2ge0p5.tsv" \
-    --download-local-path "${RUN_ROOT}/reviewer_haploreg_ld_asn_r2ge0p5.tsv" \
+    --download-file '~/haploreg_ld_eur_r2ge0p5.tsv' \
+    --download-file '~/haploreg_ld_asn_r2ge0p5.tsv' \
+    --download-local-path "${RUN_ROOT}/haploreg_ld_eur_r2ge0p5.tsv" \
+    --download-local-path "${RUN_ROOT}/haploreg_ld_asn_r2ge0p5.tsv" \
     --persistent --session-id "${SAS_SESSION_ID}" \
     --output-prefix "${RUN_ROOT}/sas_haploreg_high_ld/download"
 
-  oda --file "${SCRIPT_DIR}/run_haploreg_pairwise_ld_reviewers.sas" \
+  oda --file "${SCRIPT_DIR}/run_haploreg_pairwise_ld_benchmark.sas" \
     --persistent --session-id "${SAS_SESSION_ID}" --run-timeout-seconds 3600 \
     --output-prefix "${RUN_ROOT}/sas_haploreg_pairwise/output"
   oda \
-    --download-file '~/reviewer_haploreg_pairwise_ld.tsv' \
-    --download-local-path "${RUN_ROOT}/reviewer_haploreg_pairwise_ld.tsv" \
+    --download-file '~/haploreg_pairwise_ld.tsv' \
+    --download-local-path "${RUN_ROOT}/haploreg_pairwise_ld.tsv" \
     --persistent --session-id "${SAS_SESSION_ID}" \
     --output-prefix "${RUN_ROOT}/sas_haploreg_pairwise/download"
 
@@ -573,12 +573,12 @@ run_sas_ld() {
     --persistent --session-id "${SAS_SESSION_ID}" --run-timeout-seconds 3600 \
     --output-prefix "${RUN_ROOT}/sas_fixture_ld/output"
   oda \
-    --download-file '~/reviewer_fixture_ld_independent_leads.tsv' \
-    --download-file '~/reviewer_fixture_ld_audit.tsv' \
-    --download-file '~/reviewer_fixture_distance_leads.tsv' \
-    --download-local-path "${RUN_ROOT}/reviewer_fixture_ld_independent_leads.tsv" \
-    --download-local-path "${RUN_ROOT}/reviewer_fixture_ld_audit.tsv" \
-    --download-local-path "${RUN_ROOT}/reviewer_fixture_distance_leads.tsv" \
+    --download-file '~/ld_fixture_independent_leads.tsv' \
+    --download-file '~/ld_fixture_audit.tsv' \
+    --download-file '~/ld_fixture_distance_leads.tsv' \
+    --download-local-path "${RUN_ROOT}/ld_fixture_independent_leads.tsv" \
+    --download-local-path "${RUN_ROOT}/ld_fixture_audit.tsv" \
+    --download-local-path "${RUN_ROOT}/ld_fixture_distance_leads.tsv" \
     --persistent --session-id "${SAS_SESSION_ID}" \
     --output-prefix "${RUN_ROOT}/sas_fixture_ld/download"
 
@@ -590,10 +590,10 @@ run_sas_ld() {
     --persistent --session-id "${SAS_SESSION_ID}" --run-timeout-seconds 3600 \
     --output-prefix "${RUN_ROOT}/sas_real_diff_ld/output"
   oda \
-    --download-file '~/reviewer_pgc_diff_ld_independent_leads.tsv' \
-    --download-file '~/reviewer_pgc_diff_ld_audit.tsv' \
-    --download-local-path "${RUN_ROOT}/reviewer_pgc_diff_ld_independent_leads.tsv" \
-    --download-local-path "${RUN_ROOT}/reviewer_pgc_diff_ld_audit.tsv" \
+    --download-file '~/pgc_diff_ld_independent_leads.tsv' \
+    --download-file '~/pgc_diff_ld_audit.tsv' \
+    --download-local-path "${RUN_ROOT}/pgc_diff_ld_independent_leads.tsv" \
+    --download-local-path "${RUN_ROOT}/pgc_diff_ld_audit.tsv" \
     --persistent --session-id "${SAS_SESSION_ID}" \
     --output-prefix "${RUN_ROOT}/sas_real_diff_ld/download"
   log "Nominated-SNP and differential SAS LD stages completed."
@@ -614,10 +614,10 @@ run_sas_common() {
     --persistent --session-id "${SAS_SESSION_ID}" --run-timeout-seconds 7200 \
     --output-prefix "${RUN_ROOT}/sas_common_hybrid/output"
   oda \
-    --download-file '~/reviewer_pgc_common_ld_cached_r2ge0p2_leads.tsv' \
-    --download-file '~/reviewer_pgc_common_ld_cached_r2ge0p2_audit.tsv' \
-    --download-local-path "${RUN_ROOT}/reviewer_pgc_common_ld_cached_r2ge0p2_leads.tsv" \
-    --download-local-path "${RUN_ROOT}/reviewer_pgc_common_ld_cached_r2ge0p2_audit.tsv" \
+    --download-file '~/pgc_common_ld_cached_r2ge0p2_leads.tsv' \
+    --download-file '~/pgc_common_ld_cached_r2ge0p2_audit.tsv' \
+    --download-local-path "${RUN_ROOT}/pgc_common_ld_cached_r2ge0p2_leads.tsv" \
+    --download-local-path "${RUN_ROOT}/pgc_common_ld_cached_r2ge0p2_audit.tsv" \
     --persistent --session-id "${SAS_SESSION_ID}" \
     --output-prefix "${RUN_ROOT}/sas_common_hybrid/download"
   log "SAS archive-cache plus live-web fallback stage completed."
@@ -646,11 +646,11 @@ audit_status_count() {
 }
 
 write_ld_summary() {
-  local fixture_audit="${RUN_ROOT}/reviewer_fixture_ld_audit.tsv"
-  local fixture_distance="${RUN_ROOT}/reviewer_fixture_distance_leads.tsv"
-  local diff_audit="${RUN_ROOT}/reviewer_pgc_diff_ld_audit.tsv"
-  local archive_audit="${RUN_ROOT}/reviewer_pgc_common_ld_cached_r2ge0p2_audit_local.tsv"
-  local hybrid_audit="${RUN_ROOT}/reviewer_pgc_common_ld_cached_r2ge0p2_audit.tsv"
+  local fixture_audit="${RUN_ROOT}/ld_fixture_audit.tsv"
+  local fixture_distance="${RUN_ROOT}/ld_fixture_distance_leads.tsv"
+  local diff_audit="${RUN_ROOT}/pgc_diff_ld_audit.tsv"
+  local archive_audit="${RUN_ROOT}/pgc_common_ld_cached_r2ge0p2_audit_local.tsv"
+  local hybrid_audit="${RUN_ROOT}/pgc_common_ld_cached_r2ge0p2_audit.tsv"
   local required
   for required in "${fixture_audit}" "${fixture_distance}" "${diff_audit}" "${archive_audit}" "${hybrid_audit}"; do
     require_file "${required}"

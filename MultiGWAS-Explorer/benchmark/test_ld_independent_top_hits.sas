@@ -1,4 +1,4 @@
-/* Reviewer-facing regression fixture: LD clumping must retain two independent
+/* Regression fixture: LD clumping must retain two independent
    signals that a 1 Mb physical-distance rule collapses into one locus. */
 options validvarname=any;
 
@@ -46,15 +46,15 @@ run;
 );
 
 proc export data=fixture_ld_leads
-  outfile="~/reviewer_fixture_ld_independent_leads.tsv"
+  outfile="~/ld_fixture_independent_leads.tsv"
   dbms=tab replace;
 run;
 proc export data=fixture_ld_audit
-  outfile="~/reviewer_fixture_ld_audit.tsv"
+  outfile="~/ld_fixture_audit.tsv"
   dbms=tab replace;
 run;
 proc export data=fixture_distance_leads
-  outfile="~/reviewer_fixture_distance_leads.tsv"
+  outfile="~/ld_fixture_distance_leads.tsv"
   dbms=tab replace;
 run;
 

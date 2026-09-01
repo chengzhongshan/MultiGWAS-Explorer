@@ -25,9 +25,9 @@ pruned rs7755143 under rs753634 at ASN r2=0.82. Both selected leads returned
 complete EUR and ASN responses; no distance fallback was used.
 
 The results are in `ld_top_hit_benchmark_summary.tsv`,
-`reviewer_fixture_ld_independent_leads.tsv`, `reviewer_fixture_ld_audit.tsv`,
-`reviewer_pgc_diff_ld_independent_leads.tsv`, and
-`reviewer_pgc_diff_ld_audit.tsv`. “LD-clumped lead” is an operational pruning
+`ld_fixture_independent_leads.tsv`, `ld_fixture_audit.tsv`,
+`pgc_diff_ld_independent_leads.tsv`, and
+`pgc_diff_ld_audit.tsv`. “LD-clumped lead” is an operational pruning
 label and is not evidence that a conditional effect survives.
 
 ## Downloadable-archive acceleration

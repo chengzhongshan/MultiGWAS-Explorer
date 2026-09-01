@@ -53,11 +53,11 @@ run;
 );
 
 proc export data=pgc_common_ld_leads
-  outfile="~/reviewer_pgc_common_ld_cached_r2ge0p2_leads.tsv"
+  outfile="~/pgc_common_ld_cached_r2ge0p2_leads.tsv"
   dbms=tab replace;
 run;
 proc export data=pgc_common_ld_audit
-  outfile="~/reviewer_pgc_common_ld_cached_r2ge0p2_audit.tsv"
+  outfile="~/pgc_common_ld_cached_r2ge0p2_audit.tsv"
   dbms=tab replace;
 run;
 

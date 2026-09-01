@@ -31,7 +31,7 @@ data PAIRWISE_LD;
 run;
 
 proc export data=PAIRWISE_LD
-  outfile="~/reviewer_haploreg_pairwise_ld.tsv"
+  outfile="~/haploreg_pairwise_ld.tsv"
   dbms=tab replace;
 run;
 proc print data=PAIRWISE_LD; run;

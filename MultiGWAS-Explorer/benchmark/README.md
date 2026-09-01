@@ -12,7 +12,7 @@ submission artifacts in this directory.
 # Inspect the resolved GWAS inputs before doing any work.
 bash benchmark/run_differential_gwas_revision_benchmarks.sh show-inputs
 
-# Focused reviewer-requested comparison with official GWAMA and EasyStrata.
+# Focused comparison with official GWAMA and EasyStrata.
 bash benchmark/run_differential_gwas_revision_benchmarks.sh comparators
 
 # Complete local/report stages (full scans and archive download are expensive).
@@ -105,7 +105,7 @@ and MCP-interface results are documented in `HAPLOREG_LD_SUMMARY.md`,
 tool calls, not free-form questions submitted to an LLM. Exact expanded
 requests are in `agent_interface/AI_Interface_Evaluation_Requests.jsonl`.
 
-Reviewer-facing natural-language benchmark reports and mappings to journal
+Submission-facing natural-language benchmark reports and mappings to journal
 supplementary materials are maintained in the separate submission package and
 are intentionally not versioned in this source repository. Reusable CLI/MCP
 benchmark infrastructure remains under `agent_interface/`.
@@ -122,8 +122,8 @@ query-failure fallback. Audit tables distinguish `SELECTED_LEAD`, `PRUNED_LD`,
 and fallback decisions; this operational LD pruning does not establish
 conditional association.
 
-Regression and real-data artifacts use the `reviewer_fixture_*` and
-`reviewer_pgc_*_ld_*` filename prefixes. The differential real-data benchmark
+Regression and real-data artifacts use the `ld_fixture_*` and `pgc_*_ld_*`
+filename prefixes. The differential real-data benchmark
 reduced three MAF-passing candidates at raw P<1e-6 to two leads; rs7755143 was
 pruned under rs753634 at ASN r-squared=0.82.
 

@@ -411,7 +411,7 @@ For a new project, copy/adapt the script templates in this skill's `scripts/` fo
   non-empty lead/pruning audit. Do not report the retained count as a count of
   conditionally independent loci.
 - Use `bash benchmark/run_differential_gwas_revision_benchmarks.sh
-  validate-results` for the compact reviewer-revision syntax/result check.
+  validate-results` for the compact pipeline-revision syntax/result check.
 - For the bundled PGC schizophrenia example, expect the real differential and
   common-association validations to take minutes rather than seconds; run them
   separately if you want clearer timing/logs.

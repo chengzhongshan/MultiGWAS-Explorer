@@ -42,7 +42,7 @@ perl_scripts=(
   "${PROJECT_ROOT}/DiffGWASDeps/compare_official_benchmarks.pl"
   "${PROJECT_ROOT}/DiffGWASDeps/export_official_benchmark_fixture.pl"
   "${PROJECT_ROOT}/DiffGWASDeps/extract_haploreg_ld_for_candidates.pl"
-  "${PROJECT_ROOT}/DiffGWASDeps/reviewer_qc_long_report.pl"
+  "${PROJECT_ROOT}/DiffGWASDeps/qc_long_report.pl"
 )
 for path in "${perl_scripts[@]}"; do perl -c "$path" >/dev/null; done
 

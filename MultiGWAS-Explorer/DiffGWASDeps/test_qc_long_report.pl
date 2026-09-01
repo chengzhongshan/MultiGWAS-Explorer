@@ -24,14 +24,14 @@ my $content = join("\t", @header) . "\n";
 $content .= join("\t", @$_) . "\n" for @rows;
 gzip \$content => $input or die "Cannot create synthetic gzip: $GzipError\n";
 
-my $script = File::Spec->catfile(dirname(__FILE__), 'reviewer_qc_long_report.pl');
+my $script = File::Spec->catfile(dirname(__FILE__), 'qc_long_report.pl');
 system($^X, $script,
     '--input', $input,
     '--outdir', $outdir,
     '--candidate-p', '1e-5',
     '--exclude-strand-ambiguous',
     '--max-eaf-abs-diff', '0.2',
-) == 0 or die "reviewer_qc_long_report.pl failed\n";
+) == 0 or die "qc_long_report.pl failed\n";
 
 open my $qfh, '<', File::Spec->catfile($outdir, 'unfiltered_genomic_inflation.tsv')
     or die "Missing QC result\n";
@@ -59,4 +59,4 @@ die "Excluded rows leaked into candidate output\n" unless @candidate_lines == 3;
 die "Expected direct candidate missing\n" unless grep { /rs_direct/ } @candidate_lines;
 die "Expected chrX candidate missing\n" unless grep { /rs_x/ } @candidate_lines;
 
-print "reviewer_qc_long_report harmonization test: PASS\n";
+print "qc_long_report harmonization test: PASS\n";

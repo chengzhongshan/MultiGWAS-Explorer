@@ -1,4 +1,4 @@
-# HaploReg LD analysis for reviewer-nominated variants
+# HaploReg LD analysis for nominated variants
 
 Date: 19 August 2026
 
@@ -15,8 +15,8 @@ for HaploReg populations `EUR` and `ASN`.
 | rs10166057 | 20 | 23 | EUR: rs3768641, r2=0.88; ASN: rs3768638 and rs3768639, r2=1.00 |
 
 Complete annotation tables are in
-`reviewer_haploreg_ld_eur_r2ge0p5.tsv` and
-`reviewer_haploreg_ld_asn_r2ge0p5.tsv`. They include population frequencies,
+`haploreg_ld_eur_r2ge0p5.tsv` and
+`haploreg_ld_asn_r2ge0p5.tsv`. They include population frequencies,
 HaploReg hg38 positions, r2, D', and functional annotations returned by the
 macro.
 
@@ -49,7 +49,7 @@ rs7755143 under rs753634 at ASN r2=0.82. Both retained leads had complete EUR
 and ASN responses. A separate four-SNP fixture demonstrated why distance is
 insufficient: a 1-Mb window retained one lead, whereas LD clumping retained two
 and pruned only documented proxy pairs. The audit files are
-`reviewer_fixture_ld_audit.tsv` and `reviewer_pgc_diff_ld_audit.tsv`.
+`ld_fixture_audit.tsv` and `pgc_diff_ld_audit.tsv`.
 
 These outputs define LD-clumped lead SNPs; they do not establish conditional
 association.
@@ -73,13 +73,13 @@ available for lower thresholds and is the default fallback for archive misses.
 
 ## Reproducibility artifacts
 
-- `run_haploreg_ld_reviewers.sas`: multi-query high-LD extraction.
-- `run_haploreg_pairwise_ld_reviewers.sas`: low-threshold pairwise check.
-- `reviewer_haploreg_pairwise_ld.tsv`: filtered pairwise result.
-- `reviewer_fixture_ld_audit.tsv`: four-SNP LD-selector regression audit.
-- `reviewer_pgc_diff_ld_audit.tsv`: real differential top-hit clumping audit.
+- `run_haploreg_ld_benchmark.sas`: multi-query high-LD extraction.
+- `run_haploreg_pairwise_ld_benchmark.sas`: low-threshold pairwise check.
+- `haploreg_pairwise_ld.tsv`: filtered pairwise result.
+- `ld_fixture_audit.tsv`: four-SNP LD-selector regression audit.
+- `pgc_diff_ld_audit.tsv`: real differential top-hit clumping audit.
 - `pgc_common_haploreg_archive_coverage.tsv`: concise archive coverage audit.
-- `reviewer_pgc_common_ld_cached_r2ge0p2_leads.tsv`: SAS hybrid common-hit leads.
-- `reviewer_pgc_common_ld_cached_r2ge0p2_audit.tsv`: full SAS hybrid audit.
-- `haploreg_ld_reviewers_submit/` and `haploreg_pairwise_ld_submit2/`: SAS
+- `pgc_common_ld_cached_r2ge0p2_leads.tsv`: SAS hybrid common-hit leads.
+- `pgc_common_ld_cached_r2ge0p2_audit.tsv`: full SAS hybrid audit.
+- `haploreg_ld_benchmark_submit/` and `haploreg_pairwise_ld_submit2/`: SAS
   logs and HTML artifacts.

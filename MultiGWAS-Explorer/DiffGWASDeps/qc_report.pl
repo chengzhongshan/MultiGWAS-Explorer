@@ -6,7 +6,7 @@ use File::Path qw(make_path);
 use IO::Uncompress::Gunzip qw($GunzipError);
 use JSON::PP qw(decode_json encode_json);
 
-my ($input, $config, $outdir, $snps, $reservoir_size, $allow_filtered) = ('', '', 'reviewer_qc', '', 200_000, 0);
+my ($input, $config, $outdir, $snps, $reservoir_size, $allow_filtered) = ('', '', 'qc', '', 200_000, 0);
 GetOptions(
     'input=s'          => \$input,
     'config=s'         => \$config,
@@ -142,10 +142,10 @@ my $summary = {
         'LD and conditional independence require an ancestry-matched reference panel or individual-level genotypes and are not inferred from physical distance.',
     ],
 };
-open my $jfh, '>', "$outdir/reviewer_qc_summary.json" or die $!;
+open my $jfh, '>', "$outdir/qc_summary.json" or die $!;
 print {$jfh} JSON::PP->new->canonical->pretty->encode($summary);
 close $jfh;
-warn "Reviewer QC report written to $outdir ($rows rows scanned)\n";
+warn "QC report written to $outdir ($rows rows scanned)\n";
 
 sub open_reader {
     my ($path) = @_;
@@ -181,4 +181,4 @@ sub min {
     return $m;
 }
 sub fmt { defined $_[0] ? sprintf('%.10g', $_[0]) : '' }
-sub usage { "Usage: perl reviewer_qc_report.pl --input UNFILTERED_WIDE.tsv[.gz] --config SPEC.json --output-dir DIR [--nominated-snps rs1,rs2] [--reservoir-size 200000] [--allow-filtered-input]\n" }
+sub usage { "Usage: perl qc_report.pl --input UNFILTERED_WIDE.tsv[.gz] --config SPEC.json --output-dir DIR [--nominated-snps rs1,rs2] [--reservoir-size 200000] [--allow-filtered-input]\n" }

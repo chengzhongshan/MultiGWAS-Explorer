@@ -8,7 +8,7 @@ sub usage {
     return <<'USAGE';
 Usage:
   perl DiffGWASDeps/convert_ld_pruned_leads_to_common_loci_csv.pl \
-    --input-tsv benchmark/reviewer_pgc_common_ld_cached_r2ge0p2_leads.tsv \
+    --input-tsv benchmark/pgc_common_ld_cached_r2ge0p2_leads.tsv \
     --output-csv /path/to/Supplementary_Table_S12.csv
 
 Converts a validated LD-pruned common-association lead TSV into the formatted

@@ -19,7 +19,7 @@ configuration files only; do not execute plots; save the run log as
 description, not an input used for timing.
 
 Three error-handling trials changed `spec_file` to
-`configs/INTENTIONALLY_MISSING_REVIEWER_BENCHMARK.json`. Corrected retries
+`configs/INTENTIONALLY_MISSING_BENCHMARK.json`. Corrected retries
 restored the valid specification. Fully expanded records are in
 `AI_Interface_Evaluation_Requests.jsonl`.
 

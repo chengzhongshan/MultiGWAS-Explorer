@@ -181,7 +181,7 @@ try {
     for ($run = 1; $run -le $RecoveryRuns; $run++) {
         Start-Sleep -Milliseconds 1100
         $badLog = "$outDirRel/recovery_bad_{0:D2}.log" -f $run
-        $bad = Invoke-AgentConfig 'configs/INTENTIONALLY_MISSING_REVIEWER_BENCHMARK.json' $badLog
+        $bad = Invoke-AgentConfig 'configs/INTENTIONALLY_MISSING_BENCHMARK.json' $badLog
         Start-Sleep -Milliseconds 1100
         $goodLog = "$outDirRel/recovery_good_{0:D2}.log" -f $run
         $good = Invoke-AgentConfig $specRel $goodLog
