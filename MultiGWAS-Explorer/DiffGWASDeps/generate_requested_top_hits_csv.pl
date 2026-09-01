@@ -217,7 +217,7 @@ sub run_differential_selector {
         : '';
     my @cmd = (
         $^X,
-        File::Spec->catfile($Bin, 'gunplot', 'select_top_hits_from_wide.pl'),
+        File::Spec->catfile($Bin, 'gnuplot', 'select_top_hits_from_wide.pl'),
         '--input', $args{input},
         '--output', $tmp,
         '--focus-pvar', $args{focus_pvar},

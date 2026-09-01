@@ -105,19 +105,10 @@ and MCP-interface results are documented in `HAPLOREG_LD_SUMMARY.md`,
 tool calls, not free-form questions submitted to an LLM. Exact expanded
 requests are in `agent_interface/AI_Interface_Evaluation_Requests.jsonl`.
 
-A separate natural-language Codex evaluation is versioned under
-`ai_interface_natural_language_20/`. Its initial preregistered run met all
-criteria for 17/20 prompts, and its matched post-remediation run met 19/20.
-The only remaining underspecified request elicited clarification; two
-separately reported explicit-spec diagnostics passed 2/2 and each reproduced
-all four canonical CLI artifacts. The directory includes exact prompts,
-machine-readable run results, preflight metadata, scoring limitations, and the
-failed-prompt audit. It excludes UK Biobank requests and the time-consuming
-F03 forced-preprocessing family.
-
-The mapping from these versioned artifacts to Supplementary Tables S1-S12,
-Supplementary File S1, and Supplementary Figures S1-S3 is recorded in
-`RESUBMISSION_DOCUMENT_MAP.md`.
+Reviewer-facing natural-language benchmark reports and mappings to journal
+supplementary materials are maintained in the separate submission package and
+are intentionally not versioned in this source repository. Reusable CLI/MCP
+benchmark infrastructure remains under `agent_interface/`.
 
 ## LD-clumped top-hit selection
 

@@ -1,2 +1,0 @@
-Agent	Runs	"All criteria met"	"Overall success rate (95% CI)"	"Positive tasks completed"	"Completion rate (95% CI)"	"Task/invocation concordance (95% CI)"	"Repeated-run consistency"	"Paraphrase consistency"	"Safe-failure detection (95% CI)"	"Clarification handling (95% CI)"	"Canonical artifact parity"	"Median latency (IQR), s"	"95th percentile latency, s"
-codex	1	1/1	"100.0% (20.7-100.0%)"	1/1	"100.0% (20.7-100.0%)"	"100.0% (20.7-100.0%)"	"not assessed"	"not assessed"	NA	NA	1/1	"61.259 (61.259-61.259)"	61.259

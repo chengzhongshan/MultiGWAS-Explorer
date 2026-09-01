@@ -14,7 +14,6 @@ require_text() {
 required_files=(
   "${PROJECT_ROOT}/auto_prepare_and_run_diff_gwas.pl"
   "${PROJECT_ROOT}/server.pl"
-  "${PROJECT_ROOT}/REVIEWER_PIPELINE_REVISION_20260819.md"
   "${PROJECT_ROOT}/DiffGWASDeps/diff_pairwise_gwas.pl"
   "${PROJECT_ROOT}/DiffGWASDeps/get_top_signal_with_ld.sas"
   "${PROJECT_ROOT}/DiffGWASDeps/QueryLD_SNPs_at_Haploreg4.sas"

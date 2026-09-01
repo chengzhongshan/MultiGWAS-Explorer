@@ -60,9 +60,10 @@ perl -I DiffGWASDeps -c auto_prepare_and_run_diff_gwas.pl >/dev/null
 perl -c auto_prepare_and_run_diff_gwas_with_gunplot.pl >/dev/null
 perl -I DiffGWASDeps -c server.pl >/dev/null
 perl -I DiffGWASDeps -c run_sas_codes_or_script_in_ODA.pl >/dev/null
-perl -c DiffGWASDeps/gunplot/pdl_gunplot_manhattan.pl >/dev/null
-perl -c DiffGWASDeps/gunplot/pdl_gunplot_forest.pl >/dev/null
-perl -c DiffGWASDeps/gunplot/pdl_gunplot_local_locus.pl >/dev/null
+perl -c DiffGWASDeps/gnuplot/pdl_gunplot_manhattan.pl >/dev/null
+perl -c DiffGWASDeps/gnuplot/pdl_gunplot_forest.pl >/dev/null
+perl -c DiffGWASDeps/gnuplot/pdl_gunplot_local_locus.pl >/dev/null
+perl DiffGWASDeps/test_gnuplot_directory_layout.pl >/dev/null
 bash -n DiffGWASDeps/run_sas_oda_manhattan4diffgwas_download_png.sh
 bash -n DiffGWASDeps/run_sas_oda_local_top_hits_manhattan_download_png.sh
 bash -n DiffGWASDeps/run_sas_oda_local_top_hits_with_gtf_download_html.sh

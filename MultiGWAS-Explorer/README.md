@@ -15,8 +15,8 @@ effects, and generate shareable genome-wide and local visualizations.
 - Produces genome-wide Manhattan plots, local Manhattan plots, and local GTF
   gene-track plots through SAS ODA.
 - Produces the same genome-wide Manhattan, local Manhattan, and local GTF plot
-  families through the alternative gunplot / PDL backend.
-- Produces top-hit forest plots through both the SAS ODA and gunplot paths for
+  families through the alternative gnuplot / PDL backend.
+- Produces top-hit forest plots through both the SAS ODA and gnuplot paths for
   either one inquiry SNP or multiple common / differential top hits.
 - Lets users render either the default multi-GWAS comparison view or a custom
   displayed GWAS subset, including a single selected GWAS track.
@@ -41,6 +41,15 @@ effects, and generate shareable genome-wide and local visualizations.
   differential-GWAS runner.
 - `DiffGWASDeps/`
   Helper Perl, Bash, and SAS scripts used by the automation layer.
+
+The canonical implementation directory for the non-SAS renderer is
+`DiffGWASDeps/gnuplot/`. Earlier releases misspelled this directory as
+`DiffGWASDeps/gunplot/`; active pipeline code no longer uses that path. The
+wrapper filename `auto_prepare_and_run_diff_gwas_with_gunplot.pl`, MCP tool
+name `run_gunplot_wrapper`, renderer filenames, configuration keys, and output
+field names containing `gunplot` are retained as compatibility interfaces.
+The wrapper also migrates the legacy `.gunplot_gtf_cache` directory to
+`.gnuplot_gtf_cache` once, preserving an existing indexed GTF cache.
 
 ## Merged-Wide GWAS Support
 
@@ -225,7 +234,7 @@ Top-hit forest plots are now supported in both rendering backends:
 - SAS ODA forest plots are driven by the existing
   `DiffGWASDeps/beta2OR_forest_plot.sas` macro.
 - gunplot forest plots are rendered through
-  `DiffGWASDeps/gunplot/pdl_gunplot_forest.pl` and are intentionally styled to
+  `DiffGWASDeps/gnuplot/pdl_gunplot_forest.pl` and are intentionally styled to
   stay close to the SAS ODA forest output.
 
 Current behavior:
@@ -2560,12 +2569,12 @@ Typical outputs include:
 
 ## Additional Documentation
 
-- [benchmark/ai_interface_natural_language_20/README.md](./benchmark/ai_interface_natural_language_20/README.md)
-  Preregistered 20-prompt natural-language Codex evaluation, matched
-  post-remediation results, explicit-spec diagnostics, and machine-readable
-  audit files.
 - [GENERALIZE_DIFF_GWAS_PIPELINE.md](./GENERALIZE_DIFF_GWAS_PIPELINE.md)
   Deeper notes on the generalized pipeline contract, plotting behavior, and MCP
   wrapper behavior.
 - [gwas-sas-oda-workflow/SKILL.md](./gwas-sas-oda-workflow/SKILL.md)
   Workflow guidance for Codex or other agents using this repository.
+
+Journal manuscripts, response letters, supplementary tables/files, and
+reviewer-facing benchmark reports are maintained in the separate submission
+package and are intentionally not versioned in this source repository.

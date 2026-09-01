@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
-# Reproduce the measurements summarized in
-# REVIEWER_PIPELINE_REVISION_20260819.md and benchmark/README.md.
+# Reproduce the technical measurements summarized in benchmark/README.md.
 #
-# The default output is benchmark/reproduction so the measured submission
-# artifacts under benchmark/ are not overwritten. Run this script from Cygwin,
+# The default output is benchmark/reproduction so versioned benchmark fixtures
+# are not overwritten. Run this script from Cygwin,
 # WSL, Linux, or another Bash environment with access to the source GWAS files.
 # SAS OnDemand stages also require the repository SASPy/ODA setup and account.
 
@@ -133,7 +132,6 @@ Targets:
   summarize-ld         Consolidate completed LD audit files into the report TSV.
   web-only-control     Opt-in web-only 11,701-candidate negative control; expected
                        to time out/non-complete, as documented in the report.
-  report-docx          Render the reviewer-revision report to Word with pandoc.
   validate-results     Validate scripts and the compact published result tables.
   local-report         Run comparators, full-qc, power, agent, and ld-archive.
   all                  Run local-report plus the successful SAS ODA stages.
@@ -723,15 +721,6 @@ run_web_only_control() {
   fi
 }
 
-render_report_docx() {
-  require_command pandoc
-  mkdir -p "${RUN_ROOT}"
-  pandoc "${PROJECT_ROOT}/REVIEWER_PIPELINE_REVISION_20260819.md" \
-    --from gfm \
-    --to docx \
-    --output "${RUN_ROOT}/Differential_GWAS_revision_benchmark_report.docx"
-}
-
 validate_results() {
   "${BASH:-bash}" "${SCRIPT_DIR}/validate_revision_benchmark.sh"
 }
@@ -752,7 +741,6 @@ case "${target}" in
   ld-sas-common) run_sas_common ;;
   summarize-ld) write_ld_summary ;;
   web-only-control) run_web_only_control ;;
-  report-docx) render_report_docx ;;
   validate-results|validate-published) validate_results ;;
   local-report)
     run_comparators

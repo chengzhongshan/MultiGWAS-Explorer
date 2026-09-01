@@ -1,4 +1,4 @@
-PDL + gnuplot alternative plotting helpers
+# PDL + gnuplot alternative plotting helpers
 
 This folder contains initial proof-of-concept scripts to generate Manhattan
 and local locus plots using gnuplot. They are intentionally lightweight and
@@ -44,11 +44,11 @@ Usage examples
 
 Generate a Manhattan from a prepared wide subset:
 
-  perl pdl_gunplot_manhattan.pl --data /path/to/wide_subset.tsv.gz --outdir ./gunplot_out
+  perl pdl_gunplot_manhattan.pl --data /path/to/wide_subset.tsv.gz --outdir ./gnuplot_out
 
 Generate a local locus plot for SNP `rs12345` with a GTF:
 
-  perl pdl_gunplot_local_gtf.pl --data /path/to/wide_subset.tsv.gz --snp rs12345 --gtf /path/to/gencode.gtf --outdir ./gunplot_out
+  perl pdl_gunplot_local_gtf.pl --data /path/to/wide_subset.tsv.gz --snp rs12345 --gtf /path/to/gencode.gtf --outdir ./gnuplot_out
 
 Wrapper
 
@@ -56,6 +56,9 @@ Wrapper
 the existing data-preparation logic (optionally calling the original
 `auto_prepare_and_run_diff_gwas.pl` to produce a wide subset) and then calls
 these plotting helpers. Use `--data-gz` to supply an existing wide subset.
+The wrapper name is retained for backward compatibility, but the canonical
+implementation directory is `DiffGWASDeps/gnuplot/` and the default reusable
+GTF cache is `.gnuplot_gtf_cache`.
 
 For example, render two nearby query SNPs in one locus and highlight a known
 LD-linked SNP:

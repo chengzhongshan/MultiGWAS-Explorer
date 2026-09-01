@@ -308,7 +308,7 @@ Before running a workflow, identify:
      - `DiffGWASDeps/beta2OR_forest_plot.sas`
      - `DiffGWASDeps/run_sas_oda_top_hits_forest_plot.sas`
    - gunplot forest plots are driven by:
-     - `DiffGWASDeps/gunplot/pdl_gunplot_forest.pl`
+     - `DiffGWASDeps/gnuplot/pdl_gunplot_forest.pl`
      - `auto_prepare_and_run_diff_gwas_with_gunplot.pl --plots forest`
    Prefer these conventions:
    - single-SNP forest plot:

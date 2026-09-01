@@ -181,7 +181,7 @@ Implementation details:
 
 - `DiffGWASDeps/TopHitMAF.pm`
   - shared GWAS / gnomAD MAF parsing helpers
-- `DiffGWASDeps/gunplot/select_top_hits_from_wide.pl`
+- `DiffGWASDeps/gnuplot/select_top_hits_from_wide.pl`
   - differential top-hit selector with GWAS-first and gnomAD-fallback MAF
     filtering
 - `DiffGWASDeps/verify_common_association_loci.pl`

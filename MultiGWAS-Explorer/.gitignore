@@ -34,6 +34,11 @@ benchmark/fixture_all_100k/EasyStrata.easystrata.results.txt
 benchmark/fixture_all_100k/gwama.out
 
 *.docx
+*.doc
+*.odt
+*.rtf
+*.xlsx
+*.xls
 *.html
 *.png
 *.pptx
@@ -43,3 +48,15 @@ benchmark/fixture_all_100k/gwama.out
 *.err
 *.pyc
 Thumbs.db
+
+# Journal-submission and reviewer-response distribution artifacts belong in
+# the separate submission package, not in this source repository.
+*Manuscript*
+*manuscript*.doc*
+*Response*Letter*
+*response*letter*
+*Supplementary_Table*
+*Supplementary_File*
+*resubmission*
+*reviewer_summary*
+*benchmark_report*

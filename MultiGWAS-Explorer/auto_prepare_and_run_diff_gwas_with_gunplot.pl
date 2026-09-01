@@ -502,7 +502,7 @@ sub plot_manhattan {
     if (!(!$args{force} && -s $png_path)) {
         my @cmd = (
             $^X,
-            File::Spec->catfile($Bin, 'DiffGWASDeps', 'gunplot', 'pdl_gunplot_manhattan.pl'),
+            File::Spec->catfile($Bin, 'DiffGWASDeps', 'gnuplot', 'pdl_gunplot_manhattan.pl'),
             '--data', $args{wide_data},
             '--out-prefix', $out_prefix_path,
             '--pcols', join(',', @{ $args{pcols} || [] }),
@@ -592,7 +592,7 @@ sub plot_forest {
     if ($need_render) {
         my @cmd = (
             $^X,
-            File::Spec->catfile($Bin, 'DiffGWASDeps', 'gunplot', 'pdl_gunplot_forest.pl'),
+            File::Spec->catfile($Bin, 'DiffGWASDeps', 'gnuplot', 'pdl_gunplot_forest.pl'),
             '--csv', $top_hits_csv_path,
             '--out-prefix', $out_prefix_path,
             '--track-ids', ($runner->{FOREST_TRACK_IDS} || ''),
@@ -800,7 +800,7 @@ sub collect_top_hits_for_mode {
     my $differential_thresholds = resolve_runner_differential_threshold_ladder($runner);
     my @cmd = (
         $^X,
-        File::Spec->catfile($Bin, 'DiffGWASDeps', 'gunplot', 'select_top_hits_from_wide.pl'),
+        File::Spec->catfile($Bin, 'DiffGWASDeps', 'gnuplot', 'select_top_hits_from_wide.pl'),
         '--input', $args{wide_data},
         '--output', $out_tsv,
         '--focus-pvar', ($runner->{TOP_HIT_FOCUS_PVAR} || $runner->{MANHATTAN_P_VAR} || 'P'),
@@ -972,7 +972,18 @@ sub plot_local_series {
     my $batch_size = $args{batch_size} || scalar(@{ $args{hits} }) || 1;
     my $panel_columns = $args{panel_columns} || 0;
     my $cache_dir = $args{gtf_cache_dir}
-        || File::Spec->catfile($args{output_dir}, '.gunplot_gtf_cache');
+        || File::Spec->catfile($args{output_dir}, '.gnuplot_gtf_cache');
+    if (!$args{gtf_cache_dir} && !-e $cache_dir) {
+        my $legacy_cache_dir = File::Spec->catfile($args{output_dir}, '.gunplot_gtf_cache');
+        if (-d $legacy_cache_dir) {
+            if (rename($legacy_cache_dir, $cache_dir)) {
+                print "[migrate] Renamed legacy GTF cache directory $legacy_cache_dir to $cache_dir\n";
+            }
+            else {
+                warn "WARNING: Could not rename legacy GTF cache directory $legacy_cache_dir to $cache_dir: $!. A new canonical cache will be created.\n";
+            }
+        }
+    }
     make_path($cache_dir) unless -d $cache_dir;
     # Resolve each target from the indexed GWAS source before grouping.  On a
     # cold run the caller normally supplies only SNP names, so grouping before
@@ -1098,7 +1109,7 @@ sub plot_local_series {
             required          => \@required_locus_outputs,
             manifest          => $existing_locus_manifest,
             png               => $locus_prefix . '.png',
-            renderer          => File::Spec->catfile($Bin, 'DiffGWASDeps', 'gunplot', 'pdl_gunplot_local_locus.pl'),
+            renderer          => File::Spec->catfile($Bin, 'DiffGWASDeps', 'gnuplot', 'pdl_gunplot_local_locus.pl'),
             snp               => $hit->{SNP},
             window_bp         => $args{window_bp},
             pcols             => join(',', @{ $args{pcols} }),
@@ -1243,7 +1254,7 @@ sub plot_local_series {
 
         my @cmd = (
             $^X,
-            File::Spec->catfile($Bin, 'DiffGWASDeps', 'gunplot', 'pdl_gunplot_local_locus.pl'),
+            File::Spec->catfile($Bin, 'DiffGWASDeps', 'gnuplot', 'pdl_gunplot_local_locus.pl'),
             '--data', $locus_input,
             '--snp', $hit->{SNP},
             '--label-snps', $label_snps_csv,
