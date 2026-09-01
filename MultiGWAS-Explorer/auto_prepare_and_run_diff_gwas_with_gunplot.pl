@@ -83,6 +83,13 @@ Options:
   --ld-marker-symbol NAME       star, plus, cross, circle, square, triangle, or diamond.
                                 Default: star when highlighting is enabled.
   --ld-marker-color COLOR       Named or #RRGGBB marker color. Default: black.
+  --ld-display-mode MODE        none, markers, heatmap, or both. Default: none.
+                                heatmap colors LD proxies by r2 and adds a separate
+                                inset legend; it does not replace the Z-score scale.
+  --ld-r2-values MAP            Optional SNP:r2 pairs, comma-separated, for explicit
+                                --ld-snps (example rs1:0.92,rs2:0.81).
+  --ld-heatmap-colors LIST      Low-to-high #RRGGBB colors for the LD inset.
+                                Default: #f7fbff,#6baed6,#54278f.
   --ld-cache FILE               Normalized local HaploReg TSV/SQLite LD cache.
   --ld-population POP           HaploReg population for high-LD stars (default EUR).
   --ld-r2-threshold N           High-LD star threshold (default 0.8).
@@ -126,6 +133,9 @@ my $ld_web_fallback = 1;
 my $highlight_high_ld_snps = 0;
 my $ld_marker_symbol = 'star';
 my $ld_marker_color = 'black';
+my $ld_display_mode = 'none';
+my $ld_r2_values_override = '';
+my $ld_heatmap_colors = '#f7fbff,#6baed6,#54278f';
 my $get_common_associations = '';
 my $common_association_top_hit_threshold = '';
 my $reference_build_override = '';
@@ -154,6 +164,9 @@ GetOptions(
     'highlight-high-ld-snps!' => \$highlight_high_ld_snps,
     'ld-marker-symbol=s'      => \$ld_marker_symbol,
     'ld-marker-color=s'       => \$ld_marker_color,
+    'ld-display-mode=s'       => \$ld_display_mode,
+    'ld-r2-values=s'          => \$ld_r2_values_override,
+    'ld-heatmap-colors=s'     => \$ld_heatmap_colors,
     'get-common-associations:s' => \$get_common_associations,
     'common-association-top-hit-threshold=s' => \$common_association_top_hit_threshold,
     'reference-build=s'       => \$reference_build_override,
@@ -173,12 +186,22 @@ die "--ld-population must be AFR, AMR, ASN, or EUR\n"
     unless $ld_population_override =~ /^(?:AFR|AMR|ASN|EUR)$/;
 die "--ld-r2-threshold must be between 0 and 1\n"
     unless $ld_r2_threshold_override > 0 && $ld_r2_threshold_override <= 1;
-$highlight_high_ld_snps = 1 if length(trim($ld_snps_override));
+$ld_display_mode = lc(trim($ld_display_mode || 'none'));
+die "--ld-display-mode must be none, markers, heatmap, or both\n"
+    unless $ld_display_mode =~ /^(?:none|markers|heatmap|both)$/;
+$ld_display_mode = 'markers'
+    if $ld_display_mode eq 'none' && ($highlight_high_ld_snps || length(trim($ld_snps_override)));
+$highlight_high_ld_snps = 1 if $ld_display_mode ne 'none';
 $ld_marker_symbol = lc(trim($ld_marker_symbol || 'star'));
 die "--ld-marker-symbol must be star, plus, cross, circle, square, triangle, or diamond\n"
     unless $ld_marker_symbol =~ /^(?:star|plus|cross|circle|square|triangle|diamond)$/;
 die "--ld-marker-color must be a named color or #RRGGBB\n"
     unless $ld_marker_color =~ /^(?:#[0-9A-Fa-f]{6}|[A-Za-z][A-Za-z0-9_-]*)$/;
+my @ld_heatmap_colors = split /,/, $ld_heatmap_colors;
+die "--ld-heatmap-colors requires at least two comma-separated #RRGGBB colors\n"
+    unless @ld_heatmap_colors >= 2
+        && !grep { trim($_) !~ /^#[0-9A-Fa-f]{6}$/ } @ld_heatmap_colors;
+$ld_heatmap_colors = join(',', map { lc(trim($_)) } @ld_heatmap_colors);
 
 die "Spec file not found: $spec_file\n" unless -f $spec_file;
 
@@ -370,6 +393,9 @@ if ($requested{plot_local_manhattan}) {
             highlight_high_ld_snps => $highlight_high_ld_snps,
             ld_marker_symbol => $ld_marker_symbol,
             ld_marker_color  => $ld_marker_color,
+            ld_display_mode  => $ld_display_mode,
+            ld_r2_values     => $ld_r2_values_override,
+            ld_heatmap_colors=> $ld_heatmap_colors,
             force       => $force,
         ),
     );
@@ -410,6 +436,9 @@ if ($requested{plot_local_gtf}) {
             highlight_high_ld_snps => $highlight_high_ld_snps,
             ld_marker_symbol => $ld_marker_symbol,
             ld_marker_color  => $ld_marker_color,
+            ld_display_mode  => $ld_display_mode,
+            ld_r2_values     => $ld_r2_values_override,
+            ld_heatmap_colors=> $ld_heatmap_colors,
             force       => $force,
         ),
     );
@@ -844,19 +873,31 @@ sub merge_hit_lists_for_gunplot {
 sub resolve_ld_snps_for_query {
     my (%args) = @_;
     my %query = map { lc(trim($_)) => 1 } @{ $args{query_snps} || [] };
-    my (%seen, @ld);
+    my (%seen, %r2_for, @ld);
     my $add = sub {
-        my ($snp) = @_;
+        my ($snp, $r2) = @_;
         $snp = trim($snp // '');
         return unless length $snp;
         return if $query{lc $snp};
-        return if $seen{lc $snp}++;
+        my $key = lc $snp;
+        if (defined($r2) && $r2 =~ /^(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i) {
+            $r2 = 0 + $r2;
+            $r2_for{$key} = $r2 if !exists($r2_for{$key}) || $r2 > $r2_for{$key};
+        }
+        return if $seen{$key}++;
         push @ld, $snp;
     };
-    $add->($_) for split /,/, ($args{explicit} // '');
+    for my $item (split /,/, ($args{explicit} // '')) {
+        my ($snp, $r2) = split /:/, $item, 2;
+        $add->($snp, $r2);
+    }
+    for my $item (split /,/, ($args{explicit_r2} // '')) {
+        my ($snp, $r2) = split /:/, $item, 2;
+        $add->($snp, $r2);
+    }
     if (length(trim($args{explicit} // ''))) {
         print "[prep] User-supplied LD SNP marker overlay: " . join(',', @ld) . "\n";
-        return @ld;
+        return (\@ld, \%r2_for);
     }
 
     my $runner = $args{runner} || {};
@@ -891,7 +932,7 @@ sub resolve_ld_snps_for_query {
                 my $r2 = $f[$idx{proxy_r2}] // '';
                 next unless $r2 =~ /^(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i
                     && $r2 >= $min_r2;
-                $add->($f[$idx{candidate_snp}]);
+                $add->($f[$idx{candidate_snp}], $r2);
             }
         }
         close $fh;
@@ -920,7 +961,7 @@ sub resolve_ld_snps_for_query {
                     my $r2 = $f[$idx{proxy_r2}] // '';
                     next unless $r2 =~ /^(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i && $r2 >= $min_r2;
                 }
-                $add->($f[$idx{proxy_snp}]);
+                $add->($f[$idx{proxy_snp}], (exists($idx{proxy_r2}) ? $f[$idx{proxy_r2}] : undef));
             }
         }
         close $fh;
@@ -943,8 +984,15 @@ sub resolve_ld_snps_for_query {
         if (open my $pipe, '-|', @cmd) {
             while (my $line = <$pipe>) {
                 chomp $line;
-                next unless $line =~ /^LD_SNPS\t(.*)$/;
-                $add->($_) for split /,/, $1;
+                if ($line =~ /^LD_SNPS\t(.*)$/) {
+                    $add->($_) for split /,/, $1;
+                }
+                elsif ($line =~ /^LD_R2_PAIRS\t(.*)$/) {
+                    for my $item (split /,/, $1) {
+                        my ($snp, $r2) = split /:/, $item, 2;
+                        $add->($snp, $r2);
+                    }
+                }
             }
             my $ok = close $pipe;
             warn "WARNING: High-LD resolver exited unsuccessfully; continuing without automatic stars.\n"
@@ -958,7 +1006,7 @@ sub resolve_ld_snps_for_query {
         . " ($population, r2 >= $min_r2): " . join(',', @ld) . "\n" if @ld;
     print "[warn] No high-LD proxies resolved for " . join(',', @{ $args{query_snps} || [] })
         . " ($population, r2 >= $min_r2); no LD marker overlay will be drawn.\n" unless @ld;
-    return @ld;
+    return (\@ld, \%r2_for);
 }
 
 sub plot_local_series {
@@ -1051,8 +1099,9 @@ sub plot_local_series {
         my @label_snps = @{ $label_snps_for_index{$hit_idx} || [$hit->{SNP}] };
         my $label_snps_csv = join(',', @label_snps);
         my $locus_title_snps = join(', ', @label_snps);
-        my @ld_snps = $args{highlight_high_ld_snps} ? resolve_ld_snps_for_query(
+        my ($ld_snps_ref, $ld_r2_ref) = $args{highlight_high_ld_snps} ? resolve_ld_snps_for_query(
             explicit   => $args{ld_snps},
+            explicit_r2=> $args{ld_r2_values},
             audit_file => $args{ld_audit_file},
             ld_cache   => $args{ld_cache},
             ld_population => $args{ld_population},
@@ -1061,8 +1110,13 @@ sub plot_local_series {
             runner     => $runner,
             output_dir => $args{output_dir},
             query_snps => \@label_snps,
-        ) : ();
+        ) : ([], {});
+        my @ld_snps = @{ $ld_snps_ref || [] };
         my $ld_snps_csv = join(',', @ld_snps);
+        my $ld_r2_values = join(',', map {
+            my $key = lc $_;
+            exists($ld_r2_ref->{$key}) ? $_ . ':' . sprintf('%.6g', $ld_r2_ref->{$key}) : ()
+        } @ld_snps);
         my $safe_snp = safe_name($hit->{SNP});
         my $safe_window = safe_name($args{window_bp});
         my $batch_index = int($render_idx / $batch_size);
@@ -1120,6 +1174,10 @@ sub plot_local_series {
             ld_snps           => $ld_snps_csv,
             ld_marker_symbol  => $args{ld_marker_symbol},
             ld_marker_color   => $args{ld_marker_color},
+            ld_display_mode   => $args{ld_display_mode},
+            ld_r2_values      => $ld_r2_values,
+            ld_heatmap_colors => $args{ld_heatmap_colors},
+            ld_population     => $args{ld_population},
             height            => $args{height},
             sig               => ($runner->{TOP_HIT_SIGNAL_THRSHD} || '1e-6'),
             has_gtf           => $expected_has_gtf,
@@ -1271,6 +1329,10 @@ sub plot_local_series {
         if (length $ld_snps_csv) {
             push @cmd, ('--ld-marker-symbol', ($args{ld_marker_symbol} || 'star'));
             push @cmd, ('--ld-marker-color', ($args{ld_marker_color} || 'black'));
+            push @cmd, ('--ld-display-mode', ($args{ld_display_mode} || 'markers'));
+            push @cmd, ('--ld-population', ($args{ld_population} || 'EUR'));
+            push @cmd, ('--ld-heatmap-colors', ($args{ld_heatmap_colors} || '#f7fbff,#6baed6,#54278f'));
+            push @cmd, ('--ld-r2-values', $ld_r2_values) if length $ld_r2_values;
         }
         if ($args{kind} eq 'local_manhattan') {
             my $bottom_gene = $hit->{gene} || '';
@@ -1493,6 +1555,10 @@ sub local_locus_cache_is_reusable {
         ['ld_snps',           ($args{ld_snps} // '')],
         ['ld_marker_symbol',  ($args{ld_marker_symbol} // 'star')],
         ['ld_marker_color',   ($args{ld_marker_color} // 'black')],
+        ['ld_display_mode',   ($args{ld_display_mode} // 'none')],
+        ['ld_r2_values',      ($args{ld_r2_values} // '')],
+        ['ld_heatmap_colors', ($args{ld_heatmap_colors} // '#f7fbff,#6baed6,#54278f')],
+        ['ld_population',     ($args{ld_population} // 'EUR')],
         ['zcols',             ($args{zcols} // '')],
         ['labels',            ($args{labels} // '')],
         ['title',             ($args{title} // '')],

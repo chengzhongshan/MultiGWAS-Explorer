@@ -7,7 +7,7 @@ import tempfile
 from datetime import datetime
 HOST = '127.0.0.1'
 PORT = 8765
-SERVER_API_VERSION = '2026-07-09-macro-bootstrap-progress-frames'
+SERVER_API_VERSION = '2026-08-31-debug-macro-bootstrap-guard'
 sessions = {}
 session_macros_loaded = {}
 session_macro_bootstrap_warning = {}
@@ -17,8 +17,10 @@ LOG_PATH = os.environ.get('SAS_ODA_SESSION_DEBUG_LOG') or os.path.join(os.path.d
 STATUS_FILE = os.environ.get('SAS_ODA_STATUS_FILE') or ''
 LOAD_MACROS_CODE = '''
 %macro _pipeline_bootstrap_macros;
-%global _pipeline_macro_bootstrap_ok;
+%global _pipeline_macro_bootstrap_ok _pipeline_macro_bootstrap_skipped _pipeline_debug_macro_exists;
 %let _pipeline_macro_bootstrap_ok=0;
+%let _pipeline_macro_bootstrap_skipped=0;
+%let _pipeline_debug_macro_exists=%sysmacexist(debug_macro);
 %let _home=%sysfunc(pathname(HOME));
 %let _macro_home=&_home/Macros;
 %let _pipeline_opt_mprint=%sysfunc(getoption(mprint,keyword));
@@ -28,22 +30,30 @@ LOAD_MACROS_CODE = '''
 %let _pipeline_opt_source=%sysfunc(getoption(source,keyword));
 %let _pipeline_opt_source2=%sysfunc(getoption(source2,keyword));
 options nomprint nomlogic nosymbolgen nonotes nosource nosource2;
-%if %sysfunc(fileexist("&_home/importallmacros_ue.sas")) %then %do;
-    %include "&_home/importallmacros_ue.sas";
-%end;
-%else %if %sysfunc(fileexist("&_macro_home/importallmacros_ue.sas")) %then %do;
-    %include "&_macro_home/importallmacros_ue.sas";
+%if &_pipeline_debug_macro_exists %then %do;
+    %let _pipeline_macro_bootstrap_ok=1;
+    %let _pipeline_macro_bootstrap_skipped=1;
 %end;
 %else %do;
-    filename M url "https://raw.githubusercontent.com/chengzhongshan/COVID19_GWAS_Analyzer/main/Macros/importallmacros_ue.sas";
-    %include M;
-    filename M clear;
-%end;
-%if %sysmacexist(importallmacros_ue) %then %do;
-    %importallmacros_ue(MacroDir=&_macro_home,fileRgx=.,verbose=0);
-    %let _pipeline_macro_bootstrap_ok=1;
+    %if %sysfunc(fileexist("&_home/importallmacros_ue.sas")) %then %do;
+        %include "&_home/importallmacros_ue.sas";
+    %end;
+    %else %if %sysfunc(fileexist("&_macro_home/importallmacros_ue.sas")) %then %do;
+        %include "&_macro_home/importallmacros_ue.sas";
+    %end;
+    %else %do;
+        filename M url "https://raw.githubusercontent.com/chengzhongshan/COVID19_GWAS_Analyzer/main/Macros/importallmacros_ue.sas";
+        %include M;
+        filename M clear;
+    %end;
+    %if %sysmacexist(importallmacros_ue) %then %do;
+        %importallmacros_ue(MacroDir=&_macro_home,fileRgx=.,verbose=0);
+        %let _pipeline_macro_bootstrap_ok=1;
+    %end;
 %end;
 options &_pipeline_opt_mprint &_pipeline_opt_mlogic &_pipeline_opt_symbolgen &_pipeline_opt_notes &_pipeline_opt_source &_pipeline_opt_source2;
+%put NOTE: PIPELINE_DEBUG_MACRO_EXISTS=&_pipeline_debug_macro_exists;
+%put NOTE: PIPELINE_MACRO_BOOTSTRAP_SKIPPED=&_pipeline_macro_bootstrap_skipped;
 %put NOTE: PIPELINE_MACRO_BOOTSTRAP_OK=&_pipeline_macro_bootstrap_ok;
 %mend;
 %_pipeline_bootstrap_macros;
@@ -220,6 +230,8 @@ def ensure_macros_loaded(session_id, sess, progress_callback=None):
             "Bootstrap End: ",
             "Elapsed Seconds: ",
             "Bootstrap OK: ",
+            "Debug Macro Exists: ",
+            "Bootstrap Skipped: ",
             "Warning: ",
             "Status: running",
             "",
@@ -246,12 +258,22 @@ def ensure_macros_loaded(session_id, sess, progress_callback=None):
     )
     macro_log = res.get('LOG', '')
     bootstrap_ok = ''
+    debug_macro_exists = ''
+    bootstrap_skipped = ''
     try:
         bootstrap_ok = str(sess.symget('_pipeline_macro_bootstrap_ok') or '').strip()
+        debug_macro_exists = str(sess.symget('_pipeline_debug_macro_exists') or '').strip()
+        bootstrap_skipped = str(sess.symget('_pipeline_macro_bootstrap_skipped') or '').strip()
     except Exception:
         bootstrap_ok = ''
+        debug_macro_exists = ''
+        bootstrap_skipped = ''
     if not bootstrap_ok and 'PIPELINE_MACRO_BOOTSTRAP_OK=1' in macro_log:
         bootstrap_ok = '1'
+    if not debug_macro_exists and 'PIPELINE_DEBUG_MACRO_EXISTS=1' in macro_log:
+        debug_macro_exists = '1'
+    if not bootstrap_skipped and 'PIPELINE_MACRO_BOOTSTRAP_SKIPPED=1' in macro_log:
+        bootstrap_skipped = '1'
     warning = bootstrap_ok != '1'
     bootstrap_finished_at = status_timestamp()
     bootstrap_elapsed_seconds = round(time.time() - bootstrap_started_epoch, 2)
@@ -263,6 +285,8 @@ def ensure_macros_loaded(session_id, sess, progress_callback=None):
             f"Bootstrap End: {bootstrap_finished_at}",
             f"Elapsed Seconds: {bootstrap_elapsed_seconds}",
             f"Bootstrap OK: {bootstrap_ok or '0'}",
+            f"Debug Macro Exists: {debug_macro_exists or '0'}",
+            f"Bootstrap Skipped: {bootstrap_skipped or '0'}",
             f"Warning: {1 if warning else 0}",
             "",
             "=== SAS Macro Bootstrap Log ===",
@@ -274,12 +298,15 @@ def ensure_macros_loaded(session_id, sess, progress_callback=None):
         'finished_at': bootstrap_finished_at,
         'elapsed_seconds': bootstrap_elapsed_seconds,
         'ok': bootstrap_ok or '0',
+        'debug_macro_exists': debug_macro_exists or '0',
+        'skipped': bootstrap_skipped or '0',
         'warning': bool(warning),
         'log_path': bootstrap_log_path,
     }
     print(
         f"[{session_id}] SAS ODA macro bootstrap finished at {bootstrap_finished_at} "
-        f"(elapsed {bootstrap_elapsed_seconds}s, ok={bootstrap_ok or '0'})",
+        f"(elapsed {bootstrap_elapsed_seconds}s, ok={bootstrap_ok or '0'}, "
+        f"debug_macro_exists={debug_macro_exists or '0'}, skipped={bootstrap_skipped or '0'})",
         flush=True,
     )
     print(f"[{session_id}] Bootstrap-only SAS log saved to: {bootstrap_log_path}", flush=True)
@@ -296,6 +323,8 @@ def ensure_macros_loaded(session_id, sess, progress_callback=None):
             'finished_at': bootstrap_finished_at,
             'elapsed_seconds': bootstrap_elapsed_seconds,
             'ok': bootstrap_ok or '0',
+            'debug_macro_exists': debug_macro_exists or '0',
+            'skipped': bootstrap_skipped or '0',
             'warning': bool(warning),
         })
     session_macros_loaded[session_id] = True

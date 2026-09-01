@@ -41,6 +41,10 @@ companion runner/script pair:
 %let local_ld_snps=__GTF_LD_SNPS__;
 %let local_ld_marker_symbol=__GTF_LD_MARKER_SYMBOL__;
 %let local_ld_marker_color=__GTF_LD_MARKER_COLOR__;
+%let local_ld_display_mode=__GTF_LD_DISPLAY_MODE__;
+%let local_ld_r2_values=__GTF_LD_R2_VALUES__;
+%let local_ld_heatmap_colors=__GTF_LD_HEATMAP_COLORS__;
+%let local_ld_heatmap_legend_title=__GTF_LD_HEATMAP_LEGEND_TITLE__;
 %let common_assoc_pvars=__COMMON_ASSOC_P_VARS__;
 %let lmh_angle4xaxis_label=__LOCAL_MANHATTAN_ANGLE4XAXIS_LABEL__;
 %let lmh_xgrp_y_pos=__LOCAL_MANHATTAN_XGRP_Y_POS__;
@@ -940,6 +944,10 @@ run;
       LD_SNPs2mark_scatterplot_dots=&local_ld_snps,
       LD_marker_symbol=&local_ld_marker_symbol,
       LD_marker_color=&local_ld_marker_color,
+      LD_display_mode=&local_ld_display_mode,
+      LD_r2_values=&local_ld_r2_values,
+      LD_heatmap_colormodel=&local_ld_heatmap_colors,
+      LD_heatmap_legend_title=&local_ld_heatmap_legend_title,
       Keep_order_of_target_SNPs=1
     );
   %end;

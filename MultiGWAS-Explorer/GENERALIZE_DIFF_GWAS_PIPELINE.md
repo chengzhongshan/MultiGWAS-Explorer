@@ -1160,6 +1160,10 @@ Pay attention to SAS macro loading as a separate layer:
   and delete should not be diagnosed first as SAS macro problems
 - when a new SAS ODA session is created, the runner auto-loads macros from
   `~/Macros` once via `importallmacros_ue(...)`
+- the runner first checks `%sysmacexist(debug_macro)` inside the live SAS
+  session. An existing `%debug_macro` is the inexpensive sentinel that the ODA
+  macro library is already resident, so the redundant global bootstrap is
+  skipped and that decision is written to the bootstrap metadata
 - when a persistent session is reused, that global macro bootstrap is not run
   again
 - when the submitted SAS program already contains self-contained `%include`
@@ -1173,6 +1177,9 @@ Pay attention to SAS macro loading as a separate layer:
   patterns during preflight
 - do not add redundant `%importallmacros_ue` calls inside pipeline-generated
   SAS scripts unless you are deliberately debugging macro bootstrap behavior
+- keep LD overlays opt-in. When requested, carry numeric proxy r2 values into
+  both plot backends and render them with a separate sequential LD legend; do
+  not reuse or replace the divergent association Z-score color scale
 
 Helpful extras:
 

@@ -1730,6 +1730,11 @@ Pay attention to SAS macro loading as a separate layer:
   and delete should not be diagnosed first as SAS macro problems
 - when a new SAS ODA session is created, the runner auto-loads macros from
   `~/Macros` once via `importallmacros_ue(...)`
+- before running that expensive bootstrap, the runner evaluates
+  `%sysmacexist(debug_macro)`. If `%debug_macro` is already available in the
+  live SAS ODA session, the macro library is treated as loaded and the
+  redundant `importallmacros_ue(...)` submit is skipped. The run status records
+  both `debug_macro_exists` and `macro_bootstrap_skipped` for auditing.
 - when global macro autoload is enabled, unresolved remote macro calls are left
   to that `importallmacros_ue(...)` pass. The helper no longer injects
   targeted loaders for submacros such as `FileOrDirExist`,
@@ -2161,6 +2166,30 @@ overlay. Supported symbols are `star`, `plus`, `cross`, `circle`, `square`,
 `triangle`, and `diamond`; colors may be named colors or `#RRGGBB`. When
 enabled, the resolver prefers the reusable local HaploReg cache and queries
 HaploReg only for missing SNPs unless web fallback is disabled.
+
+For a LocusZoom-like LD view, request it explicitly with
+`--ld-display-mode heatmap` (or `both` to retain the selected marker overlay).
+The pipeline carries the HaploReg r2 values into both SAS ODA and gnuplot local
+Manhattan/GTF renderers. LD proxy points use a sequential blue-to-purple map
+and a separate inset titled `LD r2 (POP)`. The association colorbar continues
+to use its existing divergent Z-score palette, so the two encodings cannot be
+mistaken for one another. For example:
+
+```bash
+perl auto_prepare_and_run_diff_gwas.pl \
+  --spec configs/your_spec.json \
+  --target-snps rs2070788,rs383510 \
+  --step plot_local_gtf \
+  --local-ld-display-mode heatmap \
+  --local-ld-population EUR \
+  --local-ld-r2-threshold 0.5
+```
+
+The default remains `none`; no LD query or overlay is performed unless the
+user requests `markers`, `heatmap`, or `both`. Explicit proxy lists can supply
+values with `--local-ld-r2-values rs1:0.92,rs2:0.81`. The gnuplot equivalent is
+`--ld-r2-values`, and its inset palette can be changed with a comma-separated
+`--ld-heatmap-colors` list of `#RRGGBB` values.
 
 `DiffGWASDeps/extract_gencode_gtf_subset.pl` requires indexed extraction by
 default. It locates `tabix` and `bgzip` in `DiffGWASDeps/`, the repository root,

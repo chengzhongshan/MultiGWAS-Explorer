@@ -17,6 +17,10 @@ This script draws a local Manhattan plot with gene tracks for a single target SN
 %let local_window_bp=__LOCAL_WINDOW_BP__;
 %let gtf_label_snps=__GTF_LABEL_SNPS__;
 %let gtf_ld_snps=__GTF_LD_SNPS__;
+%let gtf_ld_display_mode=__GTF_LD_DISPLAY_MODE__;
+%let gtf_ld_r2_values=__GTF_LD_R2_VALUES__;
+%let gtf_ld_heatmap_colors=__GTF_LD_HEATMAP_COLORS__;
+%let gtf_ld_heatmap_legend_title=__GTF_LD_HEATMAP_LEGEND_TITLE__;
 %let html_outfile=__OUTPUT_HTML__;
 %let done_outfile=__OUTPUT_DONE__;
 %let gwas_dsd=__GWAS_DATASET__;
@@ -276,6 +280,10 @@ quit;
   makeheatmapdotintooneline=0,
   SNPs2label_scatterplot_dots=&gtf_label_snps,
   LD_SNPs2mark_scatterplot_dots=&gtf_ld_snps,
+  LD_display_mode=&gtf_ld_display_mode,
+  LD_r2_values=&gtf_ld_r2_values,
+  LD_heatmap_colormodel=&gtf_ld_heatmap_colors,
+  LD_heatmap_legend_title=&gtf_ld_heatmap_legend_title,
   Yoffset4textlabels=&gtf_yoffset4textlabels,
   verbose=0
 );

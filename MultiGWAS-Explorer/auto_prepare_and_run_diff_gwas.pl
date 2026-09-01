@@ -95,6 +95,9 @@ my $local_ld_web_fallback = 1;
 my $highlight_high_ld_snps = 0;
 my $local_ld_marker_symbol = 'star';
 my $local_ld_marker_color = 'black';
+my $local_ld_display_mode = 'none';
+my $local_ld_r2_values_override = '';
+my $local_ld_heatmap_colors = 'CXF7FBFF CX6BAED6 CX54278F';
 my $exclude_non_protein_coding_genes_in_local_gtf = 0;
 my $gnuplot_fallback_on_sas_space = 1;
 my $gnuplot_fallback_on_sas_failure = 1;
@@ -183,13 +186,16 @@ GetOptions(
     'local-gtf-yoffset4textlabels=s' => \$local_gtf_yoffset4textlabels_override,
     'local-ld-snps=s' => \$local_ld_snps_override,
     'local-ld-audit-file=s' => \$local_ld_audit_file_override,
-    'local-ld-cache=s' => \$local_ld_cache_override,
-    'local-ld-population=s' => \$local_ld_population_override,
-    'local-ld-r2-threshold=f' => \$local_ld_r2_threshold_override,
+    'local-ld-cache|ld-cache=s' => \$local_ld_cache_override,
+    'local-ld-population|ld-population=s' => \$local_ld_population_override,
+    'local-ld-r2-threshold|ld-r2-threshold=f' => \$local_ld_r2_threshold_override,
     'local-ld-web-fallback!' => \$local_ld_web_fallback,
     'local-highlight-high-ld-snps|highlight-high-ld-snps!' => \$highlight_high_ld_snps,
     'local-ld-marker-symbol|ld-marker-symbol=s' => \$local_ld_marker_symbol,
     'local-ld-marker-color|ld-marker-color=s' => \$local_ld_marker_color,
+    'local-ld-display-mode|ld-display-mode=s' => \$local_ld_display_mode,
+    'local-ld-r2-values|ld-r2-values=s' => \$local_ld_r2_values_override,
+    'local-ld-heatmap-colors|ld-heatmap-colors=s' => \$local_ld_heatmap_colors,
     'exclude-non-protein-coding-genes-in-local-gtf!' => \$exclude_non_protein_coding_genes_in_local_gtf,
     'gnuplot-fallback-on-sas-space!' => \$gnuplot_fallback_on_sas_space,
     'gnuplot-fallback-on-sas-failure!' => \$gnuplot_fallback_on_sas_failure,
@@ -431,6 +437,12 @@ my $local_plot_requested =
     || (!$skip_plots && ($plots || '') =~ /(?:^|,)local_(?:manhattan|gtf)(?:,|$)/);
 $highlight_high_ld_snps = 1
     if length($local_ld_snps_override) || length(cfg_or($spec, 'local_ld_snps', ''));
+$local_ld_display_mode = lc(trim($local_ld_display_mode || 'none'));
+die "--local-ld-display-mode must be none, markers, heatmap, or both\n"
+    unless $local_ld_display_mode =~ /^(?:none|markers|heatmap|both)$/;
+$local_ld_display_mode = 'markers'
+    if $local_ld_display_mode eq 'none' && $highlight_high_ld_snps;
+$highlight_high_ld_snps = 1 if $local_ld_display_mode ne 'none';
 $local_ld_marker_symbol = lc(trim($local_ld_marker_symbol || 'star'));
 die "--local-ld-marker-symbol must be star, plus, cross, circle, square, triangle, or diamond\n"
     unless $local_ld_marker_symbol =~ /^(?:star|plus|cross|circle|square|triangle|diamond)$/;
@@ -444,7 +456,7 @@ if ($highlight_high_ld_snps
     my $local_ld_cache = length($local_ld_cache_override)
         ? $local_ld_cache_override
         : cfg_or($spec, 'local_ld_cache_tsv', $top_hit_ld_cache_tsv);
-    $local_ld_snps_override = resolve_high_ld_snps_for_plot(
+    ($local_ld_snps_override, $local_ld_r2_values_override) = resolve_high_ld_snps_for_plot(
         query_snps  => $configured_target_snps,
         population => $local_ld_population_override,
         min_r2      => $local_ld_r2_threshold_override,
@@ -503,6 +515,9 @@ my $runner_cfg = build_runner_config(
     highlight_high_ld_snps => $highlight_high_ld_snps,
     local_ld_marker_symbol => $local_ld_marker_symbol,
     local_ld_marker_color => $local_ld_marker_color,
+    local_ld_display_mode => $local_ld_display_mode,
+    local_ld_r2_values_override => $local_ld_r2_values_override,
+    local_ld_heatmap_colors => $local_ld_heatmap_colors,
     local_gtf_label_layout_override => $local_gtf_label_layout_override,
     local_gtf_yaxis_offset4max_override => $local_gtf_yaxis_offset4max_override,
     local_gtf_yoffset4textlabels_override => $local_gtf_yoffset4textlabels_override,
@@ -2589,6 +2604,9 @@ sub build_runner_config {
     my $highlight_high_ld_snps = $args{highlight_high_ld_snps} ? 1 : 0;
     my $local_ld_marker_symbol = $args{local_ld_marker_symbol} // 'star';
     my $local_ld_marker_color = $args{local_ld_marker_color} // 'black';
+    my $local_ld_display_mode = $args{local_ld_display_mode} // 'none';
+    my $local_ld_r2_values_override = $args{local_ld_r2_values_override} // '';
+    my $local_ld_heatmap_colors = $args{local_ld_heatmap_colors} // 'CXF7FBFF CX6BAED6 CX54278F';
     my $local_gtf_label_layout_override = $args{local_gtf_label_layout_override} // '';
     my $local_gtf_yaxis_offset4max_override = $args{local_gtf_yaxis_offset4max_override} // '';
     my $local_gtf_yoffset4textlabels_override = $args{local_gtf_yoffset4textlabels_override} // '';
@@ -2886,6 +2904,10 @@ sub build_runner_config {
         ),
         GTF_LD_MARKER_SYMBOL => $local_ld_marker_symbol,
         GTF_LD_MARKER_COLOR => $local_ld_marker_color,
+        GTF_LD_DISPLAY_MODE => $local_ld_display_mode,
+        GTF_LD_R2_VALUES => $local_ld_r2_values_override,
+        GTF_LD_HEATMAP_COLORS => $local_ld_heatmap_colors,
+        GTF_LD_HEATMAP_LEGEND_TITLE => "LD r2 ($local_ld_population_override)",
         HIGHLIGHT_HIGH_LD_SNPS => $highlight_high_ld_snps,
         LOCAL_LD_CACHE_TSV => (
             length($local_ld_cache_override)
@@ -3350,6 +3372,14 @@ sub run_gnuplot_space_fallback {
         push @cmd, '--highlight-high-ld-snps';
         push @cmd, ('--ld-marker-symbol', $local_ld_marker_symbol);
         push @cmd, ('--ld-marker-color', $local_ld_marker_color);
+        push @cmd, ('--ld-display-mode', $local_ld_display_mode);
+        push @cmd, ('--ld-population', $local_ld_population_override);
+        my $gnuplot_colors = join(',', map {
+            my $c = $_; $c =~ s/^CX/#/i; lc($c)
+        } grep { length } split /[\s,]+/, $local_ld_heatmap_colors);
+        push @cmd, ('--ld-heatmap-colors', $gnuplot_colors);
+        push @cmd, ('--ld-r2-values', $local_ld_r2_values_override)
+          if length $local_ld_r2_values_override;
     }
     push @cmd, ('--ld-audit-file', $local_ld_audit_file_override)
       if defined $local_ld_audit_file_override && length $local_ld_audit_file_override;
@@ -3765,11 +3795,12 @@ sub resolve_high_ld_snps_for_plot {
     push @cmd, ('--local-cache', $local_cache)
         if length($local_cache) && -s $local_cache;
     push @cmd, '--no-web-fallback' unless $args{web_fallback};
-    my $ld_snps = '';
+    my ($ld_snps, $ld_r2_pairs) = ('', '');
     if (open my $pipe, '-|', @cmd) {
         while (my $line = <$pipe>) {
             chomp $line;
             $ld_snps = $1 if $line =~ /^LD_SNPS\t(.*)$/;
+            $ld_r2_pairs = $1 if $line =~ /^LD_R2_PAIRS\t(.*)$/;
         }
         my $ok = close $pipe;
         warn "[warn] High-LD resolver failed; SAS plots will continue without LD marker overlays.\n"
@@ -3784,7 +3815,7 @@ sub resolve_high_ld_snps_for_plot {
     else {
         print "[warn] No high-LD proxies resolved for $args{query_snps}; no LD marker overlay will be drawn.\n";
     }
-    return $ld_snps;
+    return ($ld_snps, $ld_r2_pairs);
 }
 
 sub usage {
@@ -3928,6 +3959,16 @@ Options:
                        Default: star when LD highlighting is enabled.
   --ld-marker-color COLOR
                        Named or #RRGGBB LD marker color. Default: black.
+  --local-ld-display-mode MODE
+                       none|markers|heatmap|both. Default: none. The heatmap
+                       mode colors LD proxies by r2 and adds its own blue-purple
+                       legend, separate from the association Z-score legend.
+  --local-ld-r2-values MAP
+                       Optional comma-separated SNP:r2 values for explicit
+                       --local-ld-snps.
+  --local-ld-heatmap-colors LIST
+                       Space-delimited SAS CX colors, low to high. Default:
+                       CXF7FBFF CX6BAED6 CX54278F.
   --local-ld-cache FILE
                        Normalized HaploReg TSV/SQLite cache queried before any
                        network request.

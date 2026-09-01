@@ -56,6 +56,10 @@ Note:
 %let gtf_ld_snps=__GTF_LD_SNPS__;
 %let gtf_ld_marker_symbol=__GTF_LD_MARKER_SYMBOL__;
 %let gtf_ld_marker_color=__GTF_LD_MARKER_COLOR__;
+%let gtf_ld_display_mode=__GTF_LD_DISPLAY_MODE__;
+%let gtf_ld_r2_values=__GTF_LD_R2_VALUES__;
+%let gtf_ld_heatmap_colors=__GTF_LD_HEATMAP_COLORS__;
+%let gtf_ld_heatmap_legend_title=__GTF_LD_HEATMAP_LEGEND_TITLE__;
 %let gtf_label_text_rotate_angle=__GTF_LABEL_TEXT_ROTATE_ANGLE__;
 %let gtf_include_non_protein_coding=__GTF_INCLUDE_NON_PROTEIN_CODING__;
 
@@ -1032,6 +1036,10 @@ run;
     LD_SNPs2mark_scatterplot_dots=&gtf_ld_snps,
     LD_marker_symbol=&gtf_ld_marker_symbol,
     LD_marker_color=&gtf_ld_marker_color,
+    LD_display_mode=&gtf_ld_display_mode,
+    LD_r2_values=&gtf_ld_r2_values,
+    LD_heatmap_colormodel=&gtf_ld_heatmap_colors,
+    LD_heatmap_legend_title=&gtf_ld_heatmap_legend_title,
     text_rotate_angle=&gtf_label_text_rotate_angle,
     yoffset4max_drawmarkersontop=&gtf_yoffset4maxdrawmarkersontop,
     Yoffset4textlabels=&gtf_yoffset4textlabels,

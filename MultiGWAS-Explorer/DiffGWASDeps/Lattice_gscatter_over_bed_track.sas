@@ -134,6 +134,9 @@ default is empty; provide a variable that include non-empty strings for specific
 var4mark_ld_scatterplot_dots=,/*Optional character variable containing the selected marker for LD-linked variants and blank otherwise.*/
 ld_marker_color=black,/*SAS color name or CXrrggbb value for LD marker text.*/
 ld_marker_legend_symbol=*,/*Text shown before LD-linked SNP in the legend.*/
+ld_heatmap_var=,/*Optional numeric 0-1 LD r2 variable. Blank keeps LD coloring disabled.*/
+ld_heatmap_colormodel=CXF7FBFF CX6BAED6 CX54278F,/*Separate sequential palette for LD, distinct from the association Z-score palette.*/
+ld_heatmap_legend_title=%str(LD r2),/*Title for the opt-in LD inset legend.*/
 label_dots_once_on_top=1,/*Put value 1 to label each unique label once on top of scatterplot;
 provide 0 for labeling selected dots inside scatterplots;
 The script will enlarge the macro var yaxis_offset4max to be 0.1!*/
@@ -399,6 +402,14 @@ var to link each char var for making format and using them as legend in the fina
  %Check_VarnamesInDsd(indsd=&bed_dsd,Rgx=&var4mark_ld_scatterplot_dots,exist_tag=HasLDMarkerVar);
  %if %length(&HasLDMarkerVar)=0 %then %do;
   %put ERROR: LD marker variable &var4mark_ld_scatterplot_dots does not exist in &bed_dsd.;
+  %abort 255;
+ %end;
+%end;
+
+%if %length(&ld_heatmap_var)>0 %then %do;
+ %Check_VarnamesInDsd(indsd=&bed_dsd,Rgx=&ld_heatmap_var,exist_tag=HasLDHeatmapVar);
+ %if %length(&HasLDHeatmapVar)=0 %then %do;
+  %put ERROR: LD heatmap variable &ld_heatmap_var does not exist in &bed_dsd.;
   %abort 255;
  %end;
 %end;
@@ -715,7 +726,7 @@ where &yval_var>0 and grp_end_tag=1;
 %put fake y axis values are &fake_y_axis_vals;
 
 *Note: if these added macro vars are empty, it will not affect the data step;
-data x1(keep=old_y &Variant_Length_Var &chr_var pos &yval_var &grp_var ord &st_var &end_var &scatter_grp_var &lattice_subgrp_var &var4label_scatterplot_dots &var4mark_ld_scatterplot_dots);
+data x1(keep=old_y &Variant_Length_Var &chr_var pos &yval_var &grp_var ord &st_var &end_var &scatter_grp_var &lattice_subgrp_var &var4label_scatterplot_dots &var4mark_ld_scatterplot_dots &ld_heatmap_var);
 set x1;
 array X{2} &st_var &end_var;
 do i=1 to 2;
@@ -1014,9 +1025,16 @@ proc print data=final(obs=50);run;
 
 data final;
 *Keep &st_var &end_var for CNV highlowplot if necessary;
-merge final x1(where=(&yval_var>=0) keep=old_y &Variant_Length_Var &st_var &end_var pos &yval_var &grp_var &scatter_grp_var &lattice_subgrp_var &var4label_scatterplot_dots &var4mark_ld_scatterplot_dots);
+merge final x1(where=(&yval_var>=0) keep=old_y &Variant_Length_Var &st_var &end_var pos &yval_var &grp_var &scatter_grp_var &lattice_subgrp_var &var4label_scatterplot_dots &var4mark_ld_scatterplot_dots &ld_heatmap_var);
 *Add back these excluded data;
 run;
+%if %length(&ld_heatmap_var)>0 %then %do;
+data final;
+set final;
+_LD_PLOT_Y_=.;
+if not missing(&ld_heatmap_var) then _LD_PLOT_Y_=&yval_var;
+run;
+%end;
 %put NOTE: LATTICE_STAGE positive_signal_merge_complete;
 *Asign a specific values for gene with missing value;
 proc sql noprint;
@@ -1846,6 +1864,15 @@ begingraph / designwidth=&track_width designheight=&track_height
 
 	%end;
 
+    %if %length(&ld_heatmap_var)>0 %then %do;
+      rangeattrmap name="ldheatmap";
+        range 0 - 1 / rangealtcolormodel=(&ld_heatmap_colormodel);
+        range OTHER / rangealtcolor=gray;
+        range MISSING / rangealtcolor=white;
+      endrangeattrmap;
+      rangeattrvar attrvar=ld_r2_attrvar var=&ld_heatmap_var attrmap="ldheatmap";
+    %end;
+
    %if "&color_resp_vartype"="C" and &makedotheatmap=0 %then %do;
 	    discreteattrmap name="dotgrpname" / ignorecase=true;
         /*If the symbol is used in the scatterplot statment, the following symbol specification will be overwritten!*/
@@ -2150,6 +2177,15 @@ begingraph / designwidth=&track_width designheight=&track_height
    *Overlay LD-linked points after the ordinary association scatter layer.;
    textplot x=pos y=&yval_var text=&var4mark_ld_scatterplot_dots /
      position=center textattrs=(color=&ld_marker_color size=%sysevalf(&dotsize+2) weight=bold);
+ %end;
+
+ %if %length(&ld_heatmap_var)>0 %then %do;
+   *Opt-in LocusZoom-like LD layer. Its sequential scale is independent of the association Z-score scale.;
+   scatterplot x=pos y=_LD_PLOT_Y_ /
+     markercolorgradient=ld_r2_attrvar filledoutlinedmarkers=true name="ldsc"
+     markerattrs=(symbol=circlefilled size=%sysevalf(&dotsize+1));
+   continuouslegend "ldsc" / title="&ld_heatmap_legend_title" orient=horizontal
+     location=inside halign=right valign=top;
  %end;
 
  /*This highlow plot is specifically designed for drawing CNV*/

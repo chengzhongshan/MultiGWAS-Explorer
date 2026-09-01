@@ -67,7 +67,11 @@ to query all gwas top hits; if only want to query top hits from the 1 gwas, plea
 other gwass if the correct numeric order for the gwas is supplied here!*/
 LD_SNPs2mark_scatterplot_dots=, /*Space-delimited high-LD rsIDs overlaid on every GWAS track.*/
 LD_marker_symbol=*,
-LD_marker_color=black
+LD_marker_color=black,
+LD_display_mode=none,
+LD_r2_values=,
+LD_heatmap_colormodel=CXF7FBFF CX6BAED6 CX54278F,
+LD_heatmap_legend_title=%str(LD r2)
 );
 
 /**fake data;*/
@@ -601,11 +605,25 @@ filename gout "./&outputfigname..gif";
 
 data manhattan;
 set manhattan;
-length _LD_SNP_MARK_ $8;
+length _LD_SNP_MARK_ $8 _LD_COLOR_ $16;
 _LD_SNP_MARK_='';
-%if %length(&LD_SNPs2mark_scatterplot_dots)>0 %then %do;
+_LD_R2_=.;
+%if %length(&LD_SNPs2mark_scatterplot_dots)>0 and %upcase(&LD_display_mode) ne NONE %then %do;
 if findw(upcase("&LD_SNPs2mark_scatterplot_dots"),upcase(strip(&snp_var)),' ')>0
   then _LD_SNP_MARK_="&LD_marker_symbol";
+%end;
+%if %length(&LD_r2_values)>0 and
+    (%upcase(&LD_display_mode)=HEATMAP or %upcase(&LD_display_mode)=BOTH) %then %do;
+%do _li_=1 %to %ntokens(&LD_r2_values);
+  %let _ld_pair_=%scan(&LD_r2_values,&_li_,%str( ));
+  if upcase(strip(&snp_var))=upcase("%scan(&_ld_pair_,1,%str(:))") then
+    _LD_R2_=input("%scan(&_ld_pair_,2,%str(:))",best32.);
+%end;
+if not missing(_LD_R2_) then do;
+  if _LD_R2_<0.5 then _LD_COLOR_="%scan(&LD_heatmap_colormodel,1,%str( ))";
+  else if _LD_R2_<0.8 then _LD_COLOR_="%scan(&LD_heatmap_colormodel,2,%str( ))";
+  else _LD_COLOR_="%scan(&LD_heatmap_colormodel,-1,%str( ))";
+end;
 %end;
 *Further remove signals with logP<1.3, which will save space and prevent the reference lines covered by these signals with logP<1.3;
 if logP<&rm_signals_with_logP_lt then logP=.;
@@ -625,7 +643,8 @@ if logp&_mi_^=. then logp&_mi_=logp&_mi_+&_logP_topval*&_mi_;
 
 run;
 
-%if %length(&LD_SNPs2mark_scatterplot_dots)>0 %then %do;
+%if %length(&LD_SNPs2mark_scatterplot_dots)>0 and
+    (%upcase(&LD_display_mode)=MARKERS or %upcase(&LD_display_mode)=BOTH) %then %do;
 data _ld_snp_anno;
   set manhattan(where=(not missing(_LD_SNP_MARK_)));
   length function $8 text $40 color $16 position $1 style $12;
@@ -648,6 +667,31 @@ data _ld_snp_legend;
 run;
 proc append base=anno data=_ld_snp_legend force;
 run;
+%end;
+
+%if %length(&LD_r2_values)>0 and
+    (%upcase(&LD_display_mode)=HEATMAP or %upcase(&LD_display_mode)=BOTH) %then %do;
+data _ld_r2_anno;
+  set manhattan(where=(not missing(_LD_R2_)));
+  length function $8 text $40 color $16 position $1 style $12;
+  xsys='2'; ysys='2'; function='label'; text='o'; color=_LD_COLOR_;
+  position='5'; style='Arial'; size=1.8; x=Fake_position;
+  array _ld_logp_[*] logp logp1-logp%ntokens(&Other_P_vars);
+  do _ld_i_=1 to dim(_ld_logp_);
+    y=_ld_logp_[_ld_i_]; if not missing(y) then output;
+  end;
+  keep x y xsys ysys function text color position style size;
+run;
+proc append base=anno data=_ld_r2_anno force; run;
+data _ld_r2_legend;
+  length function $8 text $80 color $16 position $1 style $12;
+  xsys='1'; ysys='1'; function='label'; position='6'; style='Arial'; size=1.0;
+  x=68; y=98; text="&LD_heatmap_legend_title"; color='black'; output;
+  x=78; text='o 0-0.5'; color="%scan(&LD_heatmap_colormodel,1,%str( ))"; output;
+  x=86; text='o 0.5-0.8'; color="%scan(&LD_heatmap_colormodel,2,%str( ))"; output;
+  x=95; text='o 0.8-1'; color="%scan(&LD_heatmap_colormodel,-1,%str( ))"; output;
+run;
+proc append base=anno data=_ld_r2_legend force; run;
 %end;
 
 proc transpose data=manhattan out=manhattan(rename=(col1=logP) drop=_name_);

@@ -180,6 +180,10 @@ the macro variable yoffset4max_drawmarkersontop included in the macro Lattice_gs
 LD_SNPs2mark_scatterplot_dots=, /*Optional space-delimited LD-linked SNPs overlaid with the selected marker on every association track.*/
 LD_marker_symbol=*, /*Marker text for LD-linked SNPs: *, +, x, o, s, ^, or d.*/
 LD_marker_color=black, /*SAS color name or CXrrggbb value for LD-linked SNP markers.*/
+LD_r2_values=, /*Space-delimited SNP:r2 pairs used by the optional LD heatmap overlay.*/
+LD_display_mode=none, /*none, markers, heatmap, or both. LD display is opt-in.*/
+LD_heatmap_colormodel=CXF7FBFF CX6BAED6 CX54278F, /*Distinct from the association Z-score palette.*/
+LD_heatmap_legend_title=%str(LD r2),
 text_rotate_angle=90, /*Angle to rotate text labels for these selected dots by users*/
 auto_rotate2zero=1, /*supply value 1 when there are <=3 text labels and you want them kept horizontal in the top headroom*/
 pct2adj4dencluster=2,/*Input value can be ranging from 0.0001 to 10 or even higher value!
@@ -199,8 +203,9 @@ adjust top SNPs labels if these labels are rotated 90 degree, which is helpful w
 verbose=0 /*Not print any notes in SAS log*/
 );
 
-%local effective_ld_marker_var;
+%local effective_ld_marker_var effective_ld_heatmap_var;
 %let effective_ld_marker_var=;
+%let effective_ld_heatmap_var=;
  
 %*It is better to output these notes into the log for AI; 
 %*However, too large number of notes will slow down the pipeline dramatically;
@@ -220,7 +225,8 @@ run;
 %end;
 
 *Add a compact star-overlay variable for LD-linked SNPs.;
-%if %length(&LD_SNPs2mark_scatterplot_dots)>0 %then %do;
+%if %length(&LD_SNPs2mark_scatterplot_dots)>0 and
+    (%upcase(&LD_display_mode)=MARKERS or %upcase(&LD_display_mode)=BOTH) %then %do;
  %let effective_ld_marker_var=_LD_SNP_MARK_;
  data &gwas_dsd;
  set &gwas_dsd;
@@ -228,6 +234,21 @@ run;
  _LD_SNP_MARK_="";
  %do _li_=1 %to %ntokens(&LD_SNPs2mark_scatterplot_dots);
    if &SNP_Var="%scan(&LD_SNPs2mark_scatterplot_dots,&_li_,%str( ))" then _LD_SNP_MARK_="&LD_marker_symbol";
+ %end;
+ run;
+%end;
+
+*Add a numeric r2 overlay variable only when the user explicitly requests the LD heatmap.;
+%if %length(&LD_r2_values)>0 and
+    (%upcase(&LD_display_mode)=HEATMAP or %upcase(&LD_display_mode)=BOTH) %then %do;
+ %let effective_ld_heatmap_var=_LD_R2_;
+ data &gwas_dsd;
+ set &gwas_dsd;
+ _LD_R2_=.;
+ %do _li_=1 %to %ntokens(&LD_r2_values);
+   %let _ld_pair_=%scan(&LD_r2_values,&_li_,%str( ));
+   if upcase(&SNP_Var)=upcase("%scan(&_ld_pair_,1,%str(:))") then
+     _LD_R2_=input("%scan(&_ld_pair_,2,%str(:))",best32.);
  %end;
  run;
 %end;
@@ -441,6 +462,9 @@ scatterplots;*/
 var4mark_ld_scatterplot_dots=&effective_ld_marker_var,
 ld_marker_color=&LD_marker_color,
 ld_marker_legend_symbol=&LD_marker_symbol,
+ld_heatmap_var=&effective_ld_heatmap_var,
+ld_heatmap_colormodel=&LD_heatmap_colormodel,
+ld_heatmap_legend_title=&LD_heatmap_legend_title,
 text_rotate_angle=&text_rotate_angle, /*Angle to rotate text labels for these selected dots by users*/
 auto_rotate2zero=&auto_rotate2zero, /*supply value 1 when there are <=3 text labels and you want them kept horizontal in the top headroom*/
 pct2adj4dencluster=&pct2adj4dencluster,/*For SNP labels on the top, please try to use this parameter, which only works when there are less than or equal to 4 top SNPs
@@ -487,6 +511,13 @@ run;
 data &gwas_dsd;
 set &gwas_dsd;
 drop _LD_SNP_MARK_;
+run;
+%end;
+
+%if %length(&effective_ld_heatmap_var)>0 %then %do;
+data &gwas_dsd;
+set &gwas_dsd;
+drop _LD_R2_;
 run;
 %end;
 

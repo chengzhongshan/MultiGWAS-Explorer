@@ -105,6 +105,19 @@ if (defined($output) && length($output)) {
 }
 
 print "LD_SNPS\t", join(',', @proxies), "\n";
+my %best_proxy_r2;
+for my $query (@queries) {
+    for my $proxy (keys %{ $proxy_for{$query} || {} }) {
+        my $r2 = $proxy_for{$query}{$proxy};
+        $best_proxy_r2{$proxy} = $r2
+            if !exists($best_proxy_r2{$proxy}) || $r2 > $best_proxy_r2{$proxy};
+    }
+}
+print "LD_R2_PAIRS\t", join(',', map {
+    $_ . ':' . sprintf('%.6g', $best_proxy_r2{$_})
+} sort {
+    ($best_proxy_r2{$b} <=> $best_proxy_r2{$a}) || ($a cmp $b)
+} grep { !$is_query{$_} } keys %best_proxy_r2), "\n";
 print "LD_POPULATION\t$population\n";
 print "LD_MIN_R2\t$min_r2\n";
 for my $query (@queries) {

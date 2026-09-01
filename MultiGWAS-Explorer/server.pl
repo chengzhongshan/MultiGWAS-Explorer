@@ -1193,6 +1193,12 @@ $server->tool(
                 type => 'string',
                 description => 'Optional comma-separated SNPs in LD with the local query SNP(s). SAS ODA and gnuplot overlay these variants with asterisk symbols on every association track; the same list is retained if SAS space exhaustion triggers gnuplot fallback.'
             },
+            local_ld_display_mode => { type => 'string', description => 'Optional LD rendering mode: none, markers, heatmap, or both. Default is none; heatmap adds a separate LD r2 scale.' },
+            local_ld_r2_values => { type => 'string', description => 'Optional comma-separated SNP:r2 values for explicit local_ld_snps.' },
+            local_ld_heatmap_colors => { type => 'string', description => 'Optional space-delimited SAS CX colors, low to high, for the LD r2 inset.' },
+            local_ld_population => { type => 'string', description => 'Optional HaploReg LD population: AFR, AMR, ASN, or EUR (default EUR).' },
+            local_ld_r2_threshold => { type => 'number', description => 'Optional minimum HaploReg LD r2, default 0.8.' },
+            local_ld_cache => { type => 'string', description => 'Optional normalized local HaploReg TSV/SQLite cache used before web fallback.' },
             local_ld_audit_file => {
                 type => 'string',
                 description => 'Optional local LD audit TSV. During gnuplot fallback, PRUNED_LD candidate_snp rows whose lead_snp matches a query SNP are automatically overlaid with asterisks.'
@@ -1289,6 +1295,12 @@ $server->tool(
         my $target_snp_genes = $args->{target_snp_genes} // '';
         my $local_ld_snps = $args->{local_ld_snps} // '';
         my $local_ld_audit_file = $args->{local_ld_audit_file} // '';
+        my $local_ld_display_mode = $args->{local_ld_display_mode} // '';
+        my $local_ld_r2_values = $args->{local_ld_r2_values} // '';
+        my $local_ld_heatmap_colors = $args->{local_ld_heatmap_colors} // '';
+        my $local_ld_population = $args->{local_ld_population} // '';
+        my $local_ld_r2_threshold = $args->{local_ld_r2_threshold};
+        my $local_ld_cache = $args->{local_ld_cache} // '';
         my $sas_oda_account = $args->{sas_oda_account} // '';
         my $sas_oda_password = $args->{sas_oda_password} // '';
         my $prompt_sas_oda_auth = $args->{prompt_sas_oda_auth} // '';
@@ -1512,6 +1524,12 @@ $server->tool(
               if defined $local_ld_snps && length $local_ld_snps;
             push @cmd, ('--local-ld-audit-file', $local_ld_audit_file)
               if defined $local_ld_audit_file && length $local_ld_audit_file;
+            push @cmd, ('--local-ld-display-mode', $local_ld_display_mode) if length $local_ld_display_mode;
+            push @cmd, ('--local-ld-r2-values', $local_ld_r2_values) if length $local_ld_r2_values;
+            push @cmd, ('--local-ld-heatmap-colors', $local_ld_heatmap_colors) if length $local_ld_heatmap_colors;
+            push @cmd, ('--local-ld-population', $local_ld_population) if length $local_ld_population;
+            push @cmd, ('--local-ld-r2-threshold', $local_ld_r2_threshold) if defined $local_ld_r2_threshold;
+            push @cmd, ('--local-ld-cache', $local_ld_cache) if length $local_ld_cache;
             push @cmd, '--emit-local-sas-scripts'
               if defined $emit_local_sas_scripts && $emit_local_sas_scripts =~ /^(?:1|true|yes|y)$/i;
             push @cmd, '--local-sas-only'
@@ -1696,6 +1714,12 @@ $server->tool(
             target_snp_genes => { type => 'string', description => 'Optional comma-separated SNP:GENE overrides, for example: rs17425819:JAK2,rs185665940:FANCL' },
             ld_snps => { type => 'string', description => 'Optional comma-separated LD-linked SNPs to overlay with asterisk symbols on local scatter panels.' },
             ld_audit_file => { type => 'string', description => 'Optional LD audit TSV. PRUNED_LD candidates linked to the plotted query lead SNP(s) are marked automatically.' },
+            ld_display_mode => { type => 'string', description => 'Optional LD rendering mode: none, markers, heatmap, or both. Heatmap uses a separate blue-purple r2 inset and leaves the association Z-score scale unchanged.' },
+            ld_r2_values => { type => 'string', description => 'Optional comma-separated SNP:r2 values for explicit ld_snps.' },
+            ld_heatmap_colors => { type => 'string', description => 'Optional comma-separated low-to-high #RRGGBB colors for the LD r2 inset.' },
+            ld_population => { type => 'string', description => 'Optional HaploReg population label/source for LD, default EUR.' },
+            ld_r2_threshold => { type => 'number', description => 'Optional minimum HaploReg LD r2, default 0.8.' },
+            ld_cache => { type => 'string', description => 'Optional normalized local HaploReg TSV/SQLite cache used before web fallback.' },
             get_common_associations => { type => 'string', description => 'Optional flag or threshold for common-association local-hit mode, for example: true or 5e-8.' },
             common_association_top_hit_threshold => { type => 'string', description => 'Optional explicit starting threshold for common-association local-hit mode.' },
             reference_build => { type => 'string', description => 'Optional reference genome build override for build-aware local GTF annotation, for example: hg19, hg38, or t2t. If omitted, the pipeline tries explicit spec fields first, then header/path tokens, and otherwise falls back to hg38.' },
@@ -1720,6 +1744,12 @@ $server->tool(
         my $target_snp_genes = $args->{target_snp_genes} // '';
         my $ld_snps = $args->{ld_snps} // '';
         my $ld_audit_file = $args->{ld_audit_file} // '';
+        my $ld_display_mode = $args->{ld_display_mode} // '';
+        my $ld_r2_values = $args->{ld_r2_values} // '';
+        my $ld_heatmap_colors = $args->{ld_heatmap_colors} // '';
+        my $ld_population = $args->{ld_population} // '';
+        my $ld_r2_threshold = $args->{ld_r2_threshold};
+        my $ld_cache = $args->{ld_cache} // '';
         my $get_common_associations = $args->{get_common_associations} // '';
         my $common_association_top_hit_threshold = $args->{common_association_top_hit_threshold} // '';
         my $reference_build = $args->{reference_build} // '';
@@ -1804,6 +1834,12 @@ $server->tool(
         push @cmd, ('--target-snp-genes', $target_snp_genes) if length $target_snp_genes;
         push @cmd, ('--ld-snps', $ld_snps) if length $ld_snps;
         push @cmd, ('--ld-audit-file', $ld_audit_file) if length $ld_audit_file;
+        push @cmd, ('--ld-display-mode', $ld_display_mode) if length $ld_display_mode;
+        push @cmd, ('--ld-r2-values', $ld_r2_values) if length $ld_r2_values;
+        push @cmd, ('--ld-heatmap-colors', $ld_heatmap_colors) if length $ld_heatmap_colors;
+        push @cmd, ('--ld-population', $ld_population) if length $ld_population;
+        push @cmd, ('--ld-r2-threshold', $ld_r2_threshold) if defined $ld_r2_threshold;
+        push @cmd, ('--ld-cache', $ld_cache) if length $ld_cache;
         if (length $get_common_associations) {
             if ($get_common_associations =~ /^(?:1|true|yes|y)$/i) {
                 push @cmd, '--get-common-associations';

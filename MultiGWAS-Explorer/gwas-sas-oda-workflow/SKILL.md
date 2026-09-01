@@ -431,6 +431,11 @@ For a new project, copy/adapt the script templates in this skill's `scripts/` fo
   starts with `chr1` and does not contain a phantom pre-`chr1` block caused by
   unsorted rows or `CHR='X'` being imported as numeric missing `.` in SAS.
 - For local GTF reruns, also verify the SAS log reports a non-zero exon count.
+- Keep LD rendering disabled unless the request explicitly asks for it. For an
+  LD heatmap, preserve numeric HaploReg r2 values, use a sequential palette and
+  a separately titled `LD r2 (population)` inset, and retain the association
+  Z-score palette/legend unchanged. Verify both legends when both encodings are
+  present.
 - For forest plots, verify the requested top-hit CSV, manifest TSV, PNG panel
   count, and left/right y-axis labeling mode.
 - For manuscript-table regeneration, verify that:
@@ -458,6 +463,10 @@ For a new project, copy/adapt the script templates in this skill's `scripts/` fo
   - `<output-prefix>/output.run.status.json`
   - `<output-prefix>/output.macro_bootstrap.log.txt`
   - `<output-prefix>/output.html.info.txt`
+- The runner uses `%sysmacexist(debug_macro)` as the live-session sentinel
+  before calling `importallmacros_ue`. A true result skips the redundant macro
+  bootstrap; confirm `debug_macro_exists` and `macro_bootstrap_skipped` in the
+  status/bootstrap metadata when diagnosing session reuse.
 - Interpret the newer debug lines carefully:
   - `Upload step: macro bootstrap helper: importallmacros_ue.sas ...`
     means the helper file upload finished; it is not the actual bootstrap

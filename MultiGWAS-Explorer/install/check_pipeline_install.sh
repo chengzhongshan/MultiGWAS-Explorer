@@ -56,6 +56,7 @@ log "GD version: $(perl -MGD -e 'print $GD::VERSION')"
 log "PDL version: $(perl -MPDL -e 'print $PDL::VERSION')"
 perl -e "require JSON::PP; require JSON::MaybeXS; require File::Which; require GD; require Mojolicious::Lite; require MCP::Server; require PDL; 1;" >/dev/null
 perl -I DiffGWASDeps -MSAS_ODA_Runner -e "print qq{SAS_ODA_Runner ok\n};"
+perl DiffGWASDeps/test_sas_oda_debug_macro_guard.pl >/dev/null
 perl -I DiffGWASDeps -c auto_prepare_and_run_diff_gwas.pl >/dev/null
 perl -c auto_prepare_and_run_diff_gwas_with_gunplot.pl >/dev/null
 perl -I DiffGWASDeps -c server.pl >/dev/null
@@ -64,8 +65,10 @@ perl -c DiffGWASDeps/gnuplot/pdl_gunplot_manhattan.pl >/dev/null
 perl -c DiffGWASDeps/gnuplot/pdl_gunplot_forest.pl >/dev/null
 perl -c DiffGWASDeps/gnuplot/pdl_gunplot_local_locus.pl >/dev/null
 perl DiffGWASDeps/test_gnuplot_directory_layout.pl >/dev/null
-bash -n DiffGWASDeps/run_sas_oda_manhattan4diffgwas_download_png.sh
-bash -n DiffGWASDeps/run_sas_oda_local_top_hits_manhattan_download_png.sh
-bash -n DiffGWASDeps/run_sas_oda_local_top_hits_with_gtf_download_html.sh
+perl DiffGWASDeps/test_ld_heatmap_rendering.pl >/dev/null
+perl DiffGWASDeps/test_ld_heatmap_contract.pl >/dev/null
+"${BASH:-bash}" -n DiffGWASDeps/run_sas_oda_manhattan4diffgwas_download_png.sh
+"${BASH:-bash}" -n DiffGWASDeps/run_sas_oda_local_top_hits_manhattan_download_png.sh
+"${BASH:-bash}" -n DiffGWASDeps/run_sas_oda_local_top_hits_with_gtf_download_html.sh
 
 log "Pipeline dependency smoke test completed successfully"

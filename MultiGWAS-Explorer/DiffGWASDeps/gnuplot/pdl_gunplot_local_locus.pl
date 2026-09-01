@@ -24,6 +24,10 @@ Options:
   --ld-marker-symbol NAME  star, plus, cross, circle, square, triangle, diamond
                            (default: star).
   --ld-marker-color COLOR  Named or #RRGGBB color (default: black).
+  --ld-display-mode MODE   none, markers, heatmap, or both (default: none).
+  --ld-r2-values MAP       Comma-separated SNP:r2 values for LD proxies.
+  --ld-population POP      Population shown in the LD inset (default: EUR).
+  --ld-heatmap-colors LIST Low-to-high #RRGGBB colors for the separate LD scale.
   --title TEXT             Optional title.
   --gtf FILE.tsv           Optional extracted GTF subset TSV.
   --width N                Default: 1500
@@ -47,6 +51,9 @@ my %opt = (
     hide_y_axis => 0,
     ld_marker_symbol => 'star',
     ld_marker_color  => 'black',
+    ld_display_mode  => 'none',
+    ld_population    => 'EUR',
+    ld_heatmap_colors=> '#f7fbff,#6baed6,#54278f',
 );
 
 GetOptions(
@@ -61,6 +68,10 @@ GetOptions(
     'ld-snps=s'    => \$opt{ld_snps},
     'ld-marker-symbol=s' => \$opt{ld_marker_symbol},
     'ld-marker-color=s'  => \$opt{ld_marker_color},
+    'ld-display-mode=s'  => \$opt{ld_display_mode},
+    'ld-r2-values=s'     => \$opt{ld_r2_values},
+    'ld-population=s'    => \$opt{ld_population},
+    'ld-heatmap-colors=s'=> \$opt{ld_heatmap_colors},
     'title=s'      => \$opt{title},
     'gtf=s'        => \$opt{gtf},
     'width=i'      => \$opt{width},
@@ -78,6 +89,15 @@ die "Input file not found: $opt{data}\n" unless -s $opt{data};
 my $ld_point_type = ld_marker_point_type($opt{ld_marker_symbol});
 die "--ld-marker-color must be a named color or #RRGGBB\n"
     unless $opt{ld_marker_color} =~ /^(?:#[0-9A-Fa-f]{6}|[A-Za-z][A-Za-z0-9_-]*)$/;
+$opt{ld_display_mode} = lc(trim($opt{ld_display_mode} || 'none'));
+die "--ld-display-mode must be none, markers, heatmap, or both\n"
+    unless $opt{ld_display_mode} =~ /^(?:none|markers|heatmap|both)$/;
+$opt{ld_population} = uc(trim($opt{ld_population} || 'EUR'));
+die "--ld-population must be AFR, AMR, ASN, or EUR\n"
+    unless $opt{ld_population} =~ /^(?:AFR|AMR|ASN|EUR)$/;
+my @ld_heatmap_colors = map { lc(trim($_)) } split /,/, $opt{ld_heatmap_colors};
+die "--ld-heatmap-colors requires at least two comma-separated #RRGGBB colors\n"
+    unless @ld_heatmap_colors >= 2 && !grep { $_ !~ /^#[0-9a-f]{6}$/ } @ld_heatmap_colors;
 
 my @pcols = grep { length } map { trim($_) } split /,/, $opt{pcols};
 my @zcols = grep { length } map { trim($_) } split /,/, ($opt{zcols} // '');
@@ -97,12 +117,22 @@ unshift @label_snps, $opt{snp}
 my %is_label_snp = map { lc($_) => 1 } @label_snps;
 my @ld_snps;
 my %is_ld_snp;
+my %ld_r2_for;
 for my $snp (split /,/, ($opt{ld_snps} // '')) {
     $snp = trim($snp);
     next unless length $snp;
     next if $is_label_snp{lc $snp};
     next if $is_ld_snp{lc $snp}++;
     push @ld_snps, $snp;
+}
+for my $item (split /,/, ($opt{ld_r2_values} // '')) {
+    my ($snp, $r2) = split /:/, $item, 2;
+    $snp = trim($snp // '');
+    next unless length($snp) && defined($r2)
+        && $r2 =~ /^(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i;
+    $r2 = cap_num(0 + $r2, 0, 1);
+    $ld_r2_for{lc $snp} = $r2
+        if !exists($ld_r2_for{lc $snp}) || $r2 > $ld_r2_for{lc $snp};
 }
 my $has_gtf = $opt{gtf} && -s $opt{gtf};
 
@@ -183,7 +213,7 @@ for my $requested (@label_snps) {
 }
 
 open my $pt, '>', $plot_tsv or die "Cannot write $plot_tsv: $!\n";
-print {$pt} join("\t", qw(BP Y TRACK LOGP IS_TARGET SNP COLORVAL IS_LD)), "\n";
+print {$pt} join("\t", qw(BP Y TRACK LOGP IS_TARGET SNP COLORVAL IS_LD LD_R2 LD_RGB)), "\n";
 my $kept_points = 0;
 my $ld_points = 0;
 my %found_ld_snp;
@@ -200,6 +230,8 @@ for my $row (@locus) {
         my $y = $track_i * $opt{top_logp} + $capped;
         my $is_target = $is_label_snp{lc $snp} ? 1 : 0;
         my $is_ld = $is_ld_snp{lc $snp} ? 1 : 0;
+        my $ld_r2 = $is_ld && exists($ld_r2_for{lc $snp}) ? $ld_r2_for{lc $snp} : -1;
+        my $ld_rgb = $ld_r2 >= 0 ? ld_rgb_integer($ld_r2, \@ld_heatmap_colors) : 0;
         if ($is_ld) {
             $ld_points++;
             $found_ld_snp{lc $snp} = $snp;
@@ -209,7 +241,7 @@ for my $row (@locus) {
             my $z = extract_requested_numeric($resolved_zcols[$track_i], $row, \%idx);
             $colorval = defined $z ? cap_num($z, -8, 8) : 0;
         }
-        print {$pt} join("\t", $bp, sprintf('%.4f', $y), $track_i, sprintf('%.6f', $logp), $is_target, $snp, sprintf('%.4f', $colorval), $is_ld), "\n";
+        print {$pt} join("\t", $bp, sprintf('%.4f', $y), $track_i, sprintf('%.6f', $logp), $is_target, $snp, sprintf('%.4f', $colorval), $is_ld, sprintf('%.4f', $ld_r2), $ld_rgb), "\n";
         $kept_points++;
     }
 }
@@ -309,6 +341,10 @@ write_gnuplot(
     ld_marker_symbol => lc($opt{ld_marker_symbol}),
     ld_marker_point_type => $ld_point_type,
     ld_marker_color => $opt{ld_marker_color},
+    ld_display_mode => $opt{ld_display_mode},
+    ld_population   => $opt{ld_population},
+    ld_heatmap_colors => \@ld_heatmap_colors,
+    ld_r2_points    => scalar(grep { exists $ld_r2_for{$_} && exists $found_ld_snp{$_} } keys %ld_r2_for),
     gene_height => $gene_height,
     use_zcolors => ($has_gtf && $has_zcols ? 1 : 0),
     colorbar_label => infer_effect_metric_label_from_cols(@resolved_zcols),
@@ -319,7 +355,7 @@ system($opt{gnuplot}, $gp_file) == 0
 
 open my $mf, '>', $manifest or die "Cannot write $manifest: $!\n";
 print {$mf} join("\t", qw(METRIC VALUE)), "\n";
-print {$mf} join("\t", 'cache_schema', 3), "\n";
+print {$mf} join("\t", 'cache_schema', 4), "\n";
 print {$mf} join("\t", 'input', $opt{data}), "\n";
 print {$mf} join("\t", 'png', $png_file), "\n";
 print {$mf} join("\t", 'plot_tsv', $plot_tsv), "\n";
@@ -334,6 +370,10 @@ print {$mf} join("\t", 'ld_snps_found', join(',', map { $found_ld_snp{$_} } sort
 print {$mf} join("\t", 'ld_points_plotted', $ld_points), "\n";
 print {$mf} join("\t", 'ld_marker_symbol', lc($opt{ld_marker_symbol})), "\n";
 print {$mf} join("\t", 'ld_marker_color', $opt{ld_marker_color}), "\n";
+print {$mf} join("\t", 'ld_display_mode', $opt{ld_display_mode}), "\n";
+print {$mf} join("\t", 'ld_r2_values', ($opt{ld_r2_values} // '')), "\n";
+print {$mf} join("\t", 'ld_population', $opt{ld_population}), "\n";
+print {$mf} join("\t", 'ld_heatmap_colors', join(',', @ld_heatmap_colors)), "\n";
 print {$mf} join("\t", 'chr', $target_chr), "\n";
 print {$mf} join("\t", 'bp', $target_bp), "\n";
 print {$mf} join("\t", 'window_bp', $window_bp), "\n";
@@ -404,8 +444,23 @@ sub write_gnuplot {
         print {$gp} "set arrow $arrow_id from $args{start},$base to $args{end},$base nohead lc rgb '#bbbbbb' lw 1\n";
         $arrow_id++;
     }
-    if ($args{ld_points}) {
+    my $draw_ld_markers = $args{ld_points}
+        && $args{ld_display_mode} =~ /^(?:markers|both)$/;
+    my $draw_ld_heatmap = $args{ld_r2_points}
+        && $args{ld_display_mode} =~ /^(?:heatmap|both)$/;
+    if ($draw_ld_markers) {
         print {$gp} "set label 900 '" . escape_gp("LD-linked SNP (" . $args{ld_marker_symbol} . ")") . "' at graph 0.015,0.985 left front tc rgb '" . escape_gp($args{ld_marker_color}) . "' font ',9'\n";
+    }
+    write_ld_heatmap_inset($gp, \%args) if $draw_ld_heatmap;
+    my @ld_layers;
+    if ($draw_ld_heatmap) {
+        push @ld_layers, "'" . escape_gp($args{plot_tsv})
+            . "' using ((\$9>=0)?\$1:1/0):2:10 with points pt 7 ps 1.35 lw 1 lc rgb variable";
+    }
+    if ($draw_ld_markers) {
+        push @ld_layers, "'" . escape_gp($args{plot_tsv})
+            . "' using ((\$8==1)?\$1:1/0):2 with points pt $args{ld_marker_point_type} ps 1.8 lw 2 lc rgb '"
+            . escape_gp($args{ld_marker_color}) . "'";
     }
     for my $i (0 .. $#{ $args{labels} }) {
         my $base = $i * $args{top_logp};
@@ -510,7 +565,7 @@ sub write_gnuplot {
             print {$gp} "set colorbox vertical user origin 0.94,0.12 size 0.02,0.76\n";
             print {$gp} "set palette defined (-8 '#63d67f', -4 '#63d8d2', 0 '#ffbf00', 4 '#ff5b00', 8 '#df1f2d')\n";
             my @plots = ("'" . escape_gp($args{plot_tsv}) . "' using 1:2:7 with points pt 7 ps 0.72 lc palette");
-            push @plots, "'" . escape_gp($args{plot_tsv}) . "' using ((\$8==1)?\$1:1/0):2 with points pt $args{ld_marker_point_type} ps 1.8 lw 2 lc rgb '" . escape_gp($args{ld_marker_color}) . "'" if $args{ld_points};
+            push @plots, @ld_layers;
             print {$gp} "plot " . join(', ', @plots) . "\n";
         }
         else {
@@ -519,7 +574,7 @@ sub write_gnuplot {
                 join(', ', map { sprintf('%d "%s"', $_ + 1, $palette[$_]) } 0 .. $#palette) . ")\n";
             print {$gp} "unset colorbox\n";
             my @plots = ("'" . escape_gp($args{plot_tsv}) . "' using 1:2:(\$3+1) with points pt 7 ps 0.72 lc palette");
-            push @plots, "'" . escape_gp($args{plot_tsv}) . "' using ((\$8==1)?\$1:1/0):2 with points pt $args{ld_marker_point_type} ps 1.8 lw 2 lc rgb '" . escape_gp($args{ld_marker_color}) . "'" if $args{ld_points};
+            push @plots, @ld_layers;
             print {$gp} "plot " . join(', ', @plots) . "\n";
         }
     }
@@ -536,10 +591,32 @@ sub write_gnuplot {
         }
         print {$gp} "unset colorbox\n";
         my @plots = ("'" . escape_gp($args{plot_tsv}) . "' using 1:2 with points pt 7 ps 0.9 lc rgb '" . escape_gp($chr_color) . "'");
-        push @plots, "'" . escape_gp($args{plot_tsv}) . "' using ((\$8==1)?\$1:1/0):2 with points pt $args{ld_marker_point_type} ps 1.8 lw 2 lc rgb '" . escape_gp($args{ld_marker_color}) . "'" if $args{ld_points};
+        push @plots, @ld_layers;
         print {$gp} "plot " . join(', ', @plots) . "\n";
     }
     close $gp or die "Cannot close $args{gp_file}: $!\n";
+}
+
+sub write_ld_heatmap_inset {
+    my ($gp, $args) = @_;
+    my @colors = @{ $args->{ld_heatmap_colors} || [] };
+    return unless @colors >= 2;
+    my $segments = 8;
+    my ($x0, $x1, $y0, $y1) = (0.70, 0.90, 0.935, 0.957);
+    my $dx = ($x1 - $x0) / $segments;
+    for my $i (0 .. $segments - 1) {
+        my $r2 = ($i + 0.5) / $segments;
+        my $color = ld_color_for_r2($r2, \@colors);
+        my $left = $x0 + $i * $dx;
+        my $right = $left + $dx;
+        my $id = 8000 + $i;
+        print {$gp} "set object $id rect from graph $left,$y0 to graph $right,$y1 fc rgb '$color' fillstyle solid 1.0 border lc rgb '$color' front\n";
+    }
+    my $title = 'LD r^2 (' . ($args->{ld_population} || 'EUR') . ')';
+    print {$gp} "set label 8900 '" . escape_gp($title) . "' at graph " . (($x0 + $x1) / 2) . "," . ($y1 + 0.022) . " center front font ',9' tc rgb '#222222'\n";
+    print {$gp} "set label 8901 '0' at graph $x0," . ($y0 - 0.010) . " center front font ',8' tc rgb '#222222'\n";
+    print {$gp} "set label 8902 '0.5' at graph " . (($x0 + $x1) / 2) . "," . ($y0 - 0.010) . " center front font ',8' tc rgb '#222222'\n";
+    print {$gp} "set label 8903 '1' at graph $x1," . ($y0 - 0.010) . " center front font ',8' tc rgb '#222222'\n";
 }
 
 sub allocate_lane {
@@ -626,6 +703,33 @@ sub cap_num {
     return $minv if $x < $minv;
     return $maxv if $x > $maxv;
     return $x;
+}
+
+sub ld_rgb_integer {
+    my ($r2, $colors) = @_;
+    my $hex = ld_color_for_r2($r2, $colors);
+    $hex =~ s/^#//;
+    return hex($hex);
+}
+
+sub ld_color_for_r2 {
+    my ($r2, $colors) = @_;
+    $r2 = cap_num($r2, 0, 1);
+    my $scaled = $r2 * (@{$colors} - 1);
+    my $left = int($scaled);
+    $left = @{$colors} - 2 if $left >= @{$colors} - 1;
+    my $fraction = $scaled - $left;
+    $fraction = 1 if $r2 >= 1;
+    my @a = hex_color_rgb($colors->[$left]);
+    my @b = hex_color_rgb($colors->[$left + 1]);
+    my @rgb = map { int($a[$_] + ($b[$_] - $a[$_]) * $fraction + 0.5) } 0 .. 2;
+    return sprintf('#%02x%02x%02x', @rgb);
+}
+
+sub hex_color_rgb {
+    my ($hex) = @_;
+    $hex =~ s/^#//;
+    return map { hex($_) } ($hex =~ /(..)(..)(..)/);
 }
 
 sub numeric {
