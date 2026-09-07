@@ -18,6 +18,10 @@ codex_*/
 cache/local_gtf_reuse/
 cache/local_manhattan_reuse/
 cache/gtf/
+cache/plink2_1kg_phase3/
+cache/plink2_bin/
+cache/plink2_ld/
+cache/plink2_tmp/
 
 # Reviewer-benchmark reruns and large downloadable HaploReg intermediates.
 benchmark/reproduction/

@@ -132,7 +132,7 @@ my $ld_audit_file_override = '';
 my $ld_cache_override = '';
 my $ld_reference_snp_override = '';
 my $ld_population_override = 'EUR';
-my $ld_r2_threshold_override = 0.8;
+my $ld_r2_threshold_override = 0;
 my $ld_web_fallback = 1;
 my $highlight_high_ld_snps = 0;
 my $ld_marker_symbol = 'star';
@@ -190,7 +190,7 @@ $ld_population_override = uc($ld_population_override || 'EUR');
 die "--ld-population must be AFR, AMR, ASN, or EUR\n"
     unless $ld_population_override =~ /^(?:AFR|AMR|ASN|EUR)$/;
 die "--ld-r2-threshold must be between 0 and 1\n"
-    unless $ld_r2_threshold_override > 0 && $ld_r2_threshold_override <= 1;
+    unless $ld_r2_threshold_override >= 0 && $ld_r2_threshold_override <= 1;
 $ld_display_mode = lc(trim($ld_display_mode || 'none'));
 die "--ld-display-mode must be none, markers, heatmap, or both\n"
     unless $ld_display_mode =~ /^(?:none|markers|heatmap|both)$/;
@@ -922,7 +922,8 @@ sub resolve_ld_snps_for_query {
 
     my $runner = $args{runner} || {};
     my $population = uc($args{ld_population} || $runner->{LOCAL_LD_POPULATION} || 'EUR');
-    my $min_r2 = 0 + ($args{ld_r2_threshold} || $runner->{LOCAL_LD_R2_THRESHOLD} || 0.8);
+    my $min_r2 = 0 + (defined($args{ld_r2_threshold}) ? $args{ld_r2_threshold}
+      : (defined($runner->{LOCAL_LD_R2_THRESHOLD}) ? $runner->{LOCAL_LD_R2_THRESHOLD} : 0));
     my $audit_file = $args{audit_file} || '';
     $audit_file = localize_path($audit_file) if length $audit_file;
     if (!length($audit_file) && length($runner->{TOP_HIT_LD_AUDIT_BASENAME} || '')) {

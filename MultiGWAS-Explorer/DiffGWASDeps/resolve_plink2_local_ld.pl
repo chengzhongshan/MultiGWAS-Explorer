@@ -3,17 +3,22 @@ use strict;
 use warnings;
 
 use File::Temp qw(tempdir);
+use File::Spec;
+use File::Path qw(make_path);
+use File::Basename qw(dirname);
+use Cwd qw(abs_path);
 use Getopt::Long qw(GetOptions);
 use Text::ParseWords qw(shellwords);
 
-my ($query, $pfile, $plink2, $chr, $from_bp, $to_bp, $keep, $output);
-my $min_r2 = 0.8;
+my ($query, $pfile, $bfile, $plink2, $chr, $from_bp, $to_bp, $keep, $output, $populations);
+my $min_r2 = 0;
 my $window_kb = 1000;
 my $phased = 1;
 
 GetOptions(
     'query-snp=s' => \$query,
     'pfile=s' => \$pfile,
+    'bfile=s' => \$bfile,
     'plink2=s' => \$plink2,
     'chr=s' => \$chr,
     'from-bp=i' => \$from_bp,
@@ -21,29 +26,57 @@ GetOptions(
     'window-kb=f' => \$window_kb,
     'min-r2=f' => \$min_r2,
     'keep=s' => \$keep,
+    'populations=s' => \$populations,
     'unphased' => sub { $phased = 0 },
     'output=s' => \$output,
 ) or die usage();
 
-die usage() unless defined($query) && defined($pfile);
-die "--min-r2 must be between 0 and 1\n" unless $min_r2 > 0 && $min_r2 <= 1;
+die usage() unless defined($query) && (defined($pfile) xor defined($bfile));
+die "--min-r2 must be between 0 and 1\n" unless $min_r2 >= 0 && $min_r2 <= 1;
 die "--window-kb must be positive\n" unless $window_kb > 0;
 $plink2 ||= $ENV{PLINK2} || 'plink2';
 
 my $tmp = tempdir('plink2_local_ld.XXXXXX', TMPDIR => 1, CLEANUP => 1);
 my $prefix = "$tmp/ld";
+my $input_prefix = defined($pfile) ? $pfile : $bfile;
+my $pfile_arg = native_path($input_prefix);
+my $tmp_prefix_arg = native_path($prefix);
+if (defined($populations) && length($populations) && !defined($keep)) {
+    my %wanted = map { uc($_) => 1 } grep { length } split /[,\s]+/, $populations;
+    my $psam = -e "$input_prefix.psam" ? "$input_prefix.psam" : undef;
+    $psam ||= (-e "$input_prefix.fam" ? "$input_prefix.fam" : undef);
+    $psam ||= (($input_prefix =~ s/_biallelic\z//r) . '.psam');
+    $psam = undef unless defined($psam) && -e $psam;
+    die "--populations requires a matching .psam file (use --keep for BED files)\n" unless $psam;
+    $keep = "$tmp/populations.keep";
+    open my $pfh, '<', $psam or die "Cannot read $psam: $!\n";
+    open my $kfh, '>', $keep or die "Cannot write $keep: $!\n";
+    while (my $line = <$pfh>) {
+        next if $line =~ /^#/;
+        chomp $line;
+        my @f = split /\s+/, $line;
+        my ($iid, $super) = @f[0,4];
+        print {$kfh} "$iid\t$iid\n" if defined($super) && $wanted{uc($super)};
+    }
+    close $kfh; close $pfh;
+    die "No samples matched --populations=$populations\n" unless -s $keep;
+}
 my @cmd = (shellwords($plink2));
-push @cmd, '--pfile', $pfile, 'vzs' if -e "$pfile.pvar.zst";
-push @cmd, '--pfile', $pfile unless -e "$pfile.pvar.zst";
+if (defined $pfile) {
+    push @cmd, '--pfile', $pfile_arg, 'vzs' if -e "$pfile.pvar.zst";
+    push @cmd, '--pfile', $pfile_arg unless -e "$pfile.pvar.zst";
+} else {
+    push @cmd, '--bfile', $pfile_arg;
+}
 push @cmd, '--chr', $chr if defined($chr) && length($chr);
 push @cmd, '--from-bp', $from_bp if defined $from_bp;
 push @cmd, '--to-bp', $to_bp if defined $to_bp;
-push @cmd, '--keep', $keep if defined($keep) && length($keep);
+push @cmd, '--keep', native_path($keep) if defined($keep) && length($keep);
 push @cmd, '--ld-snp', $query;
-push @cmd, ($phased ? '--r2-phased' : '--r2-unphased');
+push @cmd, ($phased ? '--r2-phased' : '--r2-unphased'), 'allow-ambiguous-allele';
 push @cmd, '--ld-window-kb', $window_kb;
 push @cmd, '--ld-window-r2', $min_r2;
-push @cmd, '--allow-ambiguous-allele', '--out', $prefix;
+push @cmd, '--out', $tmp_prefix_arg;
 
 system(@cmd);
 die "PLINK2 LD calculation failed (exit $?): @cmd\n" if $? != 0;
@@ -75,7 +108,7 @@ sub parse_report {
         my @f = split /\t/, $line, -1;
         my $a = value(\@f, \%idx, qw(id_a variant_id_a));
         my $b = value(\@f, \%idx, qw(id_b variant_id_b));
-        my $r2 = value(\@f, \%idx, qw(r2));
+        my $r2 = value(\@f, \%idx, qw(r2 phased_r2 unphased_r2));
         next unless defined($a) && defined($b) && defined($r2);
         next unless $a =~ /^rs\d+$/i && $b =~ /^rs\d+$/i;
         next unless $r2 =~ /^(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i;
@@ -83,6 +116,9 @@ sub parse_report {
         my $proxy = lc($a) eq lc($ref) ? $b : (lc($b) eq lc($ref) ? $a : undef);
         next unless defined $proxy;
         $best{$proxy} = 0 + $r2 if !exists($best{$proxy}) || $r2 > $best{$proxy};
+    }
+    if (defined $out_path) {
+        make_path(dirname($out_path)) unless -d dirname($out_path);
     }
     open my $out, '>', $out_path or die "Cannot write $out_path: $!\n" if defined $out_path;
     print {$out} join("\t", qw(query_snp proxy_snp ld_population proxy_r2 source)), "\n" if $out;
@@ -103,14 +139,27 @@ sub value {
     return undef;
 }
 
+sub native_path {
+    my ($path) = @_;
+    return $path unless defined($path) && length($path);
+    my $abs = abs_path($path) || File::Spec->rel2abs($path);
+    if ($abs =~ m{^/mnt/([A-Za-z])/(.*)$}) {
+        my ($drive, $rest) = (uc($1), $2);
+        $rest =~ s{/}{\\}g;
+        return "$drive:\\$rest";
+    }
+    return $abs;
+}
+
 sub usage {
     return <<'USAGE';
-Usage: resolve_plink2_local_ld.pl --query-snp rs123 --pfile /path/chr2_phase3 [options]
+Usage: resolve_plink2_local_ld.pl --query-snp rs123 (--pfile PREFIX | --bfile PREFIX) [options]
   --plink2 EXE       PLINK 2 executable (default: PLINK2 or plink2)
   --chr CHR --from-bp N --to-bp N   Optional local genomic interval
   --window-kb N      Maximum LD distance (default 1000)
-  --min-r2 N         Minimum reported r2 (default 0.8)
+  --min-r2 N         Minimum reported r2 (default 0; retain every in-window pair)
   --keep FILE        Optional PLINK sample keep file
+  --populations LIST Restrict samples to 1000G superpopulations (EUR,AMR,AFR,EAS)
   --unphased         Use dosage-correlation r2 instead of phased haplotype r2
   --output FILE      Write normalized LD cache rows
 USAGE

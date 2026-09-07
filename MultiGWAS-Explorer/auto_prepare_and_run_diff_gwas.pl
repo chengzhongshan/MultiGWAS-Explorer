@@ -91,7 +91,7 @@ my $local_ld_audit_file_override = '';
 my $local_ld_cache_override = '';
 my $local_ld_reference_snp_override = '';
 my $local_ld_population_override = 'EUR';
-my $local_ld_r2_threshold_override = 0.8;
+my $local_ld_r2_threshold_override = 0;
 my $local_ld_web_fallback = 1;
 my $highlight_high_ld_snps = 0;
 my $local_ld_marker_symbol = 'star';
@@ -254,7 +254,7 @@ $local_ld_population_override = uc($local_ld_population_override || 'EUR');
 die "--local-ld-population must be AFR, AMR, ASN, or EUR\n"
     unless $local_ld_population_override =~ /^(?:AFR|AMR|ASN|EUR)$/;
 die "--local-ld-r2-threshold must be between 0 and 1\n"
-    unless $local_ld_r2_threshold_override > 0 && $local_ld_r2_threshold_override <= 1;
+    unless $local_ld_r2_threshold_override >= 0 && $local_ld_r2_threshold_override <= 1;
 
 my $cli_raw_column_aliases = load_alias_override_file($raw_column_alias_config);
 
@@ -2618,7 +2618,7 @@ sub build_runner_config {
     my $local_ld_reference_snp = $args{local_ld_reference_snp} // '';
     my $local_ld_cache_override = $args{local_ld_cache_override} // '';
     my $local_ld_population_override = $args{local_ld_population_override} // 'EUR';
-    my $local_ld_r2_threshold_override = $args{local_ld_r2_threshold_override} // 0.8;
+    my $local_ld_r2_threshold_override = $args{local_ld_r2_threshold_override} // 0;
     my $local_ld_web_fallback = $args{local_ld_web_fallback} ? 1 : 0;
     my $highlight_high_ld_snps = $args{highlight_high_ld_snps} ? 1 : 0;
     my $local_ld_marker_symbol = $args{local_ld_marker_symbol} // 'star';
