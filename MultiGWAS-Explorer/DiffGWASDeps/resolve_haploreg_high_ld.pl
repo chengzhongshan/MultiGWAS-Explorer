@@ -29,7 +29,7 @@ $population = uc($population // 'EUR');
 die "--population must be AFR, AMR, ASN, or EUR\n"
     unless $population =~ /\A(?:AFR|AMR|ASN|EUR)\z/;
 die "--min-r2 must be between 0 and 1\n"
-    unless $min_r2 > 0 && $min_r2 <= 1;
+    unless $min_r2 >= 0 && $min_r2 <= 1;
 
 my @queries;
 my %is_query;
