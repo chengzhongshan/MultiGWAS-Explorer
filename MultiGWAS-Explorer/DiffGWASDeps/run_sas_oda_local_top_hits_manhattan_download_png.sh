@@ -984,6 +984,9 @@ while :; do
   if sas_oda_report_native_abort "${local_mh_submit_rc}" "${RUN_LOG_DIR}/output.run.status.json" "local-Manhattan SAS submit attempt ${local_mh_submit_attempt}"; then
     exit 134
   fi
+  if sas_oda_report_remote_termination "${RUN_LOG_FILE}" "${RUN_LOG_DIR}/output.run.status.json" "local-Manhattan SAS submit attempt ${local_mh_submit_attempt}" "${local_mh_submit_rc}"; then
+    exit "${SAS_ODA_REMOTE_TERMINATION_EXIT_CODE:-74}"
+  fi
   if manhattan_log_has_terminal_failure; then
     echo "ERROR: Local Manhattan SAS log contains a deterministic terminal error; preserving the log and not retrying: ${RUN_LOG_FILE}" >&2
     exit 1

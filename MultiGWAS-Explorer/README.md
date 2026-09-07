@@ -2170,10 +2170,15 @@ HaploReg only for missing SNPs unless web fallback is disabled.
 For a LocusZoom-like LD view, request it explicitly with
 `--ld-display-mode heatmap` (or `both` to retain the selected marker overlay).
 The pipeline carries the HaploReg r2 values into both SAS ODA and gnuplot local
-Manhattan/GTF renderers. LD proxy points use a sequential blue-to-purple map
-and a separate inset titled `LD r2 (POP)`. The association colorbar continues
-to use its existing divergent Z-score palette, so the two encodings cannot be
-mistaken for one another. For example:
+Manhattan/GTF renderers. In heatmap mode, each point uses a single signed-LD
+value, `sign(Z) * r2`, on the existing divergent Z-score colorbar and in its
+original position. Unlinked background points are zero; LD proxies range from
+-1 (negative Z direction, perfect LD) to +1 (positive Z direction, perfect LD).
+No separate LD inset or marker shape is needed. For a locus requested with several SNPs, LD is never
+pooled across all query SNPs: the first target SNP is the reference by default,
+and every displayed r2 is relative to that one SNP. Select a different query
+SNP with `--local-ld-reference-snp` (SAS ODA) or `--ld-reference-snp`
+(gnuplot). The selected reference must occur in `--target-snps`. For example:
 
 ```bash
 perl auto_prepare_and_run_diff_gwas.pl \
@@ -2181,6 +2186,7 @@ perl auto_prepare_and_run_diff_gwas.pl \
   --target-snps rs2070788,rs383510 \
   --step plot_local_gtf \
   --local-ld-display-mode heatmap \
+  --local-ld-reference-snp rs2070788 \
   --local-ld-population EUR \
   --local-ld-r2-threshold 0.5
 ```
@@ -2511,6 +2517,13 @@ Important interpretation:
 - a native SASPy/SAS process abort (exit `134` or `SIGABRT`) is also classified
   as a non-retryable infrastructure failure instead of blindly resubmitting the
   same plotting job
+- when ODA drops the remote SAS process without returning a definitive SAS
+  error (often an unexplained empty result or `No SAS process attached`), the
+  run is classified as `sas_oda_remote_session_termination` with exit code
+  `74` and a `*.non_retryable_remote_termination.txt` marker. This is a
+  possible WORK/quota or memory exhaustion, but is deliberately reported as
+  unconfirmed; preserve the status/log artifacts and reduce the input before
+  rerunning.
 - deterministic SAS compile records such as `ERROR 180-322:` are preserved and
   stop immediately; they are not replayed by the bounded transport retry loop
 - in that case, reduce at least one of:
@@ -2536,7 +2549,9 @@ perl run_sas_codes_or_script_in_ODA.pl --classify-sas-log output.html.info.txt
 ```
 
 The command prints JSON. A detected space failure reports `retryable:false` and
-returns exit code `73`; a log without that failure returns `0`.
+returns exit code `73`; a remote-session termination reports
+`failure_class=sas_oda_remote_session_termination` and returns `74`; a log
+without either failure returns `0`.
 
 The new safer defaults were added specifically to reduce this failure mode:
 

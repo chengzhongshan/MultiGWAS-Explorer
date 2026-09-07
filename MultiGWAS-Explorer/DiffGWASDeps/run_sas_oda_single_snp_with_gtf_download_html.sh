@@ -1171,6 +1171,9 @@ while :; do
   if sas_oda_report_space_exhaustion "${RUN_LOG_FILE}" "single-SNP local-GTF submit attempt ${single_snp_submit_attempt}"; then
     exit "${SAS_ODA_SPACE_EXHAUSTION_EXIT_CODE:-73}"
   fi
+  if sas_oda_report_remote_termination "${RUN_LOG_FILE}" "${RUN_LOG_DIR}/output.run.status.json" "single-SNP local-GTF submit attempt ${single_snp_submit_attempt}" "${single_snp_submit_rc}"; then
+    exit "${SAS_ODA_REMOTE_TERMINATION_EXIT_CODE:-74}"
+  fi
   if [[ "${single_snp_submit_rc}" -eq 0 ]] && ! single_snp_submit_needs_retry; then
     break
   fi

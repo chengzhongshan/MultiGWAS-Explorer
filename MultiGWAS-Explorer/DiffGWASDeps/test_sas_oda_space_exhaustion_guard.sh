@@ -14,9 +14,12 @@ cleanup() {
     "${TEST_TMP}/compile.log" \
     "${TEST_TMP}/source_echo.log" \
     "${TEST_TMP}/timeout.log" \
+    "${TEST_TMP}/terminated.log" \
     "${TEST_TMP}/classify_space.json" \
     "${TEST_TMP}/classify_timeout.json" \
+    "${TEST_TMP}/classify_terminated.json" \
     "${TEST_TMP}/native.run.status.json.non_retryable_infrastructure_abort.txt" \
+    "${TEST_TMP}/remote.run.status.json.non_retryable_remote_termination.txt" \
     "${TEST_TMP}/native_warning.txt" \
     "${TEST_TMP}/warning.txt"
   rmdir "${TEST_TMP}" 2>/dev/null || true
@@ -28,11 +31,13 @@ printf '%s\n' 'ERROR: UNIX errno = 122 (Disk quota exceeded).' > "${TEST_TMP}/qu
 printf '%s\n' 'ERROR 180-322: Statement is not valid or it is used out of proper order.' > "${TEST_TMP}/compile.log"
 printf '%s\n' '123  ERROR: Insufficient space in file WORK.EXAMPLE.DATA.' > "${TEST_TMP}/source_echo.log"
 printf '%s\n' 'SAS submit timed out' > "${TEST_TMP}/timeout.log"
+printf '%s\n' 'ERROR: No SAS process attached; SAS process has terminated unexpectedly.' > "${TEST_TMP}/terminated.log"
 
 sas_oda_log_has_space_exhaustion "${TEST_TMP}/space.log"
 sas_oda_log_has_space_exhaustion "${TEST_TMP}/quota.log"
 ! sas_oda_log_has_space_exhaustion "${TEST_TMP}/source_echo.log"
 ! sas_oda_log_has_space_exhaustion "${TEST_TMP}/timeout.log"
+sas_oda_log_has_remote_termination "${TEST_TMP}/terminated.log"
 sas_oda_log_has_terminal_sas_error "${TEST_TMP}/space.log"
 sas_oda_log_has_terminal_sas_error "${TEST_TMP}/compile.log"
 ! sas_oda_log_has_terminal_sas_error "${TEST_TMP}/source_echo.log"
@@ -66,5 +71,22 @@ grep -q '"retryable":false' "${TEST_TMP}/classify_space.json"
 perl "${DEPS_DIR}/../run_sas_codes_or_script_in_ODA.pl" \
   --classify-sas-log "${TEST_TMP}/timeout.log" > "${TEST_TMP}/classify_timeout.json"
 grep -q '"retryable":true' "${TEST_TMP}/classify_timeout.json"
+
+set +e
+perl "${DEPS_DIR}/../run_sas_codes_or_script_in_ODA.pl" \
+  --classify-sas-log "${TEST_TMP}/terminated.log" > "${TEST_TMP}/classify_terminated.json"
+CLASSIFY_TERMINATED_RC=$?
+set -e
+test "${CLASSIFY_TERMINATED_RC}" -eq 74
+grep -q '"failure_class":"sas_oda_remote_session_termination"' "${TEST_TMP}/classify_terminated.json"
+grep -q '"error_code":"SAS_ODA_REMOTE_SESSION_TERMINATED"' "${TEST_TMP}/classify_terminated.json"
+grep -q '"retryable":false' "${TEST_TMP}/classify_terminated.json"
+
+set +e
+sas_oda_report_remote_termination "${TEST_TMP}/terminated.log" "${TEST_TMP}/remote.run.status.json" 'synthetic remote-termination test' 74 2> "${TEST_TMP}/remote_warning.txt"
+set -e
+test -s "${TEST_TMP}/remote.run.status.json.non_retryable_remote_termination.txt"
+grep -q 'error_code=SAS_ODA_REMOTE_SESSION_TERMINATED' "${TEST_TMP}/remote.run.status.json.non_retryable_remote_termination.txt"
+grep -q 'unconfirmed' "${TEST_TMP}/remote.run.status.json.non_retryable_remote_termination.txt"
 
 echo 'SAS_ODA_SPACE_EXHAUSTION_GUARD_TEST_PASSED'

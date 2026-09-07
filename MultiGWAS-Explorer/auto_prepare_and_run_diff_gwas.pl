@@ -89,6 +89,7 @@ my $local_gtf_yoffset4textlabels_override = '';
 my $local_ld_snps_override = '';
 my $local_ld_audit_file_override = '';
 my $local_ld_cache_override = '';
+my $local_ld_reference_snp_override = '';
 my $local_ld_population_override = 'EUR';
 my $local_ld_r2_threshold_override = 0.8;
 my $local_ld_web_fallback = 1;
@@ -187,6 +188,7 @@ GetOptions(
     'local-ld-snps=s' => \$local_ld_snps_override,
     'local-ld-audit-file=s' => \$local_ld_audit_file_override,
     'local-ld-cache|ld-cache=s' => \$local_ld_cache_override,
+    'local-ld-reference-snp|ld-reference-snp=s' => \$local_ld_reference_snp_override,
     'local-ld-population|ld-population=s' => \$local_ld_population_override,
     'local-ld-r2-threshold|ld-r2-threshold=f' => \$local_ld_r2_threshold_override,
     'local-ld-web-fallback!' => \$local_ld_web_fallback,
@@ -324,6 +326,19 @@ validate_spec($spec);
 my $configured_target_snps = length($target_snps_override)
     ? $target_snps_override
     : cfg_or($spec, 'target_snps', '');
+my @configured_target_snps = grep { length }
+    map { trim($_) } split /,/, $configured_target_snps;
+my $local_ld_reference_snp = length(trim($local_ld_reference_snp_override))
+    ? trim($local_ld_reference_snp_override)
+    : trim(cfg_or($spec, 'local_ld_reference_snp', ''));
+$local_ld_reference_snp = $configured_target_snps[0]
+    if !length($local_ld_reference_snp) && @configured_target_snps;
+if (length($local_ld_reference_snp)) {
+    die "--local-ld-reference-snp requires --target-snps (or spec target_snps)\n"
+        unless @configured_target_snps;
+    die "--local-ld-reference-snp '$local_ld_reference_snp' is not in the target SNP list: $configured_target_snps\n"
+        unless grep { lc($_) eq lc($local_ld_reference_snp) } @configured_target_snps;
+}
 my $effective_get_common_associations = defined($get_common_associations)
     ? ($get_common_associations ? 1 : 0)
     : (cfg_or($spec, 'get_common_associations', 0) ? 1 : 0);
@@ -457,13 +472,15 @@ if ($highlight_high_ld_snps
         ? $local_ld_cache_override
         : cfg_or($spec, 'local_ld_cache_tsv', $top_hit_ld_cache_tsv);
     ($local_ld_snps_override, $local_ld_r2_values_override) = resolve_high_ld_snps_for_plot(
-        query_snps  => $configured_target_snps,
+        query_snps  => $local_ld_reference_snp,
         population => $local_ld_population_override,
         min_r2      => $local_ld_r2_threshold_override,
         local_cache => $local_ld_cache,
         web_fallback => $local_ld_web_fallback,
         workdir     => $workdir,
     );
+    print "[prep] LD reference SNP for the multi-query locus: $local_ld_reference_snp\n"
+        if length $local_ld_reference_snp;
 }
 
 my $pair_info = build_pair_info($spec->{pairs});
@@ -508,6 +525,7 @@ my $runner_cfg = build_runner_config(
     display_gwas_override => $display_gwas_override,
     local_gtf_label_snps_override => $local_gtf_label_snps_override,
     local_ld_snps_override => $local_ld_snps_override,
+    local_ld_reference_snp => $local_ld_reference_snp,
     local_ld_cache_override => $local_ld_cache_override,
     local_ld_population_override => $local_ld_population_override,
     local_ld_r2_threshold_override => $local_ld_r2_threshold_override,
@@ -2597,6 +2615,7 @@ sub build_runner_config {
     my $display_gwas_override = $args{display_gwas_override} // '';
     my $local_gtf_label_snps_override = $args{local_gtf_label_snps_override} // '';
     my $local_ld_snps_override = $args{local_ld_snps_override} // '';
+    my $local_ld_reference_snp = $args{local_ld_reference_snp} // '';
     my $local_ld_cache_override = $args{local_ld_cache_override} // '';
     my $local_ld_population_override = $args{local_ld_population_override} // 'EUR';
     my $local_ld_r2_threshold_override = $args{local_ld_r2_threshold_override} // 0.8;
@@ -2658,6 +2677,11 @@ sub build_runner_config {
     }
 
     my @mh_labels = map { $_->{manhattan_label} } @selected_tracks;
+    my $default_gtf_colorbar_label = (
+        $highlight_high_ld_snps
+          && $local_ld_display_mode =~ /^(?:heatmap|both)$/i
+    ) ? 'Signed R2 (sign(Z) x LD R2)'
+      : infer_effect_metric_label_from_vars(map { $_->{zvar} } @selected_tracks);
 
     my @focus_tracks = @selected_std_tracks ? @selected_std_tracks : @selected_group_tracks;
     die "No selectable Manhattan/GTF tracks were resolved for plotting.\n" unless @focus_tracks;
@@ -2878,7 +2902,7 @@ sub build_runner_config {
         GTF_COLORBAR_LABEL => cfg_or(
             $spec,
             'gtf_colorbar_label',
-            infer_effect_metric_label_from_vars(map { $_->{zvar} } @selected_tracks)
+            $default_gtf_colorbar_label
         ),
         GTF_YAXIS_OFFSET4MAX => (
             length($local_gtf_yaxis_offset4max_override)
@@ -2907,7 +2931,11 @@ sub build_runner_config {
         GTF_LD_DISPLAY_MODE => $local_ld_display_mode,
         GTF_LD_R2_VALUES => $local_ld_r2_values_override,
         GTF_LD_HEATMAP_COLORS => $local_ld_heatmap_colors,
-        GTF_LD_HEATMAP_LEGEND_TITLE => "LD r2 ($local_ld_population_override)",
+        GTF_LD_HEATMAP_LEGEND_TITLE => (
+            length($local_ld_reference_snp)
+              ? "LD r2 to $local_ld_reference_snp ($local_ld_population_override)"
+              : "LD r2 ($local_ld_population_override)"
+        ),
         HIGHLIGHT_HIGH_LD_SNPS => $highlight_high_ld_snps,
         LOCAL_LD_CACHE_TSV => (
             length($local_ld_cache_override)
@@ -2915,6 +2943,7 @@ sub build_runner_config {
               : cfg_or($spec, 'local_ld_cache_tsv', '')
         ),
         LOCAL_LD_POPULATION => $local_ld_population_override,
+        LOCAL_LD_REFERENCE_SNP => $local_ld_reference_snp,
         LOCAL_LD_R2_THRESHOLD => 0 + $local_ld_r2_threshold_override,
         LOCAL_LD_WEB_FALLBACK => $local_ld_web_fallback,
         GTF_LABEL_LAYOUT => (
@@ -3307,15 +3336,20 @@ sub run_step {
           || $stderr_text =~ /(?:failure_class=sas_oda_space_exhaustion|SAS ODA exhausted its WORK\/storage space)/i;
         my $sas_infrastructure_abort = $exit_code == 134
           || $stderr_text =~ /(?:SIGABRT|native (?:process )?abort|SASPy.*abort|SAS process has terminated unexpectedly)/i;
+        my $sas_remote_termination = $exit_code == 74
+          || $stderr_text =~ /(?:failure_class=sas_oda_remote_session_termination|SAS_ODA_REMOTE_SESSION_TERMINATED|remote SAS ODA session terminated)/i;
         my $fallback_failure_class = $sas_space_failure
           ? 'sas_oda_space_exhaustion'
-          : ($sas_infrastructure_abort ? 'sas_oda_infrastructure_abort' : '');
+          : ($sas_infrastructure_abort ? 'sas_oda_infrastructure_abort'
+            : ($sas_remote_termination ? 'sas_oda_remote_session_termination' : ''));
         my $fallback_enabled = ($sas_space_failure && $gnuplot_fallback_on_sas_space)
-          || ($sas_infrastructure_abort && $gnuplot_fallback_on_sas_failure);
+          || (($sas_infrastructure_abort || $sas_remote_termination) && $gnuplot_fallback_on_sas_failure);
         if ($fallback_enabled
             && $name =~ /^plot_(?:manhattan|local_manhattan|local_gtf|forest)$/) {
             if ($sas_space_failure) {
                 print STDERR "[fallback] SAS ODA space exhaustion was classified as non-retryable for $name.\n";
+            } elsif ($sas_remote_termination) {
+                print STDERR "[fallback] Remote SAS ODA session termination was classified as non-retryable for $name (possible WORK/quota or memory pressure; unconfirmed).\n";
             } else {
                 print STDERR "[fallback] SAS ODA/SASPy aborted with exit 134 (SIGABRT) for $name; the incomplete remote submission will not be repeated.\n";
             }
@@ -3374,6 +3408,8 @@ sub run_gnuplot_space_fallback {
         push @cmd, ('--ld-marker-color', $local_ld_marker_color);
         push @cmd, ('--ld-display-mode', $local_ld_display_mode);
         push @cmd, ('--ld-population', $local_ld_population_override);
+        push @cmd, ('--ld-reference-snp', $local_ld_reference_snp)
+          if length $local_ld_reference_snp;
         my $gnuplot_colors = join(',', map {
             my $c = $_; $c =~ s/^CX/#/i; lc($c)
         } grep { length } split /[\s,]+/, $local_ld_heatmap_colors);
@@ -3972,6 +4008,9 @@ Options:
   --local-ld-cache FILE
                        Normalized HaploReg TSV/SQLite cache queried before any
                        network request.
+  --local-ld-reference-snp SNP
+                       Use this one target SNP as the LD reference when several
+                       query SNPs share a locus. Default: first target SNP.
   --local-ld-population POP
                        HaploReg population for optional high-LD markers.
                        Default: EUR.

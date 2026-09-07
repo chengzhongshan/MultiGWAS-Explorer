@@ -90,3 +90,62 @@ sas_oda_report_native_abort() {
     "ERROR: Failure marker written to: ${marker}" >&2
   return 0
 }
+
+# A remote SAS process can disappear without returning a SAS ERROR line.  This
+# is commonly seen when ODA kills a session for WORK/quota or memory pressure,
+# but the client cannot prove the exact server-side cause.  Keep this distinct
+# from the explicit disk-full code so callers can diagnose it without blindly
+# resubmitting the same large job.
+sas_oda_log_has_remote_termination() {
+  local logfile="${1:-}"
+  [[ -n "${logfile}" && -s "${logfile}" ]] || return 1
+  grep -Eiq 'No SAS process attached|SAS process has terminated unexpectedly|SAS submit returned empty output and the SAS session was no longer usable|session server.*(terminated|closed)|remote SAS.*(terminated|disconnected)' "${logfile}"
+}
+
+sas_oda_write_remote_termination_marker() {
+  local logfile="${1:-}"
+  local status_file="${2:-}"
+  local context="${3:-SAS ODA job}"
+  local marker
+  if [[ -n "${status_file}" ]]; then
+    marker="${status_file}.non_retryable_remote_termination.txt"
+  elif [[ -n "${logfile}" ]]; then
+    marker="${logfile}.non_retryable_remote_termination.txt"
+  else
+    marker="sas_oda.non_retryable_remote_termination.txt"
+  fi
+  {
+    printf 'failure_class=sas_oda_remote_session_termination\n'
+    printf 'error_code=SAS_ODA_REMOTE_SESSION_TERMINATED\n'
+    printf 'exit_code=%s\n' "${SAS_ODA_REMOTE_TERMINATION_EXIT_CODE:-74}"
+    printf 'retryable=false\n'
+    printf 'context=%s\n' "${context}"
+    [[ -n "${logfile}" ]] && printf 'sas_log=%s\n' "${logfile}"
+    [[ -n "${status_file}" ]] && printf 'sas_status=%s\n' "${status_file}"
+    printf 'diagnosis=ODA terminated the remote SAS session without a definitive SAS log; WORK/quota or memory exhaustion is possible but unconfirmed.\n'
+    printf 'recommended_action=Preserve diagnostics, reduce the input or WORK footprint, and start a fresh ODA session before rerunning.\n'
+  } > "${marker}"
+  printf '%s\n' "${marker}"
+}
+
+sas_oda_report_remote_termination() {
+  local logfile="${1:-}"
+  local status_file="${2:-}"
+  local context="${3:-SAS ODA job}"
+  local exit_code="${4:-0}"
+  local detected=0
+  [[ "${exit_code}" =~ ^[0-9]+$ && "${exit_code}" -eq "${SAS_ODA_REMOTE_TERMINATION_EXIT_CODE:-74}" ]] && detected=1
+  sas_oda_log_has_remote_termination "${logfile}" && detected=1
+  if [[ "${detected}" -eq 0 && -n "${status_file}" && -s "${status_file}" ]]; then
+    grep -Eiq 'sas_oda_remote_session_termination|No SAS process attached|SAS process has terminated unexpectedly|session was no longer usable' "${status_file}" && detected=1
+  fi
+  [[ "${detected}" -eq 1 ]] || return 1
+  local marker
+  marker="$(sas_oda_write_remote_termination_marker "${logfile}" "${status_file}" "${context}")"
+  printf '%s\n' \
+    'ERROR: The remote SAS ODA session terminated without a definitive SAS log.' \
+    "ERROR: ${context} is classified as NON-RETRYABLE (possible WORK/quota or memory exhaustion; unconfirmed)." \
+    'ERROR: The same large submission will not be retried automatically.' \
+    "ERROR: Failure marker written to: ${marker}" >&2
+  return 0
+}
