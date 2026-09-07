@@ -63,6 +63,7 @@ if (defined($populations) && length($populations) && !defined($keep)) {
     while (my $line = <$pfh>) {
         next if $line =~ /^#/;
         chomp $line;
+        $line =~ s/\r\z//;
         my @f = split /\s+/, $line;
         my ($iid, $super) = @f[0,4];
         print {$kfh} "$iid\n" if defined($super) && $wanted{uc($super)};
@@ -111,15 +112,22 @@ sub parse_report {
         if (!$header) {
             $header = 1;
             my @h = split /\t/, $line, -1;
+            s/\r\z// for @h;
             %idx = map { lc($h[$_]) =~ s/^#//r => $_ } 0 .. $#h;
             next;
         }
         my @f = split /\t/, $line, -1;
+        s/\r\z// for @f;
         my $a = value(\@f, \%idx, qw(id_a variant_id_a));
         my $b = value(\@f, \%idx, qw(id_b variant_id_b));
         my $r2 = value(\@f, \%idx, qw(r2 phased_r2 unphased_r2));
+        $a = $f[2] if !defined($a) && @f >= 7;
+        $b = $f[5] if !defined($b) && @f >= 7;
+        $r2 = $f[6] if !defined($r2) && @f >= 7;
         next unless defined($a) && defined($b) && defined($r2);
-        next unless $a =~ /^rs\d+$/i && $b =~ /^rs\d+$/i;
+        # PLINK reference panels may contain rsIDs, chr:pos IDs, or other
+        # stable variant identifiers; retain any non-empty IDs.
+        next unless length($a) && length($b);
         next unless $r2 =~ /^(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i;
         next unless $r2 >= $threshold;
         my $proxy = lc($a) eq lc($ref) ? $b : (lc($b) eq lc($ref) ? $a : undef);
