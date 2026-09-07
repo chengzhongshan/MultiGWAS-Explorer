@@ -230,8 +230,21 @@ GTF_LD_MARKER_SYMBOL="${GTF_LD_MARKER_SYMBOL:-star}"
 GTF_LD_MARKER_COLOR="${GTF_LD_MARKER_COLOR:-black}"
 GTF_LD_DISPLAY_MODE="${GTF_LD_DISPLAY_MODE:-none}"
 GTF_LD_R2_VALUES="${GTF_LD_R2_VALUES:-}"
+GTF_LD_R2_CACHE="${GTF_LD_R2_CACHE:-${TOP_HIT_LD_CACHE_TSV:-}}"
 GTF_LD_HEATMAP_COLORS="${GTF_LD_HEATMAP_COLORS:-CXF7FBFF CX6BAED6 CX54278F}"
 GTF_LD_HEATMAP_LEGEND_TITLE="${GTF_LD_HEATMAP_LEGEND_TITLE:-LD r2 (EUR)}"
+
+augment_data_gz_with_ld_r2_column() {
+  [[ -s "${GTF_LD_R2_CACHE}" ]] || return 0
+  [[ -s "${DATA_GZ}" ]] || return 0
+  local out="${DATA_GZ%.gz}.with_ld_r2.tsv.gz"
+  if [[ ! -s "${out}" || "${GTF_LD_R2_CACHE}" -nt "${out}" || "${DATA_GZ}" -nt "${out}" ]]; then
+    echo "[prep] Adding numeric LD_R2 column to uploaded plotting data from ${GTF_LD_R2_CACHE}"
+    perl "${DEPS_DIR}/augment_gwas_with_ld_r2.pl" --input "${DATA_GZ}" --ld-cache "${GTF_LD_R2_CACHE}" --reference-snp "${GTF_LD_REFERENCE_SNP:-}" --output "${out}" >/dev/null
+  fi
+  DATA_GZ="${out}"
+  REMOTE_DATA_BASENAME="$(basename "${out}")"
+}
 case "${GTF_LD_DISPLAY_MODE,,}" in
   none|markers|heatmap|both) ;;
   *) echo "ERROR: Unsupported GTF_LD_DISPLAY_MODE=${GTF_LD_DISPLAY_MODE}" >&2; exit 2 ;;
@@ -1367,6 +1380,7 @@ augment_data_gz_with_missing_target_snps() {
 }
 
 augment_data_gz_with_missing_target_snps
+augment_data_gz_with_ld_r2_column
 
 # Region selection must use the explicit target list, not a stale or
 # genome-wide common-association verifier. Generate the target/top-hit CSV

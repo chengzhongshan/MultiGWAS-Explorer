@@ -1038,6 +1038,7 @@ run;
     LD_marker_color=&gtf_ld_marker_color,
     LD_display_mode=&gtf_ld_display_mode,
     LD_r2_values=&gtf_ld_r2_values,
+    LD_r2_var=LD_R2,
     LD_heatmap_colormodel=&gtf_ld_heatmap_colors,
     LD_heatmap_legend_title=&gtf_ld_heatmap_legend_title,
     text_rotate_angle=&gtf_label_text_rotate_angle,

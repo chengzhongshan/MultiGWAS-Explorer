@@ -181,6 +181,7 @@ LD_SNPs2mark_scatterplot_dots=, /*Optional space-delimited LD-linked SNPs overla
 LD_marker_symbol=*, /*Marker text for LD-linked SNPs: *, +, x, o, s, ^, or d.*/
 LD_marker_color=black, /*SAS color name or CXrrggbb value for LD-linked SNP markers.*/
 LD_r2_values=, /*Space-delimited SNP:r2 pairs used by the optional LD heatmap overlay.*/
+LD_r2_var=LD_R2, /*Numeric LD column uploaded with the GWAS plotting dataset.*/
 LD_display_mode=none, /*none, markers, heatmap, or both. LD display is opt-in.*/
 LD_heatmap_colormodel=CXF7FBFF CX6BAED6 CX54278F, /*Retained for legacy marker-overlay mode.*/
 LD_heatmap_legend_title=%str(LD r2),
@@ -238,20 +239,20 @@ run;
  run;
 %end;
 
-*Add a numeric r2 overlay variable only when the user explicitly requests the LD heatmap.;
-%if %length(&LD_r2_values)>0 and
-    (%upcase(&LD_display_mode)=HEATMAP or %upcase(&LD_display_mode)=BOTH) %then %do;
+*Add a numeric r2 overlay variable from the uploaded LD_R2 column.;
+%if (%upcase(&LD_display_mode)=HEATMAP or %upcase(&LD_display_mode)=BOTH) %then %do;
  %let effective_ld_heatmap_var=_LD_R2_;
  data &gwas_dsd;
  set &gwas_dsd;
  _LD_R2_=.;
  %let _ld_reference_snp_=%scan(&SNPs2label_scatterplot_dots,1,%str( ));
  %if %length(&_ld_reference_snp_)=0 %then %let _ld_reference_snp_=%scan(&SNP_IDs,1,%str( ));
- if upcase(&SNP_Var)=upcase("&_ld_reference_snp_") then _LD_R2_=1;
+ if not missing(vvaluex("&LD_r2_var")) then _LD_R2_=input(vvaluex("&LD_r2_var"),best32.);
+ if missing(_LD_R2_) and upcase(&SNP_Var)=upcase("&_ld_reference_snp_") then _LD_R2_=1;
  %do _li_=1 %to %ntokens(&LD_r2_values);
    %let _ld_pair_=%scan(&LD_r2_values,&_li_,%str( ));
    if upcase(&SNP_Var)=upcase("%scan(&_ld_pair_,1,%str(:))") then
-     _LD_R2_=input("%scan(&_ld_pair_,2,%str(:))",best32.);
+     if missing(_LD_R2_) then _LD_R2_=input("%scan(&_ld_pair_,2,%str(:))",best32.);
  %end;
  run;
  %let effective_signed_r2=1;
