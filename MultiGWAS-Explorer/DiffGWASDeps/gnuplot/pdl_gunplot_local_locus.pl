@@ -19,8 +19,10 @@ Options:
   --labels A|B|C           Optional display labels.
   --label-snps A,B,C       Ordered SNPs to mark and label at the top. The first
                            SNP remains the locus center supplied by --snp.
-  --ld-snps A,B,C          Optional SNPs in LD with the query SNP(s). Matching
+  --ld-snps A,B,C          Optional SNPs in LD with the reference SNP. Matching
                            scatter points are overlaid with the selected marker.
+  --ld-reference-snp SNP   Reference SNP used to calculate the displayed r2.
+                           Defaults to the first --label-snps value.
   --ld-marker-symbol NAME  star, plus, cross, circle, square, triangle, diamond
                            (default: star).
   --ld-marker-color COLOR  Named or #RRGGBB color (default: black).
@@ -66,6 +68,7 @@ GetOptions(
     'labels=s'     => \$opt{labels},
     'label-snps=s' => \$opt{label_snps},
     'ld-snps=s'    => \$opt{ld_snps},
+    'ld-reference-snp=s' => \$opt{ld_reference_snp},
     'ld-marker-symbol=s' => \$opt{ld_marker_symbol},
     'ld-marker-color=s'  => \$opt{ld_marker_color},
     'ld-display-mode=s'  => \$opt{ld_display_mode},
@@ -114,14 +117,23 @@ for my $snp (split /,/, ($opt{label_snps} // $opt{snp})) {
 @label_snps = ($opt{snp}) unless @label_snps;
 unshift @label_snps, $opt{snp}
     unless grep { lc($_) eq lc($opt{snp}) } @label_snps;
+my $ld_reference_snp = trim($opt{ld_reference_snp} // $label_snps[0]);
+die "--ld-reference-snp '$ld_reference_snp' is not in --label-snps\n"
+    unless grep { lc($_) eq lc($ld_reference_snp) } @label_snps;
 my %is_label_snp = map { lc($_) => 1 } @label_snps;
 my @ld_snps;
 my %is_ld_snp;
 my %ld_r2_for;
+# The LD reference is in perfect LD with itself. Keep it in the numeric
+# map so signed-R2 coloring also shows the reference SNP at +/-1.
+$ld_r2_for{lc $ld_reference_snp} = 1;
 for my $snp (split /,/, ($opt{ld_snps} // '')) {
     $snp = trim($snp);
     next unless length $snp;
-    next if $is_label_snp{lc $snp};
+    # The reference has r2=1 by definition and keeps its ordinary query-SNP
+    # styling. Other labeled query SNPs may legitimately be LD proxies and
+    # must retain their r2 color/marker as well as their top label.
+    next if lc($snp) eq lc($ld_reference_snp);
     next if $is_ld_snp{lc $snp}++;
     push @ld_snps, $snp;
 }
@@ -218,6 +230,8 @@ my $kept_points = 0;
 my $ld_points = 0;
 my %found_ld_snp;
 my $has_zcols = @resolved_zcols == @resolved_pcols ? 1 : 0;
+my $use_signed_r2 = ($has_gtf && $has_zcols && %ld_r2_for
+    && $opt{ld_display_mode} =~ /^(?:heatmap|both)$/) ? 1 : 0;
 for my $row (@locus) {
     my $bp  = numeric($row->[ $idx{BP} ]);
     my $snp = $row->[ $idx{SNP} ] // '';
@@ -229,8 +243,8 @@ for my $row (@locus) {
         my $capped = $logp > $opt{top_logp} ? $opt{top_logp} : $logp;
         my $y = $track_i * $opt{top_logp} + $capped;
         my $is_target = $is_label_snp{lc $snp} ? 1 : 0;
-        my $is_ld = $is_ld_snp{lc $snp} ? 1 : 0;
-        my $ld_r2 = $is_ld && exists($ld_r2_for{lc $snp}) ? $ld_r2_for{lc $snp} : -1;
+        my $is_ld = exists($ld_r2_for{lc $snp}) ? 1 : 0;
+        my $ld_r2 = $is_ld ? $ld_r2_for{lc $snp} : -1;
         my $ld_rgb = $ld_r2 >= 0 ? ld_rgb_integer($ld_r2, \@ld_heatmap_colors) : 0;
         if ($is_ld) {
             $ld_points++;
@@ -240,6 +254,13 @@ for my $row (@locus) {
         if ($has_zcols) {
             my $z = extract_requested_numeric($resolved_zcols[$track_i], $row, \%idx);
             $colorval = defined $z ? cap_num($z, -8, 8) : 0;
+            if ($use_signed_r2) {
+                # Background variants are unlinked (r2=0), while LD-linked
+                # variants retain the direction of their association Z-score.
+                $colorval = ($is_ld && defined $z)
+                    ? cap_num(($z < 0 ? -1 : $z > 0 ? 1 : 0) * $ld_r2, -1, 1)
+                    : 0;
+            }
         }
         print {$pt} join("\t", $bp, sprintf('%.4f', $y), $track_i, sprintf('%.6f', $logp), $is_target, $snp, sprintf('%.4f', $colorval), $is_ld, sprintf('%.4f', $ld_r2), $ld_rgb), "\n";
         $kept_points++;
@@ -343,10 +364,12 @@ write_gnuplot(
     ld_marker_color => $opt{ld_marker_color},
     ld_display_mode => $opt{ld_display_mode},
     ld_population   => $opt{ld_population},
+    ld_reference_snp=> $ld_reference_snp,
     ld_heatmap_colors => \@ld_heatmap_colors,
     ld_r2_points    => scalar(grep { exists $ld_r2_for{$_} && exists $found_ld_snp{$_} } keys %ld_r2_for),
     gene_height => $gene_height,
     use_zcolors => ($has_gtf && $has_zcols ? 1 : 0),
+    use_signed_r2 => ($has_gtf && $use_signed_r2 ? 1 : 0),
     colorbar_label => infer_effect_metric_label_from_cols(@resolved_zcols),
 );
 
@@ -355,7 +378,7 @@ system($opt{gnuplot}, $gp_file) == 0
 
 open my $mf, '>', $manifest or die "Cannot write $manifest: $!\n";
 print {$mf} join("\t", qw(METRIC VALUE)), "\n";
-print {$mf} join("\t", 'cache_schema', 4), "\n";
+print {$mf} join("\t", 'cache_schema', 5), "\n";
 print {$mf} join("\t", 'input', $opt{data}), "\n";
 print {$mf} join("\t", 'png', $png_file), "\n";
 print {$mf} join("\t", 'plot_tsv', $plot_tsv), "\n";
@@ -373,7 +396,9 @@ print {$mf} join("\t", 'ld_marker_color', $opt{ld_marker_color}), "\n";
 print {$mf} join("\t", 'ld_display_mode', $opt{ld_display_mode}), "\n";
 print {$mf} join("\t", 'ld_r2_values', ($opt{ld_r2_values} // '')), "\n";
 print {$mf} join("\t", 'ld_population', $opt{ld_population}), "\n";
+print {$mf} join("\t", 'ld_reference_snp', $ld_reference_snp), "\n";
 print {$mf} join("\t", 'ld_heatmap_colors', join(',', @ld_heatmap_colors)), "\n";
+print {$mf} join("\t", 'signed_r2_coloring', $use_signed_r2), "\n";
 print {$mf} join("\t", 'chr', $target_chr), "\n";
 print {$mf} join("\t", 'bp', $target_bp), "\n";
 print {$mf} join("\t", 'window_bp', $window_bp), "\n";
@@ -446,7 +471,10 @@ sub write_gnuplot {
     }
     my $draw_ld_markers = $args{ld_points}
         && $args{ld_display_mode} =~ /^(?:markers|both)$/;
+    # In heatmap mode LD is encoded directly in the existing association
+    # colorbar as signed R2; do not add a second LD inset/overlay scale.
     my $draw_ld_heatmap = $args{ld_r2_points}
+        && !$args{use_signed_r2}
         && $args{ld_display_mode} =~ /^(?:heatmap|both)$/;
     if ($draw_ld_markers) {
         print {$gp} "set label 900 '" . escape_gp("LD-linked SNP (" . $args{ld_marker_symbol} . ")") . "' at graph 0.015,0.985 left front tc rgb '" . escape_gp($args{ld_marker_color}) . "' font ',9'\n";
@@ -559,11 +587,17 @@ sub write_gnuplot {
         }
         print {$gp} "set xlabel 'Chromosome " . escape_gp($args{target_chr}) . "'\n";
         if ($args{use_zcolors}) {
-            print {$gp} "set cbrange [-8:8]\n";
-            print {$gp} "set cbtics ('-8' -8, '0' 0, '8' 8)\n";
-            print {$gp} "set cblabel '" . escape_gp($args{colorbar_label} || 'Effect metric') . "'\n";
+            my ($cbmin, $cbmax, $cbticks, $cblabel, $palette) =
+                $args{use_signed_r2}
+                  ? (-1, 1, "('-1' -1, '0' 0, '1' 1)", 'Signed R^2 (sign(Z) x LD R^2)',
+                     "(-1 '#63d67f', -0.5 '#63d8d2', 0 '#ffbf00', 0.5 '#ff5b00', 1 '#df1f2d')")
+                  : (-8, 8, "('-8' -8, '0' 0, '8' 8)", ($args{colorbar_label} || 'Effect metric'),
+                     "(-8 '#63d67f', -4 '#63d8d2', 0 '#ffbf00', 4 '#ff5b00', 8 '#df1f2d')");
+            print {$gp} "set cbrange [$cbmin:$cbmax]\n";
+            print {$gp} "set cbtics $cbticks\n";
+            print {$gp} "set cblabel '" . escape_gp($cblabel) . "'\n";
             print {$gp} "set colorbox vertical user origin 0.94,0.12 size 0.02,0.76\n";
-            print {$gp} "set palette defined (-8 '#63d67f', -4 '#63d8d2', 0 '#ffbf00', 4 '#ff5b00', 8 '#df1f2d')\n";
+            print {$gp} "set palette defined $palette\n";
             my @plots = ("'" . escape_gp($args{plot_tsv}) . "' using 1:2:7 with points pt 7 ps 0.72 lc palette");
             push @plots, @ld_layers;
             print {$gp} "plot " . join(', ', @plots) . "\n";
@@ -612,7 +646,8 @@ sub write_ld_heatmap_inset {
         my $id = 8000 + $i;
         print {$gp} "set object $id rect from graph $left,$y0 to graph $right,$y1 fc rgb '$color' fillstyle solid 1.0 border lc rgb '$color' front\n";
     }
-    my $title = 'LD r^2 (' . ($args->{ld_population} || 'EUR') . ')';
+    my $title = 'LD r^2 to ' . ($args->{ld_reference_snp} || $args->{snp})
+        . ' (' . ($args->{ld_population} || 'EUR') . ')';
     print {$gp} "set label 8900 '" . escape_gp($title) . "' at graph " . (($x0 + $x1) / 2) . "," . ($y1 + 0.022) . " center front font ',9' tc rgb '#222222'\n";
     print {$gp} "set label 8901 '0' at graph $x0," . ($y0 - 0.010) . " center front font ',8' tc rgb '#222222'\n";
     print {$gp} "set label 8902 '0.5' at graph " . (($x0 + $x1) / 2) . "," . ($y0 - 0.010) . " center front font ',8' tc rgb '#222222'\n";

@@ -49,7 +49,7 @@ my @cmd = (
     $^X, $renderer,
     '--data', $gz,
     '--snp', 'rs100',
-    '--label-snps', 'rs100',
+    '--label-snps', 'rs100,rs200',
     '--out-prefix', $prefix,
     '--window-bp', 100,
     '--pcols', 'EUR_P',
@@ -60,6 +60,7 @@ my @cmd = (
     '--ld-snps', 'rs200,rs300',
     '--ld-r2-values', 'rs200:0.55,rs300:0.91',
     '--ld-display-mode', 'heatmap',
+    '--ld-reference-snp', 'rs100',
     '--ld-population', 'EUR',
 );
 system(@cmd) == 0 or die "LD heatmap renderer failed (exit " . ($? >> 8) . ")\n";
@@ -70,17 +71,28 @@ for my $path ("$prefix.png", "$prefix.gp", "$prefix.plot.tsv", "$prefix.manifest
 open my $gp, '<:raw', "$prefix.gp" or die $!;
 my $gp_text = do { local $/; <$gp> };
 close $gp;
-die "Association Z-score colorbar is missing\n" unless $gp_text =~ /set cblabel 'Z score'/;
-die "Separate LD inset title is missing\n" unless $gp_text =~ /LD r\^2 \(EUR\)/;
-die "LD RGB-variable overlay is missing\n" unless $gp_text =~ /using \(\(\$9>=0\)\?\$1:1\/0\):2:10/;
-my ($ld_low_color) = $gp_text =~ /set object 8000 .*?fc rgb '(#[0-9a-f]{6})'/;
-die "LD inset palette was not emitted\n" unless defined $ld_low_color;
-die "LD palette unexpectedly reused an association endpoint color\n"
-    if $ld_low_color =~ /^(?:#63d67f|#63d8d2|#ffbf00|#ff5b00|#df1f2d)$/;
+die "Signed-R2 colorbar is missing\n"
+    unless $gp_text =~ /set cbrange \[-1:1\]/
+        && $gp_text =~ /set cblabel 'Signed R\^2 \(sign\(Z\) x LD R\^2\)'/;
+die "Separate LD inset should not be emitted in signed-R2 mode\n"
+    if $gp_text =~ /LD r\^2 to rs100/ || $gp_text =~ /using \(\(\$9>=0\)\?\$1:1\/0\):2:10/;
 
 open my $pt, '<:raw', "$prefix.plot.tsv" or die $!;
 my $header = <$pt> // '';
+my $point_text = do { local $/; <$pt> };
 close $pt;
 die "LD numeric/color columns are missing\n" unless $header =~ /\tLD_R2\tLD_RGB\s*$/;
+die "A non-reference query SNP did not retain both target-label and LD-r2 status\n"
+    unless $point_text =~ /^120\t[^\n]*\t1\trs200\t[^\n]*\t1\t0\.5500\t/m;
+die "Signed-R2 value for positive-z LD proxy is missing\n"
+    unless $point_text =~ /^120\t[^\t]*\t0\t[^\t]*\t1\trs200\t0\.5500\t1\t0\.5500/m;
+die "Signed-R2 value for negative-z reference is missing\n"
+    unless $point_text =~ /^100\t[^\t]*\t0\t[^\t]*\t1\trs100\t-1\.0000\t1\t1\.0000/m;
+
+open my $manifest_fh, '<:raw', "$prefix.manifest.tsv" or die $!;
+my $manifest_text = do { local $/; <$manifest_fh> };
+close $manifest_fh;
+die "LD reference SNP is missing from the render manifest\n"
+    unless $manifest_text =~ /^ld_reference_snp\trs100$/m;
 
 print "Optional LD heatmap rendering: PASS\n";

@@ -91,6 +91,9 @@ Options:
   --ld-heatmap-colors LIST      Low-to-high #RRGGBB colors for the LD inset.
                                 Default: #f7fbff,#6baed6,#54278f.
   --ld-cache FILE               Normalized local HaploReg TSV/SQLite LD cache.
+  --ld-reference-snp SNP       Use this target SNP as the LD reference when
+                                several query SNPs share one locus. Default:
+                                first target SNP in that locus.
   --ld-population POP           HaploReg population for high-LD stars (default EUR).
   --ld-r2-threshold N           High-LD star threshold (default 0.8).
   --[no-]ld-web-fallback        Query HaploReg only when the local cache misses
@@ -127,6 +130,7 @@ my $target_snp_genes_override = '';
 my $ld_snps_override = '';
 my $ld_audit_file_override = '';
 my $ld_cache_override = '';
+my $ld_reference_snp_override = '';
 my $ld_population_override = 'EUR';
 my $ld_r2_threshold_override = 0.8;
 my $ld_web_fallback = 1;
@@ -158,6 +162,7 @@ GetOptions(
     'ld-snps=s'               => \$ld_snps_override,
     'ld-audit-file=s'         => \$ld_audit_file_override,
     'ld-cache=s'              => \$ld_cache_override,
+    'ld-reference-snp=s'      => \$ld_reference_snp_override,
     'ld-population=s'         => \$ld_population_override,
     'ld-r2-threshold=f'       => \$ld_r2_threshold_override,
     'ld-web-fallback!'        => \$ld_web_fallback,
@@ -278,6 +283,12 @@ if (!$reused_existing_runner) {
 
 die "Runner config was not generated: $runner_config_local\n" unless -f $runner_config_local;
 my $runner = load_json($runner_config_local);
+$ld_reference_snp_override = trim(
+    $ld_reference_snp_override
+      || $runner->{LOCAL_LD_REFERENCE_SNP}
+      || $spec->{local_ld_reference_snp}
+      || ''
+);
 
 my $gnuplot = find_gnuplot_exe();
 print "Using gnuplot executable: $gnuplot\n";
@@ -331,6 +342,13 @@ if ($requested{plot_manhattan}) {
 my @hits;
 if ($requested{plot_local_manhattan} || $requested{plot_local_gtf}) {
     my $effective_target_snps = $target_snps_override || ($runner->{TARGET_SNP_LIST} || '');
+    my @effective_target_snps = grep { length } map { trim($_) } split /,/, $effective_target_snps;
+    if (length(trim($ld_reference_snp_override))) {
+        die "--ld-reference-snp requires --target-snps (or runner TARGET_SNP_LIST)\n"
+            unless @effective_target_snps;
+        die "--ld-reference-snp '$ld_reference_snp_override' is not in the target SNP list: $effective_target_snps\n"
+            unless grep { lc($_) eq lc(trim($ld_reference_snp_override)) } @effective_target_snps;
+    }
     @hits = collect_top_hits(
         spec_file    => $spec_file,
         runner_config_path => $runner_config_local,
@@ -387,6 +405,7 @@ if ($requested{plot_local_manhattan}) {
             ld_snps      => $ld_snps_override,
             ld_audit_file=> $ld_audit_file_override,
             ld_cache     => $ld_cache_override,
+            ld_reference_snp => $ld_reference_snp_override,
             ld_population=> $ld_population_override,
             ld_r2_threshold => $ld_r2_threshold_override,
             ld_web_fallback => $ld_web_fallback,
@@ -430,6 +449,7 @@ if ($requested{plot_local_gtf}) {
             ld_snps      => $ld_snps_override,
             ld_audit_file=> $ld_audit_file_override,
             ld_cache     => $ld_cache_override,
+            ld_reference_snp => $ld_reference_snp_override,
             ld_population=> $ld_population_override,
             ld_r2_threshold => $ld_r2_threshold_override,
             ld_web_fallback => $ld_web_fallback,
@@ -1002,7 +1022,7 @@ sub resolve_ld_snps_for_query {
             warn "WARNING: Cannot start high-LD resolver $helper: $!\n";
         }
     }
-    print "[prep] LD-linked SNP marker overlay for " . join(',', @{ $args{query_snps} || [] })
+    print "[prep] LD-linked SNP marker overlay relative to " . join(',', @{ $args{query_snps} || [] })
         . " ($population, r2 >= $min_r2): " . join(',', @ld) . "\n" if @ld;
     print "[warn] No high-LD proxies resolved for " . join(',', @{ $args{query_snps} || [] })
         . " ($population, r2 >= $min_r2); no LD marker overlay will be drawn.\n" unless @ld;
@@ -1099,6 +1119,10 @@ sub plot_local_series {
         my @label_snps = @{ $label_snps_for_index{$hit_idx} || [$hit->{SNP}] };
         my $label_snps_csv = join(',', @label_snps);
         my $locus_title_snps = join(', ', @label_snps);
+        my $ld_reference_snp = trim($args{ld_reference_snp} // '');
+        $ld_reference_snp = $label_snps[0]
+            unless length($ld_reference_snp)
+                && grep { lc($_) eq lc($ld_reference_snp) } @label_snps;
         my ($ld_snps_ref, $ld_r2_ref) = $args{highlight_high_ld_snps} ? resolve_ld_snps_for_query(
             explicit   => $args{ld_snps},
             explicit_r2=> $args{ld_r2_values},
@@ -1109,7 +1133,7 @@ sub plot_local_series {
             ld_web_fallback => $args{ld_web_fallback},
             runner     => $runner,
             output_dir => $args{output_dir},
-            query_snps => \@label_snps,
+            query_snps => [$ld_reference_snp],
         ) : ([], {});
         my @ld_snps = @{ $ld_snps_ref || [] };
         my $ld_snps_csv = join(',', @ld_snps);
@@ -1178,6 +1202,7 @@ sub plot_local_series {
             ld_r2_values      => $ld_r2_values,
             ld_heatmap_colors => $args{ld_heatmap_colors},
             ld_population     => $args{ld_population},
+            ld_reference_snp  => $ld_reference_snp,
             height            => $args{height},
             sig               => ($runner->{TOP_HIT_SIGNAL_THRSHD} || '1e-6'),
             has_gtf           => $expected_has_gtf,
@@ -1325,8 +1350,9 @@ sub plot_local_series {
             '--gnuplot', $args{gnuplot},
             '--sig', ($runner->{TOP_HIT_SIGNAL_THRSHD} || '1e-6'),
         );
+        push @cmd, ('--ld-reference-snp', $ld_reference_snp);
         push @cmd, ('--ld-snps', $ld_snps_csv) if length $ld_snps_csv;
-        if (length $ld_snps_csv) {
+        if ($args{highlight_high_ld_snps}) {
             push @cmd, ('--ld-marker-symbol', ($args{ld_marker_symbol} || 'star'));
             push @cmd, ('--ld-marker-color', ($args{ld_marker_color} || 'black'));
             push @cmd, ('--ld-display-mode', ($args{ld_display_mode} || 'markers'));
@@ -1559,6 +1585,7 @@ sub local_locus_cache_is_reusable {
         ['ld_r2_values',      ($args{ld_r2_values} // '')],
         ['ld_heatmap_colors', ($args{ld_heatmap_colors} // '#f7fbff,#6baed6,#54278f')],
         ['ld_population',     ($args{ld_population} // 'EUR')],
+        ['ld_reference_snp',  ($args{ld_reference_snp} // '')],
         ['zcols',             ($args{zcols} // '')],
         ['labels',            ($args{labels} // '')],
         ['title',             ($args{title} // '')],

@@ -182,7 +182,7 @@ LD_marker_symbol=*, /*Marker text for LD-linked SNPs: *, +, x, o, s, ^, or d.*/
 LD_marker_color=black, /*SAS color name or CXrrggbb value for LD-linked SNP markers.*/
 LD_r2_values=, /*Space-delimited SNP:r2 pairs used by the optional LD heatmap overlay.*/
 LD_display_mode=none, /*none, markers, heatmap, or both. LD display is opt-in.*/
-LD_heatmap_colormodel=CXF7FBFF CX6BAED6 CX54278F, /*Distinct from the association Z-score palette.*/
+LD_heatmap_colormodel=CXF7FBFF CX6BAED6 CX54278F, /*Retained for legacy marker-overlay mode.*/
 LD_heatmap_legend_title=%str(LD r2),
 text_rotate_angle=90, /*Angle to rotate text labels for these selected dots by users*/
 auto_rotate2zero=1, /*supply value 1 when there are <=3 text labels and you want them kept horizontal in the top headroom*/
@@ -245,12 +245,39 @@ run;
  data &gwas_dsd;
  set &gwas_dsd;
  _LD_R2_=.;
+ %let _ld_reference_snp_=%scan(&SNPs2label_scatterplot_dots,1,%str( ));
+ %if %length(&_ld_reference_snp_)=0 %then %let _ld_reference_snp_=%scan(&SNP_IDs,1,%str( ));
+ if upcase(&SNP_Var)=upcase("&_ld_reference_snp_") then _LD_R2_=1;
  %do _li_=1 %to %ntokens(&LD_r2_values);
    %let _ld_pair_=%scan(&LD_r2_values,&_li_,%str( ));
    if upcase(&SNP_Var)=upcase("%scan(&_ld_pair_,1,%str(:))") then
      _LD_R2_=input("%scan(&_ld_pair_,2,%str(:))",best32.);
  %end;
  run;
+ %let effective_signed_r2=1;
+ %let effective_ld_heatmap_var=;
+%end;
+%else %let effective_signed_r2=0;
+%let effective_zscore_vars=&ZscoreVars;
+%let effective_heatmap_min_neg_val=&heatmap_min_neg_val;
+%let effective_heatmap_max_pos_val=&heatmap_max_pos_val;
+%if &effective_signed_r2=1 %then %do;
+  %let effective_zscore_vars=;
+  data &gwas_dsd;
+  set &gwas_dsd;
+  %do _zi_=1 %to %sysfunc(countw(&ZscoreVars));
+    _SIGNED_R2_&_zi_=0;
+    if not missing(_LD_R2_) then do;
+      if %scan(&ZscoreVars,&_zi_) < 0 then _SIGNED_R2_&_zi_=-_LD_R2_;
+      else if %scan(&ZscoreVars,&_zi_) > 0 then _SIGNED_R2_&_zi_=_LD_R2_;
+    end;
+  %end;
+  run;
+  %do _zi_=1 %to %sysfunc(countw(&ZscoreVars));
+    %let effective_zscore_vars=&effective_zscore_vars _SIGNED_R2_&_zi_;
+  %end;
+  %let effective_heatmap_min_neg_val=-1;
+  %let effective_heatmap_max_pos_val=1;
 %end;
 
 *Add labels for target SNPs if they exist;
@@ -366,7 +393,7 @@ to work on these transcripts instead of genes*/
   max_end=&maxend, 
   dist2genes=1000, 
   AssocPVars=&AssocPVars, 
-  ZscoreVars=&ZscoreVars, 
+  ZscoreVars=&effective_zscore_vars,
   gwas_labels_in_order=&gwas_labels_in_order,
   design_width=&design_width, 
   design_height=&design_height, 
@@ -424,9 +451,9 @@ using lattice_subgrp_var with rangeattrmap instead of drawing dots using binary 
 and negative directions of latticen_subgrp_var!*/
 heatmap_Neg_rangealtcolormodel=&heatmap_Neg_rangealtcolormodel,/*Range alt color model for negative values, heatmap_var<=0,  in heatmap*/
 heatmap_Pos_rangealtcolormodel=&heatmap_Pos_rangealtcolormodel,/*Range alt color model for positve values, heatmap_var>=0, in heatmap*/
-heatmap_min_neg_val=&heatmap_min_neg_val,/*Minimum negative value for the heatmap_var when it is not empty; 
+  heatmap_min_neg_val=&effective_heatmap_min_neg_val,/*Minimum negative value for the heatmap_var when it is not empty;
 change this to customize the minimum value for colorbar in heatmap*/
-heatmap_max_pos_val=&heatmap_max_pos_val,/*Maximum postive value for the heatmap_var when it is not empty; 
+  heatmap_max_pos_val=&effective_heatmap_max_pos_val,/*Maximum postive value for the heatmap_var when it is not empty;
 change this to customize the max value for colorbar in heatmap*/
 
 /*Alternative color scheme for categorical color response variable! Please keep it in default

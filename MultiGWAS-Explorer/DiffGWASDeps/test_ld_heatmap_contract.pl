@@ -9,6 +9,9 @@ my %required = (
     'SNP_Local_Manhattan_With_GTF.sas' => [
         'LD_display_mode=none', 'LD_r2_values=',
         'ld_heatmap_var=&effective_ld_heatmap_var',
+        'effective_signed_r2=1', '_SIGNED_R2_',
+        'effective_heatmap_min_neg_val=-1',
+        'effective_heatmap_max_pos_val=1',
     ],
     'Multgscatter_with_gene_exons.sas' => [
         'ld_heatmap_var=', 'ld_heatmap_var=&ld_heatmap_var',
@@ -56,6 +59,36 @@ for my $shell (qw(
     for my $name (qw(GTF_LD_DISPLAY_MODE GTF_LD_R2_VALUES GTF_LD_HEATMAP_COLORS GTF_LD_HEATMAP_LEGEND_TITLE)) {
         die "$shell does not render $name\n"
             unless $text =~ /--replace\s+"$name=/;
+    }
+}
+
+my $root = File::Spec->catdir($Bin, File::Spec->updir());
+my %reference_contract = (
+    'auto_prepare_and_run_diff_gwas.pl' => [
+        'local-ld-reference-snp|ld-reference-snp=s',
+        'query_snps  => $local_ld_reference_snp',
+        'LD r2 to $local_ld_reference_snp',
+    ],
+    'auto_prepare_and_run_diff_gwas_with_gunplot.pl' => [
+        'ld-reference-snp=s',
+        'query_snps => [$ld_reference_snp]',
+        "push \@cmd, ('--ld-reference-snp', \$ld_reference_snp)",
+    ],
+    'server.pl' => [
+        'local_ld_reference_snp',
+        "('--local-ld-reference-snp', \$local_ld_reference_snp)",
+        'ld_reference_snp',
+        "('--ld-reference-snp', \$ld_reference_snp)",
+    ],
+);
+for my $name (sort keys %reference_contract) {
+    my $path = File::Spec->catfile($root, $name);
+    open my $fh, '<:raw', $path or die "Cannot read $path: $!\n";
+    my $text = do { local $/; <$fh> };
+    close $fh;
+    for my $token (@{ $reference_contract{$name} }) {
+        die "$name is missing single-reference LD contract token: $token\n"
+            unless index($text, $token) >= 0;
     }
 }
 
