@@ -42,10 +42,19 @@ my $input_prefix = defined($pfile) ? $pfile : $bfile;
 my $pfile_arg = native_path($input_prefix);
 my $tmp_prefix_arg = native_path($prefix);
 if (defined($populations) && length($populations) && !defined($keep)) {
-    my %wanted = map { uc($_) => 1 } grep { length } split /[,\s]+/, $populations;
+    my %wanted;
+    for my $pop (split /,/, $populations) {
+        $pop =~ s/^\s+|\s+$//g;
+        $wanted{uc($pop)} = 1 if length $pop;
+    }
     my $psam = -e "$input_prefix.psam" ? "$input_prefix.psam" : undef;
+    if (!defined($psam) && $input_prefix =~ /_biallelic\z/) {
+        my $candidate = $input_prefix . '';
+        $candidate =~ s/_biallelic\z//;
+        $candidate .= '.psam';
+        $psam = $candidate if -e $candidate;
+    }
     $psam ||= (-e "$input_prefix.fam" ? "$input_prefix.fam" : undef);
-    $psam ||= (($input_prefix =~ s/_biallelic\z//r) . '.psam');
     $psam = undef unless defined($psam) && -e $psam;
     die "--populations requires a matching .psam file (use --keep for BED files)\n" unless $psam;
     $keep = "$tmp/populations.keep";
@@ -56,7 +65,7 @@ if (defined($populations) && length($populations) && !defined($keep)) {
         chomp $line;
         my @f = split /\s+/, $line;
         my ($iid, $super) = @f[0,4];
-        print {$kfh} "$iid\t$iid\n" if defined($super) && $wanted{uc($super)};
+        print {$kfh} "$iid\n" if defined($super) && $wanted{uc($super)};
     }
     close $kfh; close $pfh;
     die "No samples matched --populations=$populations\n" unless -s $keep;
