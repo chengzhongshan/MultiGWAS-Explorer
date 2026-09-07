@@ -2921,7 +2921,7 @@ sub build_runner_config {
               : cfg_or($spec, 'local_gtf_label_snps', '')
         ),
         GTF_LD_SNPS => (
-            !$highlight_high_ld_snps ? ''
+            !$highlight_high_ld_snps || $local_ld_display_mode eq 'heatmap' ? ''
             : length($local_ld_snps_override)
               ? $local_ld_snps_override
               : cfg_or($spec, 'local_ld_snps', '')
@@ -2929,7 +2929,7 @@ sub build_runner_config {
         GTF_LD_MARKER_SYMBOL => $local_ld_marker_symbol,
         GTF_LD_MARKER_COLOR => $local_ld_marker_color,
         GTF_LD_DISPLAY_MODE => $local_ld_display_mode,
-        GTF_LD_R2_VALUES => $local_ld_r2_values_override,
+        GTF_LD_R2_VALUES => ($local_ld_display_mode eq 'heatmap' ? '' : $local_ld_r2_values_override),
         GTF_LD_R2_CACHE => $local_ld_cache_override,
         GTF_LD_HEATMAP_COLORS => $local_ld_heatmap_colors,
         GTF_LD_HEATMAP_LEGEND_TITLE => (
