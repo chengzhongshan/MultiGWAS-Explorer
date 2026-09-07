@@ -32,6 +32,13 @@ Notes
   star/plus/cross/circle/square/triangle/diamond and a named or `#RRGGBB`
   color. Markers are overlaid on every association track in both
   local-Manhattan and local-GTF plots.
+- For window-wide LD instead of HaploReg's returned high-LD proxy list, first
+  create a normalized cache with `perl ../resolve_plink2_local_ld.pl` from a
+  local 1000 Genomes PLINK2 fileset, using a low `--min-r2` such as `0.01`.
+  Then pass that file with `--ld-cache` and use the same threshold for the
+  plot. This lets signed-R2 coloring use local PLINK2 values across the full
+  displayed window; the large reference files are deliberately not downloaded
+  by the repository.
 - A reusable tabix-indexed GTF cache is queried for each locus; it is not
   rebuilt for every SNP when the cached BGZF file and index remain valid.
 - The repository wrapper now tunes the genome-wide Manhattan palette and

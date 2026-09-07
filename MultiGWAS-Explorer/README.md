@@ -2488,6 +2488,39 @@ fails before SAS submission:
 
 ## Local GTF Overflow Debugging
 
+## Local PLINK2 LD Reference
+
+The HaploReg resolver is intentionally a high-LD proxy resolver: it returns
+only variants meeting the configured display threshold (normally `r² >= 0.8`)
+and only variants in the response/cache. The signed-R² renderer therefore
+correctly colors those returned proxies, but it cannot infer r² for every
+variant in the displayed GTF window. Unreturned variants are treated as
+background (`r²=0`), which can make a dense LD block look sparse.
+
+For complete window-wide LD, use the repository helper
+`DiffGWASDeps/resolve_plink2_local_ld.pl` with a local PLINK2 1000 Genomes
+fileset. It runs `--r2-phased` by default (or `--unphased` for dosage
+correlation), applies the requested chromosome/window and r² threshold, and
+emits the same normalized `query_snp/proxy_snp/proxy_r2` format consumed by
+the plotting pipeline:
+
+```bash
+perl DiffGWASDeps/resolve_plink2_local_ld.pl \
+  --query-snp rs185665940 \
+  --pfile /data/1kg/chr2_phase3 \
+  --chr 2 --from-bp 71269028 --to-bp 73269028 \
+  --window-kb 20000 --min-r2 0.1 \
+  --output cache/plink2_ld/rs185665940_chr2.tsv
+```
+
+The PLINK2 resource page provides phased 1000 Genomes phase-3 `.pgen`, `.pvar`
+and `.psam` files, including chromosome-split downloads. The `.pgen.zst` file
+must be decompressed before use; `.pvar.zst` can be read with PLINK2's `vzs`
+modifier. Keep the reference build aligned with the plot (the phase-3 files
+are GRCh37/hg19), and prefer a chromosome-split fileset so a local query does
+not require a whole-genome scan. The helper does not download or commit these
+large reference files.
+
 When a large-window local GTF rerun looks like it "finished" but the HTML
 contains blank regions, check the saved `run_local_hits_with_gtf_*/output.html.info.txt`
 before trusting the figure.
