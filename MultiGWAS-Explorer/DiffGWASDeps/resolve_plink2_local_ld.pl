@@ -144,7 +144,9 @@ sub parse_report {
     print "LD_SOURCE\tPLINK2_LOCAL\nLD_MIN_R2\t$threshold\n";
     if ($out) {
         for my $proxy (keys %best) {
-            print {$out} join("\t", $ref, $proxy, '1KG', $best{$proxy}, 'PLINK2_LOCAL'), "\n";
+            # The current BED reference is the combined 1000 Genomes panel;
+            # label it EUR-compatible for the existing plot-cache contract.
+            print {$out} join("\t", $ref, $proxy, 'EUR', $best{$proxy}, 'PLINK2_LOCAL'), "\n";
         }
         close $out;
     }
