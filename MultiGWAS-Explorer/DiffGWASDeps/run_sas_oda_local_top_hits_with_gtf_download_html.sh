@@ -190,6 +190,7 @@ MAGICK_BIN="${MAGICK_BIN:-}"
 # displayed genomic half-window in the final figure.
 GTF_DIST2SNP="${LOCAL_GTF_WINDOW_BP}"
 GTF_DESIGN_WIDTH="${GTF_DESIGN_WIDTH:-950}"
+GTF_IMAGE_DPI="${GTF_IMAGE_DPI:-150}"
 count_shell_words() {
   local text="${1:-}"
   local count=0
@@ -231,6 +232,7 @@ GTF_LD_MARKER_COLOR="${GTF_LD_MARKER_COLOR:-black}"
 GTF_LD_DISPLAY_MODE="${GTF_LD_DISPLAY_MODE:-none}"
 GTF_LD_R2_VALUES="${GTF_LD_R2_VALUES:-}"
 GTF_LD_R2_CACHE="${GTF_LD_R2_CACHE:-${TOP_HIT_LD_CACHE_TSV:-}}"
+GTF_LD_REFERENCE_SNP="${GTF_LD_REFERENCE_SNP:-${LOCAL_LD_REFERENCE_SNP:-}}"
 GTF_LD_HEATMAP_COLORS="${GTF_LD_HEATMAP_COLORS:-CXF7FBFF CX6BAED6 CX54278F}"
 GTF_LD_HEATMAP_LEGEND_TITLE="${GTF_LD_HEATMAP_LEGEND_TITLE:-LD r2 (EUR)}"
 
@@ -712,6 +714,34 @@ recover_html_from_submit_artifacts_for_logdir() {
     echo "[recover] Reused the HTML artifact already saved by the submit helper: ${runner_html}"
     return 0
   fi
+  return 1
+}
+
+recover_remote_html_after_session_termination() {
+  local remote_html_basename="$1"
+  local target_html="$2"
+  local target_png="$3"
+  local output_prefix="$4"
+
+  # ODA can finish writing ODS HTML and then drop the SASPy connection while
+  # the helper is collecting the SAS log.  The expected remote HTML is safe to
+  # trust here because stale expected outputs are deleted before submission.
+  rm -f "${target_html}" "${target_png}"
+  echo "[recover] Checking for completed remote HTML after the ODA session terminated: ${remote_html_basename}"
+  oda_download_many_with_timeout \
+    "${ODA_RESULT_DOWNLOAD_TIMEOUT_SECONDS}" \
+    "${ODA_RESULT_DOWNLOAD_TIMEOUT_GRACE_SECONDS}" \
+    "${output_prefix}" \
+    --download-file "~/${remote_html_basename}" \
+    --download-local-path "${target_html}" || true
+
+  [[ -s "${target_html}" ]] || return 1
+  if extract_embedded_png_from_html_path_if_present "${target_html}" "${target_png}"; then
+    echo "[recover] ODA completed the figure before disconnecting; recovered HTML and embedded PNG."
+    return 0
+  fi
+
+  echo "[recover] Remote HTML was present but did not contain a rendered PNG; preserving the remote-termination failure." >&2
   return 1
 }
 
@@ -1399,11 +1429,17 @@ if [[ -n "${TARGET_SNP_LIST}" ]]; then
   fi
 fi
 
+schema_import_extra_args=()
+if [[ -s "${GTF_LD_R2_CACHE}" ]]; then
+  schema_import_extra_args+=(--extra-numeric-cols LD_R2)
+fi
+
 perl "${SCHEMA_INCLUDE_HELPER}" \
   --config "${SCHEMA_CONFIG_JSON}" \
   --dataset scz_mh \
   --source-type gzip \
-  --remote-basename "${REMOTE_DATA_BASENAME}" > "${IMPORT_BLOCK_RENDERED}"
+  --remote-basename "${REMOTE_DATA_BASENAME}" \
+  "${schema_import_extra_args[@]}" > "${IMPORT_BLOCK_RENDERED}"
 
 : > "${GTF_IMPORT_BLOCK_RENDERED}"
 
@@ -1601,6 +1637,7 @@ render_gtf_runner() {
     --replace "GTF_DIST2SNP=${GTF_DIST2SNP}" \
     --replace "GTF_DESIGN_WIDTH=${GTF_DESIGN_WIDTH}" \
     --replace "GTF_DESIGN_HEIGHT=${GTF_DESIGN_HEIGHT}" \
+    --replace "GTF_IMAGE_DPI=${GTF_IMAGE_DPI}" \
     --replace "GTF_DIST2SEP_GENES=${GTF_DIST2SEP_GENES}" \
     --replace "GTF_SHIFT_TEXT_YVAL=${GTF_SHIFT_TEXT_YVAL}" \
     --replace "GTF_PCT4NEG_Y=${GTF_PCT4NEG_Y}" \
@@ -1616,6 +1653,7 @@ render_gtf_runner() {
     --replace "GTF_LD_MARKER_COLOR=${GTF_LD_MARKER_SAS_COLOR}" \
     --replace "GTF_LD_DISPLAY_MODE=${GTF_LD_DISPLAY_MODE}" \
     --replace "GTF_LD_R2_VALUES=${GTF_LD_R2_VALUES//,/ }" \
+    --replace "GTF_LD_REFERENCE_SNP=${GTF_LD_REFERENCE_SNP}" \
     --replace "GTF_LD_HEATMAP_COLORS=${GTF_LD_HEATMAP_COLORS}" \
     --replace "GTF_LD_HEATMAP_LEGEND_TITLE=${GTF_LD_HEATMAP_LEGEND_TITLE}" \
     --replace "GTF_LABEL_TEXT_ROTATE_ANGLE=${label_text_rotate_angle}" \
@@ -2240,6 +2278,14 @@ if [[ -f "${CSV_OUT}" && -s "${CSV_OUT}" ]]; then
           exit 134
         fi
         if sas_oda_report_remote_termination "${batch_run_log_file}" "${batch_run_log_dir}/output.run.status.json" "local-GTF batch ${part} submit attempt ${batch_submit_attempt}" "${batch_submit_rc}"; then
+          if recover_remote_html_after_session_termination \
+            "${batch_output_html_basename}" \
+            "${batch_output_html}" \
+            "${batch_png}" \
+            "recover_local_gtf_after_termination_${stamp}_part${part}"; then
+            batch_submit_rc=0
+            break
+          fi
           exit "${SAS_ODA_REMOTE_TERMINATION_EXIT_CODE:-74}"
         fi
         if gtf_log_has_terminal_failure "${batch_run_log_file}"; then
@@ -2368,6 +2414,14 @@ while :; do
     exit 134
   fi
   if sas_oda_report_remote_termination "${RUN_LOG_FILE}" "${RUN_LOG_DIR}/output.run.status.json" "local-GTF SAS submit attempt ${gtf_submit_attempt}" "${gtf_submit_rc}"; then
+    if recover_remote_html_after_session_termination \
+      "${OUTPUT_HTML_BASENAME}" \
+      "${HTML_OUT}" \
+      "${PNG_OUT}" \
+      "recover_local_gtf_after_termination_${stamp}"; then
+      gtf_submit_rc=0
+      break
+    fi
     exit "${SAS_ODA_REMOTE_TERMINATION_EXIT_CODE:-74}"
   fi
   if gtf_log_has_terminal_failure "${RUN_LOG_FILE}"; then
@@ -2400,7 +2454,7 @@ if gtf_log_has_terminal_failure "${RUN_LOG_FILE}"; then
 fi
 
 echo "[5/5] Downloading self-contained HTML result..."
-rm -f "${HTML_OUT}" "${RAW_HTML_OUT}" "${PNG_OUT}"
+rm -f "${RAW_HTML_OUT}"
 recover_html_from_submit_artifacts || true
 if [[ -s "${HTML_OUT}" ]]; then
   echo "[recover] Using the local SAS HTML artifact saved by the submit helper; remote HTML download will be skipped unless another file is still missing."

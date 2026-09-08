@@ -167,6 +167,14 @@ sub native_path {
         $rest =~ s{/}{\\}g;
         return "$drive:\\$rest";
     }
+    if ($^O =~ /cygwin/i && $abs =~ m{^/}) {
+        if (open my $cygpath, '-|', 'cygpath', '-w', $abs) {
+            my $win = <$cygpath> // '';
+            close $cygpath;
+            $win =~ s/[\r\n]+\z//;
+            return $win if length $win;
+        }
+    }
     return $abs;
 }
 

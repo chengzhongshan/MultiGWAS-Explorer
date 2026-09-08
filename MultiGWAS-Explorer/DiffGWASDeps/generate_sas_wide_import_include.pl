@@ -21,6 +21,7 @@ my $base_cols = join(',', default_base_cols());
 my $value_fields = join(',', default_value_fields());
 my $pair_map = 'SCZ_W3_ALL_SEX=ALL,SCZ_W3_ASN_SEX=ASN,SCZ_W3_EUR_SEX=EUR';
 my $prefix_order = 'ALL,ASN,EUR';
+my $extra_numeric_cols = '';
 
 GetOptions(
     'config=s'          => \$config_file,
@@ -32,6 +33,7 @@ GetOptions(
     'value-fields=s'    => \$value_fields,
     'pair-map=s'        => \$pair_map,
     'prefix-order=s'    => \$prefix_order,
+    'extra-numeric-cols=s' => \$extra_numeric_cols,
 ) or die usage();
 
 die "--remote-basename is required\n" unless length $remote_basename;
@@ -63,6 +65,11 @@ else {
     for my $prefix (@pair_order) {
         push @out_cols, map { "${prefix}_$_" } @value_fields;
     }
+}
+my %out_col_seen = map { uc($_) => 1 } @out_cols;
+for my $col (parse_list($extra_numeric_cols)) {
+    next if $out_col_seen{uc($col)}++;
+    push @out_cols, $col;
 }
 
 my %col_type = map { $_ => 'num' } @out_cols;
@@ -169,6 +176,8 @@ Options:
   --value-fields LIST     Optional override for value fields
   --pair-map LIST         Optional override for pair/prefix mapping
   --prefix-order LIST     Optional override for output prefix ordering
+  --extra-numeric-cols LIST
+                          Comma-separated numeric columns appended to the input table.
 
 Config extras:
   wide_columns            Explicit ordered list of already-wide columns to read.

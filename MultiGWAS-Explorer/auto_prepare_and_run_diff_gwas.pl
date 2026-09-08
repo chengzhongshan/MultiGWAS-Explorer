@@ -42,6 +42,7 @@ my $mode = 'full';
 my $skip_plots = 0;
 my $plots = 'manhattan,local_manhattan,local_gtf';
 my $force = 0;
+my $force_requested = 0;
 my @step_args;
 my $from_step = '';
 my $to_step = '';
@@ -214,6 +215,8 @@ GetOptions(
     'plot-forest!'              => \$step_flag{plot_forest},
     'cleanup-shared-plot-data!' => \$step_flag{cleanup_shared_plot_data},
 ) or die usage();
+
+$force_requested = $force;
 
 if ($print_spec_example || $print_columns_help) {
     print full_help(
@@ -465,6 +468,7 @@ die "--local-ld-marker-color must be a named color or #RRGGBB\n"
     unless $local_ld_marker_color =~ /^(?:#[0-9A-Fa-f]{6}|[A-Za-z][A-Za-z0-9_-]*)$/;
 if ($highlight_high_ld_snps
     && $local_plot_requested
+    && $local_ld_display_mode ne 'heatmap'
     && !$generate_spec_only
     && length($configured_target_snps)
     && !length($local_ld_snps_override)) {
@@ -2618,6 +2622,9 @@ sub build_runner_config {
     my $local_ld_reference_snp = $args{local_ld_reference_snp} // '';
     my $local_ld_cache_override = $args{local_ld_cache_override} // '';
     my $local_ld_population_override = $args{local_ld_population_override} // 'EUR';
+    my $local_ld_population_label = $local_ld_cache_override =~ /(?:^|[_.-])major4(?:[_.-]|$)/i
+      ? 'EUR+AMR+AFR+EAS'
+      : $local_ld_population_override;
     my $local_ld_r2_threshold_override = $args{local_ld_r2_threshold_override} // 0;
     my $local_ld_web_fallback = $args{local_ld_web_fallback} ? 1 : 0;
     my $highlight_high_ld_snps = $args{highlight_high_ld_snps} ? 1 : 0;
@@ -2931,11 +2938,13 @@ sub build_runner_config {
         GTF_LD_DISPLAY_MODE => $local_ld_display_mode,
         GTF_LD_R2_VALUES => ($local_ld_display_mode eq 'heatmap' ? '' : $local_ld_r2_values_override),
         GTF_LD_R2_CACHE => $local_ld_cache_override,
+        GTF_LD_REFERENCE_SNP => $local_ld_reference_snp,
+        GTF_IMAGE_DPI => cfg_or($spec, 'gtf_image_dpi', 150),
         GTF_LD_HEATMAP_COLORS => $local_ld_heatmap_colors,
         GTF_LD_HEATMAP_LEGEND_TITLE => (
             length($local_ld_reference_snp)
-              ? "LD r2 to $local_ld_reference_snp ($local_ld_population_override)"
-              : "LD r2 ($local_ld_population_override)"
+              ? "Signed R2 to $local_ld_reference_snp ($local_ld_population_label)"
+              : "Signed R2 ($local_ld_population_label)"
         ),
         HIGHLIGHT_HIGH_LD_SNPS => $highlight_high_ld_snps,
         LOCAL_LD_CACHE_TSV => (
@@ -3411,6 +3420,10 @@ sub run_gnuplot_space_fallback {
         push @cmd, ('--ld-population', $local_ld_population_override);
         push @cmd, ('--ld-reference-snp', $local_ld_reference_snp)
           if length $local_ld_reference_snp;
+        push @cmd, ('--ld-cache', $local_ld_cache_override)
+          if length $local_ld_cache_override;
+        push @cmd, ('--ld-r2-threshold', 0 + $local_ld_r2_threshold_override);
+        push @cmd, '--no-ld-web-fallback' unless $local_ld_web_fallback;
         my $gnuplot_colors = join(',', map {
             my $c = $_; $c =~ s/^CX/#/i; lc($c)
         } grep { length } split /[\s,]+/, $local_ld_heatmap_colors);
@@ -3432,7 +3445,7 @@ sub run_gnuplot_space_fallback {
           : (length($common_association_cli_threshold || '') ? $common_association_cli_threshold : 1);
         push @cmd, "--get-common-associations=$threshold";
     }
-    push @cmd, '--force' if $force;
+    push @cmd, '--force' if $force_requested;
 
     print "[fallback command] " . join(' ', map { shell_quote_for_display($_) } @cmd) . "\n";
     my $fallback_rc = system(@cmd);

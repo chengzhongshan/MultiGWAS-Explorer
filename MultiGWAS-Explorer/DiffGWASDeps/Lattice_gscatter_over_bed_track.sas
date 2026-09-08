@@ -31,6 +31,7 @@ yaxis_label=Group,/*The value will be used to label the y-axis*/
 linethickness=20, /*line thinkness for gene bed regions*/
 track_width=800, /*Final figure width*/
 track_height=400,/*Final figure height*/
+image_dpi=300,/*Raster output DPI. Lower values reduce SAS ODA Java memory use without changing the layout.*/
 dist2st_and_end=0,/*Extend the start and end position for the x-axis*/
 dotsize=10,/*Scatter plot marker symbol size, and the default marker is circlefilled dot; when making heatmap, it is
 possible to restrict the dotsize as the same for the highlow line size, such as 10pt, which would be different from the 
@@ -2283,7 +2284,7 @@ run;
 
 %put The final figure is put here:;
 %put &workdir/&outimagename._f&outimage_rand_suffix..&fig_fmt;
-ods html image_dpi=300;
+ods html image_dpi=&image_dpi;
 ods graphics on /
 reset=all
 outputfmt=&fig_fmt 

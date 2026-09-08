@@ -43,6 +43,7 @@ Note:
 %let gtf_dist2snp=__GTF_DIST2SNP__;
 %let gtf_design_width=__GTF_DESIGN_WIDTH__;
 %let gtf_design_height=__GTF_DESIGN_HEIGHT__;
+%let gtf_image_dpi=__GTF_IMAGE_DPI__;
 %let gtf_dist2sep_genes=__GTF_DIST2SEP_GENES__;
 %let gtf_shift_text_yval=__GTF_SHIFT_TEXT_YVAL__;
 %let gtf_pct4neg_y=__GTF_PCT4NEG_Y__;
@@ -58,6 +59,7 @@ Note:
 %let gtf_ld_marker_color=__GTF_LD_MARKER_COLOR__;
 %let gtf_ld_display_mode=__GTF_LD_DISPLAY_MODE__;
 %let gtf_ld_r2_values=__GTF_LD_R2_VALUES__;
+%let gtf_ld_reference_snp=__GTF_LD_REFERENCE_SNP__;
 %let gtf_ld_heatmap_colors=__GTF_LD_HEATMAP_COLORS__;
 %let gtf_ld_heatmap_legend_title=__GTF_LD_HEATMAP_LEGEND_TITLE__;
 %let gtf_label_text_rotate_angle=__GTF_LABEL_TEXT_ROTATE_ANGLE__;
@@ -1019,6 +1021,7 @@ run;
     gwas_labels_in_order=&gtf_labels,
     design_width=&gtf_design_width,
     design_height=&gtf_design_height,
+    image_dpi=&gtf_image_dpi,
     barthickness=10,
     dotsize=5,
     grp_font_size=&effective_gtf_grp_font_size,
@@ -1039,6 +1042,7 @@ run;
     LD_display_mode=&gtf_ld_display_mode,
     LD_r2_values=&gtf_ld_r2_values,
     LD_r2_var=LD_R2,
+    LD_reference_snp=&gtf_ld_reference_snp,
     LD_heatmap_colormodel=&gtf_ld_heatmap_colors,
     LD_heatmap_legend_title=&gtf_ld_heatmap_legend_title,
     text_rotate_angle=&gtf_label_text_rotate_angle,

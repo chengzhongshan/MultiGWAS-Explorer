@@ -69,6 +69,7 @@ The list will be used to label scatterplots
 by the sub-macro map_grp_assoc2gene4covidsexgwas*/
 design_width=500,/*Best width for publication, and usually used width rangs from 400 to 800*/ 
 design_height=500,/*Best height for publication, and usally used height rangs from 400 to 800*/
+image_dpi=300,/*Raster output DPI; the SAS ODA wrapper uses 150 to limit Java memory.*/
 barthickness=10, /*gene track bar thinkness*/
 dotsize=6,/*scatter data point size for the following macro variable scattermarker_symbol*/
 grp_font_size=8,/*font size for gene labels in the bottom gene track*/
@@ -182,6 +183,7 @@ LD_marker_symbol=*, /*Marker text for LD-linked SNPs: *, +, x, o, s, ^, or d.*/
 LD_marker_color=black, /*SAS color name or CXrrggbb value for LD-linked SNP markers.*/
 LD_r2_values=, /*Space-delimited SNP:r2 pairs used by the optional LD heatmap overlay.*/
 LD_r2_var=LD_R2, /*Numeric LD column uploaded with the GWAS plotting dataset.*/
+LD_reference_snp=, /*Explicit LD reference SNP; falls back to the first labeled SNP when omitted.*/
 LD_display_mode=none, /*none, markers, heatmap, or both. LD display is opt-in.*/
 LD_heatmap_colormodel=CXF7FBFF CX6BAED6 CX54278F, /*Retained for legacy marker-overlay mode.*/
 LD_heatmap_legend_title=%str(LD r2),
@@ -204,9 +206,10 @@ adjust top SNPs labels if these labels are rotated 90 degree, which is helpful w
 verbose=0 /*Not print any notes in SAS log*/
 );
 
-%local effective_ld_marker_var effective_ld_heatmap_var;
+%local effective_ld_marker_var effective_ld_heatmap_var effective_heatmap_legend_title;
 %let effective_ld_marker_var=;
 %let effective_ld_heatmap_var=;
+%let effective_heatmap_legend_title=&heatmap_legend_title;
  
 %*It is better to output these notes into the log for AI; 
 %*However, too large number of notes will slow down the pipeline dramatically;
@@ -244,15 +247,17 @@ run;
  %let effective_ld_heatmap_var=_LD_R2_;
  data &gwas_dsd;
  set &gwas_dsd;
- _LD_R2_=.;
- %let _ld_reference_snp_=%scan(&SNPs2label_scatterplot_dots,1,%str( ));
+ _LD_R2_=&LD_r2_var;
+ %let _ld_reference_snp_=&LD_reference_snp;
+ %if %length(&_ld_reference_snp_)=0 %then %let _ld_reference_snp_=%scan(&SNPs2label_scatterplot_dots,1,%str( ));
  %if %length(&_ld_reference_snp_)=0 %then %let _ld_reference_snp_=%scan(&SNP_IDs,1,%str( ));
- if not missing(vvaluex("&LD_r2_var")) then _LD_R2_=input(vvaluex("&LD_r2_var"),best32.);
  if missing(_LD_R2_) and upcase(&SNP_Var)=upcase("&_ld_reference_snp_") then _LD_R2_=1;
- %do _li_=1 %to %ntokens(&LD_r2_values);
-   %let _ld_pair_=%scan(&LD_r2_values,&_li_,%str( ));
-   if upcase(&SNP_Var)=upcase("%scan(&_ld_pair_,1,%str(:))") then
-     if missing(_LD_R2_) then _LD_R2_=input("%scan(&_ld_pair_,2,%str(:))",best32.);
+ %if %length(%superq(LD_r2_values))>0 %then %do;
+   %do _li_=1 %to %ntokens(&LD_r2_values);
+     %let _ld_pair_=%scan(&LD_r2_values,&_li_,%str( ));
+     if upcase(&SNP_Var)=upcase("%scan(&_ld_pair_,1,%str(:))") then
+       if missing(_LD_R2_) then _LD_R2_=input("%scan(&_ld_pair_,2,%str(:))",best32.);
+   %end;
  %end;
  run;
  %let effective_signed_r2=1;
@@ -279,6 +284,7 @@ run;
   %end;
   %let effective_heatmap_min_neg_val=-1;
   %let effective_heatmap_max_pos_val=1;
+  %let effective_heatmap_legend_title=&LD_heatmap_legend_title;
 %end;
 
 *Add labels for target SNPs if they exist;
@@ -398,6 +404,7 @@ to work on these transcripts instead of genes*/
   gwas_labels_in_order=&gwas_labels_in_order,
   design_width=&design_width, 
   design_height=&design_height, 
+  image_dpi=&image_dpi,
   barthickness=&barthickness, 
   dotsize=&dotsize, 
   grp_font_size=&grp_font_size,
@@ -503,7 +510,7 @@ this fixed value will be used instead of yaxis_offset4max!*/
 Yoffset4textlabels=&Yoffset4textlabels, /*Move up the text labels for target SNPs in specific fold; 
 the default value 2.5 fold works for most cases*/
 scatter_yaxis_label=&scatter_yaxis_label, /*Visible y-axis title for the stacked association tracks*/
-heatmap_legend_title=&heatmap_legend_title, /*Visible title for the continuous colorbar when heatmap coloring is enabled*/
+heatmap_legend_title=&effective_heatmap_legend_title, /*Visible title for the continuous colorbar when heatmap coloring is enabled*/
 adj_spaces_among_top_snps=&adj_spaces_among_top_snps /*Provide value 1 to adjust spaces among top SNP labels; otherwise, give value 0 to not 
 adjust top SNPs labels if these labels are rotated 90 degree, which is helpful when the space adjusted labels are not pretty*/ 
   ); 

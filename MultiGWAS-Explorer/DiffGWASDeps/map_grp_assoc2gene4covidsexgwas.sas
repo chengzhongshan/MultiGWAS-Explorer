@@ -22,6 +22,7 @@ AssocPVars=pval gwas1_p gwas2_p,
 ZscoreVars=diff_zscore gwas1_z gwas2_z,
 design_width=800,/*Width*height=800*800 would be the best for publication*/
 design_height=800,
+image_dpi=300,
 barthickness=8,
 dotsize=6,
 grp_font_size=8,/*font size for gene labels in the bottom gene track*/
@@ -366,6 +367,7 @@ gene_exon_bed_dsd=exons,/*Too many exons will slow down the macro dramatically*/
 dist2st_and_end=0,
 design_width=&design_width,
 design_height=&design_height,
+image_dpi=&image_dpi,
 barthickness=&barthickness,
 dotsize=&dotsize,
 grp_font_size=&grp_font_size,
