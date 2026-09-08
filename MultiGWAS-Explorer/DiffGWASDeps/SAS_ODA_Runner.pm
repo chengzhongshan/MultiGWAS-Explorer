@@ -148,9 +148,9 @@ sys.stdout = sys.stderr
 
 LOAD_MACROS_CODE = '''
 %macro _pipeline_bootstrap_macros;
-%global _pipeline_macro_bootstrap_ok _pipeline_macro_bootstrap_skipped _pipeline_debug_macro_exists;
+%global _pipeline_macro_bootstrap_ok _pipeline_macro_boot_skipped _pipeline_debug_macro_exists;
 %let _pipeline_macro_bootstrap_ok=0;
-%let _pipeline_macro_bootstrap_skipped=0;
+%let _pipeline_macro_boot_skipped=0;
 %let _pipeline_debug_macro_exists=%sysmacexist(debug_macro);
 %let _home=%sysfunc(pathname(HOME));
 %let _macro_home=&_home/Macros;
@@ -163,7 +163,7 @@ LOAD_MACROS_CODE = '''
 options nomprint nomlogic nosymbolgen nonotes nosource nosource2;
 %if &_pipeline_debug_macro_exists %then %do;
     %let _pipeline_macro_bootstrap_ok=1;
-    %let _pipeline_macro_bootstrap_skipped=1;
+    %let _pipeline_macro_boot_skipped=1;
 %end;
 %else %do;
     %if %sysfunc(fileexist("&_home/importallmacros_ue.sas")) %then %do;
@@ -184,7 +184,7 @@ options nomprint nomlogic nosymbolgen nonotes nosource nosource2;
 %end;
 options &_pipeline_opt_mprint &_pipeline_opt_mlogic &_pipeline_opt_symbolgen &_pipeline_opt_notes &_pipeline_opt_source &_pipeline_opt_source2;
 %put NOTE: PIPELINE_DEBUG_MACRO_EXISTS=&_pipeline_debug_macro_exists;
-%put NOTE: PIPELINE_MACRO_BOOTSTRAP_SKIPPED=&_pipeline_macro_bootstrap_skipped;
+%put NOTE: PIPELINE_MACRO_BOOTSTRAP_SKIPPED=&_pipeline_macro_boot_skipped;
 %put NOTE: PIPELINE_MACRO_BOOTSTRAP_OK=&_pipeline_macro_bootstrap_ok;
 %mend;
 %_pipeline_bootstrap_macros;
@@ -468,7 +468,7 @@ def ensure_macros_loaded(session_obj):
     try:
         bootstrap_ok = str(session.symget('_pipeline_macro_bootstrap_ok') or '').strip()
         debug_macro_exists = str(session.symget('_pipeline_debug_macro_exists') or '').strip()
-        bootstrap_skipped = str(session.symget('_pipeline_macro_bootstrap_skipped') or '').strip()
+        bootstrap_skipped = str(session.symget('_pipeline_macro_boot_skipped') or '').strip()
     except Exception:
         bootstrap_ok = ''
         debug_macro_exists = ''
@@ -1391,7 +1391,7 @@ sub _autoload_macros_enabled {
 
 my $SERVER_HOST = '127.0.0.1';
 my $SERVER_PORT = 8765;
-my $SERVER_API_VERSION = '2026-08-31-debug-macro-bootstrap-guard';
+my $SERVER_API_VERSION = '2026-09-01-sas32-debug-macro-guard';
 my $SERVER_CONNECT_TIMEOUT_SECONDS = int($ENV{SAS_ODA_SESSION_CONNECT_TIMEOUT_SECONDS} // 5);
 my $SERVER_CREATE_TIMEOUT_SECONDS  = int($ENV{SAS_ODA_SESSION_CREATE_TIMEOUT_SECONDS} // 60);
 my $SERVER_FILEOP_TIMEOUT_SECONDS  = int($ENV{SAS_ODA_SESSION_FILEOP_TIMEOUT_SECONDS} // 20);
@@ -1598,7 +1598,7 @@ import tempfile
 from datetime import datetime
 HOST = '127.0.0.1'
 PORT = 8765
-SERVER_API_VERSION = '2026-08-31-debug-macro-bootstrap-guard'
+SERVER_API_VERSION = '2026-09-01-sas32-debug-macro-guard'
 sessions = {}
 session_macros_loaded = {}
 session_macro_bootstrap_warning = {}
@@ -1608,9 +1608,9 @@ LOG_PATH = os.environ.get('SAS_ODA_SESSION_DEBUG_LOG') or os.path.join(os.path.d
 STATUS_FILE = os.environ.get('SAS_ODA_STATUS_FILE') or ''
 LOAD_MACROS_CODE = '''
 %macro _pipeline_bootstrap_macros;
-%global _pipeline_macro_bootstrap_ok _pipeline_macro_bootstrap_skipped _pipeline_debug_macro_exists;
+%global _pipeline_macro_bootstrap_ok _pipeline_macro_boot_skipped _pipeline_debug_macro_exists;
 %let _pipeline_macro_bootstrap_ok=0;
-%let _pipeline_macro_bootstrap_skipped=0;
+%let _pipeline_macro_boot_skipped=0;
 %let _pipeline_debug_macro_exists=%sysmacexist(debug_macro);
 %let _home=%sysfunc(pathname(HOME));
 %let _macro_home=&_home/Macros;
@@ -1623,7 +1623,7 @@ LOAD_MACROS_CODE = '''
 options nomprint nomlogic nosymbolgen nonotes nosource nosource2;
 %if &_pipeline_debug_macro_exists %then %do;
     %let _pipeline_macro_bootstrap_ok=1;
-    %let _pipeline_macro_bootstrap_skipped=1;
+    %let _pipeline_macro_boot_skipped=1;
 %end;
 %else %do;
     %if %sysfunc(fileexist("&_home/importallmacros_ue.sas")) %then %do;
@@ -1644,7 +1644,7 @@ options nomprint nomlogic nosymbolgen nonotes nosource nosource2;
 %end;
 options &_pipeline_opt_mprint &_pipeline_opt_mlogic &_pipeline_opt_symbolgen &_pipeline_opt_notes &_pipeline_opt_source &_pipeline_opt_source2;
 %put NOTE: PIPELINE_DEBUG_MACRO_EXISTS=&_pipeline_debug_macro_exists;
-%put NOTE: PIPELINE_MACRO_BOOTSTRAP_SKIPPED=&_pipeline_macro_bootstrap_skipped;
+%put NOTE: PIPELINE_MACRO_BOOTSTRAP_SKIPPED=&_pipeline_macro_boot_skipped;
 %put NOTE: PIPELINE_MACRO_BOOTSTRAP_OK=&_pipeline_macro_bootstrap_ok;
 %mend;
 %_pipeline_bootstrap_macros;
@@ -1854,7 +1854,7 @@ def ensure_macros_loaded(session_id, sess, progress_callback=None):
     try:
         bootstrap_ok = str(sess.symget('_pipeline_macro_bootstrap_ok') or '').strip()
         debug_macro_exists = str(sess.symget('_pipeline_debug_macro_exists') or '').strip()
-        bootstrap_skipped = str(sess.symget('_pipeline_macro_bootstrap_skipped') or '').strip()
+        bootstrap_skipped = str(sess.symget('_pipeline_macro_boot_skipped') or '').strip()
     except Exception:
         bootstrap_ok = ''
         debug_macro_exists = ''

@@ -1,4 +1,4 @@
-%macro Check_VarnamesInDsd(indsd=,Rgx=.,exist_tag=);
+%macro Check_VarnamesInDsd(indsd=,Rgx=.,exist_tag=,abort_on_missing=1);
 
 %global &exist_tag;
 %let &exist_tag=;
@@ -28,7 +28,9 @@ from _tmp_1;
 
 %if %length(&&&exist_tag)=0 %then %do;
   %put No varnames matching with your Rgx (&Rgx);
-  %abort 255;
+  %if %sysevalf(&abort_on_missing=1) %then %do;
+    %abort 255;
+  %end;
 %end;
 %else %do;
 	 proc datasets lib=work nolist;

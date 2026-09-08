@@ -17,6 +17,10 @@ my $runner_path = File::Spec->catfile($Bin, 'SAS_ODA_Runner.pm');
 my $server_path = File::Spec->catfile($Bin, 'sas_oda_session_server.py');
 my $runner = slurp($runner_path);
 my $server = slurp($server_path);
+die "Runner still references the overlength SAS macro variable\n"
+    if $runner =~ /_pipeline_macro_bootstrap_skipped/;
+die "Session server still references the overlength SAS macro variable\n"
+    if $server =~ /_pipeline_macro_bootstrap_skipped/;
 
 my @runner_blocks = ($runner =~ /LOAD_MACROS_CODE\s*=\s*'''(.*?)'''/sg);
 my @server_blocks = ($server =~ /LOAD_MACROS_CODE\s*=\s*'''(.*?)'''/sg);
@@ -30,7 +34,7 @@ for my $block (@runner_blocks, @server_blocks) {
     ++$block_number;
     my $probe = '%let _pipeline_debug_macro_exists=%sysmacexist(debug_macro);';
     my $guard = '%if &_pipeline_debug_macro_exists %then %do;';
-    my $skip = '%let _pipeline_macro_bootstrap_skipped=1;';
+    my $skip = '%let _pipeline_macro_boot_skipped=1;';
     my $include = '%include';
 
     my $probe_at = index($block, $probe);
@@ -45,6 +49,13 @@ for my $block (@runner_blocks, @server_blocks) {
         unless $probe_at < $include_at && $guard_at < $include_at && $skip_at < $include_at;
     die "Block $block_number does not expose the skip diagnostic\n"
         unless $block =~ /PIPELINE_MACRO_BOOTSTRAP_SKIPPED=/;
+    while ($block =~ /%global\s+([^;]+);/g) {
+        for my $name (split /\s+/, $1) {
+            next unless length $name;
+            die "Block $block_number declares SAS macro variable longer than 32 characters: $name\n"
+                if length($name) > 32;
+        }
+    }
 }
 
 my ($perl_api) = $runner =~ /my \$SERVER_API_VERSION = '([^']+)'/;

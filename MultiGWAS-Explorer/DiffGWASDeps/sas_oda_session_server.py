@@ -7,7 +7,7 @@ import tempfile
 from datetime import datetime
 HOST = '127.0.0.1'
 PORT = 8765
-SERVER_API_VERSION = '2026-08-31-debug-macro-bootstrap-guard'
+SERVER_API_VERSION = '2026-09-01-sas32-debug-macro-guard'
 sessions = {}
 session_macros_loaded = {}
 session_macro_bootstrap_warning = {}
@@ -17,9 +17,9 @@ LOG_PATH = os.environ.get('SAS_ODA_SESSION_DEBUG_LOG') or os.path.join(os.path.d
 STATUS_FILE = os.environ.get('SAS_ODA_STATUS_FILE') or ''
 LOAD_MACROS_CODE = '''
 %macro _pipeline_bootstrap_macros;
-%global _pipeline_macro_bootstrap_ok _pipeline_macro_bootstrap_skipped _pipeline_debug_macro_exists;
+%global _pipeline_macro_bootstrap_ok _pipeline_macro_boot_skipped _pipeline_debug_macro_exists;
 %let _pipeline_macro_bootstrap_ok=0;
-%let _pipeline_macro_bootstrap_skipped=0;
+%let _pipeline_macro_boot_skipped=0;
 %let _pipeline_debug_macro_exists=%sysmacexist(debug_macro);
 %let _home=%sysfunc(pathname(HOME));
 %let _macro_home=&_home/Macros;
@@ -32,7 +32,7 @@ LOAD_MACROS_CODE = '''
 options nomprint nomlogic nosymbolgen nonotes nosource nosource2;
 %if &_pipeline_debug_macro_exists %then %do;
     %let _pipeline_macro_bootstrap_ok=1;
-    %let _pipeline_macro_bootstrap_skipped=1;
+    %let _pipeline_macro_boot_skipped=1;
 %end;
 %else %do;
     %if %sysfunc(fileexist("&_home/importallmacros_ue.sas")) %then %do;
@@ -53,7 +53,7 @@ options nomprint nomlogic nosymbolgen nonotes nosource nosource2;
 %end;
 options &_pipeline_opt_mprint &_pipeline_opt_mlogic &_pipeline_opt_symbolgen &_pipeline_opt_notes &_pipeline_opt_source &_pipeline_opt_source2;
 %put NOTE: PIPELINE_DEBUG_MACRO_EXISTS=&_pipeline_debug_macro_exists;
-%put NOTE: PIPELINE_MACRO_BOOTSTRAP_SKIPPED=&_pipeline_macro_bootstrap_skipped;
+%put NOTE: PIPELINE_MACRO_BOOTSTRAP_SKIPPED=&_pipeline_macro_boot_skipped;
 %put NOTE: PIPELINE_MACRO_BOOTSTRAP_OK=&_pipeline_macro_bootstrap_ok;
 %mend;
 %_pipeline_bootstrap_macros;
@@ -263,7 +263,7 @@ def ensure_macros_loaded(session_id, sess, progress_callback=None):
     try:
         bootstrap_ok = str(sess.symget('_pipeline_macro_bootstrap_ok') or '').strip()
         debug_macro_exists = str(sess.symget('_pipeline_debug_macro_exists') or '').strip()
-        bootstrap_skipped = str(sess.symget('_pipeline_macro_bootstrap_skipped') or '').strip()
+        bootstrap_skipped = str(sess.symget('_pipeline_macro_boot_skipped') or '').strip()
     except Exception:
         bootstrap_ok = ''
         debug_macro_exists = ''
@@ -413,8 +413,35 @@ def ensure_session(session_id):
     return sessions[session_id]
 
 def session_home(sess):
-    sess.submit("%let homepath=%sysfunc(pathname(HOME));")
-    return sess.symget('homepath')
+    cfg = getattr(getattr(sess, '_io', None), 'sascfg', None)
+    userid = str(getattr(cfg, 'omruser', '') or '').strip()
+    authkey = str(getattr(cfg, 'authkey', '') or '').strip()
+    if not userid:
+        authfile = os.path.join(os.path.expanduser('~'), '_authinfo' if os.name == 'nt' else '.authinfo')
+        try:
+            with open(authfile, 'r', encoding='utf-8') as handle:
+                for line in handle:
+                    fields = line.split()
+                    if len(fields) == 5 and (not authkey or fields[0] == authkey) and fields[1] == 'user' and fields[3] == 'password':
+                        userid = fields[2]
+                        break
+        except OSError:
+            pass
+    home_user = userid.split('@', 1)[0]
+    if home_user and home_user.lower() not in ('admin', 'root') and all(c.isalnum() or c in '._-' for c in home_user):
+        return f"/home/{home_user}"
+    sess.submit(r'''
+%global _mg_homepath;
+%let _mg_homepath=;
+%if %symexist(_USERHOME) %then %let _mg_homepath=%superq(_USERHOME);
+%if %superq(_mg_homepath)= %then %let _mg_homepath=%sysget(HOME);
+%if %superq(_mg_homepath)= %then %let _mg_homepath=%sysfunc(pathname(HOME));
+''')
+    userid = str(sess.symget('SYSUSERID') or '').strip()
+    home_user = userid.split('@', 1)[0]
+    if home_user and home_user.lower() not in ('admin', 'root') and all(c.isalnum() or c in '._-' for c in home_user):
+        return f"/home/{home_user}"
+    return str(sess.symget('_mg_homepath') or '').strip()
 
 def resolve_remote_path(remote_path, sess):
     if remote_path.startswith('~/'):
@@ -599,14 +626,14 @@ def probe_session_after_empty_submit(sess):
         detail = traceback.format_exc()
         return False, f"{type(exc).__name__}: {exc}\n{detail}"
 
-def with_retry(session_id, fn):
+def with_retry(session_id, fn, retry_session_loss=True):
     try:
         sess = ensure_session(session_id)
         return fn(sess)
     except Exception as e:
         err = str(e)
         log_event(f"with_retry error session_id={session_id} err={err}")
-        if 'No SAS process attached' in err or 'SAS process has terminated' in err:
+        if retry_session_loss and ('No SAS process attached' in err or 'SAS process has terminated' in err):
             with lock:
                 log_event(f"with_retry recreating session_id={session_id}")
                 sess = create_session(session_id)
@@ -689,7 +716,12 @@ def handle_client(conn, addr):
                         if not alive:
                             raise RuntimeError("SAS submit returned empty output and the SAS session was no longer usable afterwards.\n" + probe_detail)
                     return res
-                res = with_retry(session_id, _submit)
+                # Never resubmit user SAS code implicitly after the ODA process
+                # dies.  A WORK-space exhaustion can terminate the process, and
+                # replaying the same code wastes time and normally fails again.
+                # The caller preserves/classifies the SAS log and decides whether
+                # a genuinely retryable submission should be started.
+                res = with_retry(session_id, _submit, retry_session_loss=False)
                 log = str(res.get('LOG',''))
                 lst = str(res.get('LST',''))
                 if macro_log and macro_warning:

@@ -67,7 +67,7 @@ my %reference_contract = (
     'auto_prepare_and_run_diff_gwas.pl' => [
         'local-ld-reference-snp|ld-reference-snp=s',
         'query_snps  => $local_ld_reference_snp',
-        'LD r2 to $local_ld_reference_snp',
+        'Signed R2 to $local_ld_reference_snp',
     ],
     'auto_prepare_and_run_diff_gwas_with_gunplot.pl' => [
         'ld-reference-snp=s',

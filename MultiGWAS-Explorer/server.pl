@@ -1196,6 +1196,7 @@ $server->tool(
             local_ld_display_mode => { type => 'string', description => 'Optional LD rendering mode: none, markers, heatmap, or both. Default is none; heatmap adds a separate LD r2 scale.' },
             local_ld_r2_values => { type => 'string', description => 'Optional comma-separated SNP:r2 values for explicit local_ld_snps.' },
             local_ld_heatmap_colors => { type => 'string', description => 'Optional space-delimited SAS CX colors, low to high, for the LD r2 inset.' },
+            local_ld_reference_snp => { type => 'string', description => 'Optional target SNP used as the single LD reference for a multi-query locus. Defaults to the first target SNP.' },
             local_ld_population => { type => 'string', description => 'Optional HaploReg LD population: AFR, AMR, ASN, or EUR (default EUR).' },
             local_ld_r2_threshold => { type => 'number', description => 'Optional minimum HaploReg LD r2, default 0.8.' },
             local_ld_cache => { type => 'string', description => 'Optional normalized local HaploReg TSV/SQLite cache used before web fallback.' },
@@ -1298,6 +1299,7 @@ $server->tool(
         my $local_ld_display_mode = $args->{local_ld_display_mode} // '';
         my $local_ld_r2_values = $args->{local_ld_r2_values} // '';
         my $local_ld_heatmap_colors = $args->{local_ld_heatmap_colors} // '';
+        my $local_ld_reference_snp = $args->{local_ld_reference_snp} // '';
         my $local_ld_population = $args->{local_ld_population} // '';
         my $local_ld_r2_threshold = $args->{local_ld_r2_threshold};
         my $local_ld_cache = $args->{local_ld_cache} // '';
@@ -1527,6 +1529,7 @@ $server->tool(
             push @cmd, ('--local-ld-display-mode', $local_ld_display_mode) if length $local_ld_display_mode;
             push @cmd, ('--local-ld-r2-values', $local_ld_r2_values) if length $local_ld_r2_values;
             push @cmd, ('--local-ld-heatmap-colors', $local_ld_heatmap_colors) if length $local_ld_heatmap_colors;
+            push @cmd, ('--local-ld-reference-snp', $local_ld_reference_snp) if length $local_ld_reference_snp;
             push @cmd, ('--local-ld-population', $local_ld_population) if length $local_ld_population;
             push @cmd, ('--local-ld-r2-threshold', $local_ld_r2_threshold) if defined $local_ld_r2_threshold;
             push @cmd, ('--local-ld-cache', $local_ld_cache) if length $local_ld_cache;
@@ -1717,6 +1720,7 @@ $server->tool(
             ld_display_mode => { type => 'string', description => 'Optional LD rendering mode: none, markers, heatmap, or both. Heatmap uses a separate blue-purple r2 inset and leaves the association Z-score scale unchanged.' },
             ld_r2_values => { type => 'string', description => 'Optional comma-separated SNP:r2 values for explicit ld_snps.' },
             ld_heatmap_colors => { type => 'string', description => 'Optional comma-separated low-to-high #RRGGBB colors for the LD r2 inset.' },
+            ld_reference_snp => { type => 'string', description => 'Optional target SNP used as the single LD reference for a multi-query locus. Defaults to the first target SNP.' },
             ld_population => { type => 'string', description => 'Optional HaploReg population label/source for LD, default EUR.' },
             ld_r2_threshold => { type => 'number', description => 'Optional minimum HaploReg LD r2, default 0.8.' },
             ld_cache => { type => 'string', description => 'Optional normalized local HaploReg TSV/SQLite cache used before web fallback.' },
@@ -1747,6 +1751,7 @@ $server->tool(
         my $ld_display_mode = $args->{ld_display_mode} // '';
         my $ld_r2_values = $args->{ld_r2_values} // '';
         my $ld_heatmap_colors = $args->{ld_heatmap_colors} // '';
+        my $ld_reference_snp = $args->{ld_reference_snp} // '';
         my $ld_population = $args->{ld_population} // '';
         my $ld_r2_threshold = $args->{ld_r2_threshold};
         my $ld_cache = $args->{ld_cache} // '';
@@ -1837,6 +1842,7 @@ $server->tool(
         push @cmd, ('--ld-display-mode', $ld_display_mode) if length $ld_display_mode;
         push @cmd, ('--ld-r2-values', $ld_r2_values) if length $ld_r2_values;
         push @cmd, ('--ld-heatmap-colors', $ld_heatmap_colors) if length $ld_heatmap_colors;
+        push @cmd, ('--ld-reference-snp', $ld_reference_snp) if length $ld_reference_snp;
         push @cmd, ('--ld-population', $ld_population) if length $ld_population;
         push @cmd, ('--ld-r2-threshold', $ld_r2_threshold) if defined $ld_r2_threshold;
         push @cmd, ('--ld-cache', $ld_cache) if length $ld_cache;
