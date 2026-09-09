@@ -1023,8 +1023,15 @@ sub resolve_ld_snps_for_query {
             warn "WARNING: Cannot start high-LD resolver $helper: $!\n";
         }
     }
-    print "[prep] LD-linked SNP marker overlay relative to " . join(',', @{ $args{query_snps} || [] })
-        . " ($population, r2 >= $min_r2): " . join(',', @ld) . "\n" if @ld;
+    if (@ld) {
+        my $preview_limit = 20;
+        my @preview = @ld > $preview_limit ? @ld[0 .. $preview_limit - 1] : @ld;
+        my $suffix = @ld > $preview_limit
+            ? sprintf(' ... (%d total; first %d shown)', scalar(@ld), $preview_limit)
+            : sprintf(' (%d total)', scalar(@ld));
+        print "[prep] LD-linked SNP marker overlay relative to " . join(',', @{ $args{query_snps} || [] })
+            . " ($population, r2 >= $min_r2): " . join(',', @preview) . $suffix . "\n";
+    }
     print "[warn] No high-LD proxies resolved for " . join(',', @{ $args{query_snps} || [] })
         . " ($population, r2 >= $min_r2); no LD marker overlay will be drawn.\n" unless @ld;
     return (\@ld, \%r2_for);
@@ -1154,6 +1161,19 @@ sub plot_local_series {
         my $batch_pos = $render_idx - $batch_start;
         my $batch_col = $batch_pos % $batch_cols;
         my $locus_prefix = File::Spec->catfile($args{output_dir}, $base_name . '_' . $safe_snp);
+        my $ld_r2_file = $locus_prefix . '.ld_r2.tsv';
+        if (@ld_snps) {
+            open my $ldfh, '>:raw', $ld_r2_file
+                or die "Cannot write LD R2 sidecar $ld_r2_file: $!\n";
+            print {$ldfh} "SNP\tR2\n";
+            for my $snp (@ld_snps) {
+                my $key = lc $snp;
+                my $r2 = exists($ld_r2_ref->{$key})
+                    ? sprintf('%.6g', $ld_r2_ref->{$key}) : '';
+                print {$ldfh} "$snp\t$r2\n";
+            }
+            close $ldfh or die "Cannot close LD R2 sidecar $ld_r2_file: $!\n";
+        }
         my $existing_locus_manifest = $locus_prefix . '.manifest.tsv';
         if (-s $existing_locus_manifest && (!defined $hit->{CHR} || !defined $hit->{BP})) {
             my $prior_metrics = read_manifest_tsv($existing_locus_manifest);
@@ -1171,6 +1191,7 @@ sub plot_local_series {
         if ($args{with_gtf} || $batch_annotation_mode eq 'gtf') {
             push @required_locus_outputs, $locus_prefix . '.genes.tsv';
         }
+        push @required_locus_outputs, $ld_r2_file if @ld_snps;
         my $expected_gtf_file = infer_cached_locus_gtf_path(
             output_dir => $args{output_dir},
             snp        => $hit->{SNP},
@@ -1352,14 +1373,13 @@ sub plot_local_series {
             '--sig', ($runner->{TOP_HIT_SIGNAL_THRSHD} || '1e-6'),
         );
         push @cmd, ('--ld-reference-snp', $ld_reference_snp);
-        push @cmd, ('--ld-snps', $ld_snps_csv) if length $ld_snps_csv;
+        push @cmd, ('--ld-r2-file', $ld_r2_file) if @ld_snps;
         if ($args{highlight_high_ld_snps}) {
             push @cmd, ('--ld-marker-symbol', ($args{ld_marker_symbol} || 'star'));
             push @cmd, ('--ld-marker-color', ($args{ld_marker_color} || 'black'));
             push @cmd, ('--ld-display-mode', ($args{ld_display_mode} || 'markers'));
             push @cmd, ('--ld-population', ($args{ld_population} || 'EUR'));
             push @cmd, ('--ld-heatmap-colors', ($args{ld_heatmap_colors} || '#f7fbff,#6baed6,#54278f'));
-            push @cmd, ('--ld-r2-values', $ld_r2_values) if length $ld_r2_values;
         }
         if ($args{kind} eq 'local_manhattan') {
             my $bottom_gene = $hit->{gene} || '';

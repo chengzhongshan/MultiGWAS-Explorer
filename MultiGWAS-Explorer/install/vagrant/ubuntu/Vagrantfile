@@ -9,9 +9,20 @@ Vagrant.configure("2") do |config|
     h.vmname = "diffgwas-pipeline-ubuntu"
   end
 
-  config.vm.provision "shell", privileged: true, inline: <<-SHELL
+  # Install into the VM's Linux filesystem.  Installing directly in /repo would
+  # overwrite the host's .venv-pipeline with Linux binaries when /repo is a
+  # Windows shared folder.
+  config.vm.provision "shell", privileged: false, inline: <<-SHELL
     set -euo pipefail
-    cd /repo
+    vm_root=/home/vagrant/MultiGWAS-Explorer
+    mkdir -p "${vm_root}"
+    tar \
+      --exclude=.venv-pipeline \
+      --exclude=local \
+      --exclude=cache \
+      --exclude=.oda_upload_aliases \
+      -C /repo -cf - . | tar -C "${vm_root}" -xf -
+    cd "${vm_root}"
     bash install/install_ubuntu.sh
   SHELL
 end

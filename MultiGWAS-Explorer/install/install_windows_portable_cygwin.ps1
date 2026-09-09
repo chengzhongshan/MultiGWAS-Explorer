@@ -175,7 +175,7 @@ function Invoke-PortablePackageRefresh {
     Reset-PortableCygwinRoot -PortableCygwinRoot $PortableCygwinRoot
 
     if ([string]::IsNullOrWhiteSpace($CygwinPackages)) {
-        $CygwinPackages = 'bash,ca-certificates,curl,cygwin,gcc-core,gcc-g++,gnuplot-base,ImageMagick,libbz2-devel,libcurl-devel,libgd-devel,liblzma-devel,make,openssl,openssl-devel,perl,perl-File-Which,perl-GD,perl-JSON,perl-JSON-MaybeXS,perl-Mojolicious,pkg-config,python3,python312,python312-devel,python312-imaging,python312-pip,python312-setuptools,python312-wheel,unzip,wget,which,zip,zlib-devel'
+        $CygwinPackages = 'bash,ca-certificates,curl,cygwin,gcc-core,gcc-g++,gnuplot-base,ImageMagick,libbz2-devel,libcurl-devel,libgd-devel,liblzma-devel,libssl-devel,make,openssl,perl,perl-DBD-SQLite,perl-DBI,perl-File-Which,perl-GD,perl-JSON,perl-JSON-MaybeXS,perl-Mojolicious,perl-Text-CSV,pkg-config,python3,python312,python312-devel,python312-imaging,python312-pip,python312-setuptools,python312-wheel,unzip,wget,which,zip,zlib-devel'
     }
 
     Write-InstallLog "Refreshing portable Cygwin packages under $PortableCygwinRoot"

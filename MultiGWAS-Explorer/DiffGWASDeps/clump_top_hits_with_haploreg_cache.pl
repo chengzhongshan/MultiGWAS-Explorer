@@ -1,4 +1,26 @@
 #!/usr/bin/env perl
+BEGIN {
+    require Config;
+    require File::Basename;
+    require File::Spec;
+    require lib;
+    my $project_root = File::Spec->catdir(
+        File::Basename::dirname(__FILE__),
+        File::Spec->updir(),
+    );
+    my $platform_tag = lc($^O || '');
+    $platform_tag =~ s/[^a-z0-9]+/_/g;
+    for my $base (
+        File::Spec->catdir($project_root, 'local', "perl5-$platform_tag", 'lib', 'perl5'),
+        File::Spec->catdir($project_root, 'local', 'perl5', 'lib', 'perl5'),
+    ) {
+        next unless -d $base;
+        lib->import($base);
+        my $arch = File::Spec->catdir($base, $Config::Config{archname});
+        lib->import($arch) if -d $arch;
+    }
+}
+
 use strict;
 use warnings;
 use DBI;

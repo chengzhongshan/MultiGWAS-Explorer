@@ -28,6 +28,8 @@ Options:
   --ld-marker-color COLOR  Named or #RRGGBB color (default: black).
   --ld-display-mode MODE   none, markers, heatmap, or both (default: none).
   --ld-r2-values MAP       Comma-separated SNP:r2 values for LD proxies.
+  --ld-r2-file FILE        Two-column SNP/R2 TSV. Preferred for large LD sets
+                           because it avoids operating-system argument limits.
   --ld-population POP      Population shown in the LD inset (default: EUR).
   --ld-heatmap-colors LIST Low-to-high #RRGGBB colors for the separate LD scale.
   --title TEXT             Optional title.
@@ -73,6 +75,7 @@ GetOptions(
     'ld-marker-color=s'  => \$opt{ld_marker_color},
     'ld-display-mode=s'  => \$opt{ld_display_mode},
     'ld-r2-values=s'     => \$opt{ld_r2_values},
+    'ld-r2-file=s'       => \$opt{ld_r2_file},
     'ld-population=s'    => \$opt{ld_population},
     'ld-heatmap-colors=s'=> \$opt{ld_heatmap_colors},
     'title=s'      => \$opt{title},
@@ -89,6 +92,38 @@ GetOptions(
 
 die usage() unless $opt{data} && $opt{snp} && $opt{out_prefix} && $opt{window_bp} && $opt{pcols};
 die "Input file not found: $opt{data}\n" unless -s $opt{data};
+if (defined($opt{ld_r2_file}) && length(trim($opt{ld_r2_file}))) {
+    die "LD R2 file not found or empty: $opt{ld_r2_file}\n" unless -s $opt{ld_r2_file};
+    my (@file_snps, @file_pairs);
+    open my $ldf, '<:raw', $opt{ld_r2_file}
+        or die "Cannot read LD R2 file $opt{ld_r2_file}: $!\n";
+    my $header = <$ldf> // '';
+    chomp $header;
+    $header =~ s/\r$//;
+    my @header_cols = split /\t/, $header, -1;
+    my %header_idx = map { lc(trim($header_cols[$_])) => $_ } 0 .. $#header_cols;
+    my $snp_idx = exists($header_idx{snp}) ? $header_idx{snp}
+        : exists($header_idx{proxy_snp}) ? $header_idx{proxy_snp} : 0;
+    my $r2_idx = exists($header_idx{r2}) ? $header_idx{r2}
+        : exists($header_idx{proxy_r2}) ? $header_idx{proxy_r2} : 1;
+    while (my $line = <$ldf>) {
+        chomp $line;
+        $line =~ s/\r$//;
+        next unless length $line;
+        my @f = split /\t/, $line, -1;
+        my $snp = trim($f[$snp_idx] // '');
+        my $r2 = trim($f[$r2_idx] // '');
+        next unless length $snp;
+        push @file_snps, $snp;
+        push @file_pairs, "$snp:$r2"
+            if $r2 =~ /^(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i;
+    }
+    close $ldf or die "Cannot close LD R2 file $opt{ld_r2_file}: $!\n";
+    $opt{ld_snps} = join(',', grep { defined($_) && length($_) }
+        ($opt{ld_snps}, join(',', @file_snps)));
+    $opt{ld_r2_values} = join(',', grep { defined($_) && length($_) }
+        ($opt{ld_r2_values}, join(',', @file_pairs)));
+}
 my $ld_point_type = ld_marker_point_type($opt{ld_marker_symbol});
 die "--ld-marker-color must be a named color or #RRGGBB\n"
     unless $opt{ld_marker_color} =~ /^(?:#[0-9A-Fa-f]{6}|[A-Za-z][A-Za-z0-9_-]*)$/;

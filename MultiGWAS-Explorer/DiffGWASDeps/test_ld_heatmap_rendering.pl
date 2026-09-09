@@ -13,6 +13,7 @@ my $plain = File::Spec->catfile($tmp, 'fixture.tsv');
 my $gz = "$plain.gz";
 my $gtf = File::Spec->catfile($tmp, 'fixture.gtf.tsv');
 my $ld_cache = File::Spec->catfile($tmp, 'fixture.ld.tsv');
+my $ld_r2_file = File::Spec->catfile($tmp, 'fixture.renderer.ld.tsv');
 my $prefix = File::Spec->catfile($tmp, 'locus');
 
 open my $fh, '>:raw', $plain or die "Cannot write $plain: $!\n";
@@ -34,6 +35,11 @@ print {$lf} "query_snp\tproxy_snp\tld_population\tproxy_r2\n";
 print {$lf} "RS100\tRS200\tEUR\t0.55\n";
 print {$lf} "RS100\tRS300\tEUR\t0.91\n";
 close $lf or die "Cannot close $ld_cache: $!\n";
+open my $lrf, '>:raw', $ld_r2_file or die "Cannot write $ld_r2_file: $!\n";
+print {$lrf} "SNP\tR2\n";
+print {$lrf} "rs200\t0.55\n";
+print {$lrf} "rs300\t0.91\n";
+close $lrf or die "Cannot close $ld_r2_file: $!\n";
 my $resolver = File::Spec->catfile($Bin, 'resolve_haploreg_high_ld.pl');
 open my $resolver_fh, '-|', $^X, $resolver,
     '--query-snps', 'rs100', '--population', 'EUR', '--min-r2', '0.5',
@@ -57,8 +63,7 @@ my @cmd = (
     '--labels', 'EUR',
     '--gtf', $gtf,
     '--gnuplot', $gnuplot,
-    '--ld-snps', 'rs200,rs300',
-    '--ld-r2-values', 'rs200:0.55,rs300:0.91',
+    '--ld-r2-file', $ld_r2_file,
     '--ld-display-mode', 'heatmap',
     '--ld-reference-snp', 'rs100',
     '--ld-population', 'EUR',

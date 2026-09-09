@@ -383,7 +383,7 @@ The repository includes tested Windows executables at
 `DiffGWASDeps/bgzip.exe` and `DiffGWASDeps/tabix.exe`. The Windows package list
 also includes the Cygwin headers needed to build a newer local htslib when the
 bundled tools cannot be used:
-`libbz2-devel`, `libcurl-devel`, `liblzma-devel`, `openssl-devel`, and
+`libbz2-devel`, `libcurl-devel`, `liblzma-devel`, `libssl-devel`, and
 `zlib-devel`. If `tools/htslib-1.20.tar.bz2` is not already present, the
 installer downloads the expected upstream htslib release before building
 `local/bin/bgzip.exe` and `local/bin/tabix.exe`.
@@ -457,6 +457,13 @@ Cygwin shell, run the phase-2 installer directly:
 bash install/install_cygwin.sh
 ```
 
+The PowerShell entry point is preferred for a first install because it refreshes
+the portable Cygwin runtime before starting a Cygwin shell. The in-shell script
+adds missing packages but intentionally does not globally upgrade a running
+Cygwin runtime, which avoids locked-DLL failures. The Windows package set now
+uses prebuilt `perl-DBI`, `perl-DBD-SQLite`, and `perl-Text-CSV` packages for
+the SQLite-backed HaploReg cache tools.
+
 The Windows/Cygwin install path now intentionally keeps its repo-local Perl
 modules separate from Linux and macOS builds. During cross-platform validation,
 the main failure was not simply "missing GD headers"; it was accidental reuse
@@ -491,6 +498,10 @@ bash install/check_pipeline_install.sh
 The installer creates repo-local runtimes under `.venv-pipeline/` and
 `local/perl5-linux/`, so the pipeline does not depend on your global Python,
 Conda, or Perl module paths after installation.
+
+The Perl dependency contract includes `DBI`, `DBD::SQLite`, and `Text::CSV`.
+The SQLite-backed helper scripts also discover `local/perl5-linux/` directly
+when launched from a fresh shell.
 
 What the Ubuntu installer installs with `apt-get`:
 
@@ -609,6 +620,19 @@ fallback confirmed:
 - `bash install/check_pipeline_install.sh`
 - the top-level gunplot wrapper for `manhattan`, `local_manhattan`, and
   `local_gtf`
+
+To validate with Vagrant on a host with hardware virtualization enabled:
+
+```powershell
+cd install\vagrant\ubuntu
+vagrant up --provider=hyperv
+vagrant ssh -c "cd /home/vagrant/MultiGWAS-Explorer && bash install/check_pipeline_install.sh"
+```
+
+Vagrant installs into `/home/vagrant/MultiGWAS-Explorer` on the VM filesystem.
+It does not place Linux `.venv-pipeline` or native Perl modules in the Windows
+shared checkout. See `INSTALLATION_EVALUATION_20260908.md` for the latest
+portable-Cygwin, Ubuntu, Vagrant, and real PGC validation record.
 
 During the same 2026-06-08 Docker validation, the SAS ODA login probe inside
 the image did not complete successfully, so the containerized SAS ODA path

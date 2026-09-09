@@ -271,6 +271,13 @@ Post-install validation:
 bash install/check_pipeline_install.sh
 ```
 
+The 2026-09-08 clean-install evaluation also made the database-backed cache
+dependencies explicit (`DBI`, `DBD::SQLite`, and `Text::CSV`), changed large LD
+handoffs from command-line lists to `*.ld_r2.tsv` files, and isolated Vagrant's
+Linux runtime under `/home/vagrant/MultiGWAS-Explorer`. Full results and the
+host virtualization limitations are recorded in
+`INSTALLATION_EVALUATION_20260908.md`.
+
 ### Containerized deployment
 
 The same repo-local Ubuntu installation path is also saved as a container build

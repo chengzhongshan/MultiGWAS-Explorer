@@ -1,8 +1,11 @@
 requires 'File::Which';
+requires 'DBI';
+requires 'DBD::SQLite';
 requires 'GD';
 requires 'IO::Compress::Gzip';
 requires 'IO::Uncompress::Gunzip';
 requires 'JSON::MaybeXS';
 requires 'Mojolicious';
 requires 'PDL';
+requires 'Text::CSV';
 requires 'YAML::PP';

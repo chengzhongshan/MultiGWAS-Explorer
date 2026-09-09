@@ -583,7 +583,7 @@ prepare_perl_cpanfile() {
   if command_exists uname && uname -s | grep -qi '^CYGWIN'; then
     mkdir -p "${PIPELINE_LOCAL_DIR}"
     filtered_cpanfile="${PIPELINE_LOCAL_DIR}/cpanfile-cygwin"
-    grep -vE "requires '(File::Which|GD|JSON|JSON::MaybeXS|Mojolicious)';" "${cpanfile}" > "${filtered_cpanfile}"
+    grep -vE "requires '(DBD::SQLite|DBI|File::Which|GD|JSON|JSON::MaybeXS|Mojolicious|Text::CSV)';" "${cpanfile}" > "${filtered_cpanfile}"
     printf '%s\n' "${filtered_cpanfile}"
     return 0
   fi

@@ -54,7 +54,7 @@ PY
 
 log "GD version: $(perl -MGD -e 'print $GD::VERSION')"
 log "PDL version: $(perl -MPDL -e 'print $PDL::VERSION')"
-perl -e "require JSON::PP; require JSON::MaybeXS; require File::Which; require GD; require Mojolicious::Lite; require MCP::Server; require PDL; 1;" >/dev/null
+perl -e "require JSON::PP; require JSON::MaybeXS; require File::Which; require DBI; require DBD::SQLite; require GD; require Mojolicious::Lite; require MCP::Server; require PDL; require Text::CSV; 1;" >/dev/null
 perl -I DiffGWASDeps -MSAS_ODA_Runner -e "print qq{SAS_ODA_Runner ok\n};"
 perl DiffGWASDeps/test_sas_oda_debug_macro_guard.pl >/dev/null
 perl -I DiffGWASDeps -c auto_prepare_and_run_diff_gwas.pl >/dev/null
