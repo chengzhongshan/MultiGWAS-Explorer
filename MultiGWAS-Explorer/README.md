@@ -170,8 +170,9 @@ perl DiffGWASDeps/generate_requested_top_hits_csv.pl \
 
 ## LD-Clumped Lead Selection
 
-Automatic common- and differential-hit selection now defaults to greedy
-HaploReg LD clumping instead of treating physical separation as independence.
+Automatic common- and differential-hit selection now defaults to greedy,
+direct PLINK2 LD clumping against phased 1000 Genomes genotypes. HaploReg4 is
+retained only as a fallback when the local genotype reference is unavailable.
 Candidates are ranked by the applicable raw P value. After each lead is
 selected, candidates at or above the configured r-squared threshold are
 removed and written to an edge-level audit table.
@@ -181,10 +182,14 @@ Default configuration:
 ```json
 {
   "top_hit_selection_method": "ld",
+  "top_hit_ld_source": "PLINK2_1KG",
+  "top_hit_ld_pfile": "cache/plink2_1kg_phase3/all_phase3",
+  "top_hit_ld_plink2": "cache/plink2_bin/plink2.exe",
+  "top_hit_ld_window_kb": 1000,
   "top_hit_ld_r2_threshold": "0.1",
-  "top_hit_ld_populations": "EUR ASN",
+  "top_hit_ld_populations": "EUR EAS",
   "top_hit_ld_population_rule": "ANY",
-  "top_hit_ld_query_failure_action": "DISTANCE"
+  "top_hit_ld_query_failure_action": "KEEP"
 }
 ```
 
@@ -194,17 +199,36 @@ Equivalent command-line overrides are:
 perl auto_prepare_and_run_diff_gwas.pl \
   --spec configs/spec_pgc_scz_sex_common_automation.json \
   --top-hit-selection-method ld \
+  --top-hit-ld-source PLINK2_1KG \
+  --top-hit-ld-pfile cache/plink2_1kg_phase3/all_phase3 \
   --top-hit-ld-r2-threshold 0.1 \
-  --top-hit-ld-populations "EUR ASN" \
+  --top-hit-ld-populations "EUR EAS" \
   --top-hit-ld-population-rule ANY
 ```
 
-Audit outputs distinguish `SELECTED_LEAD`, `PRUNED_LD`, and
-`PRUNED_DISTANCE_FALLBACK`. These are LD-clumped lead variants, not proof of
-conditional independence or genotype-by-stratum interaction.
+Audit outputs distinguish `SELECTED_LEAD` and `PRUNED_LD`, and label selected
+variants as `ESTIMABLE`, `PARTIAL_ESTIMABLE`, or `NOT_ESTIMABLE`. An absent or
+monomorphic reference variant is retained and reported as not estimable; it is
+never converted to r²=0 or treated as independent. These are LD-clumped lead
+variants, not proof of conditional independence or genotype-by-stratum
+interaction.
 
-For large candidate sets, build a candidate-restricted local cache from the
-official HaploReg v4 downloads:
+The direct top-hit command extracts candidate variants once and computes only
+the lead-to-candidate pairs needed by greedy clumping:
+
+```bash
+perl DiffGWASDeps/select_ld_pruned_top_hits.pl \
+  --candidates common_assoc_verify.candidates.tsv \
+  --pfile cache/plink2_1kg_phase3/all_phase3 \
+  --plink2 cache/plink2_bin/plink2.exe \
+  --signal-column common_assoc_p --signal-threshold 5e-8 \
+  --populations "EUR EAS" --r2-threshold 0.1 \
+  --output-leads common.plink2_1kg.leads.tsv \
+  --output-audit common.plink2_1kg.audit.tsv
+```
+
+When the complete PLINK reference triplet or PLINK2 executable is unavailable,
+a configured HaploReg cache can be supplied as the backup:
 
 ```bash
 bash DiffGWASDeps/build_haploreg_ld_candidate_cache.sh \
@@ -2187,18 +2211,20 @@ perl auto_prepare_and_run_diff_gwas.pl \
 The gnuplot entry point accepts the same highlighting, population, threshold,
 symbol, and color controls. Supplying `--ld-snps` explicitly also enables the
 overlay. Supported symbols are `star`, `plus`, `cross`, `circle`, `square`,
-`triangle`, and `diamond`; colors may be named colors or `#RRGGBB`. When
-enabled, the resolver prefers the reusable local HaploReg cache and queries
-HaploReg only for missing SNPs unless web fallback is disabled.
+`triangle`, and `diamond`; colors may be named colors or `#RRGGBB`. When the
+configured phased 1000 Genomes reference is available, both plotters calculate
+local LD directly with PLINK2 and persist a compact normalized cache. HaploReg4
+is queried only as a backup when the local genotype reference is unavailable.
 
 For a LocusZoom-like LD view, request it explicitly with
 `--ld-display-mode heatmap` (or `both` to retain the selected marker overlay).
-The pipeline carries the HaploReg r2 values into both SAS ODA and gnuplot local
+The pipeline carries direct PLINK2 r2 values into both SAS ODA and gnuplot local
 Manhattan/GTF renderers. In heatmap mode, each point uses a single signed-LD
 value, `sign(Z) * r2`, on the existing divergent Z-score colorbar and in its
-original position. Unlinked background points are zero; LD proxies range from
--1 (negative Z direction, perfect LD) to +1 (positive Z direction, perfect LD).
-No separate LD inset or marker shape is needed. For a locus requested with several SNPs, LD is never
+original position. Estimable unlinked variants approach zero; LD proxies range
+from -1 (negative Z direction, perfect LD) to +1 (positive Z direction,
+perfect LD). Non-estimable LD remains missing in the audit and is not asserted
+to be r2=0. No separate LD inset or marker shape is needed. For a locus requested with several SNPs, LD is never
 pooled across all query SNPs: the first target SNP is the reference by default,
 and every displayed r2 is relative to that one SNP. Select a different query
 SNP with `--local-ld-reference-snp` (SAS ODA) or `--ld-reference-snp`
@@ -2207,13 +2233,30 @@ SNP with `--local-ld-reference-snp` (SAS ODA) or `--ld-reference-snp`
 ```bash
 perl auto_prepare_and_run_diff_gwas.pl \
   --spec configs/your_spec.json \
-  --target-snps rs2070788,rs383510 \
+  --target-snps rs185665940,rs10166057,rs4852780 \
   --step plot_local_gtf \
   --local-ld-display-mode heatmap \
-  --local-ld-reference-snp rs2070788 \
-  --local-ld-population EUR \
-  --local-ld-r2-threshold 0.5
+  --local-ld-reference-snp rs10166057 \
+  --local-ld-population MAJOR4 \
+  --local-ld-r2-threshold 0
 ```
+
+The equivalent local renderer is:
+
+```bash
+perl auto_prepare_and_run_diff_gwas_with_gunplot.pl \
+  --spec configs/your_spec.json \
+  --target-snps rs185665940,rs10166057,rs4852780 \
+  --step plot_local_gtf \
+  --ld-display-mode heatmap \
+  --ld-reference-snp rs10166057 \
+  --ld-population MAJOR4 \
+  --ld-r2-threshold 0
+```
+
+`MAJOR4` expands to `EUR,AFR,AMR,EAS`. The default r2 threshold is zero for
+local LD, so every estimable query-to-variant pair in the PLINK2 window is
+available to the colormap.
 
 The default remains `none`; no LD query or overlay is performed unless the
 user requests `markers`, `heatmap`, or `both`. Explicit proxy lists can supply

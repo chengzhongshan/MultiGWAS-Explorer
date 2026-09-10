@@ -465,7 +465,11 @@ sub load_common_loci {
         next unless length $line;
         my @f = split /\t/, $line, -1;
         push @rows, {
-            locus_rank     => field_from_array(\@f, \%idx, 'locus_rank'),
+            locus_rank     => first_nonempty(
+                field_from_array(\@f, \%idx, 'locus_rank'),
+                field_from_array(\@f, \%idx, 'LD_LEAD_RANK'),
+                field_from_array(\@f, \%idx, 'candidate_rank'),
+            ),
             CHR            => field_from_array(\@f, \%idx, 'CHR'),
             BP             => field_from_array(\@f, \%idx, 'BP'),
             SNP            => field_from_array(\@f, \%idx, 'SNP'),
@@ -838,6 +842,13 @@ sub value_or_blank {
     my ($v) = @_;
     return '' unless defined $v;
     return $v;
+}
+
+sub first_nonempty {
+    for my $value (@_) {
+        return $value if defined($value) && length($value);
+    }
+    return '';
 }
 
 sub compute_pair_group_maf {

@@ -65,6 +65,10 @@ my $top_hit_ld_population_rule_override = '';
 my $top_hit_ld_cache_tsv_override = '';
 my $top_hit_ld_cache_min_r2_override = '';
 my $top_hit_ld_cache_miss_action_override = '';
+my $top_hit_ld_source_override = '';
+my $top_hit_ld_pfile_override = '';
+my $top_hit_ld_bfile_override = '';
+my $top_hit_ld_plink2_override = '';
 my $top_hit_max_loci_override;
 my $local_max_hits_per_fig_override = 0;
 my $local_gtf_window_bp_override = '';
@@ -91,7 +95,7 @@ my $local_ld_snps_override = '';
 my $local_ld_audit_file_override = '';
 my $local_ld_cache_override = '';
 my $local_ld_reference_snp_override = '';
-my $local_ld_population_override = 'EUR';
+my $local_ld_population_override = '';
 my $local_ld_r2_threshold_override = 0;
 my $local_ld_web_fallback = 1;
 my $highlight_high_ld_snps = 0;
@@ -164,6 +168,10 @@ GetOptions(
     'top-hit-ld-cache-tsv=s' => \$top_hit_ld_cache_tsv_override,
     'top-hit-ld-cache-min-r2=s' => \$top_hit_ld_cache_min_r2_override,
     'top-hit-ld-cache-miss-action=s' => \$top_hit_ld_cache_miss_action_override,
+    'top-hit-ld-source=s' => \$top_hit_ld_source_override,
+    'top-hit-ld-pfile=s' => \$top_hit_ld_pfile_override,
+    'top-hit-ld-bfile=s' => \$top_hit_ld_bfile_override,
+    'top-hit-ld-plink2=s' => \$top_hit_ld_plink2_override,
     'top-hit-max-loci=i'  => \$top_hit_max_loci_override,
     'local-max-hits-per-fig=i' => \$local_max_hits_per_fig_override,
     'local-gtf-window-bp=s' => \$local_gtf_window_bp_override,
@@ -253,9 +261,10 @@ if (defined $get_common_associations) {
         die "Invalid --get-common-associations value '$raw'. Use 0/1, true/false, or a p-value in (0,1).\n";
     }
 }
-$local_ld_population_override = uc($local_ld_population_override || 'EUR');
-die "--local-ld-population must be AFR, AMR, ASN, or EUR\n"
-    unless $local_ld_population_override =~ /^(?:AFR|AMR|ASN|EUR)$/;
+$local_ld_population_override = uc($local_ld_population_override || '');
+die "--local-ld-population must be AFR, AMR, ASN/EAS, EUR, MAJOR4, or a comma/plus-separated list of those populations\n"
+    if length($local_ld_population_override)
+       && !valid_local_ld_population_spec($local_ld_population_override);
 die "--local-ld-r2-threshold must be between 0 and 1\n"
     unless $local_ld_r2_threshold_override >= 0 && $local_ld_r2_threshold_override <= 1;
 
@@ -291,6 +300,11 @@ if (!length $spec_file && length $gwas_dir) {
 
 die "--spec is required (or provide --gwas-dir to generate one)\n" unless length $spec_file;
 my $spec = load_json($spec_file);
+$local_ld_population_override = uc(
+    $local_ld_population_override || cfg_or($spec, 'local_ld_population', 'EUR')
+);
+die "--local-ld-population must be AFR, AMR, ASN/EAS, EUR, MAJOR4, or a comma/plus-separated list of those populations\n"
+    unless valid_local_ld_population_spec($local_ld_population_override);
 $spec->{raw_column_aliases} = merge_alias_override_specs($spec->{raw_column_aliases}, $cli_raw_column_aliases)
   if ref($cli_raw_column_aliases) eq 'HASH' && keys %{$cli_raw_column_aliases};
 $spec->{reference_build} = $reference_build_override
@@ -399,13 +413,26 @@ die "top_hit_ld_population_rule must be ANY or ALL\n"
 my $top_hit_ld_cache_tsv = length($top_hit_ld_cache_tsv_override)
     ? $top_hit_ld_cache_tsv_override
     : cfg_or($spec, 'top_hit_ld_cache_tsv', '');
+my $top_hit_haploreg_fallback_cache = $top_hit_ld_cache_tsv;
+my $top_hit_ld_source = length($top_hit_ld_source_override)
+    ? uc($top_hit_ld_source_override)
+    : uc(cfg_or($spec, 'top_hit_ld_source', 'PLINK2_1KG'));
+die "top_hit_ld_source must be PLINK2_1KG or HAPLOREG4\n"
+    unless $top_hit_ld_source =~ /^(?:PLINK2_1KG|HAPLOREG4)$/;
+my $top_hit_ld_pfile = resolve_project_relative_path(length($top_hit_ld_pfile_override)
+    ? $top_hit_ld_pfile_override : cfg_or($spec, 'top_hit_ld_pfile', 'cache/plink2_1kg_phase3/all_phase3'));
+my $top_hit_ld_bfile = resolve_project_relative_path(length($top_hit_ld_bfile_override)
+    ? $top_hit_ld_bfile_override : cfg_or($spec, 'top_hit_ld_bfile', ''));
+my $top_hit_ld_plink2 = resolve_project_relative_path(length($top_hit_ld_plink2_override)
+    ? $top_hit_ld_plink2_override : cfg_or($spec, 'top_hit_ld_plink2', 'cache/plink2_bin/plink2.exe'));
 my $top_hit_ld_cache_min_r2 = length($top_hit_ld_cache_min_r2_override)
     ? $top_hit_ld_cache_min_r2_override
-    : cfg_or($spec, 'top_hit_ld_cache_min_r2', '0.2');
-die "top_hit_ld_cache_min_r2 must be between 0.2 and 1 for HaploReg download archives\n"
+    : cfg_or($spec, 'top_hit_ld_cache_min_r2', ($top_hit_ld_source eq 'PLINK2_1KG' ? $top_hit_ld_r2_threshold : '0.2'));
+die "top_hit_ld_cache_min_r2 must be between 0 and 1\n"
     unless $top_hit_ld_cache_min_r2 =~ /^(?:0(?:\.\d+)?|1(?:\.0+)?)$/
-       && $top_hit_ld_cache_min_r2 >= 0.2
+       && $top_hit_ld_cache_min_r2 >= 0
        && $top_hit_ld_cache_min_r2 <= 1;
+my $top_hit_haploreg_fallback_cache_min_r2 = $top_hit_ld_cache_min_r2;
 my $top_hit_ld_cache_miss_action = length($top_hit_ld_cache_miss_action_override)
     ? uc($top_hit_ld_cache_miss_action_override)
     : uc(cfg_or($spec, 'top_hit_ld_cache_miss_action', 'WEB'));
@@ -468,21 +495,46 @@ die "--local-ld-marker-color must be a named color or #RRGGBB\n"
     unless $local_ld_marker_color =~ /^(?:#[0-9A-Fa-f]{6}|[A-Za-z][A-Za-z0-9_-]*)$/;
 if ($highlight_high_ld_snps
     && $local_plot_requested
-    && $local_ld_display_mode ne 'heatmap'
     && !$generate_spec_only
-    && length($configured_target_snps)
-    && !length($local_ld_snps_override)) {
+    && length($configured_target_snps)) {
     my $local_ld_cache = length($local_ld_cache_override)
         ? $local_ld_cache_override
         : cfg_or($spec, 'local_ld_cache_tsv', $top_hit_ld_cache_tsv);
-    ($local_ld_snps_override, $local_ld_r2_values_override) = resolve_high_ld_snps_for_plot(
-        query_snps  => $local_ld_reference_snp,
-        population => $local_ld_population_override,
-        min_r2      => $local_ld_r2_threshold_override,
-        local_cache => $local_ld_cache,
-        web_fallback => $local_ld_web_fallback,
-        workdir     => $workdir,
-    );
+    if (!length($local_ld_cache)
+        && !length($local_ld_r2_values_override)
+        && $top_hit_ld_source eq 'PLINK2_1KG') {
+        my ($direct_cache, $direct_ok) = resolve_plink2_ld_cache_for_plot(
+            query_snp  => $local_ld_reference_snp,
+            populations => $local_ld_population_override,
+            min_r2     => $local_ld_r2_threshold_override,
+            window_kb  => cfg_or($spec, 'local_ld_window_kb', cfg_or($spec, 'top_hit_ld_window_kb', 1000)),
+            pfile      => $top_hit_ld_pfile,
+            bfile      => $top_hit_ld_bfile,
+            plink2     => $top_hit_ld_plink2,
+            output_dir => $output_dir,
+            force      => $force,
+        );
+        if ($direct_ok) {
+            $local_ld_cache = $direct_cache;
+            $local_ld_cache_override = $direct_cache;
+            $local_ld_web_fallback = 0;
+            print "[prep] Direct PLINK2/1000 Genomes local-LD cache: $direct_cache\n";
+        }
+        else {
+            warn "[warn] Direct 1000 Genomes local LD is unavailable; HaploReg4 will be used only as a backup when web fallback is enabled.\n";
+        }
+    }
+    if ($local_ld_display_mode ne 'heatmap' && !length($local_ld_snps_override)) {
+        my $haploreg_population = haploreg_population_for_local_spec($local_ld_population_override);
+        ($local_ld_snps_override, $local_ld_r2_values_override) = resolve_high_ld_snps_for_plot(
+            query_snps  => $local_ld_reference_snp,
+            population => $haploreg_population,
+            min_r2      => $local_ld_r2_threshold_override,
+            local_cache => $local_ld_cache,
+            web_fallback => $local_ld_web_fallback,
+            workdir     => $workdir,
+        );
+    }
     print "[prep] LD reference SNP for the multi-query locus: $local_ld_reference_snp\n"
         if length $local_ld_reference_snp;
 }
@@ -497,6 +549,27 @@ die "top_hit_focus_prefix $focus_prefix is not one of: " . join(', ', @prefixes)
 my $merge_cfg = build_merge_config($spec, $generated) if $source_mode eq 'raw_pgc_vcf_sumstats';
 my $diff_cfg = build_diff_config($spec, $generated) if $source_mode eq 'raw_pgc_vcf_sumstats';
 my $preset_cfg = build_preset_config($spec, $generated, $pair_info, $threshold, $window_bp);
+my %common_ld_artifacts;
+if ($effective_get_common_associations
+    && !length($configured_target_snps)
+    && $top_hit_selection_method eq 'ld'
+    && $top_hit_ld_source eq 'PLINK2_1KG') {
+    my $ld_base = File::Spec->catfile(
+        $output_dir,
+        safe_name($artifact_stem) . '.common_assoc_verify.plink2_1kg',
+    );
+    %common_ld_artifacts = (
+        verify     => File::Spec->catfile($output_dir, safe_name($artifact_stem) . '.common_assoc_verify.tsv'),
+        candidates => File::Spec->catfile($output_dir, safe_name($artifact_stem) . '.common_assoc_verify.candidates.tsv'),
+        leads      => $ld_base . '.leads.tsv',
+        audit      => $ld_base . '.audit.tsv',
+        cache      => $ld_base . '.cache.tsv',
+        status     => $ld_base . '.reference_status.tsv',
+    );
+    $top_hit_ld_cache_tsv = $common_ld_artifacts{cache};
+    $top_hit_ld_cache_min_r2 = $top_hit_ld_r2_threshold;
+    $top_hit_ld_cache_miss_action = 'FAIL';
+}
 my $runner_cfg = build_runner_config(
     spec               => $spec,
     generated          => $generated,
@@ -510,6 +583,10 @@ my $runner_cfg = build_runner_config(
     top_hit_ld_r2_threshold => $top_hit_ld_r2_threshold,
     top_hit_ld_populations => $top_hit_ld_populations,
     top_hit_ld_population_rule => $top_hit_ld_population_rule,
+    top_hit_ld_source => $top_hit_ld_source,
+    top_hit_ld_pfile => $top_hit_ld_pfile,
+    top_hit_ld_bfile => $top_hit_ld_bfile,
+    top_hit_ld_plink2 => $top_hit_ld_plink2,
     top_hit_ld_cache_tsv => $top_hit_ld_cache_tsv,
     top_hit_ld_cache_min_r2 => $top_hit_ld_cache_min_r2,
     top_hit_ld_cache_miss_action => $top_hit_ld_cache_miss_action,
@@ -708,6 +785,25 @@ else {
       };
 }
 
+if (%common_ld_artifacts) {
+    my $prepare = File::Spec->catfile($deps_dir, 'prepare_common_association_plink2_ld.pl');
+    my $thresholds = defined($runner_cfg->{TOP_HIT_SIGNAL_THRSHDS})
+        ? $runner_cfg->{TOP_HIT_SIGNAL_THRSHDS} : '5e-8';
+    my $prepare_cmd = qq{perl "$prepare" --spec "$spec_file" --runner-config "$generated->{runner_config}" --verify-output "$common_ld_artifacts{verify}" --candidates "$common_ld_artifacts{candidates}" --leads "$common_ld_artifacts{leads}" --audit "$common_ld_artifacts{audit}" --cache "$common_ld_artifacts{cache}" --status "$common_ld_artifacts{status}" --plink2 "$top_hit_ld_plink2" --populations "$top_hit_ld_populations" --population-rule "$top_hit_ld_population_rule" --r2-threshold "$top_hit_ld_r2_threshold" --window-kb "} . cfg_or($spec, 'top_hit_ld_window_kb', 1000) . qq{" --signal-threshold "5e-8" --top-p-thresholds "$thresholds"};
+    $prepare_cmd .= qq{ --pfile "$top_hit_ld_pfile"} if length $top_hit_ld_pfile;
+    $prepare_cmd .= qq{ --bfile "$top_hit_ld_bfile"}
+        if !length($top_hit_ld_pfile) && length($top_hit_ld_bfile);
+    if (length $top_hit_haploreg_fallback_cache) {
+        $prepare_cmd .= qq{ --haploreg-cache "$top_hit_haploreg_fallback_cache" --haploreg-cache-min-r2 "$top_hit_haploreg_fallback_cache_min_r2"};
+    }
+    push @step_defs, {
+        name        => 'prepare_top_hit_ld',
+        description => 'Verify common candidates and compute PLINK2/1000 Genomes LD before plotting',
+        command     => $prepare_cmd,
+        outputs     => [ @common_ld_artifacts{qw(verify candidates leads audit cache status)} ],
+    };
+}
+
 if (!$skip_plots) {
     if ($share_remote_data) {
         $summary{shared_remote_plot_data} = 'yes';
@@ -829,6 +925,16 @@ if ($runner_cfg->{TOP_HIT_MODE}
     print "[skip] Common-association verifier is not needed because explicit target SNPs control this run: $runner_cfg->{TARGET_SNP_LIST}\n";
 }
 elsif ($runner_cfg->{TOP_HIT_MODE} && lc($runner_cfg->{TOP_HIT_MODE}) eq 'common_association') {
+    if (%common_ld_artifacts
+        && !grep { !-s cygpath_to_win($_) }
+            @common_ld_artifacts{qw(verify leads audit cache status)}) {
+        $summary{common_association_verify} = $common_ld_artifacts{verify};
+        $summary{common_association_ld_leads} = $common_ld_artifacts{leads};
+        $summary{common_association_ld_audit} = $common_ld_artifacts{audit};
+        $summary{common_association_ld_reference_status} = $common_ld_artifacts{status};
+        print "[skip] Reusing PLINK2/1000 Genomes common-association LD outputs prepared before plotting.\n";
+    }
+    else {
     my $verify = File::Spec->catfile($deps_dir, 'verify_common_association_loci.pl');
     if (-e cygpath_to_win($verify)) {
         my $out_base = safe_name($artifact_stem) . '.common_assoc_verify';
@@ -839,9 +945,48 @@ elsif ($runner_cfg->{TOP_HIT_MODE} && lc($runner_cfg->{TOP_HIT_MODE}) eq 'common
         print "[info] Running common-association verifier: $cmd\n";
         system($cmd) == 0 or warn "verify_common_association_loci.pl failed: $?\n";
         $summary{common_association_verify} = $out_tsv if -s cygpath_to_win($out_tsv);
+        if ($top_hit_selection_method eq 'ld' && $top_hit_ld_source eq 'PLINK2_1KG'
+            && -s cygpath_to_win($cand_tsv)) {
+            my $selector = File::Spec->catfile($deps_dir, 'select_ld_pruned_top_hits.pl');
+            my $ld_base = File::Spec->catfile($output_dir, $out_base . '.plink2_1kg');
+            my $ld_leads = $ld_base . '.leads.tsv';
+            my $ld_audit = $ld_base . '.audit.tsv';
+            my $ld_cache = $ld_base . '.cache.tsv';
+            my $ld_status = $ld_base . '.reference_status.tsv';
+            my @ld_cmd = (
+                $^X, cygpath_to_win($selector),
+                '--candidates', cygpath_to_win($cand_tsv),
+                '--output-leads', cygpath_to_win($ld_leads),
+                '--output-audit', cygpath_to_win($ld_audit),
+                '--output-cache', cygpath_to_win($ld_cache),
+                '--output-status', cygpath_to_win($ld_status),
+                '--plink2', cygpath_to_win($top_hit_ld_plink2),
+                '--signal-column', 'common_assoc_p',
+                '--signal-threshold', '5e-8',
+                '--populations', $top_hit_ld_populations,
+                '--population-rule', $top_hit_ld_population_rule,
+                '--r2-threshold', $top_hit_ld_r2_threshold,
+                '--window-kb', cfg_or($spec, 'top_hit_ld_window_kb', 1000),
+            );
+            push @ld_cmd, '--pfile', cygpath_to_win($top_hit_ld_pfile)
+                if length $top_hit_ld_pfile;
+            push @ld_cmd, '--bfile', cygpath_to_win($top_hit_ld_bfile)
+                if !length($top_hit_ld_pfile) && length($top_hit_ld_bfile);
+            if (length $top_hit_haploreg_fallback_cache) {
+                push @ld_cmd, '--haploreg-cache', cygpath_to_win($top_hit_haploreg_fallback_cache),
+                    '--haploreg-cache-min-r2', $top_hit_haploreg_fallback_cache_min_r2;
+            }
+            print "[info] Selecting top hits with direct PLINK2/1000 Genomes LD; HaploReg is fallback-only.\n";
+            system(@ld_cmd) == 0
+                or die "Direct PLINK2 top-hit selection failed (exit $?). See the reference-status output; unavailable LD must be reported as not estimable.\n";
+            $summary{common_association_ld_leads} = $ld_leads;
+            $summary{common_association_ld_audit} = $ld_audit;
+            $summary{common_association_ld_reference_status} = $ld_status;
+        }
     }
     else {
         warn "Verifier not found: $verify\n";
+    }
     }
 }
 
@@ -2601,6 +2746,7 @@ sub build_runner_config {
     my $top_hit_threshold = $args{top_hit_threshold};
     my $top_hit_dist_bp = $args{top_hit_dist_bp};
     my $top_hit_selection_method = $args{top_hit_selection_method} || 'ld';
+    my $top_hit_ld_source = uc($args{top_hit_ld_source} || 'PLINK2_1KG');
     my $top_hit_ld_r2_threshold = $args{top_hit_ld_r2_threshold} || '0.1';
     my $top_hit_ld_populations = $args{top_hit_ld_populations} || '';
     my $top_hit_ld_population_rule = $args{top_hit_ld_population_rule} || 'ANY';
@@ -2622,8 +2768,9 @@ sub build_runner_config {
     my $local_ld_reference_snp = $args{local_ld_reference_snp} // '';
     my $local_ld_cache_override = $args{local_ld_cache_override} // '';
     my $local_ld_population_override = $args{local_ld_population_override} // 'EUR';
-    my $local_ld_population_label = $local_ld_cache_override =~ /(?:^|[_.-])major4(?:[_.-]|$)/i
-      ? 'EUR+AMR+AFR+EAS'
+    my $local_ld_population_label = uc($local_ld_population_override) eq 'MAJOR4'
+      || $local_ld_cache_override =~ /(?:^|[_.-])(?:major4|eur_afr_amr_eas)(?:[_.-]|$)/i
+      ? 'EUR+AFR+AMR+EAS'
       : $local_ld_population_override;
     my $local_ld_r2_threshold_override = $args{local_ld_r2_threshold_override} // 0;
     my $local_ld_web_fallback = $args{local_ld_web_fallback} ? 1 : 0;
@@ -2714,8 +2861,8 @@ sub build_runner_config {
     if (!length $top_hit_ld_populations) {
         my $ld_focus = uc($focus_prefix || '');
         $top_hit_ld_populations = $ld_focus eq 'EUR' ? 'EUR'
-            : $ld_focus eq 'ASN' ? 'ASN'
-            : 'EUR ASN';
+            : $ld_focus =~ /^(?:ASN|EAS)$/ ? ($top_hit_ld_source eq 'PLINK2_1KG' ? 'EAS' : 'ASN')
+            : ($top_hit_ld_source eq 'PLINK2_1KG' ? 'EUR EAS' : 'EUR ASN');
     }
     my $top_hit_filter_expr;
     my $top_hit_signal_thrshds;
@@ -2825,7 +2972,15 @@ sub build_runner_config {
         TOP_HIT_LD_R2_THRESHOLD => $top_hit_ld_r2_threshold,
         TOP_HIT_LD_POPULATIONS => $top_hit_ld_populations,
         TOP_HIT_LD_POPULATION_RULE => uc($top_hit_ld_population_rule),
-        TOP_HIT_LD_QUERY_FAILURE_ACTION => uc(cfg_or($spec, 'top_hit_ld_query_failure_action', 'DISTANCE')),
+        TOP_HIT_LD_SOURCE => uc($args{top_hit_ld_source} // 'PLINK2_1KG'),
+        TOP_HIT_LD_PFILE => $args{top_hit_ld_pfile} // '',
+        TOP_HIT_LD_BFILE => $args{top_hit_ld_bfile} // '',
+        TOP_HIT_LD_PLINK2 => $args{top_hit_ld_plink2} // 'plink2',
+        TOP_HIT_LD_WINDOW_KB => cfg_or($spec, 'top_hit_ld_window_kb', 1000),
+        TOP_HIT_LD_QUERY_FAILURE_ACTION => uc(cfg_or(
+            $spec, 'top_hit_ld_query_failure_action',
+            ($top_hit_ld_source eq 'PLINK2_1KG' ? 'KEEP' : 'DISTANCE')
+        )),
         TOP_HIT_LD_CACHE_TSV => $args{top_hit_ld_cache_tsv} // '',
         TOP_HIT_LD_CACHE_MIN_R2 => $args{top_hit_ld_cache_min_r2} // '0.2',
         TOP_HIT_LD_CACHE_MISS_ACTION => uc($args{top_hit_ld_cache_miss_action} // 'WEB'),
@@ -3550,6 +3705,15 @@ sub resolve_step_selection {
         %selected = %available;
     }
 
+    # Common-association SAS macros must consume the direct PLINK2 cache rather
+    # than launching HaploReg queries during the remote plot.  Treat this
+    # preparation step as a dependency even when the caller requests only a
+    # plot rerun explicitly.
+    if ($available{prepare_top_hit_ld}
+        && grep { $selected{$_} } qw(plot_manhattan plot_local_manhattan plot_local_gtf plot_forest)) {
+        $selected{prepare_top_hit_ld} = 1;
+    }
+
     my @selected_order = grep { $selected{$_} } @available;
     return {
         selected       => \%selected,
@@ -3765,6 +3929,14 @@ sub normalized_numeric_text {
     return sprintf('%.12g', $num);
 }
 
+sub resolve_project_relative_path {
+    my ($path) = @_;
+    return '' unless defined($path) && length($path);
+    return normalize_unix_path($path)
+        if $path =~ m{^(?:[A-Za-z]:[\\/]|/|\\\\)};
+    return normalize_unix_path(File::Spec->catfile($Bin, $path));
+}
+
 sub build_standardize_cli_args {
     my (%args) = @_;
     my $method = trim($args{method});
@@ -3822,6 +3994,89 @@ sub cygpath_to_win {
     $win =~ s{/}{\\}g;
     #print STDERR "Path is defined as $path and converted to $win\n" and ;
     return $win;
+}
+
+sub valid_local_ld_population_spec {
+    my ($value) = @_;
+    $value = uc(trim($value // ''));
+    return 1 if $value eq 'MAJOR4';
+    my @parts = grep { length } split /[,+\s]+/, $value;
+    return 0 unless @parts;
+    return !grep { $_ !~ /^(?:AFR|AMR|ASN|EAS|EUR)$/ } @parts;
+}
+
+sub plink_local_populations {
+    my ($value) = @_;
+    $value = uc(trim($value // 'EUR'));
+    return 'EUR,AFR,AMR,EAS' if $value eq 'MAJOR4';
+    my %seen;
+    my @parts = grep { length && !$seen{$_}++ } map {
+        my $population = $_ eq 'ASN' ? 'EAS' : $_;
+        $population;
+    } grep { length } split /[,+\s]+/, $value;
+    return join(',', @parts);
+}
+
+sub haploreg_population_for_local_spec {
+    my ($value) = @_;
+    my @parts = grep { length } split /[,+\s]+/, uc(trim($value // 'EUR'));
+    @parts = qw(EUR AFR AMR ASN) if @parts == 1 && $parts[0] eq 'MAJOR4';
+    my $population = $parts[0] || 'EUR';
+    $population = 'ASN' if $population eq 'EAS';
+    warn "[warn] HaploReg4 backup accepts one population; using $population for local-LD fallback.\n"
+        if @parts > 1;
+    return $population;
+}
+
+sub plink_reference_is_available {
+    my (%args) = @_;
+    my $plink2 = cygpath_to_win($args{plink2} || '');
+    return 0 unless length($plink2) && (-f $plink2 || $plink2 !~ m{[\\/]});
+    my $pfile = cygpath_to_win($args{pfile} || '');
+    if (length $pfile) {
+        return 1 if -s "$pfile.pgen"
+            && (-s "$pfile.pvar" || -s "$pfile.pvar.zst")
+            && -s "$pfile.psam";
+    }
+    my $bfile = cygpath_to_win($args{bfile} || '');
+    return length($bfile) && -s "$bfile.bed" && -s "$bfile.bim" && -s "$bfile.fam";
+}
+
+sub resolve_plink2_ld_cache_for_plot {
+    my (%args) = @_;
+    return ('', 0) unless plink_reference_is_available(%args);
+    my $helper = File::Spec->catfile($Bin, 'DiffGWASDeps', 'resolve_plink2_local_ld.pl');
+    return ('', 0) unless -f $helper;
+    my $population_list = plink_local_populations($args{populations});
+    my $population_tag = lc($population_list || 'all');
+    $population_tag =~ s/[^a-z0-9]+/_/g;
+    my $query_tag = safe_name($args{query_snp} || 'query');
+    my $threshold_tag = safe_name($args{min_r2});
+    my $cache = File::Spec->catfile(
+        $args{output_dir},
+        "local_ld_${query_tag}_${population_tag}_r2_${threshold_tag}.plink2_1kg.tsv",
+    );
+    return ($cache, 1) if !$args{force} && -s cygpath_to_win($cache);
+    my @cmd = (
+        $^X, cygpath_to_win($helper),
+        '--query-snp', $args{query_snp},
+        '--plink2', cygpath_to_win($args{plink2}),
+        '--populations', $population_list,
+        '--min-r2', 0 + ($args{min_r2} // 0),
+        '--window-kb', 0 + ($args{window_kb} // 1000),
+        '--output', cygpath_to_win($cache),
+        '--quiet',
+    );
+    if (length($args{pfile} || '')) {
+        push @cmd, '--pfile', cygpath_to_win($args{pfile});
+    }
+    elsif (length($args{bfile} || '')) {
+        push @cmd, '--bfile', cygpath_to_win($args{bfile});
+    }
+    print "[prep] Calculating local LD directly with PLINK2 using 1000 Genomes populations $population_list.\n";
+    my $rc = system(@cmd);
+    return ('', 0) if $rc != 0 || !-s cygpath_to_win($cache);
+    return ($cache, 1);
 }
 
 sub resolve_high_ld_snps_for_plot {
@@ -3895,6 +4150,9 @@ Options:
   --diff-pairs          Convenience alias for --step diff_pairs
   --standardize-diff    Convenience alias for --step standardize_diff
   --extract-wide-subset Convenience alias for --step extract_wide_subset
+  --step prepare_top_hit_ld
+                       In common-association mode, verify candidates and build
+                       the direct PLINK2/1KG LD cache before any plot upload.
   --plot-manhattan      Convenience alias for --step plot_manhattan
   --plot-local-manhattan Convenience alias for --step plot_local_manhattan
   --plot-local-gtf      Convenience alias for --step plot_local_gtf
@@ -3906,20 +4164,28 @@ Options:
   --local-sas-only     Emit the local desktop-SAS plot scripts and stop before
                        any SAS ODA submit/upload work for plot steps.
   --top-hit-selection-method ld|distance
-                       Select independent leads by HaploReg LD clumping (the
-                       default) or use the legacy physical-distance rule.
+                       Select independent leads by LD clumping (default) or
+                       use the legacy physical-distance rule.
+  --top-hit-ld-source PLINK2_1KG|HAPLOREG4
+                       Prefer direct PLINK2/1000 Genomes LD (default).
+                       HaploReg4 is used only as a configured fallback when
+                       the genotype reference is unavailable.
+  --top-hit-ld-pfile PREFIX
+                       PLINK2 1000 Genomes pfile prefix.
+  --top-hit-ld-bfile PREFIX
+                       Alternative biallelic PLINK bed/bim/fam prefix.
+  --top-hit-ld-plink2 EXE
+                       PLINK2 executable path.
   --top-hit-ld-r2-threshold N
                        Prune candidate SNPs at r2 >= N. Default: 0.1.
   --top-hit-ld-populations "EUR ASN"
-                       HaploReg populations; inferred from the focus ancestry
-                       when omitted.
+                       1000 Genomes superpopulations (for example EUR EAS).
   --top-hit-ld-population-rule ANY|ALL
                        Prune when LD is present in any requested population
                        (default) or in all requested populations.
   --top-hit-ld-cache-tsv FILE
-                       Candidate-specific cache extracted from the official
-                       HaploReg downloadable LD archives. Avoids per-lead web
-                       queries. The archive supports r2 >= 0.2 only.
+                       Normalized LD cache. Used as the HaploReg backup cache
+                       when PLINK2/1000 Genomes is unavailable.
   --top-hit-ld-cache-min-r2 N
                        Minimum r2 represented by the cache. Default: 0.2.
   --top-hit-ld-cache-miss-action WEB|FAIL
@@ -4011,8 +4277,8 @@ Options:
                        Named or #RRGGBB LD marker color. Default: black.
   --local-ld-display-mode MODE
                        none|markers|heatmap|both. Default: none. The heatmap
-                       mode colors LD proxies by r2 and adds its own blue-purple
-                       legend, separate from the association Z-score legend.
+                       mode maps sign(Z)*r2 to one continuous diverging
+                       colormap in the original Z-score legend position.
   --local-ld-r2-values MAP
                        Optional comma-separated SNP:r2 values for explicit
                        --local-ld-snps.
@@ -4020,17 +4286,20 @@ Options:
                        Space-delimited SAS CX colors, low to high. Default:
                        CXF7FBFF CX6BAED6 CX54278F.
   --local-ld-cache FILE
-                       Normalized HaploReg TSV/SQLite cache queried before any
-                       network request.
+                       Normalized direct-PLINK2 or HaploReg TSV cache. When
+                       omitted and a 1KG reference is configured, the pipeline
+                       calculates the local cache directly with PLINK2.
   --local-ld-reference-snp SNP
                        Use this one target SNP as the LD reference when several
                        query SNPs share a locus. Default: first target SNP.
   --local-ld-population POP
-                       HaploReg population for optional high-LD markers.
-                       Default: EUR.
-                       Accepted values: AFR, AMR, ASN, EUR.
+                       1000 Genomes population(s) for local LD. Default: EUR.
+                       Accepted values include AFR, AMR, ASN/EAS, EUR, a
+                       comma/plus-separated list, or MAJOR4 for
+                       EUR+AFR+AMR+EAS. HaploReg backup uses one population.
   --local-ld-r2-threshold N
-                       High-LD marker threshold. Default: 0.8.
+                       Minimum retained local r2. Default: 0 so heatmap mode
+                       can color every estimable in-window variant.
   --[no-]local-ld-web-fallback
                        Query HaploReg only when the local cache misses a target
                        (default enabled), then persist the result for reuse.

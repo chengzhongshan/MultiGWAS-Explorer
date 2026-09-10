@@ -41,6 +41,8 @@ my $population_rule = 'ANY';
 my $fallback_distance_bp = 1_000_000;
 my $max_leads = 0;
 my $rebuild_sqlite = 0;
+my $cache_min_r2 = 0.2;
+my $cache_source = 'HAPLOREG4';
 
 GetOptions(
     'candidates=s'          => \$candidates,
@@ -60,6 +62,8 @@ GetOptions(
     'fallback-distance-bp=i'=> \$fallback_distance_bp,
     'max-leads=i'           => \$max_leads,
     'rebuild-sqlite!'       => \$rebuild_sqlite,
+    'cache-min-r2=f'        => \$cache_min_r2,
+    'cache-source=s'        => \$cache_source,
 ) or die usage();
 
 die usage() unless defined $candidates && defined $cache && defined $sqlite
@@ -68,8 +72,11 @@ die "Specify --signal-column or --signal-columns, not both\n"
     if length($signal_column) && length($signal_columns);
 die "Specify --signal-column or --signal-columns\n"
     unless length($signal_column) || length($signal_columns);
-die "--r2-threshold must be between 0.2 and 1 for the downloadable HaploReg archive\n"
-    unless $r2_threshold >= 0.2 && $r2_threshold <= 1;
+die "--cache-min-r2 must be between 0 and 1\n"
+    unless $cache_min_r2 >= 0 && $cache_min_r2 <= 1;
+die "--r2-threshold must be between the cache minimum ($cache_min_r2) and 1\n"
+    unless $r2_threshold >= $cache_min_r2 && $r2_threshold <= 1;
+$cache_source = uc(trim($cache_source));
 $population_rule = uc $population_rule;
 die "--population-rule must be ANY or ALL\n" unless $population_rule =~ /\A(?:ANY|ALL)\z/;
 my @populations = grep { length } map { uc } split /[\s,]+/, $populations;
@@ -103,10 +110,10 @@ for my $row (@$rows) {
 
     $presence->execute($row->{_SNP_KEY}, @populations);
     my %present = map { $_->[0] => 1 } @{$presence->fetchall_arrayref};
-    my $query_status = keys(%present) == @populations ? 'OK_LOCAL_CACHE'
-                     : keys(%present) ? 'PARTIAL_LOCAL_CACHE'
-                     : 'NO_LD_RESPONSE';
-    my $method = keys(%present) ? 'LD' : 'DISTANCE_FALLBACK';
+    my $query_status = keys(%present) == @populations ? 'ESTIMABLE'
+                     : keys(%present) ? 'PARTIAL_ESTIMABLE'
+                     : 'NOT_ESTIMABLE';
+    my $method = keys(%present) ? 'LD' : ($fallback_distance_bp > 0 ? 'DISTANCE_FALLBACK' : 'UNRESOLVED_NO_LD');
     $audit{$row->{_SNP_KEY}} = {
         action => 'SELECTED_LEAD', lead => $row->{_SNP_KEY}, lead_rank => $lead_rank,
         query_status => $query_status, method => $method, population => '', r2 => '',
@@ -173,7 +180,11 @@ printf "SQLITE_PREP_SECONDS\t%.3f\nELAPSED_SECONDS\t%.3f\n", $db_seconds, $elaps
 
 sub load_candidate_rows {
     open my $fh, '<:raw', $candidates or die "Cannot read $candidates: $!\n";
-    my $csv = Text::CSV->new({ binary => 1, auto_diag => 2 });
+    my $first = <$fh>;
+    die "Empty candidate file: $candidates\n" unless defined $first;
+    seek($fh, 0, 0) or die "Cannot rewind $candidates: $!\n";
+    my $input_sep = index($first, "\t") >= 0 ? "\t" : ',';
+    my $csv = Text::CSV->new({ binary => 1, auto_diag => 2, sep_char => $input_sep });
     my $header = $csv->getline($fh) or die "Empty candidate CSV: $candidates\n";
     my %idx = map { uc($header->[$_]) => $_ } 0 .. $#$header;
     for my $required ($snp_column, $chr_column, $bp_column) {
@@ -255,14 +266,15 @@ sub prepare_cache_database {
 sub write_leads {
     my ($header, $selected) = @_;
     open my $fh, '>:raw', $output_leads or die "Cannot write $output_leads: $!\n";
-    my $csv = Text::CSV->new({ binary => 1, eol => "\n" });
+    my $output_sep = $output_leads =~ /\.tsv\z/i ? "\t" : ',';
+    my $csv = Text::CSV->new({ binary => 1, eol => "\n", sep_char => $output_sep });
     my %header_index = map { uc($header->[$_]) => $_ } 0 .. $#$header;
-    $csv->print($fh, [@$header, qw(INDEPENDENCE_METHOD LD_POPULATIONS LD_POPULATION_RULE LD_QUERY_STATUS LD_LEAD_RANK LD_R2_THRESHOLD LD_FALLBACK_BP)]);
+    $csv->print($fh, [@$header, qw(INDEPENDENCE_METHOD LD_SOURCE LD_POPULATIONS LD_POPULATION_RULE LD_QUERY_STATUS LD_LEAD_RANK LD_R2_THRESHOLD LD_FALLBACK_BP)]);
     for my $i (0 .. $#$selected) {
         my $a = $audit{$selected->[$i]{_SNP_KEY}};
         my @values = @{$selected->[$i]{_VALUES}};
         $values[$header_index{FOCUS_SIGNAL}] = $selected->[$i]{_SIGNAL} if exists $header_index{FOCUS_SIGNAL};
-        $csv->print($fh, [@values, $a->{method}, join(' ', @populations), $population_rule,
+        $csv->print($fh, [@values, $a->{method}, $cache_source, join(' ', @populations), $population_rule,
                           $a->{query_status}, $i + 1, $r2_threshold, $fallback_distance_bp]);
     }
     close $fh;
@@ -271,11 +283,11 @@ sub write_leads {
 sub write_audit {
     my ($rows, $audit) = @_;
     open my $fh, '>:raw', $output_audit or die "Cannot write $output_audit: $!\n";
-    print {$fh} join("\t", qw(CHR BP candidate_snp lead_snp selection_action independence_method query_status ld_population candidate_rank signal lead_rank prune_r2)), "\n";
+    print {$fh} join("\t", qw(CHR BP candidate_snp lead_snp selection_action independence_method ld_source query_status ld_population candidate_rank signal lead_rank prune_r2)), "\n";
     for my $row (@$rows) {
         my $a = $audit->{$row->{_SNP_KEY}};
         print {$fh} join("\t", $row->{_CHR_KEY}, $row->{_BP_NUM}, $row->{_SNP_KEY}, $a->{lead},
-            $a->{action}, $a->{method}, $a->{query_status}, $a->{population}, $row->{_RANK},
+            $a->{action}, $a->{method}, $cache_source, $a->{query_status}, $a->{population}, $row->{_RANK},
             $row->{_SIGNAL}, $a->{lead_rank}, $a->{r2}), "\n";
     }
     close $fh;
@@ -296,5 +308,12 @@ Usage: clump_top_hits_with_haploreg_cache.pl --candidates candidates.csv
   --signal-column DIFF_P | --signal-columns "P1 P2 ..."
   --signal-threshold 5e-8 --populations "EUR ASN" --r2-threshold 0.2
   --output-leads leads.csv --output-audit audit.tsv
+  [--cache-source HAPLOREG4 --cache-min-r2 0.2]
+
+Despite the historical filename, this clumper accepts any normalized LD cache.
+For direct PLINK2 caches, use --cache-source PLINK2_1KG_DIRECT,
+--cache-min-r2 0, and --fallback-distance-bp 0. Missing or monomorphic variants
+are then retained with LD_QUERY_STATUS=NOT_ESTIMABLE instead of being declared
+independent or distance-pruned.
 USAGE
 }

@@ -84,17 +84,19 @@ Options:
                                 Default: star when highlighting is enabled.
   --ld-marker-color COLOR       Named or #RRGGBB marker color. Default: black.
   --ld-display-mode MODE        none, markers, heatmap, or both. Default: none.
-                                heatmap colors LD proxies by r2 and adds a separate
-                                inset legend; it does not replace the Z-score scale.
+                                heatmap maps sign(Z)*r2 to one continuous diverging
+                                colormap in the original Z-score legend position.
   --ld-r2-values MAP            Optional SNP:r2 pairs, comma-separated, for explicit
                                 --ld-snps (example rs1:0.92,rs2:0.81).
   --ld-heatmap-colors LIST      Low-to-high #RRGGBB colors for the LD inset.
                                 Default: #f7fbff,#6baed6,#54278f.
-  --ld-cache FILE               Normalized local HaploReg TSV/SQLite LD cache.
+  --ld-cache FILE               Normalized direct-PLINK2 or HaploReg LD cache.
+                                When omitted, configured 1KG data are used directly.
   --ld-reference-snp SNP       Use this target SNP as the LD reference when
                                 several query SNPs share one locus. Default:
                                 first target SNP in that locus.
-  --ld-population POP           HaploReg population for high-LD stars (default EUR).
+  --ld-population POP           1KG population(s), or MAJOR4 for
+                                EUR+AFR+AMR+EAS (default EUR).
   --ld-r2-threshold N           High-LD star threshold (default 0.8).
   --[no-]ld-web-fallback        Query HaploReg only when the local cache misses
                                 a query SNP (default enabled); successful queries
@@ -131,7 +133,7 @@ my $ld_snps_override = '';
 my $ld_audit_file_override = '';
 my $ld_cache_override = '';
 my $ld_reference_snp_override = '';
-my $ld_population_override = 'EUR';
+my $ld_population_override = '';
 my $ld_r2_threshold_override = 0;
 my $ld_web_fallback = 1;
 my $highlight_high_ld_snps = 0;
@@ -186,9 +188,10 @@ if ($help || !$spec_file) {
     print usage();
     exit($help ? 0 : 1);
 }
-$ld_population_override = uc($ld_population_override || 'EUR');
-die "--ld-population must be AFR, AMR, ASN, or EUR\n"
-    unless $ld_population_override =~ /^(?:AFR|AMR|ASN|EUR)$/;
+$ld_population_override = uc($ld_population_override || '');
+die "--ld-population must be AFR, AMR, ASN/EAS, EUR, MAJOR4, or a comma/plus-separated list of those populations\n"
+    if length($ld_population_override)
+       && !valid_local_ld_population_spec($ld_population_override);
 die "--ld-r2-threshold must be between 0 and 1\n"
     unless $ld_r2_threshold_override >= 0 && $ld_r2_threshold_override <= 1;
 $ld_display_mode = lc(trim($ld_display_mode || 'none'));
@@ -214,6 +217,11 @@ my %requested = normalize_requested_plots($plots, \@step_args);
 die "No gunplot plot steps were requested.\n" unless grep { $requested{$_} } qw(plot_manhattan plot_local_manhattan plot_local_gtf plot_forest);
 
 my $spec = load_json($spec_file);
+$ld_population_override = uc(
+    $ld_population_override || $spec->{local_ld_population} || 'EUR'
+);
+die "--ld-population must be AFR, AMR, ASN/EAS, EUR, MAJOR4, or a comma/plus-separated list of those populations\n"
+    unless valid_local_ld_population_spec($ld_population_override);
 my $target_snp_gene_overrides = parse_target_snp_gene_overrides(
     spec_value => $spec->{target_snp_genes},
     cli_value  => $target_snp_genes_override,
@@ -295,6 +303,37 @@ print "Using gnuplot executable: $gnuplot\n";
 
 my $wide_data_local = localize_path($runner->{DATA_GZ});
 die "Wide input file not found: $wide_data_local\n" unless -s $wide_data_local;
+
+if ($highlight_high_ld_snps
+    && ($requested{plot_local_manhattan} || $requested{plot_local_gtf})
+    && !length(trim($ld_cache_override))
+    && !length(trim($ld_r2_values_override))
+    && uc($runner->{TOP_HIT_LD_SOURCE} || $spec->{top_hit_ld_source} || 'PLINK2_1KG') eq 'PLINK2_1KG') {
+    my @targets = grep { length } map { trim($_) } split /,/,
+        ($target_snps_override || $runner->{TARGET_SNP_LIST} || '');
+    my $reference_snp = trim($ld_reference_snp_override || $targets[0] || '');
+    if (length $reference_snp) {
+        my ($direct_cache, $direct_ok) = resolve_plink2_ld_cache_for_plot(
+            query_snp   => $reference_snp,
+            populations => $ld_population_override,
+            min_r2      => $ld_r2_threshold_override,
+            window_kb   => ($spec->{local_ld_window_kb} || $runner->{TOP_HIT_LD_WINDOW_KB} || 1000),
+            pfile       => ($runner->{TOP_HIT_LD_PFILE} || $spec->{top_hit_ld_pfile} || ''),
+            bfile       => ($runner->{TOP_HIT_LD_BFILE} || $spec->{top_hit_ld_bfile} || ''),
+            plink2      => ($runner->{TOP_HIT_LD_PLINK2} || $spec->{top_hit_ld_plink2} || 'plink2'),
+            output_dir  => $output_dir_local,
+            force       => $force,
+        );
+        if ($direct_ok) {
+            $ld_cache_override = $direct_cache;
+            $ld_web_fallback = 0;
+            print "[prep] Direct PLINK2/1000 Genomes local-LD cache: $direct_cache\n";
+        }
+        else {
+            warn "WARNING: Direct 1000 Genomes local LD is unavailable; HaploReg4 will be used only as a backup when web fallback is enabled.\n";
+        }
+    }
+}
 
 my @manhattan_pcols = (
     $runner->{MANHATTAN_P_VAR},
@@ -890,6 +929,79 @@ sub merge_hit_lists_for_gunplot {
     return @hits;
 }
 
+sub valid_local_ld_population_spec {
+    my ($value) = @_;
+    $value = uc(trim($value // ''));
+    return 1 if $value eq 'MAJOR4';
+    my @parts = grep { length } split /[,+\s]+/, $value;
+    return 0 unless @parts;
+    return !grep { $_ !~ /^(?:AFR|AMR|ASN|EAS|EUR)$/ } @parts;
+}
+
+sub plink_local_populations {
+    my ($value) = @_;
+    $value = uc(trim($value // 'EUR'));
+    return 'EUR,AFR,AMR,EAS' if $value eq 'MAJOR4';
+    my %seen;
+    return join(',', grep { length && !$seen{$_}++ } map {
+        $_ eq 'ASN' ? 'EAS' : $_
+    } grep { length } split /[,+\s]+/, $value);
+}
+
+sub normalized_population_label {
+    my ($value) = @_;
+    return join('+', split /,/, plink_local_populations($value));
+}
+
+sub haploreg_population_for_local_spec {
+    my ($value) = @_;
+    my @parts = grep { length } split /[,+\s]+/, uc(trim($value // 'EUR'));
+    @parts = qw(EUR AFR AMR ASN) if @parts == 1 && $parts[0] eq 'MAJOR4';
+    my $population = $parts[0] || 'EUR';
+    $population = 'ASN' if $population eq 'EAS';
+    warn "WARNING: HaploReg4 backup accepts one population; using $population for local-LD fallback.\n"
+        if @parts > 1;
+    return $population;
+}
+
+sub resolve_plink2_ld_cache_for_plot {
+    my (%args) = @_;
+    my $pfile = localize_path($args{pfile} || '');
+    my $bfile = localize_path($args{bfile} || '');
+    my $plink2 = localize_path($args{plink2} || 'plink2');
+    my $pfile_ok = length($pfile) && -s "$pfile.pgen"
+        && (-s "$pfile.pvar" || -s "$pfile.pvar.zst") && -s "$pfile.psam";
+    my $bfile_ok = length($bfile) && -s "$bfile.bed" && -s "$bfile.bim" && -s "$bfile.fam";
+    return ('', 0) unless $pfile_ok || $bfile_ok;
+    return ('', 0) if $plink2 =~ m{[\\/]} && !-f $plink2;
+    my $helper = File::Spec->catfile($Bin, 'DiffGWASDeps', 'resolve_plink2_local_ld.pl');
+    return ('', 0) unless -f $helper;
+    my $population_list = plink_local_populations($args{populations});
+    my $tag = lc($population_list || 'all');
+    $tag =~ s/[^a-z0-9]+/_/g;
+    my $threshold_tag = safe_name($args{min_r2});
+    my $cache = File::Spec->catfile(
+        $args{output_dir},
+        'local_ld_' . safe_name($args{query_snp}) . "_${tag}_r2_${threshold_tag}.plink2_1kg.tsv",
+    );
+    return ($cache, 1) if !$args{force} && -s $cache;
+    my @cmd = (
+        $^X, $helper,
+        '--query-snp', $args{query_snp},
+        '--plink2', $plink2,
+        '--populations', $population_list,
+        '--min-r2', 0 + ($args{min_r2} // 0),
+        '--window-kb', 0 + ($args{window_kb} // 1000),
+        '--output', $cache,
+        '--quiet',
+    );
+    push @cmd, ($pfile_ok ? ('--pfile', $pfile) : ('--bfile', $bfile));
+    print "[prep] Calculating local LD directly with PLINK2 using 1000 Genomes populations $population_list.\n";
+    my $rc = system(@cmd);
+    return ('', 0) if $rc != 0 || !-s $cache;
+    return ($cache, 1);
+}
+
 sub resolve_ld_snps_for_query {
     my (%args) = @_;
     my %query = map { lc(trim($_)) => 1 } @{ $args{query_snps} || [] };
@@ -976,7 +1088,10 @@ sub resolve_ld_snps_for_query {
                 my $lead = $f[$idx{query_snp}] // '';
                 next unless $query{lc trim($lead)};
                 if (exists $idx{ld_population}) {
-                    next unless uc(trim($f[$idx{ld_population}] // '')) eq $population;
+                    my $observed_population = uc(trim($f[$idx{ld_population}] // ''));
+                    my $wanted_population = uc(normalized_population_label($population));
+                    next unless $observed_population eq $population
+                        || $observed_population eq $wanted_population;
                 }
                 if (exists $idx{proxy_r2}) {
                     my $r2 = $f[$idx{proxy_r2}] // '';
@@ -989,14 +1104,15 @@ sub resolve_ld_snps_for_query {
     }
 
     my $helper = File::Spec->catfile($Bin, 'DiffGWASDeps', 'resolve_haploreg_high_ld.pl');
-    if (-f $helper) {
+    if (-f $helper && $args{ld_web_fallback}) {
+        my $haploreg_population = haploreg_population_for_local_spec($population);
         my $web_cache = File::Spec->catfile(
             $Bin, 'cache', 'haploreg_ld', 'high_ld_queries.tsv'
         );
         my @cmd = (
             $^X, $helper,
             '--query-snps', join(',', @{ $args{query_snps} || [] }),
-            '--population', $population,
+            '--population', $haploreg_population,
             '--min-r2', $min_r2,
             '--web-cache', $web_cache,
         );
@@ -2831,7 +2947,8 @@ sub normalize_requested_plots {
         plot_local_gtf       => 0,
         plot_forest          => 0,
     );
-    for my $item (split /,/, ($plots || '')) {
+    my $plot_list = @{$step_args || []} ? '' : ($plots || '');
+    for my $item (split /,/, $plot_list) {
         my $v = trim($item);
         $requested{plot_manhattan} = 1 if $v eq 'manhattan';
         $requested{plot_local_manhattan} = 1 if $v eq 'local_manhattan';

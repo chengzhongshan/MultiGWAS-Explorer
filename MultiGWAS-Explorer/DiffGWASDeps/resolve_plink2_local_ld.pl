@@ -14,6 +14,7 @@ my ($query, $pfile, $bfile, $plink2, $chr, $from_bp, $to_bp, $keep, $output, $po
 my $min_r2 = 0;
 my $window_kb = 1000;
 my $phased = 1;
+my $quiet = 0;
 
 GetOptions(
     'query-snp=s' => \$query,
@@ -28,6 +29,7 @@ GetOptions(
     'keep=s' => \$keep,
     'populations=s' => \$populations,
     'unphased' => sub { $phased = 0 },
+    'quiet!' => \$quiet,
     'output=s' => \$output,
 ) or die usage();
 
@@ -71,7 +73,16 @@ if (defined($populations) && length($populations) && !defined($keep)) {
     close $kfh; close $pfh;
     die "No samples matched --populations=$populations\n" unless -s $keep;
 }
-my @cmd = (shellwords($plink2));
+my @cmd;
+if (-f $plink2) {
+    # A literal executable path must not be passed through shellwords(): on
+    # Cygwin, that strips backslashes from native Windows paths such as
+    # C:\\tools\\plink2.exe.  Preserve existing paths verbatim; shellwords is
+    # retained only for an explicit command string with arguments.
+    @cmd = ($plink2);
+} else {
+    @cmd = shellwords($plink2);
+}
 if (defined $pfile) {
     push @cmd, '--pfile', $pfile_arg, 'vzs' if -e "$pfile.pvar.zst";
     push @cmd, '--pfile', $pfile_arg unless -e "$pfile.pvar.zst";
@@ -95,16 +106,16 @@ die "PLINK2 did not produce a vcor report\n" unless $report;
 if ($report =~ /\.zst\z/) {
     my $zcat = $ENV{ZSTD} || 'zstd';
     open my $in, '-|', $zcat, '-dc', $report or die "Cannot decompress $report: $!\n";
-    parse_report($in, $output, $query, $min_r2);
+    parse_report($in, $output, $query, $min_r2, $quiet);
     close $in;
 } else {
     open my $in, '<', $report or die "Cannot read $report: $!\n";
-    parse_report($in, $output, $query, $min_r2);
+    parse_report($in, $output, $query, $min_r2, $quiet);
     close $in;
 }
 
 sub parse_report {
-    my ($fh, $out_path, $ref, $threshold) = @_;
+    my ($fh, $out_path, $ref, $threshold, $quiet_output) = @_;
     my ($header, %idx, %best);
     while (my $line = <$fh>) {
         chomp $line;
@@ -139,17 +150,35 @@ sub parse_report {
     }
     open my $out, '>', $out_path or die "Cannot write $out_path: $!\n" if defined $out_path;
     print {$out} join("\t", qw(query_snp proxy_snp ld_population proxy_r2 source)), "\n" if $out;
-    print "LD_SNPS\t", join(',', sort { $best{$b} <=> $best{$a} || $a cmp $b } keys %best), "\n";
-    print "LD_R2_PAIRS\t", join(',', map { $_ . ':' . sprintf('%.6g', $best{$_}) } sort { $best{$b} <=> $best{$a} || $a cmp $b } keys %best), "\n";
-    print "LD_SOURCE\tPLINK2_LOCAL\nLD_MIN_R2\t$threshold\n";
+    if (!$quiet_output) {
+        print "LD_SNPS\t", join(',', sort { $best{$b} <=> $best{$a} || $a cmp $b } keys %best), "\n";
+        print "LD_R2_PAIRS\t", join(',', map { $_ . ':' . sprintf('%.6g', $best{$_}) } sort { $best{$b} <=> $best{$a} || $a cmp $b } keys %best), "\n";
+    }
+    print "LD_SOURCE\tPLINK2_1KG_DIRECT\nLD_MIN_R2\t$threshold\n";
+    print "LD_ESTIMABILITY\t", (keys(%best) ? 'ESTIMABLE' : 'NOT_ESTIMABLE'), "\n";
     if ($out) {
+        my $population_label = population_label($populations, $keep);
+        print {$out} join("\t", $ref, $ref, $population_label, 1, 'PLINK2_1KG_DIRECT'), "\n"
+            if keys %best;
         for my $proxy (keys %best) {
-            # The current BED reference is the combined 1000 Genomes panel;
-            # label it EUR-compatible for the existing plot-cache contract.
-            print {$out} join("\t", $ref, $proxy, 'EUR', $best{$proxy}, 'PLINK2_LOCAL'), "\n";
+            print {$out} join("\t", $ref, $proxy, $population_label, $best{$proxy}, 'PLINK2_1KG_DIRECT'), "\n";
         }
         close $out;
     }
+}
+
+sub population_label {
+    my ($requested, $keep_file) = @_;
+    if (defined($requested) && length($requested)) {
+        my @pops = grep { length } map {
+            my $x = uc($_);
+            $x =~ s/^\s+|\s+$//g;
+            $x;
+        } split /,/, $requested;
+        return join('+', @pops) if @pops;
+    }
+    return 'CUSTOM' if defined($keep_file) && length($keep_file);
+    return 'ALL';
 }
 
 sub value {
@@ -188,6 +217,7 @@ Usage: resolve_plink2_local_ld.pl --query-snp rs123 (--pfile PREFIX | --bfile PR
   --keep FILE        Optional PLINK sample keep file
   --populations LIST Restrict samples to 1000G superpopulations (EUR,AMR,AFR,EAS)
   --unphased         Use dosage-correlation r2 instead of phased haplotype r2
+  --quiet            Suppress the potentially long LD_SNPS/LD_R2_PAIRS lines
   --output FILE      Write normalized LD cache rows
 USAGE
 }

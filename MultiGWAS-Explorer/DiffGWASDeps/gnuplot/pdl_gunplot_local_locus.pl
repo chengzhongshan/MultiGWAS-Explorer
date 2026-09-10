@@ -30,7 +30,8 @@ Options:
   --ld-r2-values MAP       Comma-separated SNP:r2 values for LD proxies.
   --ld-r2-file FILE        Two-column SNP/R2 TSV. Preferred for large LD sets
                            because it avoids operating-system argument limits.
-  --ld-population POP      Population shown in the LD inset (default: EUR).
+  --ld-population POP      Population label shown with the signed-LD scale;
+                           MAJOR4 means EUR+AFR+AMR+EAS (default: EUR).
   --ld-heatmap-colors LIST Low-to-high #RRGGBB colors for the separate LD scale.
   --title TEXT             Optional title.
   --gtf FILE.tsv           Optional extracted GTF subset TSV.
@@ -131,8 +132,10 @@ $opt{ld_display_mode} = lc(trim($opt{ld_display_mode} || 'none'));
 die "--ld-display-mode must be none, markers, heatmap, or both\n"
     unless $opt{ld_display_mode} =~ /^(?:none|markers|heatmap|both)$/;
 $opt{ld_population} = uc(trim($opt{ld_population} || 'EUR'));
-die "--ld-population must be AFR, AMR, ASN, or EUR\n"
-    unless $opt{ld_population} =~ /^(?:AFR|AMR|ASN|EUR)$/;
+die "--ld-population must be AFR, AMR, ASN/EAS, EUR, MAJOR4, or a population list\n"
+    unless $opt{ld_population} eq 'MAJOR4'
+        || !grep { $_ !~ /^(?:AFR|AMR|ASN|EAS|EUR)$/ }
+            grep { length } split /[,+\s]+/, $opt{ld_population};
 my @ld_heatmap_colors = map { lc(trim($_)) } split /,/, $opt{ld_heatmap_colors};
 die "--ld-heatmap-colors requires at least two comma-separated #RRGGBB colors\n"
     unless @ld_heatmap_colors >= 2 && !grep { $_ !~ /^#[0-9a-f]{6}$/ } @ld_heatmap_colors;
