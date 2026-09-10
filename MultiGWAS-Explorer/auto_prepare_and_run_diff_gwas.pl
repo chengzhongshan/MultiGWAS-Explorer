@@ -92,6 +92,7 @@ my $local_manhattan_y_axis_value_size_override = '';
 my $target_snps_override = '';
 my $target_snp_genes_override = '';
 my $display_gwas_override = '';
+my $manhattan_differential_p_mode_override = '';
 my $sas_oda_account_override = '';
 my $sas_oda_password_override = '';
 my $prompt_sas_oda_auth_override = 0;
@@ -205,6 +206,7 @@ GetOptions(
     'target-snps=s' => \$target_snps_override,
     'target-snp-genes=s' => \$target_snp_genes_override,
     'display-gwas|display-tracks=s' => \$display_gwas_override,
+    'manhattan-differential-p-mode=s' => \$manhattan_differential_p_mode_override,
     'sas-oda-account=s' => \$sas_oda_account_override,
     'sas-oda-password=s' => \$sas_oda_password_override,
     'prompt-sas-oda-auth!' => \$prompt_sas_oda_auth_override,
@@ -356,6 +358,15 @@ $spec->{reference_build} = $reference_build_override
   if defined $reference_build_override && length $reference_build_override;
 $spec->{standardize_method} = $standardize_method_override
   if defined $standardize_method_override && length $standardize_method_override;
+$spec->{manhattan_differential_p_mode} = lc($manhattan_differential_p_mode_override)
+  if defined $manhattan_differential_p_mode_override
+     && length $manhattan_differential_p_mode_override;
+my $manhattan_differential_p_mode = lc(
+    cfg_or($spec, 'manhattan_differential_p_mode', 'raw')
+);
+die "--manhattan-differential-p-mode must be raw or standardized\n"
+    unless $manhattan_differential_p_mode =~ /^(?:raw|standardized)$/;
+$spec->{manhattan_differential_p_mode} = $manhattan_differential_p_mode;
 $spec->{clip_lower_quantile} = $clip_lower_quantile_override
   if defined $clip_lower_quantile_override && length $clip_lower_quantile_override;
 $spec->{clip_upper_quantile} = $clip_upper_quantile_override
@@ -2373,6 +2384,15 @@ sub build_display_track_catalog {
     my @prefixes = @{ $pair_info->{prefix_order} || [] };
     my @labels = @{ $pair_info->{labels} || [] };
     my @gtf_labels = @{ $pair_info->{gtf_labels} || [] };
+    my $differential_p_mode = lc(
+        cfg_or($spec || {}, 'manhattan_differential_p_mode', 'raw')
+    );
+    my $differential_p_suffix = $differential_p_mode eq 'standardized'
+        ? '_STD_P'
+        : '_DIFF_P';
+    my $differential_p_label = $differential_p_mode eq 'standardized'
+        ? ' standardized differential P'
+        : ' raw differential P';
 
     for my $i (0 .. $#prefixes) {
         my $prefix = $prefixes[$i];
@@ -2380,12 +2400,13 @@ sub build_display_track_catalog {
         my $gtf_label = $gtf_labels[$i] // safe_name($label);
         my $entry = {
             id => $prefix,
-            kind => 'std', # Internal differential-track tag; P thresholds use raw DIFF_P.
+            kind => 'std', # Internal differential-track tag.
             prefix => $prefix,
             pvar => $prefix . '_DIFF_P',
+            manhattan_pvar => $prefix . $differential_p_suffix,
             zvar => $prefix . '_STD_Z',
             betavar => '',
-            manhattan_label => $label . ' differential P',
+            manhattan_label => $label . $differential_p_label,
             gtf_label => $gtf_label,
         };
         push @catalog, $entry;
@@ -2414,6 +2435,7 @@ sub build_display_track_catalog {
             group_key => $group,
             prefix => '',
             pvar => $safe_label . '_P',
+            manhattan_pvar => $safe_label . '_P',
             zvar => $safe_label . '_Z',
             betavar => $safe_label . '_BETA',
             manhattan_label => $rep->{label} . ' association P',
@@ -2442,6 +2464,7 @@ sub build_display_track_catalog {
             group_key => '',
             prefix => '',
             pvar => $track->{pvar},
+            manhattan_pvar => ($track->{manhattan_pvar} || $track->{pvar}),
             zvar => $track->{zvar},
             betavar => ($track->{betavar} || ''),
             sevar => ($track->{sevar} || ''),
@@ -3006,9 +3029,12 @@ sub build_runner_config {
         DISPLAY_GWAS_MODE => (scalar(@selected_tracks) == 1 ? 'single' : 'multi'),
         DISPLAY_GWAS_AVAILABLE => join('|', @{ $selection->{available} || [] }),
         MANHATTAN_GWAS_MODE => (scalar(@selected_tracks) == 1 ? 'single' : 'multi'),
-        MANHATTAN_P_VAR => $selected_tracks[0]{pvar},
+        MANHATTAN_DIFFERENTIAL_P_MODE => uc(cfg_or(
+            $spec, 'manhattan_differential_p_mode', 'raw'
+        )),
+        MANHATTAN_P_VAR => ($selected_tracks[0]{manhattan_pvar} || $selected_tracks[0]{pvar}),
         MANHATTAN_OTHER_P_VARS => [
-            map { $_->{pvar} } @selected_tracks[1 .. $#selected_tracks],
+            map { $_->{manhattan_pvar} || $_->{pvar} } @selected_tracks[1 .. $#selected_tracks],
         ],
         MANHATTAN_FIG_HEIGHT => $manhattan_fig_height,
         MANHATTAN_FIG_WIDTH => $manhattan_fig_width,
@@ -4300,6 +4326,10 @@ Options:
                        pipeline renders single-GWAS genomewide/local Manhattan
                        and local GTF plots and uses that selected GWAS for
                        top-hit selection unless --target-snps is provided.
+  --manhattan-differential-p-mode MODE
+                       raw|standardized. Default: raw. Differential Manhattan
+                       panels use PREFIX_DIFF_P by default; standardized mode
+                       is retained only for reproducing legacy visualizations.
   --standardize-method NAME
                        Differential standardization method passed to
                        standardize_diff_gwas_zscore.pl. Supported values:

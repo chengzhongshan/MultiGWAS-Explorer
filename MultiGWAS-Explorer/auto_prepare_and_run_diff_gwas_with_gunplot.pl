@@ -73,6 +73,8 @@ Options:
                                 SAS ODA runner config. Use pair prefixes such as
                                 ALL,EUR,ASN for differential tracks and GWAS labels
                                 such as ALL_FEMALE or EUR_MALE for single-GWAS tracks.
+  --manhattan-differential-p-mode MODE
+                                raw or standardized. Default: raw.
   --remove-X-chr / --no-remove-X-chr
                                 Remove chromosome X from final gunplot figures.
                                 Default: enabled.
@@ -140,6 +142,7 @@ my @step_args;
 my $force = 0;
 my $force_upstream = 0;
 my $display_gwas_override = '';
+my $manhattan_differential_p_mode_override = '';
 my $target_snps_override = '';
 my $target_snp_genes_override = '';
 my $ld_snps_override = '';
@@ -182,6 +185,7 @@ GetOptions(
     'force!'                  => \$force,
     'force-upstream!'         => \$force_upstream,
     'display-gwas|display-tracks=s' => \$display_gwas_override,
+    'manhattan-differential-p-mode=s' => \$manhattan_differential_p_mode_override,
     'remove-x-chr!'            => \$remove_x_chr,
     'target-snps=s'           => \$target_snps_override,
     'target-snp-genes=s'      => \$target_snp_genes_override,
@@ -228,6 +232,10 @@ die "--ld-population must be AFR, AMR, ASN/EAS, EUR, MAJOR4, or a comma/plus-sep
        && !valid_local_ld_population_spec($ld_population_override);
 die "--ld-r2-threshold must be between 0 and 1\n"
     unless $ld_r2_threshold_override >= 0 && $ld_r2_threshold_override <= 1;
+$manhattan_differential_p_mode_override = lc(trim($manhattan_differential_p_mode_override));
+die "--manhattan-differential-p-mode must be raw or standardized\n"
+    if length($manhattan_differential_p_mode_override)
+       && $manhattan_differential_p_mode_override !~ /^(?:raw|standardized)$/;
 $ld_display_mode = lc(trim($ld_display_mode || 'none'));
 die "--ld-display-mode must be none, markers, heatmap, or both\n"
     unless $ld_display_mode =~ /^(?:none|markers|heatmap|both)$/;
@@ -298,6 +306,7 @@ my $reused_existing_runner = 0;
 my $has_runner_override = 0;
 for my $override_value (
     $display_gwas_override,
+    $manhattan_differential_p_mode_override,
     $target_snps_override,
     $target_snp_genes_override,
     $get_common_associations,
@@ -332,6 +341,7 @@ if (!$reused_existing_runner) {
         spec_file                       => $spec_file,
         force                           => $force_upstream,
         display_gwas_override           => $display_gwas_override,
+        manhattan_differential_p_mode_override => $manhattan_differential_p_mode_override,
         target_snps_override            => $target_snps_override,
         target_snp_genes_override       => $target_snp_genes_override,
         get_common_associations         => $get_common_associations,
@@ -616,6 +626,10 @@ sub run_upstream_preprocessing {
     push @cmd, '--force' if $args{force};
     if ($args{display_gwas_override}) {
         push @cmd, '--display-gwas', $args{display_gwas_override};
+    }
+    if ($args{manhattan_differential_p_mode_override}) {
+        push @cmd, '--manhattan-differential-p-mode',
+          $args{manhattan_differential_p_mode_override};
     }
     if ($args{target_snps_override}) {
         push @cmd, '--target-snps', $args{target_snps_override};

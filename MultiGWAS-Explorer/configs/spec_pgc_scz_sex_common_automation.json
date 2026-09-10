@@ -12,6 +12,7 @@
   "threshold": 0.05,
   "window_bp": 10000000,
   "manhattan_fig_height": 1875,
+  "manhattan_differential_p_mode": "raw",
   "top_hit_focus_prefix": "ALL",
   "top_hit_signal_thrshd": "1e-6",
   "top_hit_selection_method": "ld",

@@ -2298,6 +2298,15 @@ Dimensions are pixels in the range 200–10,000. In the gnuplot wrapper,
 table; use the separate `--force-upstream` only when that large table must also
 be rebuilt.
 
+Genome-wide differential Manhattan panels use the directly calculated raw
+`PREFIX_DIFF_P` columns by default. This is explicit in generated runner files
+as `MANHATTAN_DIFFERENTIAL_P_MODE=RAW` and can be set in a spec with
+`"manhattan_differential_p_mode": "raw"`. The command-line equivalent for
+both SAS ODA and gnuplot is `--manhattan-differential-p-mode raw`.
+`standardized` is available only to reproduce legacy visualizations; top-hit
+selection and inferential thresholds continue to use raw differential P
+values in either plotting mode.
+
 The default remains `none`; no LD query or overlay is performed unless the
 user requests `markers`, `heatmap`, or `both`. Explicit proxy lists can supply
 values with `--local-ld-r2-values rs1:0.92,rs2:0.81`. The gnuplot equivalent is
