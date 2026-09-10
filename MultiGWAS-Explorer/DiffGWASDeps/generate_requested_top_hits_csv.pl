@@ -170,6 +170,7 @@ my ($header, $rows) = build_export_rows(
     focus_pvar      => $focus_pvar,
     target_snp_genes => ($opt{target_snp_genes} || $runner->{TARGET_SNP_GENES} || ''),
     gene_annotation_gtf => $gene_annotation_gtf,
+    annotate_missing_genes => length($target_snps) ? 0 : 1,
 );
 
 write_csv(
@@ -310,13 +311,15 @@ sub build_export_rows {
         length($chr) ? ($chr => 1) : ()
     } @{ $args{hits} || [] };
     my $needs_gtf_annotation = 0;
-    for my $hit (@{ $args{hits} || [] }) {
-        my $snp = uc($hit->{SNP} || '');
-        my $gene = $gene_override{$snp} || $hit->{gene} || '';
-        $gene = extract_gene_from_snp_gene($hit->{snp_gene}) if !length $gene;
-        if (!length($gene) || $gene =~ /^(?:NA|N\/A|null)$/i) {
-            $needs_gtf_annotation = 1;
-            last;
+    if (!exists($args{annotate_missing_genes}) || $args{annotate_missing_genes}) {
+        for my $hit (@{ $args{hits} || [] }) {
+            my $snp = uc($hit->{SNP} || '');
+            my $gene = $gene_override{$snp} || $hit->{gene} || '';
+            $gene = extract_gene_from_snp_gene($hit->{snp_gene}) if !length $gene;
+            if (!length($gene) || $gene =~ /^(?:NA|N\/A|null)$/i) {
+                $needs_gtf_annotation = 1;
+                last;
+            }
         }
     }
     my $genes_by_chr = {};

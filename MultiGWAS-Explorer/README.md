@@ -2235,6 +2235,9 @@ perl auto_prepare_and_run_diff_gwas.pl \
   --spec configs/your_spec.json \
   --target-snps rs185665940,rs10166057,rs4852780 \
   --step plot_local_gtf \
+  --local-gtf-window-bp 650000 \
+  --local-gtf-fig-width 1500 \
+  --local-gtf-fig-height 1395 \
   --local-ld-display-mode heatmap \
   --local-ld-reference-snp rs10166057 \
   --local-ld-population MAJOR4 \
@@ -2248,6 +2251,9 @@ perl auto_prepare_and_run_diff_gwas_with_gunplot.pl \
   --spec configs/your_spec.json \
   --target-snps rs185665940,rs10166057,rs4852780 \
   --step plot_local_gtf \
+  --local-gtf-window-bp 650000 \
+  --local-gtf-fig-width 1500 \
+  --local-gtf-fig-height 1395 \
   --ld-display-mode heatmap \
   --ld-reference-snp rs10166057 \
   --ld-population MAJOR4 \
@@ -2257,6 +2263,40 @@ perl auto_prepare_and_run_diff_gwas_with_gunplot.pl \
 `MAJOR4` expands to `EUR,AFR,AMR,EAS`. The default r2 threshold is zero for
 local LD, so every estimable query-to-variant pair in the PLINK2 window is
 available to the colormap.
+
+`--local-gtf-window-bp` restricts the local GTF half-window around each
+requested SNP. Overlapping SNP-centered intervals are merged into one shared
+locus. In this three-SNP example, the panel is centered on the first SNP;
+650,000 bp is the smallest rounded half-window that includes all three SNPs
+while substantially reducing the displayed region and the number of genes in
+the lower track.
+
+When the configured half-window exceeds 5,000,000 bp (a total displayed span
+of more than approximately 10 Mb), both entry points print a performance
+warning. Large intervals require more association and GTF records and can
+substantially increase SAS ODA upload size, memory use, and rendering time. For
+fast local-GTF plots, use the smallest half-window that contains the requested
+variants.
+
+For explicit `--target-snps` runs, the compact top-hit CSV no longer scans the
+entire GENCODE file merely to fill missing nearest-gene labels; the plotted gene
+track still comes from the interval-specific GTF subset. Supply
+`--target-snp-genes rs1:GENE1,rs2:GENE2` when explicit SNP-to-gene labels are
+required in the target CSV.
+
+All SAS ODA and gnuplot entry points accept the same publication-sizing
+interface. `--figure-width` and `--figure-height` apply to every requested
+plot; the following plot-specific options take precedence:
+
+- `--manhattan-fig-width` and `--manhattan-fig-height`
+- `--local-manhattan-fig-width` and `--local-manhattan-fig-height`
+- `--local-gtf-fig-width` and `--local-gtf-fig-height`
+- `--forest-fig-width` and `--forest-fig-height`
+
+Dimensions are pixels in the range 200–10,000. In the gnuplot wrapper,
+`--force` now regenerates plot artifacts while reusing a valid upstream wide
+table; use the separate `--force-upstream` only when that large table must also
+be rebuilt.
 
 The default remains `none`; no LD query or overlay is performed unless the
 user requests `markers`, `heatmap`, or `both`. Explicit proxy lists can supply

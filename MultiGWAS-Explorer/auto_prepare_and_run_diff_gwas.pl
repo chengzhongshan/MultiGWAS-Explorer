@@ -72,6 +72,16 @@ my $top_hit_ld_plink2_override = '';
 my $top_hit_max_loci_override;
 my $local_max_hits_per_fig_override = 0;
 my $local_gtf_window_bp_override = '';
+my $figure_width_override = 0;
+my $figure_height_override = 0;
+my $manhattan_fig_width_override = 0;
+my $manhattan_fig_height_override = 0;
+my $local_manhattan_fig_width_override = 0;
+my $local_manhattan_fig_height_override = 0;
+my $local_gtf_fig_width_override = 0;
+my $local_gtf_fig_height_override = 0;
+my $forest_fig_width_override = 0;
+my $forest_fig_height_override = 0;
 my $local_manhattan_angle4xaxis_label_override = '';
 my $local_manhattan_xgrp_y_pos_override = '';
 my $local_manhattan_yoffset_top_override = '';
@@ -175,6 +185,16 @@ GetOptions(
     'top-hit-max-loci=i'  => \$top_hit_max_loci_override,
     'local-max-hits-per-fig=i' => \$local_max_hits_per_fig_override,
     'local-gtf-window-bp=s' => \$local_gtf_window_bp_override,
+    'figure-width|plot-width=i' => \$figure_width_override,
+    'figure-height|plot-height=i' => \$figure_height_override,
+    'manhattan-fig-width=i' => \$manhattan_fig_width_override,
+    'manhattan-fig-height=i' => \$manhattan_fig_height_override,
+    'local-manhattan-fig-width=i' => \$local_manhattan_fig_width_override,
+    'local-manhattan-fig-height=i' => \$local_manhattan_fig_height_override,
+    'local-gtf-fig-width=i' => \$local_gtf_fig_width_override,
+    'local-gtf-fig-height=i' => \$local_gtf_fig_height_override,
+    'forest-fig-width=i' => \$forest_fig_width_override,
+    'forest-fig-height=i' => \$forest_fig_height_override,
     'local-manhattan-angle4xaxis-label=s' => \$local_manhattan_angle4xaxis_label_override,
     'local-manhattan-xgrp-y-pos=s' => \$local_manhattan_xgrp_y_pos_override,
     'local-manhattan-yoffset-top=s' => \$local_manhattan_yoffset_top_override,
@@ -300,6 +320,31 @@ if (!length $spec_file && length $gwas_dir) {
 
 die "--spec is required (or provide --gwas-dir to generate one)\n" unless length $spec_file;
 my $spec = load_json($spec_file);
+$manhattan_fig_width_override ||= $figure_width_override;
+$manhattan_fig_height_override ||= $figure_height_override;
+$local_manhattan_fig_width_override ||= $figure_width_override;
+$local_manhattan_fig_height_override ||= $figure_height_override;
+$local_gtf_fig_width_override ||= $figure_width_override;
+$local_gtf_fig_height_override ||= $figure_height_override;
+$forest_fig_width_override ||= $figure_width_override;
+$forest_fig_height_override ||= $figure_height_override;
+for my $dimension (
+    [manhattan_fig_width => $manhattan_fig_width_override],
+    [manhattan_fig_height => $manhattan_fig_height_override],
+    [local_manhattan_fig_width => $local_manhattan_fig_width_override],
+    [local_manhattan_fig_height => $local_manhattan_fig_height_override],
+    [gtf_design_width => $local_gtf_fig_width_override],
+    [gtf_design_height => $local_gtf_fig_height_override],
+    [forest_fig_width => $forest_fig_width_override],
+    [forest_fig_height => $forest_fig_height_override],
+) {
+    next unless $dimension->[1];
+    my $dimension_option = $dimension->[0];
+    $dimension_option =~ s/_/-/g;
+    die "--$dimension_option must be between 200 and 10000 pixels\n"
+        unless $dimension->[1] >= 200 && $dimension->[1] <= 10000;
+    $spec->{ $dimension->[0] } = int($dimension->[1]);
+}
 $local_ld_population_override = uc(
     $local_ld_population_override || cfg_or($spec, 'local_ld_population', 'EUR')
 );
@@ -446,6 +491,17 @@ my $top_hit_max_loci = defined($top_hit_max_loci_override)
     : cfg_or($spec, 'top_hit_max_loci', 0);
 my $local_window_bp = cfg_or($spec, 'local_window_bp', '1e7');
 my $local_gtf_window_bp = cfg_or($spec, 'local_gtf_window_bp', $local_window_bp);
+if ($local_gtf_window_bp =~ /^(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i
+    && (0 + $local_gtf_window_bp) > 5_000_000) {
+    my $total_span = 2 * (0 + $local_gtf_window_bp);
+    warn sprintf(
+        "[warn] Large local-GTF half-window requested: %.0f bp (approximately %.0f bp total span). " .
+        "Large intervals increase GWAS/GTF extraction, SAS ODA upload size, memory use, and rendering time. " .
+        "For faster plots, use --local-gtf-window-bp 5000000 or less, preferably the smallest window containing the requested SNPs.\n",
+        0 + $local_gtf_window_bp,
+        $total_span,
+    );
+}
 my $open_result = cfg_or($spec, 'open_result', 0) ? 1 : 0;
 my $clean_oda_input = cfg_or($spec, 'clean_oda_input', 1) ? 1 : 0;
 my $keep_remote_plot_data = cfg_or($spec, 'keep_remote_plot_data', 0) ? 1 : 0;
@@ -3095,6 +3151,8 @@ sub build_runner_config {
         GTF_LD_R2_CACHE => $local_ld_cache_override,
         GTF_LD_REFERENCE_SNP => $local_ld_reference_snp,
         GTF_IMAGE_DPI => cfg_or($spec, 'gtf_image_dpi', 150),
+        GTF_DESIGN_WIDTH => cfg_or($spec, 'gtf_design_width', ''),
+        GTF_DESIGN_HEIGHT => cfg_or($spec, 'gtf_design_height', ''),
         GTF_LD_HEATMAP_COLORS => $local_ld_heatmap_colors,
         GTF_LD_HEATMAP_LEGEND_TITLE => (
             length($local_ld_reference_snp)
@@ -4197,6 +4255,18 @@ Options:
   --local-max-hits-per-fig N
                        Requested upper bound for local top-hit columns per panel.
                        Current pipeline maximum is 15.
+  --figure-width N --figure-height N
+                       Apply one pixel size to every requested plot type.
+                       Plot-specific options below take precedence.
+  --manhattan-fig-width N --manhattan-fig-height N
+                       Genome-wide Manhattan PNG dimensions in pixels.
+  --local-manhattan-fig-width N --local-manhattan-fig-height N
+                       Local Manhattan PNG dimensions in pixels.
+  --local-gtf-fig-width N --local-gtf-fig-height N
+                       Local association-plus-GTF PNG dimensions in pixels.
+  --forest-fig-width N --forest-fig-height N
+                       Forest-plot PNG dimensions in pixels. All dimensions
+                       must be between 200 and 10000.
   --local-manhattan-angle4xaxis-label N
                        Override the SNP/gene label rotation angle in local
                        top-hit Manhattan panels. Default is macro-driven.

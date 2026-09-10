@@ -99,6 +99,39 @@ TOP_HIT_LD_MACRO_SAS="${TOP_HIT_LD_MACRO_SAS:-${DEPS_DIR}/get_top_signal_with_ld
 HAPLOREG_LD_QUERY_MACRO_SAS="${HAPLOREG_LD_QUERY_MACRO_SAS:-${DEPS_DIR}/QueryLD_SNPs_at_Haploreg4.sas}"
 GTF_CACHE_DIR="${GTF_CACHE_DIR:-${WORKDIR}/cache/gtf}"
 LOCAL_GTF_REUSE_CACHE_DIR="${LOCAL_GTF_REUSE_CACHE_DIR:-${WORKDIR}/cache/local_gtf_reuse}"
+
+fresh_tabix_index_exists() {
+  local data_path="$1"
+  local index_path
+  [[ -s "${data_path}" ]] || return 1
+  for index_path in "${data_path}.tbi" "${data_path}.csi"; do
+    [[ -s "${index_path}" ]] || continue
+    [[ ! "${data_path}" -nt "${index_path}" ]] && return 0
+  done
+  return 1
+}
+
+resolve_existing_tabix_source() {
+  local source_path="$1"
+  local stem candidate
+  fresh_tabix_index_exists "${source_path}" && { printf '%s' "${source_path}"; return 0; }
+  stem="${source_path%.gz}"
+  for candidate in \
+    "${stem%.tsv}.tabix_ready.tsv.gz" \
+    "${stem}.tabix_ready.tsv.gz"; do
+    fresh_tabix_index_exists "${candidate}" || continue
+    printf '%s' "${candidate}"
+    return 0
+  done
+  printf '%s' "${source_path}"
+}
+
+if [[ -n "${SOURCE_LONG_GZ:-}" ]]; then
+  SOURCE_LONG_GZ="$(resolve_existing_tabix_source "${SOURCE_LONG_GZ}")"
+  if fresh_tabix_index_exists "${SOURCE_LONG_GZ}"; then
+    echo "[prep] Using indexed long GWAS source for local-GTF extraction: ${SOURCE_LONG_GZ}"
+  fi
+fi
 if [[ -z "${GTF_ASSOC_PVARS:-}" || -z "${GTF_ZSCORE_VARS:-}" || -z "${GTF_LABELS:-}" ]]; then
   case "${TOP_HIT_FOCUS_PVAR}" in
     ASN_*)

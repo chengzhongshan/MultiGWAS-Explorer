@@ -67,7 +67,8 @@ Usage:
 Options:
   --plots LIST                  Comma list: manhattan,local_manhattan,local_gtf,forest
   --step NAME                   Plot step(s): plot_manhattan, plot_local_manhattan, plot_local_gtf, plot_forest
-  --force                       Force upstream preprocessing refresh.
+  --force                       Force plot regeneration while reusing valid upstream data.
+  --force-upstream              Also rebuild the upstream wide GWAS subset.
   --display-gwas LIST           Comma-separated displayed GWAS tracks, shared with the
                                 SAS ODA runner config. Use pair prefixes such as
                                 ALL,EUR,ASN for differential tracks and GWAS labels
@@ -110,6 +111,17 @@ Options:
   --reference-build BUILD      Override genome build for local GTF annotations:
                                 hg19, hg38, or t2t. Default: auto-detect, then hg38 fallback.
   --local-gtf-window-bp N       Override local GTF window.
+  --figure-width N --figure-height N
+                                Apply one pixel size to every requested plot type.
+  --manhattan-fig-width N --manhattan-fig-height N
+                                Genome-wide Manhattan dimensions in pixels.
+  --local-manhattan-fig-width N --local-manhattan-fig-height N
+                                Local Manhattan dimensions in pixels.
+  --local-gtf-fig-width N --local-gtf-fig-height N
+                                Local association-plus-GTF dimensions in pixels.
+  --forest-fig-width N --forest-fig-height N
+                                Forest-plot dimensions in pixels. Plot-specific
+                                values override --figure-width/--figure-height.
   --local-max-hits-per-fig N    Override local Manhattan batch size.
   --local-manhattan-columns N   Override the number of loci columns per combined gunplot local-Manhattan figure.
   --local-manhattan-annotation MODE  Under-column annotation for combined local Manhattan: labels, gtf, auto, none
@@ -126,6 +138,7 @@ my $spec_file = '';
 my $plots = 'manhattan,local_manhattan,local_gtf';
 my @step_args;
 my $force = 0;
+my $force_upstream = 0;
 my $display_gwas_override = '';
 my $target_snps_override = '';
 my $target_snp_genes_override = '';
@@ -146,6 +159,16 @@ my $get_common_associations = '';
 my $common_association_top_hit_threshold = '';
 my $reference_build_override = '';
 my $local_gtf_window_bp_override = '';
+my $figure_width_override = 0;
+my $figure_height_override = 0;
+my $manhattan_fig_width_override = 0;
+my $manhattan_fig_height_override = 0;
+my $local_manhattan_fig_width_override = 0;
+my $local_manhattan_fig_height_override = 0;
+my $local_gtf_fig_width_override = 0;
+my $local_gtf_fig_height_override = 0;
+my $forest_fig_width_override = 0;
+my $forest_fig_height_override = 0;
 my $local_max_hits_per_fig_override = 0;
 my $local_manhattan_columns_override = 0;
 my $local_manhattan_annotation_override = '';
@@ -157,6 +180,7 @@ GetOptions(
     'plots=s'                 => \$plots,
     'step=s@'                 => \@step_args,
     'force!'                  => \$force,
+    'force-upstream!'         => \$force_upstream,
     'display-gwas|display-tracks=s' => \$display_gwas_override,
     'remove-x-chr!'            => \$remove_x_chr,
     'target-snps=s'           => \$target_snps_override,
@@ -178,6 +202,16 @@ GetOptions(
     'common-association-top-hit-threshold=s' => \$common_association_top_hit_threshold,
     'reference-build=s'       => \$reference_build_override,
     'local-gtf-window-bp=s'   => \$local_gtf_window_bp_override,
+    'figure-width|plot-width=i' => \$figure_width_override,
+    'figure-height|plot-height=i' => \$figure_height_override,
+    'manhattan-fig-width=i' => \$manhattan_fig_width_override,
+    'manhattan-fig-height=i' => \$manhattan_fig_height_override,
+    'local-manhattan-fig-width=i' => \$local_manhattan_fig_width_override,
+    'local-manhattan-fig-height=i' => \$local_manhattan_fig_height_override,
+    'local-gtf-fig-width=i' => \$local_gtf_fig_width_override,
+    'local-gtf-fig-height=i' => \$local_gtf_fig_height_override,
+    'forest-fig-width=i' => \$forest_fig_width_override,
+    'forest-fig-height=i' => \$forest_fig_height_override,
     'local-max-hits-per-fig=i'=> \$local_max_hits_per_fig_override,
     'local-manhattan-columns=i'=> \$local_manhattan_columns_override,
     'local-manhattan-annotation=s'=> \$local_manhattan_annotation_override,
@@ -210,6 +244,25 @@ die "--ld-heatmap-colors requires at least two comma-separated #RRGGBB colors\n"
     unless @ld_heatmap_colors >= 2
         && !grep { trim($_) !~ /^#[0-9A-Fa-f]{6}$/ } @ld_heatmap_colors;
 $ld_heatmap_colors = join(',', map { lc(trim($_)) } @ld_heatmap_colors);
+
+$manhattan_fig_width_override ||= $figure_width_override;
+$manhattan_fig_height_override ||= $figure_height_override;
+$local_manhattan_fig_width_override ||= $figure_width_override;
+$local_manhattan_fig_height_override ||= $figure_height_override;
+$local_gtf_fig_width_override ||= $figure_width_override;
+$local_gtf_fig_height_override ||= $figure_height_override;
+$forest_fig_width_override ||= $figure_width_override;
+$forest_fig_height_override ||= $figure_height_override;
+for my $dimension (
+    $manhattan_fig_width_override, $manhattan_fig_height_override,
+    $local_manhattan_fig_width_override, $local_manhattan_fig_height_override,
+    $local_gtf_fig_width_override, $local_gtf_fig_height_override,
+    $forest_fig_width_override, $forest_fig_height_override,
+) {
+    next unless $dimension;
+    die "Figure dimensions must be between 200 and 10000 pixels\n"
+        unless $dimension >= 200 && $dimension <= 10000;
+}
 
 die "Spec file not found: $spec_file\n" unless -f $spec_file;
 
@@ -259,7 +312,7 @@ for my $override_value (
 }
 $has_runner_override = 1 if $local_max_hits_per_fig_override;
 
-if (!$force && !$has_runner_override && -f $runner_config_local) {
+if (!$force_upstream && !$has_runner_override && -f $runner_config_local) {
     my $existing_runner = load_json($runner_config_local);
     my $existing_data = localize_path($existing_runner->{DATA_GZ} || '');
     if ($existing_data && -s $existing_data) {
@@ -277,7 +330,7 @@ if (!$force && !$has_runner_override && -f $runner_config_local) {
 if (!$reused_existing_runner) {
     run_upstream_preprocessing(
         spec_file                       => $spec_file,
-        force                           => $force,
+        force                           => $force_upstream,
         display_gwas_override           => $display_gwas_override,
         target_snps_override            => $target_snps_override,
         target_snp_genes_override       => $target_snp_genes_override,
@@ -291,6 +344,14 @@ if (!$reused_existing_runner) {
 
 die "Runner config was not generated: $runner_config_local\n" unless -f $runner_config_local;
 my $runner = load_json($runner_config_local);
+$runner->{MANHATTAN_FIG_WIDTH} = $manhattan_fig_width_override if $manhattan_fig_width_override;
+$runner->{MANHATTAN_FIG_HEIGHT} = $manhattan_fig_height_override if $manhattan_fig_height_override;
+$runner->{LOCAL_MANHATTAN_FIG_WIDTH} = $local_manhattan_fig_width_override if $local_manhattan_fig_width_override;
+$runner->{LOCAL_MANHATTAN_FIG_HEIGHT} = $local_manhattan_fig_height_override if $local_manhattan_fig_height_override;
+$runner->{GTF_DESIGN_WIDTH} = $local_gtf_fig_width_override if $local_gtf_fig_width_override;
+$runner->{GTF_DESIGN_HEIGHT} = $local_gtf_fig_height_override if $local_gtf_fig_height_override;
+$runner->{FOREST_FIG_WIDTH} = $forest_fig_width_override if $forest_fig_width_override;
+$runner->{FOREST_FIG_HEIGHT} = $forest_fig_height_override if $forest_fig_height_override;
 $ld_reference_snp_override = trim(
     $ld_reference_snp_override
       || $runner->{LOCAL_LD_REFERENCE_SNP}
@@ -322,7 +383,7 @@ if ($highlight_high_ld_snps
             bfile       => ($runner->{TOP_HIT_LD_BFILE} || $spec->{top_hit_ld_bfile} || ''),
             plink2      => ($runner->{TOP_HIT_LD_PLINK2} || $spec->{top_hit_ld_plink2} || 'plink2'),
             output_dir  => $output_dir_local,
-            force       => $force,
+            force       => $force_upstream,
         );
         if ($direct_ok) {
             $ld_cache_override = $direct_cache;
@@ -353,7 +414,7 @@ if ($requested{plot_local_manhattan} || $requested{plot_local_gtf}) {
         source_long => localize_path($runner->{SOURCE_LONG_GZ} || ''),
         output_dir  => $output_dir_local,
         gnuplot     => $gnuplot,
-        force       => $force,
+        force       => $force_upstream,
     );
 }
 
@@ -435,6 +496,7 @@ if ($requested{plot_local_manhattan}) {
                 || 'gtf'),
             output_base  => gunplotize_name($runner->{LOCAL_OUTPUT_PREFIX} || 'local_top_hits_manhattan'),
             html_title   => gunplot_title($runner->{LOCAL_HTML_TITLE} || 'Local top hits Manhattan Plot'),
+            width        => ($runner->{LOCAL_MANHATTAN_FIG_WIDTH} || 1800),
             height       => ($runner->{LOCAL_MANHATTAN_FIG_HEIGHT} || 1200),
             with_gtf     => 0,
             source_long  => ($indexed_source_long_local || localize_path($runner->{SOURCE_LONG_GZ} || '')),
@@ -462,6 +524,17 @@ if ($requested{plot_local_manhattan}) {
 
 if ($requested{plot_local_gtf}) {
     my $gtf_window = $local_gtf_window_bp_override || ($runner->{LOCAL_GTF_WINDOW_BP} || $runner->{LOCAL_WINDOW_BP} || '1e7');
+    if ($gtf_window =~ /^(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i
+        && (0 + $gtf_window) > 5_000_000) {
+        my $total_span = 2 * (0 + $gtf_window);
+        warn sprintf(
+            "[warn] Large local-GTF half-window requested: %.0f bp (approximately %.0f bp total span). " .
+            "Large intervals increase association/GTF extraction and rendering time; SAS ODA runs also require larger uploads and more memory. " .
+            "For faster plots, use --local-gtf-window-bp 5000000 or less, preferably the smallest window containing the requested SNPs.\n",
+            0 + $gtf_window,
+            $total_span,
+        );
+    }
     my $step_started = time();
     %outputs = (
         %outputs,
@@ -479,7 +552,8 @@ if ($requested{plot_local_gtf}) {
             batch_size   => ($runner->{LOCAL_GTF_MAX_HITS_PER_FIG} || 1),
             output_base  => gunplotize_name($runner->{OUTPUT_HTML_BASENAME} || 'local_top_hits_with_gtf.html'),
             html_title   => gunplot_title($runner->{LOCAL_HTML_TITLE} || 'Local top hits Manhattan and GTF Plot'),
-            height       => compute_gtf_height(scalar(@gtf_pcols)),
+            width        => ($runner->{GTF_DESIGN_WIDTH} || 1500),
+            height       => ($runner->{GTF_DESIGN_HEIGHT} || compute_gtf_height(scalar(@gtf_pcols))),
             with_gtf     => 1,
             source_long  => ($indexed_source_long_local || localize_path($runner->{SOURCE_LONG_GZ} || '')),
             preset_config=> $preset_config_local,
@@ -1341,6 +1415,7 @@ sub plot_local_series {
             ld_heatmap_colors => $args{ld_heatmap_colors},
             ld_population     => $args{ld_population},
             ld_reference_snp  => $ld_reference_snp,
+            width             => ($args{width} || 1500),
             height            => $args{height},
             sig               => ($runner->{TOP_HIT_SIGNAL_THRSHD} || '1e-6'),
             has_gtf           => $expected_has_gtf,
@@ -1484,6 +1559,7 @@ sub plot_local_series {
             '--pcols', join(',', @{ $args{pcols} }),
             '--labels', join('|', @{ $args{labels} }),
             '--title', sprintf('%s: %s (%s:%s)', $args{html_title}, $locus_title_snps, $hit->{CHR}, $hit->{BP}),
+            '--width', ($args{width} || 1500),
             '--height', $args{height},
             '--gnuplot', $args{gnuplot},
             '--sig', ($runner->{TOP_HIT_SIGNAL_THRSHD} || '1e-6'),
@@ -1726,6 +1802,7 @@ sub local_locus_cache_is_reusable {
         ['zcols',             ($args{zcols} // '')],
         ['labels',            ($args{labels} // '')],
         ['title',             ($args{title} // '')],
+        ['width',             ($args{width} // '')],
         ['height',            ($args{height} // '')],
         ['sig',               ($args{sig} // '')],
         ['has_gtf',           ($args{has_gtf} ? 1 : 0)],
