@@ -5,6 +5,7 @@ _install_check_source="${BASH_SOURCE[0]:-$0}"
 SCRIPT_DIR="$(cd "$(/usr/bin/dirname "${_install_check_source}")" && pwd)"
 # shellcheck source=install/common.sh
 . "${SCRIPT_DIR}/common.sh"
+cd "${PIPELINE_ROOT}"
 
 need_cmd() {
   local cmd="$1"
@@ -52,6 +53,15 @@ if not cfg_names or 'oda' not in cfg_names:
     raise SystemExit("saspy ODA config was not provisioned in the repo-local install")
 PY
 
+if command_exists cygpath; then
+  java_bin="$(resolve_windows_java_for_saspy || true)"
+  [ -n "$java_bin" ] && java_bin="$(cygpath -u "$java_bin")"
+else
+  java_bin="$(resolve_unix_java_for_saspy || true)"
+fi
+[ -n "$java_bin" ] || die "Java runtime not found. Install a JDK and set JAVA_HOME, SASPY_JAVA (Unix), or SASPY_JAVA_WIN (Windows)."
+"$java_bin" -version || die "Java could not start: ${java_bin}"
+
 log "GD version: $(perl -MGD -e 'print $GD::VERSION')"
 log "PDL version: $(perl -MPDL -e 'print $PDL::VERSION')"
 perl -e "require JSON::PP; require JSON::MaybeXS; require File::Which; require DBI; require DBD::SQLite; require GD; require Mojolicious::Lite; require MCP::Server; require PDL; require Text::CSV; 1;" >/dev/null
@@ -72,3 +82,4 @@ perl DiffGWASDeps/test_ld_heatmap_contract.pl >/dev/null
 "${BASH:-bash}" -n DiffGWASDeps/run_sas_oda_local_top_hits_with_gtf_download_html.sh
 
 log "Pipeline dependency smoke test completed successfully"
+log "Local dependencies and synthetic plotting passed; SAS ODA login was not tested"

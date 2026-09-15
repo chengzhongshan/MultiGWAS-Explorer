@@ -24,6 +24,7 @@ PIPELINE_CPANFILE="${PIPELINE_ROOT}/cpanfile"
 PIPELINE_HTSLIB_VERSION="${PIPELINE_HTSLIB_VERSION:-1.20}"
 PIPELINE_HTSLIB_URL="${PIPELINE_HTSLIB_URL:-https://github.com/samtools/htslib/releases/download/${PIPELINE_HTSLIB_VERSION}/htslib-${PIPELINE_HTSLIB_VERSION}.tar.bz2}"
 PIPELINE_CPANM_BIN=""
+PIPELINE_CPAN_MIRROR="${PIPELINE_CPAN_MIRROR:-https://cpan.metacpan.org}"
 PIPELINE_PYTHON_BIN="${PIPELINE_PYTHON_BIN:-}"
 
 if [[ "${PIPELINE_INSTALL_DEBUG:-0}" =~ ^(1|true|yes|y|on)$ ]]; then
@@ -258,6 +259,21 @@ resolve_saspy_site_packages() {
 
 resolve_windows_java_for_saspy() {
   local cand="" unix_cand=""
+  # Respect explicit configuration, then standard JDK installations (including
+  # setup-java on CI), before trying legacy Oracle launcher locations.
+  for cand in "${SASPY_JAVA_WIN:-}" "${JAVA_HOME:+${JAVA_HOME}/bin/java.exe}"; do
+    [ -n "$cand" ] || continue
+    unix_cand="$(cygpath -u "$cand" 2>/dev/null || printf '%s' "$cand")"
+    if [ -f "$unix_cand" ]; then
+      cygpath -w "$unix_cand"
+      return 0
+    fi
+  done
+  unix_cand="$(command -v java.exe 2>/dev/null || true)"
+  if [ -n "$unix_cand" ]; then
+    cygpath -w "$unix_cand"
+    return 0
+  fi
   if command_exists cygpath; then
     for unix_cand in \
       /usr/local/jdk/bin/java.exe \
@@ -486,6 +502,9 @@ resolve_unix_java_for_saspy() {
   local cand=""
   for cand in \
     "${SASPY_JAVA:-}" \
+    "${JAVA_HOME:+${JAVA_HOME}/bin/java}" \
+    /opt/homebrew/opt/openjdk/bin/java \
+    /usr/local/opt/openjdk/bin/java \
     /usr/bin/java \
     /usr/local/bin/java \
     java; do
@@ -704,7 +723,9 @@ create_python_venv() {
 activate_perl_env() {
   local base="${PIPELINE_PERL_LOCAL_DIR}/lib/perl5"
   local arch
-  mkdir -p "${PIPELINE_PERL_LOCAL_DIR}"
+  # Include the target in PERL5LIB even on the first installation, before CPAN
+  # creates it. Configure/build subprocesses must see newly installed modules.
+  mkdir -p "$base"
   prepend_path "${PIPELINE_PERL_LOCAL_DIR}/bin"
   prepend_path "${PIPELINE_LOCAL_DIR}/bin"
   if [ -d "${PIPELINE_VENDOR_PERL_DIR}" ]; then
@@ -718,7 +739,7 @@ activate_perl_env() {
       prepend_env_list PERL5LIB "$arch"
     done
   fi
-  export PERL_LOCAL_LIB_ROOT="${PIPELINE_PERL_LOCAL_DIR}${PERL_LOCAL_LIB_ROOT:+:${PERL_LOCAL_LIB_ROOT}}"
+  prepend_env_list PERL_LOCAL_LIB_ROOT "${PIPELINE_PERL_LOCAL_DIR}"
   export PERL_MB_OPT="--install_base ${PIPELINE_PERL_LOCAL_DIR}"
   export PERL_MM_OPT="INSTALL_BASE=${PIPELINE_PERL_LOCAL_DIR}"
 }
@@ -761,10 +782,12 @@ install_perl_deps() {
   done
   if [ "${#regular_modules[@]}" -gt 0 ]; then
     perl "${PIPELINE_CPANM_BIN}" \
-      --local-lib-contained "${PIPELINE_PERL_LOCAL_DIR}" \
+      --mirror "${PIPELINE_CPAN_MIRROR}" --mirror-only \
+      --local-lib "${PIPELINE_PERL_LOCAL_DIR}" \
       --notest \
       "${regular_modules[@]}"
   fi
+  activate_perl_env
   if [ "${needs_pdl}" -eq 1 ]; then
     install_pdl_perl_deps
   fi
@@ -781,7 +804,8 @@ install_pdl_perl_deps() {
   fi
   log "Installing PDL with extended Cygwin-friendly build timeouts"
   MAKEFLAGS="${MAKEFLAGS:--j$(num_cpus)}" perl "${PIPELINE_CPANM_BIN}" \
-    --local-lib-contained "${PIPELINE_PERL_LOCAL_DIR}" \
+    --mirror "${PIPELINE_CPAN_MIRROR}" --mirror-only \
+    --local-lib "${PIPELINE_PERL_LOCAL_DIR}" \
     --notest \
     --configure-timeout 900 \
     --build-timeout 7200 \

@@ -6,6 +6,7 @@ _authinfo
 .vagrant/
 install/cache/
 tools/
+example-output/
 
 run_local_hits_*/
 run_manhattan_*/

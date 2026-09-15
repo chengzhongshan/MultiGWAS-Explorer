@@ -44,12 +44,31 @@ request records are published under `benchmark/agent_interface/`.
 
 ## Installation
 
+[Installation CI](https://github.com/chengzhongshan/MultiGWAS-Explorer/actions/workflows/installation.yml)
+tests Ubuntu, Windows portable Cygwin, macOS ARM/Intel, and Docker. Check the
+individual job results for the revision you are installing; SAS ODA login and
+Apptainer are separate integration checks.
+
+First clone the repository and enter the pipeline directory. All installation
+and container commands below start in this directory:
+
+```bash
+git clone https://github.com/chengzhongshan/MultiGWAS-Explorer.git
+cd MultiGWAS-Explorer/MultiGWAS-Explorer
+```
+
+If you downloaded a ZIP, enter its `MultiGWAS-Explorer` subdirectory instead.
+Do not repeat the directory change before each command below.
+
 ### Windows
 
 Recommended for portable Cygwin:
 
+Install 7-Zip (`7z` on PATH) and a Java JDK first. Set `JAVA_HOME` to the JDK
+directory if `java.exe` is not on PATH. The bootstrap installs Cygwin packages;
+it does not install a Windows JDK.
+
 ```powershell
-cd .\MultiGWAS-Explorer
 powershell -NoProfile -ExecutionPolicy Bypass `
   -File .\install\install_windows_portable_cygwin.ps1
 ```
@@ -60,7 +79,6 @@ self-signed certificate chain while bootstrapping repo-local dependencies, rerun
 with the explicit opt-in:
 
 ```powershell
-cd .\MultiGWAS-Explorer
 powershell -NoProfile -ExecutionPolicy Bypass `
   -File .\install\install_windows_portable_cygwin.ps1 `
   -AllowInsecureDownloads
@@ -87,7 +105,7 @@ Inside Cygwin, change into the project by using `/mnt/c/...` paths, then run
 the smoke test or pipeline:
 
 ```bash
-cd /mnt/c/Users/<username>/Desktop/MultiGWAS-Explorer-main/MultiGWAS-Explorer-main/MultiGWAS-Explorer
+cd /mnt/c/Users/<username>/Desktop/MultiGWAS-Explorer-main/MultiGWAS-Explorer
 bash install/check_pipeline_install.sh
 perl ./auto_prepare_and_run_diff_gwas_with_gunplot.pl \
   --spec configs/spec_pgc_scz_sex_common_automation.json \
@@ -98,7 +116,6 @@ perl ./auto_prepare_and_run_diff_gwas_with_gunplot.pl \
 If you are already inside a supported Cygwin shell:
 
 ```bash
-cd MultiGWAS-Explorer
 bash install/install_cygwin.sh
 ```
 
@@ -109,7 +126,6 @@ systems with equivalent packages, or the Docker/Singularity paths below for old
 or locked-down machines. On Ubuntu, run:
 
 ```bash
-cd MultiGWAS-Explorer
 sudo bash install/install_ubuntu.sh
 bash install/check_pipeline_install.sh
 ```
@@ -119,10 +135,14 @@ repo-local phase with `PIPELINE_SKIP_APT=1 bash install/install_ubuntu.sh`.
 See [MultiGWAS-Explorer/README.md](MultiGWAS-Explorer/README.md) for package
 details and legacy Ubuntu troubleshooting.
 
+Perl packages are installed into the repository using the HTTPS mirror
+`https://cpan.metacpan.org`. To use an institutional mirror, set
+`PIPELINE_CPAN_MIRROR` when running the installer. Existing system Perl modules
+can satisfy dependencies; newly installed modules stay under `local/perl5-<platform>`.
+
 ### macOS
 
 ```bash
-cd MultiGWAS-Explorer
 bash install/install_macos.sh
 ```
 
@@ -131,11 +151,13 @@ bash install/install_macos.sh
 Run this on any host install:
 
 ```bash
-cd MultiGWAS-Explorer
 bash install/check_pipeline_install.sh
 ```
 
 ## Containers
+
+Run these commands from the pipeline directory containing `Dockerfile` and
+`install/`, not the outer Git checkout directory.
 
 ### Docker
 
@@ -214,9 +236,26 @@ Firefox before falling back to `xdg-open`. Override the browser with
 with `OPEN_RESULT_DISPLAY=:20`, or set `OPEN_RESULT=0` to only print the saved
 HTML path.
 
-### 2. Quick gunplot validation
+### 2. Self-contained local plotting example
 
-This path does not require SAS ODA and is the easiest first functional test:
+After installation, create a synthetic local Manhattan plot without downloading
+GWAS data or using SAS ODA credentials:
+
+```bash
+bash install/run_plotting_example.sh
+```
+
+Open `example-output/example.png`. Supply an output directory as the first
+argument to save the example elsewhere. The dependency smoke test also checks
+synthetic LD heatmap rendering. It checks that Java starts, but does not log in
+to SAS ODA.
+
+### PGC data example
+
+The following example requires your PGC summary statistics and reference files.
+Edit `input_dir`, `output_dir`, `workdir`, and PLINK/reference paths in the spec
+for your machine before running it; the bundled spec contains author-specific
+paths and is not a fresh-install test:
 
 ```bash
 perl ./auto_prepare_and_run_diff_gwas_with_gunplot.pl \

@@ -496,10 +496,9 @@ of Linux-built repo-local Perl modules from a Cygwin shell, which caused
 stack now avoids that by preferring `local/perl5-cygwin/` on portable Cygwin
 instead of sharing one generic `local/perl5/` tree across operating systems.
 
-SASPy ODA also needs a Java runtime. The smoke test can pass without opening an
-actual ODA session, but if the installer prints `Could not resolve a Windows
-java.exe`, install Java or set `SASPY_JAVA_WIN` to the Windows path of
-`java.exe` before running SAS ODA jobs.
+SASPy ODA also needs a Java runtime. Install a Windows JDK and set `JAVA_HOME`
+or `SASPY_JAVA_WIN` before installing. The smoke test runs Java and reports a
+missing or unusable executable, but does not open an actual ODA session.
 
 ### Ubuntu / Linux Pipeline Install
 
@@ -707,7 +706,7 @@ Why Ubuntu/Docker validation can feel slow:
 
 macOS:
 
-The macOS installer is intended to be run from the repository root on either
+The macOS installer is intended to be run from the nested pipeline directory on either
 Apple Silicon or Intel macOS. It creates a repo-local Python and Perl runtime,
 uses Homebrew for compiled tools, configures SASPy for SAS OnDemand for
 Academics, and runs the same dependency smoke test used by the other native
@@ -724,8 +723,8 @@ xcode-select --install
 - Homebrew. On Apple Silicon, the installer prefers ARM Homebrew under
   `/opt/homebrew`; if only Intel Homebrew under `/usr/local` is available, the
   script warns and uses that detected install.
-- A working Java runtime visible as `java` or through `SASPY_JAVA`. SASPy uses
-  Java to start the SAS ODA IOM bridge.
+- The installer provisions Homebrew OpenJDK. Set `SASPY_JAVA` or `JAVA_HOME`
+  to use a different JDK. SASPy uses Java to start the SAS ODA IOM bridge.
 - A SAS OnDemand for Academics account if you want to run the SAS-backed
   plotting path. The local gunplot path does not need SAS ODA credentials.
 
@@ -739,7 +738,7 @@ What this script does:
 
 - installs or verifies Homebrew packages:
   - `bash`, `curl`, `cpanminus`, `gd`, `gnuplot`, `htslib`, `imagemagick`,
-    `pkg-config`, `python`, and `wget`
+    `openjdk`, `pkg-config`, `python`, and `wget`
 - creates `.venv-pipeline/` and installs Python packages from
   `install/requirements-pipeline.txt`
 - installs repo-local Perl modules into `local/perl5-darwin/`

@@ -87,6 +87,9 @@ function Expand-PortableArchive {
     Write-InstallLog "Extracting portable Cygwin into $DestinationRoot"
     New-Item -ItemType Directory -Force -Path $DestinationRoot | Out-Null
     & 7z x $ArchivePath "-o$DestinationRoot" -y | Out-Host
+    if ($LASTEXITCODE -ne 0) {
+        Fail "Portable Cygwin archive extraction failed with code $LASTEXITCODE"
+    }
 }
 
 function Resolve-PortableBash {
@@ -186,12 +189,12 @@ function Invoke-PortablePackageRefresh {
         '-n',
         '-N',
         '--no-write-registry',
-        '-R', $PortableCygwinRoot,
-        '-l', $pkgCache,
+        '-R', ('"' + $PortableCygwinRoot + '"'),
+        '-l', ('"' + $pkgCache + '"'),
         '-s', 'https://mirrors.kernel.org/sourceware/cygwin/',
         '-P', $CygwinPackages
     )
-    $setupProcess = Start-Process -FilePath $setupExeWindows -ArgumentList $arguments -WorkingDirectory $pkgCache -PassThru -Wait
+    $setupProcess = Start-Process -FilePath $setupExeWindows -ArgumentList $arguments -WorkingDirectory $pkgCache -WindowStyle Hidden -PassThru -Wait
     if ($setupProcess.ExitCode -ne 0) {
         Fail "Portable Cygwin package refresh exited with code $($setupProcess.ExitCode)"
     }

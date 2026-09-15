@@ -1,0 +1,96 @@
+name: Installation
+
+on:
+  push:
+    branches: [main, 'fix/cross-platform-installation']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: installation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unix:
+    name: Install on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15, macos-15-intel]
+    defaults:
+      run:
+        shell: bash
+        working-directory: MultiGWAS-Explorer
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check installer environment
+        run: bash install/test_install_environment.sh
+      - name: Install from scratch
+        run: |
+          set -o pipefail
+          if [[ "$RUNNER_OS" == Linux ]]; then
+            sudo bash install/install_ubuntu.sh 2>&1 | tee install.log
+          else
+            bash install/install_macos.sh 2>&1 | tee install.log
+          fi
+      - name: Render synthetic example
+        run: bash install/run_plotting_example.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: installation-${{ matrix.os }}
+          path: |
+            MultiGWAS-Explorer/install.log
+            MultiGWAS-Explorer/example-output/
+
+  windows:
+    runs-on: windows-2022
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install portable Cygwin and pipeline
+        shell: powershell
+        run: |
+          $env:PATH = 'C:\Program Files\7-Zip;' + $env:PATH
+          & .\MultiGWAS-Explorer\install\install_windows_portable_cygwin.ps1 -PortableRoot "$env:RUNNER_TEMP\CygwinPortablePipeline" *>&1 | Tee-Object install.log
+      - name: Render synthetic example
+        shell: powershell
+        run: |
+          $bash = "$env:RUNNER_TEMP\CygwinPortablePipeline\App\Runtime\Cygwin\bin\bash.exe"
+          $drive = $env:GITHUB_WORKSPACE.Substring(0, 1).ToLowerInvariant()
+          $script = '/mnt/' + $drive + ($env:GITHUB_WORKSPACE.Substring(2) -replace '\\', '/')
+          & $bash -l "$script/MultiGWAS-Explorer/install/run_plotting_example.sh"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: installation-windows
+          path: |
+            install.log
+            MultiGWAS-Explorer/example-output/
+
+  docker:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and test image
+        run: |
+          set -o pipefail
+          docker build --progress=plain -t multigwas-test ./MultiGWAS-Explorer 2>&1 | tee docker-build.log
+          docker run --rm multigwas-test bash install/check_pipeline_install.sh
+          docker run --rm multigwas-test bash install/run_plotting_example.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: installation-docker
+          path: docker-build.log
