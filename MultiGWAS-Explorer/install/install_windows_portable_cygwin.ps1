@@ -242,9 +242,18 @@ function Invoke-Phase2Installer {
     $phase2Command = ($phase2CmdParts -join '; ')
 
     Write-InstallLog "Running repo-local pipeline bootstrap phase inside portable Cygwin"
-    & $PortableBashPath -lc $phase2Command
-    if ($LASTEXITCODE -ne 0) {
-        Fail "Portable Cygwin repo-local bootstrap phase exited with code $LASTEXITCODE"
+    # Perl syntax checks and java -version write successful diagnostics to
+    # stderr. PowerShell 5 must not treat those messages as terminating errors.
+    $savedErrorPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        & $PortableBashPath -lc $phase2Command 2>&1 | ForEach-Object { Write-Host "$_" }
+        $phaseExitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $savedErrorPreference
+    }
+    if ($phaseExitCode -ne 0) {
+        Fail "Portable Cygwin repo-local bootstrap phase exited with code $phaseExitCode"
     }
 }
 

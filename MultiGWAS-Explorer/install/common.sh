@@ -172,9 +172,9 @@ download_url() {
   mkdir -p "$(dirname "$dest")"
   if command_exists curl; then
     if [ "${PIPELINE_CURL_INSECURE:-0}" = "1" ]; then
-      curl -kLfsS "$url" -o "$dest"
+      curl -kLfsS --retry 3 --connect-timeout 30 --max-time 300 "$url" -o "$dest"
     else
-      curl -LfsS "$url" -o "$dest"
+      curl -LfsS --retry 3 --connect-timeout 30 --max-time 300 "$url" -o "$dest"
     fi
   elif command_exists wget; then
     if [ "${PIPELINE_CURL_INSECURE:-0}" = "1" ]; then
@@ -746,10 +746,8 @@ activate_perl_env() {
 
 ensure_cpanm() {
   activate_perl_env
-  if command_exists cpanm; then
-    PIPELINE_CPANM_BIN="$(command -v cpanm)"
-    return 0
-  fi
+  # PATH can contain a cpanm belonging to another Perl (e.g. Strawberry Perl
+  # on a Cygwin host). Always run our standalone script with the active Perl.
   PIPELINE_CPANM_BIN="${PIPELINE_LOCAL_DIR}/bin/cpanm"
   if [ ! -f "${PIPELINE_CPANM_BIN}" ]; then
     log "Bootstrapping cpanminus into ${PIPELINE_CPANM_BIN}"
@@ -821,10 +819,10 @@ ensure_local_hts_tools() {
     return 0
   fi
   log "bgzip/tabix not found; building a repo-local htslib copy"
-  "${PIPELINE_INSTALL_DIR}/build_local_htslib.sh"
+  bash "${PIPELINE_INSTALL_DIR}/build_local_htslib.sh"
   prepend_path "${PIPELINE_LOCAL_DIR}/bin"
 }
 
 run_pipeline_check() {
-  (cd "${PIPELINE_ROOT}" && "${PIPELINE_INSTALL_DIR}/check_pipeline_install.sh")
+  (cd "${PIPELINE_ROOT}" && bash "${PIPELINE_INSTALL_DIR}/check_pipeline_install.sh")
 }

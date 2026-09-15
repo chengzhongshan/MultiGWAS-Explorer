@@ -45,9 +45,10 @@ request records are published under `benchmark/agent_interface/`.
 ## Installation
 
 [Installation CI](https://github.com/chengzhongshan/MultiGWAS-Explorer/actions/workflows/installation.yml)
-tests Ubuntu, Windows portable Cygwin, macOS ARM/Intel, and Docker. Check the
+tests Ubuntu, Windows portable Cygwin, macOS ARM/Intel, Docker, and Apptainer. Check the
 individual job results for the revision you are installing; SAS ODA login and
-Apptainer are separate integration checks.
+remote plotting are separate integration checks.
+See [validation scope and commands](MultiGWAS-Explorer/install/VALIDATION.md).
 
 First clone the repository and enter the pipeline directory. All installation
 and container commands below start in this directory:
@@ -141,6 +142,10 @@ Perl packages are installed into the repository using the HTTPS mirror
 can satisfy dependencies; newly installed modules stay under `local/perl5-<platform>`.
 
 ### macOS
+
+The installer supports Intel and Apple Silicon, provisions OpenJDK, and builds
+a local gnuplot without Qt when no PNG-capable gnuplot is available. This avoids
+lengthy GUI dependency builds on Intel Macs.
 
 ```bash
 bash install/install_macos.sh

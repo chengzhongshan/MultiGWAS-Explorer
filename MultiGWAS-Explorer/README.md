@@ -737,8 +737,12 @@ bash install/install_macos.sh
 What this script does:
 
 - installs or verifies Homebrew packages:
-  - `bash`, `curl`, `cpanminus`, `gd`, `gnuplot`, `htslib`, `imagemagick`,
+  - `bash`, `curl`, `gd`, `htslib`, `imagemagick`,
     `openjdk`, `pkg-config`, `python`, and `wget`
+- reuses gnuplot if it supports `pngcairo`; otherwise builds a checksum-verified
+  gnuplot 6.0.4 locally with Cairo/Pango and without Qt. This avoids long GUI
+  dependency builds on Intel Macs. Set `PIPELINE_MACOS_GNUPLOT=brew` to request
+  the full Homebrew gnuplot package instead.
 - creates `.venv-pipeline/` and installs Python packages from
   `install/requirements-pipeline.txt`
 - installs repo-local Perl modules into `local/perl5-darwin/`

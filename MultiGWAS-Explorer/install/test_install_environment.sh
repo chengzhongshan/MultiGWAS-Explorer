@@ -18,6 +18,16 @@ first_lib_root="$PERL_LOCAL_LIB_ROOT"
 activate_perl_env
 [ "$PERL_LOCAL_LIB_ROOT" = "$first_lib_root" ] || die "Repeated activation duplicates PERL_LOCAL_LIB_ROOT"
 
+# A foreign cpanm on PATH must never be selected. Avoid a network request by
+# placing a standalone script at the repository-local bootstrap destination.
+mkdir -p "$test_root/foreign" "$PIPELINE_LOCAL_DIR/bin"
+printf '#!/bin/sh\nexit 91\n' > "$test_root/foreign/cpanm"
+chmod +x "$test_root/foreign/cpanm"
+printf '# standalone test fixture\n' > "$PIPELINE_LOCAL_DIR/bin/cpanm"
+export PATH="$test_root/foreign:$PATH"
+ensure_cpanm
+[ "$PIPELINE_CPANM_BIN" = "$PIPELINE_LOCAL_DIR/bin/cpanm" ] || die "Foreign cpanm selected"
+
 # A JAVA_HOME path with spaces should be returned as a single executable path.
 mkdir -p "$test_root/JDK with spaces/bin"
 printf '#!/usr/bin/env sh\nexit 0\n' > "$test_root/JDK with spaces/bin/java"

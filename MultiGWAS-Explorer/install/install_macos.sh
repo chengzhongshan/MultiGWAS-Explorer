@@ -86,7 +86,16 @@ ensure_homebrew
 
 log "Installing macOS packages with Homebrew"
 brew_cmd update
-brew_cmd install bash curl cpanminus gd gnuplot htslib imagemagick openjdk pkg-config python wget
+brew_cmd install bash curl gd htslib imagemagick openjdk pkg-config python wget
+prepend_path "${PIPELINE_LOCAL_DIR}/bin"
+if ! command_exists gnuplot || ! gnuplot -e 'set terminal pngcairo' >/dev/null 2>&1; then
+  if [ "${PIPELINE_MACOS_GNUPLOT:-headless}" = brew ]; then
+    brew_cmd install gnuplot
+  else
+    brew_cmd install cairo pango
+    bash "${SCRIPT_DIR}/build_local_gnuplot.sh"
+  fi
+fi
 
 make_project_scripts_executable
 
