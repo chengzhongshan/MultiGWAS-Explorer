@@ -7,7 +7,8 @@ backend for genome-wide Manhattan plots, local Manhattan plots, local GTF
 gene-track plots, and forest plots.
 <img width="2400" height="2510" alt="Figure1_pipeline_overview_Zhongshan" src="https://github.com/user-attachments/assets/a56b8675-2a48-41c9-ba2c-1d1e793603ee" />
 For the full project guide, advanced troubleshooting, and validation notes,
-see [DiffGWASDeps/README.md](DiffGWASDeps/README.md).
+see [MultiGWAS-Explorer/README.md](MultiGWAS-Explorer/README.md).
+The [main README](README.md) is the canonical installation guide.
 
 ## Main Scripts
 
@@ -21,9 +22,20 @@ see [DiffGWASDeps/README.md](DiffGWASDeps/README.md).
 
 ## Installation
 
+Clone the repository and enter its nested pipeline directory before running
+any of the installation or container commands below:
+
+```bash
+git clone https://github.com/chengzhongshan/MultiGWAS-Explorer.git
+cd MultiGWAS-Explorer/MultiGWAS-Explorer
+```
+
 ### Windows
 
 Recommended for portable Cygwin:
+
+Install 7-Zip (`7z` on PATH) and a Java JDK first. Set `JAVA_HOME` to the JDK
+directory if `java.exe` is not on PATH.
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass `
@@ -41,7 +53,7 @@ bash install/install_cygwin.sh
 Ubuntu:
 
 ```bash
-bash install/install_ubuntu.sh
+sudo bash install/install_ubuntu.sh
 ```
 
 ### macOS
@@ -108,7 +120,15 @@ perl ./run_sas_codes_or_script_in_ODA.pl --check-sas-oda-login-only
 
 ### 2. Quick gunplot validation
 
-This path does not require SAS ODA and is the easiest first functional test:
+For a self-contained test without SAS ODA credentials or external GWAS data:
+
+```bash
+bash install/run_plotting_example.sh
+```
+
+Open `example-output/example.png`. The PGC examples below require the external
+data and reference files; edit the bundled spec's input, output, work-directory,
+and PLINK/reference paths to match your machine first:
 
 ```bash
 perl ./auto_prepare_and_run_diff_gwas_with_gunplot.pl \
@@ -173,4 +193,4 @@ perl ./auto_prepare_and_run_diff_gwas.pl \
 - On container runs, keep `PIPELINE_WORKDIR=/opt/MultiGWAS-Explorer` so the
   wrappers use the Linux-installed environment inside the image.
 - For detailed options, top-hit filtering behavior, troubleshooting, and file
-  management commands, see [DiffGWASDeps/README.md](DiffGWASDeps/README.md).
+  management commands, see [MultiGWAS-Explorer/README.md](MultiGWAS-Explorer/README.md).

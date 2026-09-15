@@ -25,6 +25,25 @@ CI; the jobs exercise installation against each runner's supplied base image.
 
 ## Initial findings and fixes (September 2026)
 
+### Verified result
+
+All six jobs passed at source commit
+`f073931eb08ae019106a9595ab016a3a66b4740e`:
+[run 34967910284](https://github.com/chengzhongshan/MultiGWAS-Explorer/actions/runs/34967910284).
+
+| Environment | Installer/build and example |
+| --- | --- |
+| Ubuntu 24.04 x64 | Passed |
+| Windows Server 2022 / portable Cygwin | Passed |
+| macOS 15 Apple Silicon | Passed |
+| macOS 15 Intel | Passed |
+| Docker / Ubuntu 24.04 | Passed |
+| Apptainer / Ubuntu 24.04 | Passed |
+
+Intel macOS used the local gnuplot build without Qt. The Windows run selected
+the repository-local cpanm rather than Strawberry Perl's copy. Later
+documentation-only edits do not change the tested installer source.
+
 Default CPAN mirror downloads failed repeatedly on Ubuntu. The installer now
 selects an HTTPS mirror explicitly (`PIPELINE_CPAN_MIRROR` overrides it).
 PDL configuration could not see newly installed prerequisites. The installer
