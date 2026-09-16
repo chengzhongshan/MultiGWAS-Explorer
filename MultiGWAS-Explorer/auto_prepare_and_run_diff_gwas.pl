@@ -532,6 +532,15 @@ my $generated = build_generated_paths(
     output_dir    => $output_dir,
     artifact_stem => $artifact_stem,
 );
+if ($source_mode eq 'precomputed_diff_stdized') {
+    die "input_stdized is required for source_mode=precomputed_diff_stdized\n"
+      unless length cfg_or($spec, 'input_stdized', '');
+    $generated->{stdized_output} = normalize_unix_path($spec->{input_stdized});
+}
+elsif ($source_mode eq 'precomputed_diff') {
+    $generated->{stdized_output} = normalize_unix_path(cfg_or($spec, 'stdized_output', $generated->{stdized_output}));
+    $generated->{stdized_manifest} = normalize_unix_path(cfg_or($spec, 'stdized_manifest', $generated->{stdized_manifest}));
+}
 if ($source_mode eq 'merged_gwas_table') {
     $generated->{wide_output} = "$output_dir/" . safe_name($artifact_stem) . ".merged_plotwide.tsv.gz";
     $generated->{wide_manifest} = "$output_dir/" . safe_name($artifact_stem) . ".merged_plotwide.manifest.tsv";
@@ -2764,7 +2773,8 @@ sub detect_stdized_value_and_filter_fields {
     );
     my @default_filter_fields = qw(GROUP1_P GROUP2_P DIFF_P STD_DIFF_P);
     return (\@default_value_fields, \@default_filter_fields)
-      unless defined $stdized_output && length $stdized_output;
+      unless defined $stdized_output && length $stdized_output
+        && -s cygpath_to_win($stdized_output);
 
     my %idx;
     eval {
@@ -3022,6 +3032,7 @@ sub build_runner_config {
         REFERENCE_BUILD => ($reference_build_profile->{build} || 'hg38'),
         REFERENCE_BUILD_SOURCE => ($reference_build_profile->{source} || 'fallback_default'),
         REFERENCE_BUILD_EVIDENCE => ($reference_build_profile->{evidence} || ''),
+        GTF_CACHE_DIR => normalize_unix_path(cfg_or($spec, 'gtf_cache_dir', "$workdir/cache/gtf")),
         DATA_GZ => $generated->{wide_output},
         SOURCE_LONG_GZ => ($source_mode eq 'merged_gwas_table' ? '' : $generated->{stdized_output}),
         EXTRACTOR_CONFIG_JSON => $generated->{preset_config},
@@ -3847,10 +3858,14 @@ sub print_summary {
 
 sub ensure_parent_dir {
     my ($path) = @_;
+    # Cygwin's File::Spec treats backslashes as filename characters, although
+    # its filesystem calls accept drive-letter paths. Normalize before splitting.
+    $path =~ s{\\}{/}g if $^O =~ /^(?:cygwin|MSWin32)$/i;
     my ($vol, $dir) = File::Spec->splitpath($path);
     my $parent = File::Spec->catpath($vol, $dir, '');
     return unless length $parent;
-    mkdir $parent unless -d $parent;
+    make_path($parent) unless -d $parent;
+    die "Cannot create parent directory $parent\n" unless -d $parent;
 }
 
 sub load_json {
@@ -4073,6 +4088,15 @@ sub cygpath_to_win {
         my ($drive, $rest) = ($1, $2);
         $rest =~ s{/}{\\}g;
         return uc($drive) . ":\\" . $rest;
+    }
+    if ($^O eq 'cygwin') {
+        open my $fh, '-|', '/usr/bin/cygpath', '-m', $path
+          or die "Cannot convert Cygwin path $path: $!\n";
+        my $converted = <$fh>;
+        close $fh or die "cygpath failed for $path\n";
+        die "cygpath returned no path for $path\n" unless defined $converted;
+        $converted =~ s/[\r\n]+$//;
+        return $converted;
     }
     my $win = $path;
     $win =~ s{/}{\\}g;

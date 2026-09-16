@@ -50,6 +50,10 @@ individual job results for the revision you are installing; SAS ODA login and
 remote plotting are separate integration checks.
 See [validation scope and commands](MultiGWAS-Explorer/install/VALIDATION.md).
 
+For an end-to-end test using public female and male schizophrenia GWAS,
+including chromosome X and optional SAS ODA plotting, see the
+[Perl real-data test guide](MultiGWAS-Explorer/install/PUBLIC_GWAS_TEST.md).
+
 First clone the repository and enter the pipeline directory. All installation
 and container commands below start in this directory:
 

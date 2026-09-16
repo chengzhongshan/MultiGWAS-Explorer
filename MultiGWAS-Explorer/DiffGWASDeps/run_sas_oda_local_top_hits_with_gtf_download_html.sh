@@ -1188,7 +1188,7 @@ upload_home_file_if_needed() {
 
 generate_requested_top_hits_csv_locally() {
   [[ -x "${LOCAL_TOP_HITS_CSV_HELPER}" || -f "${LOCAL_TOP_HITS_CSV_HELPER}" ]] || return 1
-  echo "[prep] Generating MAF-filtered requested local-top-hit CSV locally..."
+  echo "[prep] Generating requested local-top-hit CSV locally..."
   local candidate_dist_bp="${TOP_HIT_DIST_BP}"
   local candidate_max_hits="${TOP_HIT_MAX_LOCI}"
   if [[ "${TOP_HIT_SELECTION_METHOD^^}" == "LD" && -z "${TARGET_SNP_LIST}" ]]; then

@@ -61,7 +61,7 @@ my ($n, $mean, $sd) = @{$stats}{qw(n mean sd)};
 die "No numeric values found in $z_col\n" unless $n > 0;
 die "Cannot standardize because standard deviation is zero\n" unless $sd > 0;
 
-open my $in,  '-|', "zcat '$input'"       or die "Cannot read $input with zcat: $!\n";
+open my $in, '-|', 'gzip', '-dc', '--', $input or die "Cannot read $input with gzip: $!\n";
 my $writer_cmd = $can_index_output
   ? "$bgzip -c > '$output'"
   : "gzip -c > '$output'";
@@ -98,7 +98,15 @@ my $index_status = 'disabled';
 if ($can_index_output) {
     my $seq_col = $idx{CHR} + 1;
     my $bp_col  = $idx{BP} + 1;
-    if (system($tabix, '-f', '-s', $seq_col, '-b', $bp_col, '-e', $bp_col, '-S', 1, $output) == 0) {
+    my $index_input = $output;
+    if ($^O eq 'cygwin') {
+        open my $cp, '-|', '/usr/bin/cygpath', '-m', $output or die "Cannot run cygpath: $!\n";
+        $index_input = <$cp>;
+        close $cp or die "cygpath failed for $output\n";
+        die "cygpath returned an empty path\n" unless defined $index_input && length $index_input;
+        $index_input =~ s/[\r\n]+$//;
+    }
+    if (system($tabix, '-f', '-s', $seq_col, '-b', $bp_col, '-e', $bp_col, '-S', 1, $index_input) == 0) {
         $index_status = 'created';
     }
     else {
@@ -172,7 +180,7 @@ sub command_exists {
 
 sub read_header {
     my ($path) = @_;
-    open my $fh, '-|', "zcat '$path'" or die "Cannot read $path with zcat: $!\n";
+    open my $fh, '-|', 'gzip', '-dc', '--', $path or die "Cannot read $path with gzip: $!\n";
     my $h = <$fh>;
     close $fh;
     die "Input is empty: $path\n" unless defined $h;
@@ -215,7 +223,7 @@ sub compute_standardization_stats {
 
 sub z_stats {
     my ($path, $col_i) = @_;
-    open my $fh, '-|', "zcat '$path'" or die "Cannot read $path with zcat: $!\n";
+    open my $fh, '-|', 'gzip', '-dc', '--', $path or die "Cannot read $path with gzip: $!\n";
     <$fh>;
     my ($n, $mean, $m2) = (0, 0, 0);
     while (my $line = <$fh>) {
@@ -285,7 +293,7 @@ sub z_stats_clipped {
 
 sub read_numeric_values {
     my ($path, $col_i) = @_;
-    open my $fh, '-|', "zcat '$path'" or die "Cannot read $path with zcat: $!\n";
+    open my $fh, '-|', 'gzip', '-dc', '--', $path or die "Cannot read $path with gzip: $!\n";
     <$fh>;
     my @values;
     while (my $line = <$fh>) {

@@ -63,11 +63,12 @@ FOREST_MACRO_SAS="${DEPS_DIR}/beta2OR_forest_plot.sas"
 
 cd "${WORKDIR}"
 
-ODA_HELPER_SCRIPT="${ODA_HELPER_SCRIPT:-${DEPS_DIR}/run_sas_codes_or_script_in_ODA.pl}"
+ODA_HELPER_SCRIPT="${ODA_HELPER_SCRIPT:-${WORKDIR}/run_sas_codes_or_script_in_ODA.pl}"
 if [[ -f "${ODA_HELPER_SCRIPT}" ]]; then
   ODA_PERL_BASE=(perl "${ODA_HELPER_SCRIPT}")
 else
-  ODA_PERL_BASE=(perl -S run_sas_codes_or_script_in_ODA.pl)
+  echo "ERROR: SAS ODA helper script was not found: ${ODA_HELPER_SCRIPT}" >&2
+  exit 2
 fi
 
 if [[ "${USE_PERSISTENT_SESSION}" == "1" ]]; then

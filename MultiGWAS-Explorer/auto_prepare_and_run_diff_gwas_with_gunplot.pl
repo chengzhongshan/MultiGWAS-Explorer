@@ -289,7 +289,8 @@ my $target_snp_gene_overrides = parse_target_snp_gene_overrides(
 );
 my $artifact_stem = $spec->{artifact_stem} || $spec->{project_tag} || 'diff_gwas';
 my $workdir_local = resolve_portable_workdir($spec->{workdir} || $Bin, $Bin);
-my $configs_dir_local = File::Spec->catdir($workdir_local, 'configs');
+my $configs_dir_local = localize_path($spec->{configs_dir}
+    || File::Spec->catdir($workdir_local, 'configs'));
 my $output_dir_local = localize_path($spec->{output_dir} || $spec->{input_dir} || $Bin);
 my $shared_gtf_cache_local = localize_path(
     $spec->{gtf_cache_dir} || File::Spec->catdir($workdir_local, 'cache', 'gtf')
@@ -807,7 +808,7 @@ sub plot_forest {
     my $combined_png = '';
     if (@images > 1) {
         $combined_png = $out_prefix_path . '_combined.png';
-        if ($args{force} || !png_is_newer_than_dependencies($combined_png, map { $_->{image} } @images)) {
+        if ($args{force} || !target_is_newer_than_inputs($combined_png, map { $_->{image} } @images)) {
             compose_png_grid(
                 output_png => $combined_png,
                 images     => [ map { $_->{image} } @images ],

@@ -39,6 +39,7 @@ else
     libcurl4-openssl-dev \
     libgd-dev \
     liblzma-dev \
+    libssl-dev \
     make \
     perl \
     pkg-config \
