@@ -248,7 +248,7 @@ sub render_panel {
         @plot_clauses = (
             qq{"$data_path" using 2:1:3:4 with xerrorbars lw 1.2 lc rgb "#4f67b0"},
             qq{"" using 2:1 with points pt 7 ps $point_size lc rgb "#4f67b0"},
-            qq{"" using ((\$5 == 1) ? \$2 : 1/0):1:7 with labels center tc rgb "#111111" font "Arial,@{[$args{y_font_size} + 1]}"},
+            qq{"" using ((\$5 == 1) ? \$2 : 1/0):1:7 with labels center tc rgb "#111111" font "Sans,@{[$args{y_font_size} + 1]}"},
         );
     } else {
         @plot_clauses = (
@@ -258,7 +258,7 @@ sub render_panel {
             qq{"" using ((strcol(6) eq "DIFFERENTIAL") ? \$2 : 1/0):1 with points pt 7 ps $point_size lc rgb "#c0504d"},
             qq{"" using ((strcol(6) ne "COMMON" && strcol(6) ne "DIFFERENTIAL") ? \$2 : 1/0):1:3:4 with xerrorbars lw 1.2 lc rgb "#666666"},
             qq{"" using ((strcol(6) ne "COMMON" && strcol(6) ne "DIFFERENTIAL") ? \$2 : 1/0):1 with points pt 7 ps $point_size lc rgb "#666666"},
-            qq{"" using ((\$5 == 1) ? \$2 : 1/0):1:7 with labels center tc rgb "#111111" font "Arial,@{[$args{y_font_size} + 1]}"},
+            qq{"" using ((\$5 == 1) ? \$2 : 1/0):1:7 with labels center tc rgb "#111111" font "Sans,@{[$args{y_font_size} + 1]}"},
         );
     }
     my @separator_cmds;
@@ -270,25 +270,25 @@ sub render_panel {
 
     open my $gp, '>', $gp_path or die "Cannot write $gp_path: $!\n";
     print {$gp} <<"GP";
-set terminal pngcairo size $args{width},$args{height} enhanced font "Arial,$args{y_font_size}"
+set terminal pngcairo size $args{width},$args{height} enhanced font "Sans,$args{y_font_size}"
 set output "$gp_png_path"
 unset key
 set title "${\gp_escape($args{panel_title})}"
 set xrange [$args{min_axis}:$args{max_axis}]
 set yrange [0.5:$n+0.5]
-set ytics nomirror font "Arial,$args{y_font_size}" ($ytics_text)
-set xlabel "OR and 95% CI" font "Arial,$args{y_font_size}"
-set ylabel "" font "Arial,$args{y_font_size}"
+set ytics nomirror font "Sans,$args{y_font_size}" ($ytics_text)
+set xlabel "OR and 95% CI" font "Sans,$args{y_font_size}"
+set ylabel "@{[$args{single_snp_mode} ? 'Cohort' : 'Variant']}" font "Sans,$args{y_font_size}"
 set border 3
 set tmargin 2
 set lmargin 18
 set rmargin @{[$args{single_snp_mode} ? 4 : 18]}
 set bmargin 4
 unset grid
-set xtics nomirror font "Arial,$args{y_font_size}"
+set xtics nomirror font "Sans,$args{y_font_size}"
 @{[$args{single_snp_mode} ? '' : 'set y2range [0.5:'.$n.'+0.5]']}
-@{[$args{single_snp_mode} ? '' : 'set y2tics nomirror font "Arial,'.$args{y_font_size}.'" textcolor rgb "#444444" ('.$y2tics_text.')']}
-@{[$args{single_snp_mode} ? '' : 'set y2label "" font "Arial,'.$args{y_font_size}.'"']}
+@{[$args{single_snp_mode} ? '' : 'set y2tics nomirror font "Sans,'.$args{y_font_size}.'" textcolor rgb "#444444" ('.$y2tics_text.')']}
+@{[$args{single_snp_mode} ? '' : 'set y2label "" font "Sans,'.$args{y_font_size}.'"']}
 @{[$args{single_snp_mode} ? '' : 'set grid ytics lc rgb "#d9d9d9" dt 3 lw 1']}
 set arrow 1 from 1, graph 0 to 1, graph 1 nohead lw 1 lc rgb "#777777"
 $xtics_cmd

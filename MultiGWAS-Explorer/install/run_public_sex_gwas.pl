@@ -61,7 +61,8 @@ if ($phase eq 'all' || $phase eq 'plots') {
   run('sas_login',$^X,'run_sas_codes_or_script_in_ODA.pl','--check-sas-oda-login-only');
   run('sas_inquiry',$^X,'auto_prepare_and_run_diff_gwas.pl',
    '--spec',$spec,'--plots','manhattan,local_manhattan,local_gtf,forest',
-   '--target-snps',$targets,'--from-step','plot_manhattan');
+   '--target-snps',$targets,'--from-step','plot_manhattan','--force',
+   '--no-gnuplot-fallback-on-sas-space','--no-gnuplot-fallback-on-sas-failure');
   verify_images('SAS');
  }
 }
@@ -98,6 +99,10 @@ sub verify_images {
 if ($phase eq 'images') {
  verify_images('GUNPLOT') if $backend eq 'gnuplot' || $backend eq 'both';
  verify_images('SAS') if $backend eq 'sas' || $backend eq 'both';
+}
+if ($phase eq 'all' || $phase eq 'plots' || $phase eq 'images') {
+ system($^X,"$Bin/build_public_gwas_gallery.pl",'--output-dir',$out)==0
+   or die "Building results gallery failed\n";
 }
 print "Requested phase completed. Reports: $out\n";
 sub run {

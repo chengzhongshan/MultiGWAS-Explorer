@@ -82,6 +82,7 @@ perl DiffGWASDeps/test_ld_heatmap_rendering.pl >/dev/null
 perl DiffGWASDeps/test_ld_heatmap_contract.pl >/dev/null
 perl install/test_sort_long_gwas.pl >/dev/null
 perl install/test_precomputed_paths.pl >/dev/null
+perl install/test_forest_text.pl
 "${BASH:-bash}" -n DiffGWASDeps/run_sas_oda_manhattan4diffgwas_download_png.sh
 "${BASH:-bash}" -n DiffGWASDeps/run_sas_oda_local_top_hits_manhattan_download_png.sh
 "${BASH:-bash}" -n DiffGWASDeps/run_sas_oda_local_top_hits_with_gtf_download_html.sh

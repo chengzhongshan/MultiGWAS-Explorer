@@ -756,14 +756,15 @@ sub plot_forest {
         print "[skip] reusing existing gunplot forest top-hit CSV $top_hits_csv_path\n";
     }
 
-    my @png_candidates = (
-        $out_prefix_path . '_single_snp.png',
-        map { $out_prefix_path . '_' . safe_name($_) . '.png' } split(/\|/, ($runner->{FOREST_TRACK_IDS} || '')),
-    );
     my $need_render = $args{force} || !-s $manifest_path;
     if (!$need_render) {
-        my @existing_pngs = grep { -s $_ } @png_candidates;
-        $need_render = @existing_pngs ? 0 : 1;
+        my @panels = read_forest_manifest_rows($manifest_path);
+        my @expected_pngs = map { File::Spec->catfile($args{output_dir}, $_->{png_file}) }
+            grep { defined $_->{png_file} && length $_->{png_file} } @panels;
+        my $renderer = File::Spec->catfile($Bin, 'DiffGWASDeps', 'gnuplot', 'pdl_gunplot_forest.pl');
+        $need_render = !@expected_pngs || grep {
+            !target_is_newer_than_inputs($_, $top_hits_csv_path, $renderer)
+        } @expected_pngs;
     }
 
     if ($need_render) {

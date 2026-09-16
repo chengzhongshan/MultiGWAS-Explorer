@@ -46,6 +46,8 @@ perl install/run_public_sex_gwas.pl \
 
 Do not put SAS passwords in command lines, scripts, or Git. Use the existing
 SASPy configuration/authinfo setup supported by the installer.
+The SAS test forces fresh plot rendering and disables automatic gnuplot
+fallback, so a failed SAS stage cannot count as a successful SAS test.
 
 For existing downloads, add `--input-dir /path/to/PGC_SCZ_Sex_Stratified_GWASs`.
 The four exact filenames and published MD5 checksums are in
@@ -83,8 +85,16 @@ manifests, `numeric_validation.json`, `targets.txt`, and `test_run_*.json`.
 The run records report process exit status. `image_validation_*.json` records
 decoded PNG dimensions and requires all four plot families. SAS downloads may
 be in the pipeline directory; their paths are recorded in that report. Recheck
-existing images with `--phase images --backend both`. Inspect HTML and SAS
-logs as well. A successful login alone does not establish that SAS
+existing images with `--phase images --backend both`.
+
+The test also creates `results.html` and copies validated images from both
+backends into `figures/gunplot/` and `figures/sas/` inside the output directory.
+Open `results.html` to browse both sets together. Rebuild this gallery with
+`perl install/build_public_gwas_gallery.pl --output-dir /path/to/results`.
+`results_gallery_manifest.json` records each source image and SHA-256 checksum;
+each gallery copy is checked against its source.
+
+Inspect HTML and SAS logs as well. A successful login alone does not establish that SAS
 plots succeeded. Keep source data and generated results outside Git.
 
 The small `test_sort_long_gwas.pl` regression is also part of the installation

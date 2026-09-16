@@ -1,5 +1,21 @@
 # Public sex-stratified GWAS validation (September 2026)
 
+## Follow-up correction: forest text and output discoverability
+
+User inspection found that the original gnuplot forest PNGs decoded correctly
+but had invisible text in portable Cygwin. Hard-coded Arial selection was the
+cause; the renderer now uses generic Sans, includes a Variant/Cohort y-axis
+title, and refreshes cached panels after renderer changes or missing panels.
+The real-data forest panels were regenerated and visually inspected. A Perl
+pixel-region regression checks visible label text and passed on Windows and
+Ubuntu with the pipeline-installed gnuplot. The earlier PNG-decoding pass
+alone did not establish forest-label correctness.
+
+Seven SAS PNGs existed in the pipeline working directory. A new results
+gallery collects both backends under the selected output directory and
+verifies the copied images using SHA-256. The public SAS test also disables
+gnuplot fallback and forces fresh rendering to prevent ambiguous test results.
+
 Test source: [PGC schizophrenia 2022](https://figshare.com/articles/dataset/scz2022/19426775) European female and male summary statistics,
 including autosomes and X (GRCh37/hg19). All four published MD5 checksums passed.
 The new Perl downloader also downloaded and verified the male X file from the
