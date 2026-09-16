@@ -45,7 +45,7 @@ binary_supports_current_arch() {
   [ -n "${bin}" ] || return 1
   [ -x "${bin}" ] || return 1
   current_arch="$(uname -m)"
-  file_info="$(file "${bin}" 2>/dev/null || true)"
+  file_info="$(file -L "${bin}" 2>/dev/null || true)"
   case "${current_arch}:${file_info}" in
     arm64:*arm64*|arm64:*arm64e*|x86_64:*x86_64*) return 0 ;;
   esac
@@ -59,6 +59,7 @@ select_macos_python() {
     /opt/homebrew/opt/python@3.14/bin/python3 \
     /opt/homebrew/opt/python@3.13/bin/python3 \
     /opt/homebrew/opt/python@3.12/bin/python3 \
+    /usr/local/bin/python3 \
     /usr/bin/python3 \
     python3; do
     if command_exists "${cand}" || [ -x "${cand}" ]; then
@@ -85,7 +86,16 @@ ensure_homebrew
 
 log "Installing macOS packages with Homebrew"
 brew_cmd update
-brew_cmd install bash curl cpanminus gd gnuplot htslib imagemagick pkg-config python wget
+brew_cmd install bash curl gd htslib imagemagick openjdk pkg-config python wget
+prepend_path "${PIPELINE_LOCAL_DIR}/bin"
+if ! command_exists gnuplot || ! gnuplot -e 'set terminal pngcairo' >/dev/null 2>&1; then
+  if [ "${PIPELINE_MACOS_GNUPLOT:-headless}" = brew ]; then
+    brew_cmd install gnuplot
+  else
+    brew_cmd install cairo pango
+    bash "${SCRIPT_DIR}/build_local_gnuplot.sh"
+  fi
+fi
 
 make_project_scripts_executable
 
