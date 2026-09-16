@@ -1,5 +1,8 @@
 # End-to-end test with public female and male GWAS
 
+See the [September 2026 validation results](PUBLIC_GWAS_RESULTS.md) for the
+completed full Windows run, SAS/gnuplot outputs, and platform-test scope.
+
 This test uses the European female and male schizophrenia GWAS from
 [Trubetskoy et al., Nature 2022](https://doi.org/10.1038/s41586-022-04434-5),
 distributed in the [PGC scz2022 release](https://figshare.com/articles/dataset/scz2022/19426775).
