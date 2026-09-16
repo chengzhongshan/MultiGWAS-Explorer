@@ -30,3 +30,12 @@ for my $region ('1:1-30','23:1-300') {
  die "Wrong query rows for $region\n" unless @rows==($region=~/^1:/?2:1);
 }
 print "PASS: coordinate sorting, excluded row, real tabix index, autosome/X queries, paths containing spaces\n";
+my $diff="CHR\tBP\tSNP\tDIFF_Z\tDIFF_P\n1\t10\trs1\t1\t0.3\n1\t20\trs2\t-1\t0.3\n23\t200\trs3\t2\t0.05\n";
+gzip(\$diff=>"$dir/diff.gz") or die $GzipError;
+system($^X,"$Bin/../DiffGWASDeps/standardize_diff_gwas_zscore.pl",
+ '--input',"$dir/diff.gz",'--output',"$dir/std.gz",'--manifest',"$dir/std.manifest.tsv")==0
+ or die "Standardization failed\n";
+open my $mf,'<',"$dir/std.manifest.tsv" or die $!;
+my $metrics=do {local $/;<$mf>};close $mf;
+die "Standardized output was not indexed\n" unless $metrics=~/^index_status\tcreated$/m;
+print "PASS: standardized differential output has a tabix index\n";

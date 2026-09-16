@@ -4,6 +4,8 @@ requires 'DBD::SQLite';
 requires 'GD';
 requires 'IO::Compress::Gzip';
 requires 'IO::Uncompress::Gunzip';
+requires 'IO::Socket::SSL';
+requires 'Net::SSLeay';
 requires 'JSON::MaybeXS';
 requires 'Mojolicious';
 requires 'PDL';

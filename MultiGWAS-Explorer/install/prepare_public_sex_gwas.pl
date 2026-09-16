@@ -61,7 +61,7 @@ my $spec={
  manhattan_differential_p_mode=>'raw',top_hit_focus_prefix=>'EUR',
  top_hit_maf_threshold=>0.01,top_hit_selection_method=>'ld',
  top_hit_ld_source=>'HAPLOREG4',top_hit_ld_populations=>'EUR',
- top_hit_ld_query_failure_action=>'FAIL',top_hit_max_loci=>3,
+ top_hit_ld_query_failure_action=>'KEEP',top_hit_max_loci=>3,
  local_window_bp=>500000,local_gtf_window_bp=>500000,
  open_result=>0,clean_oda_input=>1,keep_remote_plot_data=>0,
  groups=>[{tag=>'EUR_FEMALE',files=>[$files[0][0],$files[1][0]]},

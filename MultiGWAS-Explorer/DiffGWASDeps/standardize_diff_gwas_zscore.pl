@@ -98,7 +98,15 @@ my $index_status = 'disabled';
 if ($can_index_output) {
     my $seq_col = $idx{CHR} + 1;
     my $bp_col  = $idx{BP} + 1;
-    if (system($tabix, '-f', '-s', $seq_col, '-b', $bp_col, '-e', $bp_col, '-S', 1, $output) == 0) {
+    my $index_input = $output;
+    if ($^O eq 'cygwin') {
+        open my $cp, '-|', '/usr/bin/cygpath', '-m', $output or die "Cannot run cygpath: $!\n";
+        $index_input = <$cp>;
+        close $cp or die "cygpath failed for $output\n";
+        die "cygpath returned an empty path\n" unless defined $index_input && length $index_input;
+        $index_input =~ s/[\r\n]+$//;
+    }
+    if (system($tabix, '-f', '-s', $seq_col, '-b', $bp_col, '-e', $bp_col, '-S', 1, $index_input) == 0) {
         $index_status = 'created';
     }
     else {

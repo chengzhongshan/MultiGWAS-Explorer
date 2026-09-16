@@ -86,7 +86,8 @@ ensure_homebrew
 
 log "Installing macOS packages with Homebrew"
 brew_cmd update
-brew_cmd install bash curl gd htslib imagemagick openjdk pkg-config python wget
+brew_cmd install bash curl gd htslib imagemagick openjdk openssl@3 pkg-config python wget
+export OPENSSL_PREFIX="$(brew_cmd --prefix openssl@3)"
 prepend_path "${PIPELINE_LOCAL_DIR}/bin"
 if ! command_exists gnuplot || ! gnuplot -e 'set terminal pngcairo' >/dev/null 2>&1; then
   if [ "${PIPELINE_MACOS_GNUPLOT:-headless}" = brew ]; then

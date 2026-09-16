@@ -74,8 +74,11 @@ lead-selection runs; report LD service/reference failures separately.
 
 Inspect `source_manifest.json`, the pipeline's row-count/harmonization
 manifests, `numeric_validation.json`, `targets.txt`, and `test_run_*.json`.
-The run records report process exit status; inspect generated PNG/HTML files
-and SAS logs as well. A successful login alone does not establish that SAS
+The run records report process exit status. `image_validation_*.json` records
+decoded PNG dimensions and requires all four plot families. SAS downloads may
+be in the pipeline directory; their paths are recorded in that report. Recheck
+existing images with `--phase images --backend both`. Inspect HTML and SAS
+logs as well. A successful login alone does not establish that SAS
 plots succeeded. Keep source data and generated results outside Git.
 
 The small `test_sort_long_gwas.pl` regression is also part of the installation
