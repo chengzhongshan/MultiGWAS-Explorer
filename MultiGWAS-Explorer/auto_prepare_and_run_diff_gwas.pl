@@ -2764,7 +2764,8 @@ sub detect_stdized_value_and_filter_fields {
     );
     my @default_filter_fields = qw(GROUP1_P GROUP2_P DIFF_P STD_DIFF_P);
     return (\@default_value_fields, \@default_filter_fields)
-      unless defined $stdized_output && length $stdized_output;
+      unless defined $stdized_output && length $stdized_output
+        && -s cygpath_to_win($stdized_output);
 
     my %idx;
     eval {
@@ -3022,6 +3023,7 @@ sub build_runner_config {
         REFERENCE_BUILD => ($reference_build_profile->{build} || 'hg38'),
         REFERENCE_BUILD_SOURCE => ($reference_build_profile->{source} || 'fallback_default'),
         REFERENCE_BUILD_EVIDENCE => ($reference_build_profile->{evidence} || ''),
+        GTF_CACHE_DIR => normalize_unix_path(cfg_or($spec, 'gtf_cache_dir', "$workdir/cache/gtf")),
         DATA_GZ => $generated->{wide_output},
         SOURCE_LONG_GZ => ($source_mode eq 'merged_gwas_table' ? '' : $generated->{stdized_output}),
         EXTRACTOR_CONFIG_JSON => $generated->{preset_config},
@@ -3847,10 +3849,14 @@ sub print_summary {
 
 sub ensure_parent_dir {
     my ($path) = @_;
+    # Cygwin's File::Spec treats backslashes as filename characters, although
+    # its filesystem calls accept drive-letter paths. Normalize before splitting.
+    $path =~ s{\\}{/}g if $^O =~ /^(?:cygwin|MSWin32)$/i;
     my ($vol, $dir) = File::Spec->splitpath($path);
     my $parent = File::Spec->catpath($vol, $dir, '');
     return unless length $parent;
-    mkdir $parent unless -d $parent;
+    make_path($parent) unless -d $parent;
+    die "Cannot create parent directory $parent\n" unless -d $parent;
 }
 
 sub load_json {

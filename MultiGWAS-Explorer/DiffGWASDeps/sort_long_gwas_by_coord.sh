@@ -5,7 +5,7 @@ INPUT_GZ="${INPUT_GZ:-}"
 OUTPUT_GZ="${OUTPUT_GZ:-}"
 EXCLUDED_GZ="${EXCLUDED_GZ:-}"
 TMPDIR_SORT="${TMPDIR_SORT:-}"
-HTSBIN="${HTSBIN:-/mnt/g/NGS_lib/Linux_codes_SAM/Conda_and_Docker_Related_Scripts/perlMCP4Gemini_Paper/local/bin}"
+HTSBIN="${HTSBIN:-}"
 
 if [[ -z "${INPUT_GZ}" || -z "${OUTPUT_GZ}" || -z "${EXCLUDED_GZ}" || -z "${TMPDIR_SORT}" ]]; then
   echo "Required env vars: INPUT_GZ OUTPUT_GZ EXCLUDED_GZ TMPDIR_SORT" >&2
@@ -14,10 +14,8 @@ fi
 
 mkdir -p "${TMPDIR_SORT}"
 
-if [[ -x "${HTSBIN}/bgzip" && -x "${HTSBIN}/tabix" ]]; then
+if [[ -n "${HTSBIN}" && -x "${HTSBIN}/bgzip" && -x "${HTSBIN}/tabix" ]]; then
   export PATH="${HTSBIN}:$PATH"
-elif ! command -v bgzip >/dev/null 2>&1 || ! command -v tabix >/dev/null 2>&1; then
-  export PATH="/mnt/e/plink_win64:$PATH"
 fi
 
 HAS_BGZIP=0
@@ -30,10 +28,12 @@ if command -v tabix >/dev/null 2>&1; then
 fi
 
 if [[ "${HAS_BGZIP}" -eq 0 ]]; then
-  echo "bgzip not found on PATH; falling back to gzip output without block indexing" >&2
+  echo "bgzip not found on PATH; activate the pipeline environment or set HTSBIN" >&2
+  exit 1
 fi
 if [[ "${HAS_TABIX}" -eq 0 ]]; then
-  echo "tabix not found on PATH; a placeholder ${OUTPUT_GZ}.tbi note will be written" >&2
+  echo "tabix not found on PATH; activate the pipeline environment or set HTSBIN" >&2
+  exit 1
 fi
 
 echo "Input:    ${INPUT_GZ}"
@@ -42,11 +42,7 @@ echo "Excluded: ${EXCLUDED_GZ}"
 echo "Tmpdir:   ${TMPDIR_SORT}"
 echo "Start:    $(date)"
 
-if [[ "${HAS_BGZIP}" -eq 1 ]]; then
-  COMPRESS_CMD=(bgzip -c)
-else
-  COMPRESS_CMD=(gzip -c)
-fi
+COMPRESS_CMD=(bgzip -c)
 
 {
   set +o pipefail
@@ -68,16 +64,16 @@ gzip -dc "${INPUT_GZ}" |
   awk -F $'\t' '$1 == "" || $2 !~ /^[0-9]+$/' |
   gzip -c > "${EXCLUDED_GZ}"
 
-if [[ "${HAS_TABIX}" -eq 1 && "${HAS_BGZIP}" -eq 1 ]]; then
-  tabix -f -s 1 -b 2 -e 2 -S 1 "${OUTPUT_GZ}"
-else
-  cat > "${OUTPUT_GZ}.tbi" <<EOF
-placeholder_index
-reason=$([[ "${HAS_BGZIP}" -eq 0 ]] && echo "bgzip_missing" || echo "tabix_missing")
-file=${OUTPUT_GZ}
-created=$(date)
-EOF
+# Windows htslib cannot open Cygwin /mnt or /cygdrive paths. Native Cygwin
+# tabix accepts them, so convert only for PE binaries without cygwin1.dll.
+tabix_input="${OUTPUT_GZ}"
+if [[ "$(uname -s)" == CYGWIN* ]]; then
+  tabix_bin="$(command -v tabix)"
+  if ! cygcheck "$tabix_bin" 2>/dev/null | grep -qi 'cygwin1.dll'; then
+    tabix_input="$(cygpath -w "${OUTPUT_GZ}")"
+  fi
 fi
+tabix -f -s 1 -b 2 -e 2 -S 1 "$tabix_input"
 
 echo "Done: $(date)"
 ls -lh "${OUTPUT_GZ}" "${OUTPUT_GZ}.tbi" "${EXCLUDED_GZ}"
