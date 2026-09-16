@@ -107,6 +107,7 @@ my $target_snps = first_nonempty(
 
 my @hits;
 if (length $target_snps) {
+    print "Explicit inquiry targets bypass automatic lead selection and MAF filtering.\n";
     my @targets = grep { length } map { trim($_) } split /,/, $target_snps;
     my %gene_map = parse_target_snp_gene_map($opt{target_snp_genes} || $runner->{TARGET_SNP_GENES});
     my $order = 0;

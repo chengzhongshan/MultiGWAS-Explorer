@@ -71,6 +71,9 @@ The chosen inquiry SNPs are test targets; selecting a minimum P value does
 not establish statistical significance. Inquiry plots do not test automatic
 LD clumping. The generated spec retains MAF/LD settings for separate automatic
 lead-selection runs; report LD service/reference failures separately.
+Explicit inquiry targets also bypass automatic MAF filtering. Their retention
+does not validate the MAF safeguard; use the separate MAF regression suite for
+that check. Blank MAF audit fields in an inquiry CSV are not a filter pass.
 
 Inspect `source_manifest.json`, the pipeline's row-count/harmonization
 manifests, `numeric_validation.json`, `targets.txt`, and `test_run_*.json`.
