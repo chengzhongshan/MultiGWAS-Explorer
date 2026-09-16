@@ -6,6 +6,9 @@ User inspection found that the original gnuplot forest PNGs decoded correctly
 but had invisible text in portable Cygwin. Hard-coded Arial selection was the
 cause; the renderer now uses generic Sans, includes a Variant/Cohort y-axis
 title, and refreshes cached panels after renderer changes or missing panels.
+All gnuplot renderers now disable enhanced-text parsing so underscores and
+asterisks in dataset names, variants, and titles remain literal. Gene italics
+use font selection rather than enhanced-text markup.
 The real-data forest panels were regenerated and visually inspected. A Perl
 pixel-region regression checks visible label text and passed on Windows and
 Ubuntu with the pipeline-installed gnuplot. The earlier PNG-decoding pass

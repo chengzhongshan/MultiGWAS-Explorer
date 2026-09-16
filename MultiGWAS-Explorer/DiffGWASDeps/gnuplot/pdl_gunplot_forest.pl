@@ -236,7 +236,7 @@ sub render_panel {
         my $point = $args{points}[$i];
         push @ytics, sprintf('"%s" %d', gp_escape($point->{left_label}), $i + 1);
         if (!$args{single_snp_mode}) {
-            push @y2tics, sprintf('"%s" %d', gp_enhanced_italic($point->{right_label}), $i + 1);
+            push @y2tics, sprintf('"%s" %d', gp_escape(normalize_gene_label($point->{right_label})), $i + 1);
         }
     }
     my $ytics_text = join(", ", @ytics);
@@ -270,7 +270,7 @@ sub render_panel {
 
     open my $gp, '>', $gp_path or die "Cannot write $gp_path: $!\n";
     print {$gp} <<"GP";
-set terminal pngcairo size $args{width},$args{height} enhanced font "Sans,$args{y_font_size}"
+set terminal pngcairo size $args{width},$args{height} noenhanced font "Sans,$args{y_font_size}"
 set output "$gp_png_path"
 unset key
 set title "${\gp_escape($args{panel_title})}"
@@ -287,7 +287,7 @@ set bmargin 4
 unset grid
 set xtics nomirror font "Sans,$args{y_font_size}"
 @{[$args{single_snp_mode} ? '' : 'set y2range [0.5:'.$n.'+0.5]']}
-@{[$args{single_snp_mode} ? '' : 'set y2tics nomirror font "Sans,'.$args{y_font_size}.'" textcolor rgb "#444444" ('.$y2tics_text.')']}
+@{[$args{single_snp_mode} ? '' : 'set y2tics nomirror font "Sans Italic,'.$args{y_font_size}.'" textcolor rgb "#444444" ('.$y2tics_text.')']}
 @{[$args{single_snp_mode} ? '' : 'set y2label "" font "Sans,'.$args{y_font_size}.'"']}
 @{[$args{single_snp_mode} ? '' : 'set grid ytics lc rgb "#d9d9d9" dt 3 lw 1']}
 set arrow 1 from 1, graph 0 to 1, graph 1 nohead lw 1 lc rgb "#777777"
@@ -417,17 +417,6 @@ sub gp_escape {
     $text =~ s/\\/\\\\/g;
     $text =~ s/"/\\"/g;
     return $text;
-}
-
-sub gp_enhanced_italic {
-    my ($text) = @_;
-    $text = normalize_gene_label($text);
-    $text =~ s/\\/\\\\/g;
-    $text =~ s/"/\\"/g;
-    $text =~ s/_/\\_/g;
-    $text =~ s/\{/\\{/g;
-    $text =~ s/\}/\\}/g;
-    return "{/:Italic $text}";
 }
 
 sub point_size_from_dotsize {

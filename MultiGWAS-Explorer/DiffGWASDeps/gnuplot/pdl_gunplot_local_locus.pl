@@ -467,7 +467,7 @@ sub write_gnuplot {
     my $ymin = $args{gene_tsv} ? -$args{gene_height} : (($args{bottom_gene_label} || $args{bottom_snp_label}) ? -6.8 : -2.6);
     my $chr_color = chromosome_color($args{target_chr});
     my $xmid = ($args{start} + $args{end}) / 2;
-    print {$gp} "set terminal png enhanced size $args{width},$args{height}\n";
+    print {$gp} "set terminal png noenhanced size $args{width},$args{height}\n";
     print {$gp} "set output '" . escape_gp($args{png_file}) . "'\n";
     print {$gp} "set datafile separator '\\t'\n";
     print {$gp} "set title \"" . escape_gp($args{title}) . "\"\n";

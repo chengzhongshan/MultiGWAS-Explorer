@@ -281,7 +281,7 @@ sub write_gnuplot {
     my @xtics = map { sprintf('"%s" %.0f', $_, $args{chr_mid}{$_}) } @{ $args{chrs} };
     my @ytics = repeated_panel_ytics_manhattan(scalar(@{ $args{labels} }), $args{top_logp});
 
-    print {$gp} "set terminal png size $args{width},$args{height}\n";
+    print {$gp} "set terminal png noenhanced size $args{width},$args{height}\n";
     print {$gp} "set output '" . escape_gp($args{png_file}) . "'\n";
     print {$gp} "set datafile separator '\\t'\n";
     if (defined $args{title} && length $args{title}) {

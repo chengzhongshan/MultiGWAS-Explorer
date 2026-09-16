@@ -1991,7 +1991,7 @@ sub render_combined_local_manhattan_batch {
     $sig_y = safe_neglog10_text('1e-6') unless defined $sig_y;
 
     open my $gp, '>', $gp_file or die "Cannot write $gp_file: $!\n";
-    print {$gp} "set terminal png enhanced size 2200,1780\n";
+    print {$gp} "set terminal png noenhanced size 2200,1780\n";
     print {$gp} "set output '" . escape_gp($args{output_png}) . "'\n";
     print {$gp} "set datafile separator '\\t'\n";
     print {$gp} "set title \"" . escape_gp($title) . "\"\n";
@@ -2235,7 +2235,7 @@ sub render_combined_local_manhattan_gtf_batch {
     $sig_y = safe_neglog10_text('1e-6') unless defined $sig_y;
 
     open my $gp, '>', $gp_file or die "Cannot write $gp_file: $!\n";
-    print {$gp} "set terminal png enhanced size 2200,1780\n";
+    print {$gp} "set terminal png noenhanced size 2200,1780\n";
     print {$gp} "set output '" . escape_gp($args{output_png}) . "'\n";
     print {$gp} "set datafile separator '\\t'\n";
     print {$gp} "set title \"" . escape_gp($title) . "\"\n";

@@ -7,11 +7,11 @@ use GD;
 use Test::More;
 my $dir=tempdir('forest-text-XXXXX',TMPDIR=>1,CLEANUP=>1);
 open my $csv,'>',"$dir/hits.csv" or die $!;
-print {$csv} "SNP,hit_class,BETA,SE,P\nrs123,DIFFERENTIAL,0.1,0.05,0.04\n";
+print {$csv} "SNP,hit_class,BETA,SE,P\nrs_123*,DIFFERENTIAL,0.1,0.05,0.04\n";
 close $csv;
 my $rc=system($^X,"$Bin/../DiffGWASDeps/gnuplot/pdl_gunplot_forest.pl",
  '--csv',"$dir/hits.csv",'--out-prefix',"$dir/forest",'--track-ids','TEST',
- '--track-labels','Test cohort','--track-beta-vars','BETA','--track-se-vars','SE',
+ '--track-labels','Test_cohort','--track-beta-vars','BETA','--track-se-vars','SE',
  '--track-p-vars','P','--width',900,'--height',420);
 is($rc,0,'forest renderer succeeds');
 open my $fh,'<:raw',"$dir/forest_single_snp.png" or die $!;
