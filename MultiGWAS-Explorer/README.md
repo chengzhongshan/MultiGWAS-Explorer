@@ -1,5 +1,11 @@
 # MultiGWAS-Explorer Workflow
 
+For platform setup and practical examples, see the
+[installation and usage guide](../docs/README.md). Scientific revision history
+and reviewer-related validation notes are in its
+[revision section](../docs/README.md#reviewer-driven-scientific-revision).
+For a shorter overview, return to the [project homepage](../README.md).
+
 This repository combines a Perl MCP server, GWAS preprocessing utilities, and
 SAS OnDemand for Academics plotting wrappers into one workflow for differential
 GWAS analysis. It is designed to take one or more GWAS summary-statistics
