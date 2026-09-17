@@ -106,7 +106,6 @@ my $local_ld_snps_override = '';
 my $local_ld_audit_file_override = '';
 my $local_ld_cache_override = '';
 my $local_ld_reference_snp_override = '';
-my $local_ld_cache_is_multi = 0;
 my $local_ld_population_override = '';
 my $local_ld_r2_threshold_override = 0;
 my $local_ld_web_fallback = 1;
@@ -584,7 +583,7 @@ if ($highlight_high_ld_snps
         die "1000 Genomes Phase 3 PLINK2 LD requires a GRCh37/hg19 GWAS reference build; got '$reference_build_profile->{build}'.\n"
             unless $ld_build =~ /^(?:hg19|grch37)$/;
         my ($direct_cache, $direct_ok) = resolve_plink2_ld_cache_for_plot(
-            query_snps => join(',', @configured_target_snps),
+            query_snp   => $local_ld_reference_snp,
             populations => $local_ld_population_override,
             min_r2     => $local_ld_r2_threshold_override,
             window_kb  => cfg_or($spec, 'local_ld_window_kb', cfg_or($spec, 'top_hit_ld_window_kb', 1000)),
@@ -598,7 +597,6 @@ if ($highlight_high_ld_snps
             $local_ld_cache = $direct_cache;
             $local_ld_cache_override = $direct_cache;
             $local_ld_web_fallback = 0;
-            $local_ld_cache_is_multi = @configured_target_snps > 1 ? 1 : 0;
             print "[prep] Direct PLINK2/1000 Genomes local-LD cache: $direct_cache\n";
         }
         else {
@@ -616,7 +614,7 @@ if ($highlight_high_ld_snps
             workdir     => $workdir,
         );
     }
-    print "[prep] LD reference SNP for the multi-query locus: $local_ld_reference_snp\n"
+    print "[prep] LD reference SNP for the plotted locus: $local_ld_reference_snp\n"
         if length $local_ld_reference_snp;
 }
 
@@ -687,7 +685,7 @@ my $runner_cfg = build_runner_config(
     display_gwas_override => $display_gwas_override,
     local_gtf_label_snps_override => $local_gtf_label_snps_override,
     local_ld_snps_override => $local_ld_snps_override,
-    local_ld_reference_snp => ($local_ld_cache_is_multi ? '' : $local_ld_reference_snp),
+    local_ld_reference_snp => $local_ld_reference_snp,
     local_ld_cache_override => $local_ld_cache_override,
     local_ld_population_override => $local_ld_population_override,
     local_ld_r2_threshold_override => $local_ld_r2_threshold_override,

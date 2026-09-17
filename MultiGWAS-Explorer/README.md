@@ -2616,6 +2616,49 @@ The HaploReg resolver is an optional high-LD proxy fallback. It returns only
 variants meeting the configured display threshold and cannot provide complete
 window-wide LD. Use the local PLINK2 reference for reproducible GTF plots.
 
+### Regression-prevention rule: one LD reference per plotted locus
+
+A signed-LD heatmap has meaning only when every displayed r² value is measured
+against one named reference SNP. For a list of nearby target SNPs whose windows
+are packed into one SAS locus plot, the runner must therefore:
+
+1. choose one explicit reference (`--local-ld-reference-snp`, or the first
+   target when the option is omitted);
+2. run PLINK2 once with that reference;
+3. retain the reference in `GTF_LD_REFERENCE_SNP`; and
+4. calculate each track's color as `r² * sign(Z)`, with a fixed range from
+   `-1` through `0` to `1`.
+
+Do not merge LD rows calculated from several query SNPs into one heatmap and
+then clear the reference name. A value in that union no longer answers the
+question "LD to which variant?" and can silently change the scientific meaning
+of the color scale. If requested SNPs represent separate loci, run one command
+per locus so each output has its own explicit reference.
+
+This command is the real-data regression check for the overlapping
+`rs2070788`/`rs383510` locus:
+
+```bash
+perl auto_prepare_and_run_diff_gwas.pl \
+  --spec configs/spec_pgc_scz_sex_common_automation.json \
+  --target-snps rs2070788,rs383510 \
+  --step plot_local_gtf \
+  --local-ld-display-mode heatmap \
+  --local-ld-population EUR \
+  --local-ld-r2-threshold 0.2
+```
+
+Unless `--local-ld-reference-snp` is supplied, the expected log and generated
+runner config identify `rs2070788` as the reference. The uploaded GWAS subset
+must contain numeric `LD_R2`; the reference row must have `LD_R2=1`; and the
+final SAS PNG must label both target SNPs and show a signed colorbar titled
+`Signed LD r2 to rs2070788` with limits `-1` and `1`. Run the focused Perl
+contract test before submission:
+
+```bash
+perl DiffGWASDeps/test_ld_heatmap_contract.pl
+```
+
 For complete window-wide LD, use the repository helper
 `DiffGWASDeps/resolve_plink2_local_ld.pl` with a local PLINK2 1000 Genomes
 fileset. It runs `--r2-phased` by default (or `--unphased` for dosage

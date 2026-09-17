@@ -80,7 +80,7 @@ my $root = File::Spec->catdir($Bin, File::Spec->updir());
 my %reference_contract = (
     'auto_prepare_and_run_diff_gwas.pl' => [
         'local-ld-reference-snp|ld-reference-snp=s',
-        "'--query-snps', join(',', \@queries)",
+        'query_snp   => $local_ld_reference_snp',
         '_r2_${threshold_tag}_w${window_tag}.plink2_1kg_phase3.tsv',
         '1000G Phase 3 / PLINK2',
     ],
@@ -105,6 +105,18 @@ for my $name (sort keys %reference_contract) {
         die "$name is missing single-reference LD contract token: $token\n"
             unless index($text, $token) >= 0;
     }
+}
+
+my $sas_auto_path = File::Spec->catfile($root, 'auto_prepare_and_run_diff_gwas.pl');
+open my $sas_auto_fh, '<:raw', $sas_auto_path or die "Cannot read $sas_auto_path: $!\n";
+my $sas_auto_text = do { local $/; <$sas_auto_fh> };
+close $sas_auto_fh;
+for my $forbidden (
+    'query_snps => join(\',\', @configured_target_snps)',
+    'local_ld_cache_is_multi',
+) {
+    die "SAS local-GTF orchestration must retain one explicit LD reference per plotted locus; found: $forbidden\n"
+        if index($sas_auto_text, $forbidden) >= 0;
 }
 
 print "SAS/gnuplot optional LD heatmap contract: PASS\n";
