@@ -4172,9 +4172,10 @@ sub resolve_plink2_ld_cache_for_plot {
         ? scalar(@queries) . '_queries_' . substr(md5_hex(join(',', map { lc } @queries)), 0, 10)
         : safe_name($queries[0]);
     my $threshold_tag = safe_name($args{min_r2});
+    my $window_tag = safe_name(0 + ($args{window_kb} // 1000));
     my $cache = File::Spec->catfile(
         $args{output_dir},
-        "local_ld_${query_tag}_${population_tag}_r2_${threshold_tag}.plink2_1kg_phase3.tsv",
+        "local_ld_${query_tag}_${population_tag}_r2_${threshold_tag}_w${window_tag}.plink2_1kg_phase3.tsv",
     );
     return ($cache, 1) if !$args{force} && -s cygpath_to_win($cache);
     my @cmd = (

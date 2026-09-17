@@ -81,6 +81,7 @@ my %reference_contract = (
     'auto_prepare_and_run_diff_gwas.pl' => [
         'local-ld-reference-snp|ld-reference-snp=s',
         "'--query-snps', join(',', \@queries)",
+        '_r2_${threshold_tag}_w${window_tag}.plink2_1kg_phase3.tsv',
         '1000G Phase 3 / PLINK2',
     ],
     'auto_prepare_and_run_diff_gwas_with_gunplot.pl' => [
