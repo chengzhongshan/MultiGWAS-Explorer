@@ -17,11 +17,13 @@ my @files = (
  ['daner_PGC_SCZ_w3_75_0618a_eur_male.gz',41008139,'564694661075c1a805aa10586f2fc1f6'],
  ['daner_scz_w3_HRC_chrX_eur_mal_deduped_0518e.gz',52744043,'0a3fed754eaf7b5857d7214fb708aaf5'],
 );
-my ($output, $input, $gtf_cache, $help);
+my ($output, $input, $gtf_cache, $plink2_1kg_pfile, $plink2, $help);
 GetOptions('output-dir=s'=>\$output, 'input-dir=s'=>\$input,
-           'gtf-cache-dir=s'=>\$gtf_cache, 'help'=>\$help) or die "Invalid options\n";
+           'gtf-cache-dir=s'=>\$gtf_cache,
+           'plink2-1kg-pfile=s'=>\$plink2_1kg_pfile,
+           'plink2=s'=>\$plink2, 'help'=>\$help) or die "Invalid options\n";
 if ($help || !$output) {
- print "Usage: perl install/prepare_public_sex_gwas.pl --output-dir DIR [--input-dir EXISTING_GWAS_DIR] [--gtf-cache-dir DIR]\n";
+ print "Usage: perl install/prepare_public_sex_gwas.pl --output-dir DIR [--input-dir EXISTING_GWAS_DIR] [--gtf-cache-dir DIR] [--plink2-1kg-pfile PREFIX --plink2 EXE]\n";
  exit($help ? 0 : 2);
 }
 $|=1;
@@ -60,7 +62,8 @@ my $spec={
  exclude_strand_ambiguous=>1,max_eaf_abs_diff=>0.2,threshold=>0.05,rho=>0,
  manhattan_differential_p_mode=>'raw',top_hit_focus_prefix=>'EUR',
  top_hit_maf_threshold=>0.01,top_hit_selection_method=>'ld',
- top_hit_ld_source=>'HAPLOREG4',top_hit_ld_populations=>'EUR',
+ top_hit_ld_source=>'PLINK2_1KG',top_hit_ld_populations=>'EUR',
+ local_ld_population=>'EUR',local_ld_display_mode=>'heatmap',local_ld_r2_threshold=>0.1,
  top_hit_ld_query_failure_action=>'KEEP',top_hit_max_loci=>3,
  local_window_bp=>500000,local_gtf_window_bp=>500000,
  open_result=>0,clean_oda_input=>1,keep_remote_plot_data=>0,
@@ -69,6 +72,19 @@ my $spec={
  pairs=>[{pair_tag=>'EUR_FEMALE_vs_MALE',group1=>'EUR_FEMALE',
           group2=>'EUR_MALE',prefix=>'EUR',label=>'EUR'}],
 };
+if (defined($plink2_1kg_pfile) || defined($plink2)) {
+ die "Provide both --plink2-1kg-pfile and --plink2\n"
+   unless defined($plink2_1kg_pfile) && defined($plink2);
+ my $pgen_abs=abs_path("$plink2_1kg_pfile.pgen");
+ my $prefix=defined($pgen_abs) ? $pgen_abs : $plink2_1kg_pfile;
+ $prefix =~ s/\.pgen\z//;
+ die "Missing 1000 Genomes Phase 3 PLINK2 files for prefix $prefix\n"
+   unless -s "$prefix.pgen" && (-s "$prefix.pvar" || -s "$prefix.pvar.zst") && -s "$prefix.psam";
+ my $plink_exe=abs_path($plink2) || $plink2;
+ die "PLINK2 executable not found: $plink2\n" unless -f $plink_exe;
+ $spec->{top_hit_ld_pfile}=$prefix;
+ $spec->{top_hit_ld_plink2}=$plink_exe;
+}
 if (defined $gtf_cache) {
  die "GTF cache does not exist: $gtf_cache\n" unless -d $gtf_cache;
  $spec->{gtf_cache_dir}=abs_path($gtf_cache);

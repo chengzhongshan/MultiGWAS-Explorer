@@ -80,6 +80,7 @@ perl -c DiffGWASDeps/gnuplot/pdl_gunplot_local_locus.pl >/dev/null
 perl DiffGWASDeps/test_gnuplot_directory_layout.pl >/dev/null
 perl DiffGWASDeps/test_ld_heatmap_rendering.pl >/dev/null
 perl DiffGWASDeps/test_ld_heatmap_contract.pl >/dev/null
+perl DiffGWASDeps/test_ld_cache_queries.pl >/dev/null
 perl install/test_sort_long_gwas.pl >/dev/null
 perl install/test_precomputed_paths.pl >/dev/null
 perl install/test_forest_text.pl

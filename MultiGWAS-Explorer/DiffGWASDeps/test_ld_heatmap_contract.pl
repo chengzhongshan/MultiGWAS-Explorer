@@ -62,12 +62,26 @@ for my $shell (qw(
     }
 }
 
+my $single_runner = File::Spec->catfile($Bin, 'run_sas_oda_single_snp_with_gtf_download_html.sh');
+open my $single_fh, '<:raw', $single_runner or die "Cannot read $single_runner: $!\n";
+my $single_text = do { local $/; <$single_fh> };
+close $single_fh;
+for my $token (
+    'GTF_LD_R2_CACHE',
+    'augment_gwas_with_ld_r2.pl',
+    '--extra-numeric-cols LD_R2',
+    'GTF_LD_REFERENCE_SNP',
+) {
+    die "Single-SNP SAS runner is missing numeric LD-cache support: $token\n"
+        unless index($single_text, $token) >= 0;
+}
+
 my $root = File::Spec->catdir($Bin, File::Spec->updir());
 my %reference_contract = (
     'auto_prepare_and_run_diff_gwas.pl' => [
         'local-ld-reference-snp|ld-reference-snp=s',
-        'query_snps  => $local_ld_reference_snp',
-        'Signed R2 to $local_ld_reference_snp',
+        "'--query-snps', join(',', \@queries)",
+        '1000G Phase 3 / PLINK2',
     ],
     'auto_prepare_and_run_diff_gwas_with_gunplot.pl' => [
         'ld-reference-snp=s',

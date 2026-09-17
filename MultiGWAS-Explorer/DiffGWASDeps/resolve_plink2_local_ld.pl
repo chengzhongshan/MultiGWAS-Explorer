@@ -149,7 +149,7 @@ sub parse_report {
         make_path(dirname($out_path)) unless -d dirname($out_path);
     }
     open my $out, '>', $out_path or die "Cannot write $out_path: $!\n" if defined $out_path;
-    print {$out} join("\t", qw(query_snp proxy_snp ld_population proxy_r2 source)), "\n" if $out;
+    print {$out} join("\t", qw(query_snp proxy_snp ld_population proxy_r2 source reference_panel reference_build ld_method)), "\n" if $out;
     if (!$quiet_output) {
         print "LD_SNPS\t", join(',', sort { $best{$b} <=> $best{$a} || $a cmp $b } keys %best), "\n";
         print "LD_R2_PAIRS\t", join(',', map { $_ . ':' . sprintf('%.6g', $best{$_}) } sort { $best{$b} <=> $best{$a} || $a cmp $b } keys %best), "\n";
@@ -158,10 +158,10 @@ sub parse_report {
     print "LD_ESTIMABILITY\t", (keys(%best) ? 'ESTIMABLE' : 'NOT_ESTIMABLE'), "\n";
     if ($out) {
         my $population_label = population_label($populations, $keep);
-        print {$out} join("\t", $ref, $ref, $population_label, 1, 'PLINK2_1KG_DIRECT'), "\n"
+        print {$out} join("\t", $ref, $ref, $population_label, 1, 'PLINK2_1KG_DIRECT', '1000_GENOMES_PHASE_3', 'GRCh37_hg19', ($phased ? 'PLINK2_R2_PHASED' : 'PLINK2_R2_UNPHASED')), "\n"
             if keys %best;
         for my $proxy (keys %best) {
-            print {$out} join("\t", $ref, $proxy, $population_label, $best{$proxy}, 'PLINK2_1KG_DIRECT'), "\n";
+            print {$out} join("\t", $ref, $proxy, $population_label, $best{$proxy}, 'PLINK2_1KG_DIRECT', '1000_GENOMES_PHASE_3', 'GRCh37_hg19', ($phased ? 'PLINK2_R2_PHASED' : 'PLINK2_R2_UNPHASED')), "\n";
         }
         close $out;
     }

@@ -8,16 +8,19 @@ use File::Path qw(make_path);
 use JSON::PP;
 use POSIX qw(strftime);
 
-my ($out,$input,$cache,$help);
+my ($out,$input,$cache,$plink2_1kg_pfile,$plink2,$help);
 my $phase='all';
 my $backend='gnuplot';
 GetOptions('output-dir=s'=>\$out,'input-dir=s'=>\$input,'gtf-cache-dir=s'=>\$cache,
+ 'plink2-1kg-pfile=s'=>\$plink2_1kg_pfile,'plink2=s'=>\$plink2,
  'phase=s'=>\$phase,'backend=s'=>\$backend,'help'=>\$help) or die "Invalid options\n";
 if ($help || !$out) {
  print <<'USAGE';
 Usage: perl install/run_public_sex_gwas.pl --output-dir DIR [options]
   --input-dir DIR       Reuse four public source files after checksum checks
   --gtf-cache-dir DIR   Reuse an existing GENCODE hg19 cache
+  --plink2-1kg-pfile P  1000 Genomes Phase 3 GRCh37 PLINK2 prefix
+  --plink2 EXE          PLINK2 executable used for phased LD r2
   --phase NAME         all, prepare, preprocess, validate, plots, images
   --backend NAME       gnuplot (default), sas, both
 Activate install/common.sh before running. SAS requires configured ODA access.
@@ -39,6 +42,8 @@ if ($phase eq 'all' || $phase eq 'prepare') {
  my @cmd=($^X,"$Bin/prepare_public_sex_gwas.pl",'--output-dir',$out);
  push @cmd,('--input-dir',$input) if defined $input;
  push @cmd,('--gtf-cache-dir',$cache) if defined $cache;
+ push @cmd,('--plink2-1kg-pfile',$plink2_1kg_pfile,'--plink2',$plink2)
+   if defined($plink2_1kg_pfile) || defined($plink2);
  run('prepare',@cmd);
 }
 if ($phase eq 'all' || $phase eq 'preprocess') {

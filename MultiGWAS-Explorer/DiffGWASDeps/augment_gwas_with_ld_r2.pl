@@ -8,7 +8,12 @@ die usage() unless $input && $cache && $output;
 open my $cfh,'<',$cache or die "Cannot read LD cache $cache: $!\n";
 my $ch=<$cfh>; die "Empty LD cache\n" unless defined $ch; chomp $ch; $ch =~ s/\r$//; my @hc=split /\t/,$ch,-1; my %ci=map {lc($hc[$_])=>$_} 0..$#hc;
 die "LD cache requires proxy_snp and proxy_r2 columns\n" unless exists $ci{proxy_snp} && exists $ci{proxy_r2};
-my %r2; while(my $line=<$cfh>){chomp $line; $line=~s/\r$//; my @f=split /\t/,$line,-1; my $s=$f[$ci{proxy_snp}]//' '; my $r=$f[$ci{proxy_r2}]//' '; next unless $s ne ' ' && $r =~ /^\d/; $r2{lc $s}=0+$r if !exists($r2{lc $s}) || $r>$r2{lc $s};} close $cfh;
+my %r2; while(my $line=<$cfh>){chomp $line; $line=~s/\r$//; my @f=split /\t/,$line,-1;
+    if (defined($reference) && length($reference) && exists($ci{query_snp})) {
+        my $query=$f[$ci{query_snp}]//'';
+        next unless lc($query) eq lc($reference);
+    }
+    my $s=$f[$ci{proxy_snp}]//' '; my $r=$f[$ci{proxy_r2}]//' '; next unless $s ne ' ' && $r =~ /^\d/; $r2{lc $s}=0+$r if !exists($r2{lc $s}) || $r>$r2{lc $s};} close $cfh;
 $r2{lc $reference}=1 if defined $reference && length $reference;
 my $in=$input=~/\.gz$/ ? IO::Uncompress::Gunzip->new($input) : do {open my $fh,'<',$input or die $!; $fh}; die "Cannot read input\n" unless $in;
 my $out=$output=~/\.gz$/ ? IO::Compress::Gzip->new($output) : do {open my $fh,'>',$output or die $!; $fh}; die "Cannot write output\n" unless $out;

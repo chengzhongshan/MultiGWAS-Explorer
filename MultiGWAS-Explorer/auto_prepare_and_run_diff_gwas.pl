@@ -106,6 +106,7 @@ my $local_ld_snps_override = '';
 my $local_ld_audit_file_override = '';
 my $local_ld_cache_override = '';
 my $local_ld_reference_snp_override = '';
+my $local_ld_cache_is_multi = 0;
 my $local_ld_population_override = '';
 my $local_ld_r2_threshold_override = 0;
 my $local_ld_web_fallback = 1;
@@ -579,8 +580,11 @@ if ($highlight_high_ld_snps
     if (!length($local_ld_cache)
         && !length($local_ld_r2_values_override)
         && $top_hit_ld_source eq 'PLINK2_1KG') {
+        my $ld_build = lc(trim($reference_build_profile->{build} || ''));
+        die "1000 Genomes Phase 3 PLINK2 LD requires a GRCh37/hg19 GWAS reference build; got '$reference_build_profile->{build}'.\n"
+            unless $ld_build =~ /^(?:hg19|grch37)$/;
         my ($direct_cache, $direct_ok) = resolve_plink2_ld_cache_for_plot(
-            query_snp  => $local_ld_reference_snp,
+            query_snps => join(',', @configured_target_snps),
             populations => $local_ld_population_override,
             min_r2     => $local_ld_r2_threshold_override,
             window_kb  => cfg_or($spec, 'local_ld_window_kb', cfg_or($spec, 'top_hit_ld_window_kb', 1000)),
@@ -594,6 +598,7 @@ if ($highlight_high_ld_snps
             $local_ld_cache = $direct_cache;
             $local_ld_cache_override = $direct_cache;
             $local_ld_web_fallback = 0;
+            $local_ld_cache_is_multi = @configured_target_snps > 1 ? 1 : 0;
             print "[prep] Direct PLINK2/1000 Genomes local-LD cache: $direct_cache\n";
         }
         else {
@@ -682,7 +687,7 @@ my $runner_cfg = build_runner_config(
     display_gwas_override => $display_gwas_override,
     local_gtf_label_snps_override => $local_gtf_label_snps_override,
     local_ld_snps_override => $local_ld_snps_override,
-    local_ld_reference_snp => $local_ld_reference_snp,
+    local_ld_reference_snp => ($local_ld_cache_is_multi ? '' : $local_ld_reference_snp),
     local_ld_cache_override => $local_ld_cache_override,
     local_ld_population_override => $local_ld_population_override,
     local_ld_r2_threshold_override => $local_ld_r2_threshold_override,
@@ -2923,7 +2928,7 @@ sub build_runner_config {
     my $default_gtf_colorbar_label = (
         $highlight_high_ld_snps
           && $local_ld_display_mode =~ /^(?:heatmap|both)$/i
-    ) ? 'Signed R2 (sign(Z) x LD R2)'
+    ) ? 'Signed LD r2 (r2 x sign(Z); 1000 Genomes Phase 3 / PLINK2)'
       : infer_effect_metric_label_from_vars(map { $_->{zvar} } @selected_tracks);
 
     my @focus_tracks = @selected_std_tracks ? @selected_std_tracks : @selected_group_tracks;
@@ -3193,8 +3198,8 @@ sub build_runner_config {
         GTF_LD_HEATMAP_COLORS => $local_ld_heatmap_colors,
         GTF_LD_HEATMAP_LEGEND_TITLE => (
             length($local_ld_reference_snp)
-              ? "Signed R2 to $local_ld_reference_snp ($local_ld_population_label)"
-              : "Signed R2 ($local_ld_population_label)"
+              ? "Signed LD r2 to $local_ld_reference_snp ($local_ld_population_label; 1000G Phase 3 / PLINK2)"
+              : "Signed LD r2 ($local_ld_population_label; 1000G Phase 3 / PLINK2)"
         ),
         HIGHLIGHT_HIGH_LD_SNPS => $highlight_high_ld_snps,
         LOCAL_LD_CACHE_TSV => (
@@ -4153,21 +4158,28 @@ sub plink_reference_is_available {
 sub resolve_plink2_ld_cache_for_plot {
     my (%args) = @_;
     return ('', 0) unless plink_reference_is_available(%args);
-    my $helper = File::Spec->catfile($Bin, 'DiffGWASDeps', 'resolve_plink2_local_ld.pl');
+    my @queries = grep { length } map { trim($_) } split /,/, ($args{query_snps} || $args{query_snp} || '');
+    return ('', 0) unless @queries;
+    my $helper = File::Spec->catfile(
+        $Bin, 'DiffGWASDeps',
+        @queries > 1 ? 'build_plink2_local_ld_cache.pl' : 'resolve_plink2_local_ld.pl'
+    );
     return ('', 0) unless -f $helper;
     my $population_list = plink_local_populations($args{populations});
     my $population_tag = lc($population_list || 'all');
     $population_tag =~ s/[^a-z0-9]+/_/g;
-    my $query_tag = safe_name($args{query_snp} || 'query');
+    my $query_tag = @queries > 1
+        ? scalar(@queries) . '_queries_' . substr(md5_hex(join(',', map { lc } @queries)), 0, 10)
+        : safe_name($queries[0]);
     my $threshold_tag = safe_name($args{min_r2});
     my $cache = File::Spec->catfile(
         $args{output_dir},
-        "local_ld_${query_tag}_${population_tag}_r2_${threshold_tag}.plink2_1kg.tsv",
+        "local_ld_${query_tag}_${population_tag}_r2_${threshold_tag}.plink2_1kg_phase3.tsv",
     );
     return ($cache, 1) if !$args{force} && -s cygpath_to_win($cache);
     my @cmd = (
         $^X, cygpath_to_win($helper),
-        '--query-snp', $args{query_snp},
+        (@queries > 1 ? ('--query-snps', join(',', @queries)) : ('--query-snp', $queries[0])),
         '--plink2', cygpath_to_win($args{plink2}),
         '--populations', $population_list,
         '--min-r2', 0 + ($args{min_r2} // 0),

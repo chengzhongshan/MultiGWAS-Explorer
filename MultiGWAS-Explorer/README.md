@@ -2227,17 +2227,14 @@ is queried only as a backup when the local genotype reference is unavailable.
 
 For a LocusZoom-like LD view, request it explicitly with
 `--ld-display-mode heatmap` (or `both` to retain the selected marker overlay).
-The pipeline carries direct PLINK2 r2 values into both SAS ODA and gnuplot local
-Manhattan/GTF renderers. In heatmap mode, each point uses a single signed-LD
-value, `sign(Z) * r2`, on the existing divergent Z-score colorbar and in its
-original position. Estimable unlinked variants approach zero; LD proxies range
-from -1 (negative Z direction, perfect LD) to +1 (positive Z direction,
-perfect LD). Non-estimable LD remains missing in the audit and is not asserted
-to be r2=0. No separate LD inset or marker shape is needed. For a locus requested with several SNPs, LD is never
-pooled across all query SNPs: the first target SNP is the reference by default,
-and every displayed r2 is relative to that one SNP. Select a different query
-SNP with `--local-ld-reference-snp` (SAS ODA) or `--ld-reference-snp`
-(gnuplot). The selected reference must occur in `--target-snps`. For example:
+The pipeline carries phased PLINK2 r2 values into both SAS ODA and gnuplot
+local Manhattan/GTF renderers. Heatmap mode plots `r2 * sign(Z)` on a
+diverging scale from -1 through 0 to 1. Negative values mean a negative GWAS
+Z score, positive values mean a positive Z score, and the absolute value is
+the PLINK2 LD r2. Each locus is calculated against its own target SNP. A
+multi-locus SAS run builds one audited cache containing separate `query_snp`
+rows for every target. The reference panel and build are recorded as 1000
+Genomes Phase 3 and GRCh37/hg19. For example:
 
 ```bash
 perl auto_prepare_and_run_diff_gwas.pl \
@@ -2615,12 +2612,9 @@ fails before SAS submission:
 
 ## Local PLINK2 LD Reference
 
-The HaploReg resolver is intentionally a high-LD proxy resolver: it returns
-only variants meeting the configured display threshold (normally `r² >= 0.8`)
-and only variants in the response/cache. The signed-R² renderer therefore
-correctly colors those returned proxies, but it cannot infer r² for every
-variant in the displayed GTF window. Unreturned variants are treated as
-background (`r²=0`), which can make a dense LD block look sparse.
+The HaploReg resolver is an optional high-LD proxy fallback. It returns only
+variants meeting the configured display threshold and cannot provide complete
+window-wide LD. Use the local PLINK2 reference for reproducible GTF plots.
 
 For complete window-wide LD, use the repository helper
 `DiffGWASDeps/resolve_plink2_local_ld.pl` with a local PLINK2 1000 Genomes
@@ -2638,13 +2632,23 @@ perl DiffGWASDeps/resolve_plink2_local_ld.pl \
   --output cache/plink2_ld/rs185665940_chr2.tsv
 ```
 
-The PLINK2 resource page provides phased 1000 Genomes phase-3 `.pgen`, `.pvar`
+The PLINK2 resource page provides phased 1000 Genomes Phase 3 `.pgen`, `.pvar`
 and `.psam` files, including chromosome-split downloads. The `.pgen.zst` file
 must be decompressed before use; `.pvar.zst` can be read with PLINK2's `vzs`
 modifier. Keep the reference build aligned with the plot (the phase-3 files
 are GRCh37/hg19), and prefer a chromosome-split fileset so a local query does
 not require a whole-genome scan. The helper does not download or commit these
 large reference files.
+
+The public real-GWAS test accepts the same reference explicitly:
+
+```bash
+perl install/run_public_sex_gwas.pl \
+  --output-dir public_gwas_demo/windows-full \
+  --backend both \
+  --plink2-1kg-pfile /data/1kg/all_phase3 \
+  --plink2 /opt/plink2/plink2
+```
 
 When a large-window local GTF rerun looks like it "finished" but the HTML
 contains blank regions, check the saved `run_local_hits_with_gtf_*/output.html.info.txt`

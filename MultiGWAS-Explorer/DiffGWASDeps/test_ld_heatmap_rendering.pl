@@ -78,7 +78,7 @@ my $gp_text = do { local $/; <$gp> };
 close $gp;
 die "Signed-R2 colorbar is missing\n"
     unless $gp_text =~ /set cbrange \[-1:1\]/
-        && $gp_text =~ /set cblabel 'Signed R\^2 \(sign\(Z\) x LD R\^2\)'/;
+        && $gp_text =~ /set cblabel 'Signed LD r\^2 \(r\^2 x sign\(Z\); EUR; 1000 Genomes Phase 3 \/ PLINK2\)'/;
 die "Separate LD inset should not be emitted in signed-R2 mode\n"
     if $gp_text =~ /LD r\^2 to rs100/ || $gp_text =~ /using \(\(\$9>=0\)\?\$1:1\/0\):2:10/;
 
@@ -99,5 +99,8 @@ my $manifest_text = do { local $/; <$manifest_fh> };
 close $manifest_fh;
 die "LD reference SNP is missing from the render manifest\n"
     unless $manifest_text =~ /^ld_reference_snp\trs100$/m;
+die "1000 Genomes/PLINK2 reference panel is missing from the render manifest\n"
+    unless $manifest_text =~ /^ld_reference_panel\t1000 Genomes Phase 3 \/ PLINK2$/m
+        && $manifest_text =~ /^signed_r2_coloring\t1$/m;
 
 print "Optional LD heatmap rendering: PASS\n";

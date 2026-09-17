@@ -18,6 +18,8 @@ CALLER_GTF_LABEL_SNPS="${GTF_LABEL_SNPS-__UNSET__}"
 CALLER_GTF_LD_SNPS="${GTF_LD_SNPS-__UNSET__}"
 CALLER_GTF_LD_DISPLAY_MODE="${GTF_LD_DISPLAY_MODE-__UNSET__}"
 CALLER_GTF_LD_R2_VALUES="${GTF_LD_R2_VALUES-__UNSET__}"
+CALLER_GTF_LD_R2_CACHE="${GTF_LD_R2_CACHE-__UNSET__}"
+CALLER_GTF_LD_REFERENCE_SNP="${GTF_LD_REFERENCE_SNP-__UNSET__}"
 CALLER_GTF_LD_HEATMAP_COLORS="${GTF_LD_HEATMAP_COLORS-__UNSET__}"
 CALLER_GTF_LD_HEATMAP_LEGEND_TITLE="${GTF_LD_HEATMAP_LEGEND_TITLE-__UNSET__}"
 CALLER_LOCAL_GTF_INCLUDE_NON_PROTEIN_CODING_GENES="${LOCAL_GTF_INCLUDE_NON_PROTEIN_CODING_GENES-__UNSET__}"
@@ -47,6 +49,12 @@ if [[ "${CALLER_GTF_LD_DISPLAY_MODE}" != "__UNSET__" ]]; then
 fi
 if [[ "${CALLER_GTF_LD_R2_VALUES}" != "__UNSET__" ]]; then
   GTF_LD_R2_VALUES="${CALLER_GTF_LD_R2_VALUES}"
+fi
+if [[ "${CALLER_GTF_LD_R2_CACHE}" != "__UNSET__" ]]; then
+  GTF_LD_R2_CACHE="${CALLER_GTF_LD_R2_CACHE}"
+fi
+if [[ "${CALLER_GTF_LD_REFERENCE_SNP}" != "__UNSET__" ]]; then
+  GTF_LD_REFERENCE_SNP="${CALLER_GTF_LD_REFERENCE_SNP}"
 fi
 if [[ "${CALLER_GTF_LD_HEATMAP_COLORS}" != "__UNSET__" ]]; then
   GTF_LD_HEATMAP_COLORS="${CALLER_GTF_LD_HEATMAP_COLORS}"
@@ -97,6 +105,8 @@ GTF_LD_SNPS="${GTF_LD_SNPS:-}"
 GTF_LD_SNPS="${GTF_LD_SNPS//,/ }"
 GTF_LD_DISPLAY_MODE="${GTF_LD_DISPLAY_MODE:-none}"
 GTF_LD_R2_VALUES="${GTF_LD_R2_VALUES:-}"
+GTF_LD_R2_CACHE="${GTF_LD_R2_CACHE:-${LOCAL_LD_CACHE_TSV:-}}"
+GTF_LD_REFERENCE_SNP="${GTF_LD_REFERENCE_SNP:-${LOCAL_LD_REFERENCE_SNP:-${TARGET_SNP}}}"
 GTF_LD_HEATMAP_COLORS="${GTF_LD_HEATMAP_COLORS:-CXF7FBFF CX6BAED6 CX54278F}"
 GTF_LD_HEATMAP_LEGEND_TITLE="${GTF_LD_HEATMAP_LEGEND_TITLE:-LD r2 (EUR)}"
 case "${GTF_LD_DISPLAY_MODE,,}" in
@@ -381,6 +391,7 @@ GTF_IMPORT_BLOCK_RENDERED="${WORKDIR}/auto_gtf_import_single_snp.${stamp}.sas"
 LOCAL_GTF_SUBSET="${WORKDIR}/local_gtf_subset_${SAFE_TARGET_SNP}_${stamp}.tsv"
 LOCAL_GTF_SUBSET_GZ="${LOCAL_GTF_SUBSET}.gz"
 LOCAL_GTF_SUBSET_CACHE_MANAGED=0
+LOCAL_LD_AUGMENTED_GZ=""
 REMOTE_GTF_BASENAME="$(basename "${LOCAL_GTF_SUBSET_GZ}")"
 PNG_OUT=""
 RAW_HTML_OUT=""
@@ -390,6 +401,9 @@ RUN_LOG_FILE="${RUN_LOG_DIR}/output.html.info.txt"
 
 cleanup_local_artifacts() {
   rm -f "${RUN_SAS_RENDERED}" "${IMPORT_BLOCK_RENDERED}" "${GTF_IMPORT_BLOCK_RENDERED}"
+  if [[ "${CLEAN_LOCAL_AUTOGEN}" == "1" && -n "${LOCAL_LD_AUGMENTED_GZ}" ]]; then
+    rm -f "${LOCAL_LD_AUGMENTED_GZ}"
+  fi
   if [[ "${CLEAN_LOCAL_AUTOGEN}" == "1" && "${LOCAL_GTF_SUBSET_CACHE_MANAGED}" != "1" ]]; then
     rm -f "${LOCAL_GTF_SUBSET}" "${LOCAL_GTF_SUBSET_GZ}"
   fi
@@ -927,6 +941,22 @@ fi
 echo "[prep] Verified that the local single-SNP wide subset contains ${TARGET_SNP}."
 log_local_subset_target_summary_if_available
 
+if [[ -n "${GTF_LD_R2_CACHE}" ]]; then
+  if [[ ! -s "${GTF_LD_R2_CACHE}" ]]; then
+    echo "ERROR: GTF_LD_R2_CACHE does not exist or is empty: ${GTF_LD_R2_CACHE}" >&2
+    exit 2
+  fi
+  LOCAL_LD_AUGMENTED_GZ="${WORKDIR}/single_snp_ld_augmented_${SAFE_TARGET_SNP}_${stamp}.tsv.gz"
+  echo "[prep] Adding PLINK2 LD_R2 values for ${GTF_LD_REFERENCE_SNP} from ${GTF_LD_R2_CACHE}"
+  perl "${DEPS_DIR}/augment_gwas_with_ld_r2.pl" \
+    --input "${DATA_GZ}" \
+    --ld-cache "${GTF_LD_R2_CACHE}" \
+    --reference-snp "${GTF_LD_REFERENCE_SNP}" \
+    --output "${LOCAL_LD_AUGMENTED_GZ}" >/dev/null
+  DATA_GZ="${LOCAL_LD_AUGMENTED_GZ}"
+  REMOTE_DATA_BASENAME="$(basename "${DATA_GZ}")"
+fi
+
 if [[ -n "${SINGLE_SNP_TOP_HITS_CSV_BASENAME}" ]]; then
   SINGLE_SNP_TOP_HITS_CSV_OUT="${WORKDIR}/${SINGLE_SNP_TOP_HITS_CSV_BASENAME}"
   perl -MIO::Uncompress::Gunzip=gunzip,\$GunzipError -e '
@@ -1072,11 +1102,16 @@ if [[ ! -s "${LOCAL_GTF_SUBSET_GZ}" ]]; then
 fi
 REMOTE_GTF_BASENAME="$(basename "${LOCAL_GTF_SUBSET_GZ}")"
 
+schema_import_extra_args=()
+if [[ -n "${GTF_LD_R2_CACHE}" ]]; then
+  schema_import_extra_args+=(--extra-numeric-cols LD_R2)
+fi
 perl "${SCHEMA_INCLUDE_HELPER}" \
   --config "${SCHEMA_CONFIG_JSON}" \
   --dataset "${GWAS_DATASET}" \
   --source-type gzip \
-  --remote-basename "${REMOTE_DATA_BASENAME}" > "${IMPORT_BLOCK_RENDERED}"
+  --remote-basename "${REMOTE_DATA_BASENAME}" \
+  "${schema_import_extra_args[@]}" > "${IMPORT_BLOCK_RENDERED}"
 
 perl "${GTF_IMPORT_INCLUDE_HELPER}" \
   --dataset "${GTF_LOCAL_DSD}" \

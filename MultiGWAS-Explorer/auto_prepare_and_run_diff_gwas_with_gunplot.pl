@@ -87,8 +87,8 @@ Options:
                                 Default: star when highlighting is enabled.
   --ld-marker-color COLOR       Named or #RRGGBB marker color. Default: black.
   --ld-display-mode MODE        none, markers, heatmap, or both. Default: none.
-                                heatmap maps sign(Z)*r2 to one continuous diverging
-                                colormap in the original Z-score legend position.
+                                heatmap maps r2*sign(Z) to a -1..1 diverging
+                                colormap in the original colorbar position.
   --ld-r2-values MAP            Optional SNP:r2 pairs, comma-separated, for explicit
                                 --ld-snps (example rs1:0.92,rs2:0.81).
   --ld-heatmap-colors LIST      Low-to-high #RRGGBB colors for the LD inset.
@@ -376,37 +376,6 @@ print "Using gnuplot executable: $gnuplot\n";
 my $wide_data_local = localize_path($runner->{DATA_GZ});
 die "Wide input file not found: $wide_data_local\n" unless -s $wide_data_local;
 
-if ($highlight_high_ld_snps
-    && ($requested{plot_local_manhattan} || $requested{plot_local_gtf})
-    && !length(trim($ld_cache_override))
-    && !length(trim($ld_r2_values_override))
-    && uc($runner->{TOP_HIT_LD_SOURCE} || $spec->{top_hit_ld_source} || 'PLINK2_1KG') eq 'PLINK2_1KG') {
-    my @targets = grep { length } map { trim($_) } split /,/,
-        ($target_snps_override || $runner->{TARGET_SNP_LIST} || '');
-    my $reference_snp = trim($ld_reference_snp_override || $targets[0] || '');
-    if (length $reference_snp) {
-        my ($direct_cache, $direct_ok) = resolve_plink2_ld_cache_for_plot(
-            query_snp   => $reference_snp,
-            populations => $ld_population_override,
-            min_r2      => $ld_r2_threshold_override,
-            window_kb   => ($spec->{local_ld_window_kb} || $runner->{TOP_HIT_LD_WINDOW_KB} || 1000),
-            pfile       => ($runner->{TOP_HIT_LD_PFILE} || $spec->{top_hit_ld_pfile} || ''),
-            bfile       => ($runner->{TOP_HIT_LD_BFILE} || $spec->{top_hit_ld_bfile} || ''),
-            plink2      => ($runner->{TOP_HIT_LD_PLINK2} || $spec->{top_hit_ld_plink2} || 'plink2'),
-            output_dir  => $output_dir_local,
-            force       => $force_upstream,
-        );
-        if ($direct_ok) {
-            $ld_cache_override = $direct_cache;
-            $ld_web_fallback = 0;
-            print "[prep] Direct PLINK2/1000 Genomes local-LD cache: $direct_cache\n";
-        }
-        else {
-            warn "WARNING: Direct 1000 Genomes local LD is unavailable; HaploReg4 will be used only as a backup when web fallback is enabled.\n";
-        }
-    }
-}
-
 my @manhattan_pcols = (
     $runner->{MANHATTAN_P_VAR},
     @{ ref($runner->{MANHATTAN_OTHER_P_VARS}) eq 'ARRAY' ? $runner->{MANHATTAN_OTHER_P_VARS} : [] },
@@ -528,6 +497,7 @@ if ($requested{plot_local_manhattan}) {
             ld_r2_values     => $ld_r2_values_override,
             ld_heatmap_colors=> $ld_heatmap_colors,
             force       => $force,
+            force_ld    => $force_upstream,
         ),
     );
     print "[done] plot_local_manhattan finished in " . format_elapsed_seconds(time() - $step_started) . "\n";
@@ -584,6 +554,7 @@ if ($requested{plot_local_gtf}) {
             ld_r2_values     => $ld_r2_values_override,
             ld_heatmap_colors=> $ld_heatmap_colors,
             force       => $force,
+            force_ld    => $force_upstream,
         ),
     );
     print "[done] plot_local_gtf finished in " . format_elapsed_seconds(time() - $step_started) . "\n";
@@ -1070,9 +1041,10 @@ sub resolve_plink2_ld_cache_for_plot {
     my $tag = lc($population_list || 'all');
     $tag =~ s/[^a-z0-9]+/_/g;
     my $threshold_tag = safe_name($args{min_r2});
+    my $window_tag = safe_name($args{window_kb} // 1000);
     my $cache = File::Spec->catfile(
         $args{output_dir},
-        'local_ld_' . safe_name($args{query_snp}) . "_${tag}_r2_${threshold_tag}.plink2_1kg.tsv",
+        'local_ld_' . safe_name($args{query_snp}) . "_${tag}_r2_${threshold_tag}_w${window_tag}.plink2_1kg_phase3.tsv",
     );
     return ($cache, 1) if !$args{force} && -s $cache;
     my @cmd = (
@@ -1086,6 +1058,12 @@ sub resolve_plink2_ld_cache_for_plot {
         '--quiet',
     );
     push @cmd, ($pfile_ok ? ('--pfile', $pfile) : ('--bfile', $bfile));
+    if (defined($args{chr}) && length($args{chr}) && defined($args{bp}) && $args{bp} =~ /^\d+$/) {
+        my $half_window = int(1000 * (0 + ($args{window_kb} // 1000)));
+        my $from = $args{bp} - $half_window;
+        $from = 1 if $from < 1;
+        push @cmd, ('--chr', $args{chr}, '--from-bp', $from, '--to-bp', $args{bp} + $half_window);
+    }
     print "[prep] Calculating local LD directly with PLINK2 using 1000 Genomes populations $population_list.\n";
     my $rc = system(@cmd);
     return ('', 0) if $rc != 0 || !-s $cache;
@@ -1337,14 +1315,46 @@ sub plot_local_series {
         $ld_reference_snp = $label_snps[0]
             unless length($ld_reference_snp)
                 && grep { lc($_) eq lc($ld_reference_snp) } @label_snps;
+        my $locus_ld_cache = $args{ld_cache};
+        my $locus_web_fallback = $args{ld_web_fallback};
+        my $ld_source = uc($runner->{TOP_HIT_LD_SOURCE} || 'PLINK2_1KG');
+        if ($args{highlight_high_ld_snps}
+            && !length(trim($args{ld_snps} // ''))
+            && !length(trim($args{ld_r2_values} // ''))
+            && $ld_source eq 'PLINK2_1KG') {
+            my $build = lc(trim($runner->{REFERENCE_BUILD} || 'hg19'));
+            die "1000 Genomes Phase 3 PLINK2 LD requires a GRCh37/hg19 GWAS reference build; got '$runner->{REFERENCE_BUILD}'.\n"
+                unless $build =~ /^(?:hg19|grch37)$/;
+            my ($direct_cache, $direct_ok) = resolve_plink2_ld_cache_for_plot(
+                query_snp   => $ld_reference_snp,
+                chr         => $hit->{CHR},
+                bp          => $hit->{BP},
+                populations => $args{ld_population},
+                min_r2      => $args{ld_r2_threshold},
+                window_kb   => ($runner->{TOP_HIT_LD_WINDOW_KB} || int(($args{window_bp} || 1) / 1000) || 1000),
+                pfile       => ($runner->{TOP_HIT_LD_PFILE} || ''),
+                bfile       => ($runner->{TOP_HIT_LD_BFILE} || ''),
+                plink2      => ($runner->{TOP_HIT_LD_PLINK2} || 'plink2'),
+                output_dir  => $args{output_dir},
+                force       => $args{force_ld},
+            );
+            if ($direct_ok) {
+                $locus_ld_cache = $direct_cache;
+                $locus_web_fallback = 0;
+                print "[prep] Locus-specific PLINK2/1000 Genomes Phase 3 LD cache for $ld_reference_snp: $direct_cache\n";
+            }
+            else {
+                warn "WARNING: PLINK2/1000 Genomes Phase 3 LD is unavailable for $ld_reference_snp.\n";
+            }
+        }
         my ($ld_snps_ref, $ld_r2_ref) = $args{highlight_high_ld_snps} ? resolve_ld_snps_for_query(
             explicit   => $args{ld_snps},
             explicit_r2=> $args{ld_r2_values},
             audit_file => $args{ld_audit_file},
-            ld_cache   => $args{ld_cache},
+            ld_cache   => $locus_ld_cache,
             ld_population => $args{ld_population},
             ld_r2_threshold => $args{ld_r2_threshold},
-            ld_web_fallback => $args{ld_web_fallback},
+            ld_web_fallback => $locus_web_fallback,
             runner     => $runner,
             output_dir => $args{output_dir},
             query_snps => [$ld_reference_snp],
@@ -1587,6 +1597,7 @@ sub plot_local_series {
             push @cmd, ('--ld-marker-color', ($args{ld_marker_color} || 'black'));
             push @cmd, ('--ld-display-mode', ($args{ld_display_mode} || 'markers'));
             push @cmd, ('--ld-population', ($args{ld_population} || 'EUR'));
+            push @cmd, ('--ld-reference-panel', '1000 Genomes Phase 3 / PLINK2');
             push @cmd, ('--ld-heatmap-colors', ($args{ld_heatmap_colors} || '#f7fbff,#6baed6,#54278f'));
         }
         if ($args{kind} eq 'local_manhattan') {

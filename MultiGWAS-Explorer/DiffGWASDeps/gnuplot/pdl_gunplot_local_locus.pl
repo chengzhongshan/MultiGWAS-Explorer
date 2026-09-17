@@ -30,8 +30,10 @@ Options:
   --ld-r2-values MAP       Comma-separated SNP:r2 values for LD proxies.
   --ld-r2-file FILE        Two-column SNP/R2 TSV. Preferred for large LD sets
                            because it avoids operating-system argument limits.
-  --ld-population POP      Population label shown with the signed-LD scale;
+  --ld-population POP      Population label shown with the signed LD r2 scale;
                            MAJOR4 means EUR+AFR+AMR+EAS (default: EUR).
+  --ld-reference-panel TXT Reference-panel label shown with the LD r2 scale
+                           (default: 1000 Genomes Phase 3 / PLINK2).
   --ld-heatmap-colors LIST Low-to-high #RRGGBB colors for the separate LD scale.
   --title TEXT             Optional title.
   --gtf FILE.tsv           Optional extracted GTF subset TSV.
@@ -58,6 +60,7 @@ my %opt = (
     ld_marker_color  => 'black',
     ld_display_mode  => 'none',
     ld_population    => 'EUR',
+    ld_reference_panel => '1000 Genomes Phase 3 / PLINK2',
     ld_heatmap_colors=> '#f7fbff,#6baed6,#54278f',
 );
 
@@ -78,6 +81,7 @@ GetOptions(
     'ld-r2-values=s'     => \$opt{ld_r2_values},
     'ld-r2-file=s'       => \$opt{ld_r2_file},
     'ld-population=s'    => \$opt{ld_population},
+    'ld-reference-panel=s' => \$opt{ld_reference_panel},
     'ld-heatmap-colors=s'=> \$opt{ld_heatmap_colors},
     'title=s'      => \$opt{title},
     'gtf=s'        => \$opt{gtf},
@@ -162,8 +166,7 @@ my %is_label_snp = map { lc($_) => 1 } @label_snps;
 my @ld_snps;
 my %is_ld_snp;
 my %ld_r2_for;
-# The LD reference is in perfect LD with itself. Keep it in the numeric
-# map so signed-R2 coloring also shows the reference SNP at +/-1.
+# The LD reference is in perfect LD with itself.
 $ld_r2_for{lc $ld_reference_snp} = 1;
 for my $snp (split /,/, ($opt{ld_snps} // '')) {
     $snp = trim($snp);
@@ -293,8 +296,6 @@ for my $row (@locus) {
             my $z = extract_requested_numeric($resolved_zcols[$track_i], $row, \%idx);
             $colorval = defined $z ? cap_num($z, -8, 8) : 0;
             if ($use_signed_r2) {
-                # Background variants are unlinked (r2=0), while LD-linked
-                # variants retain the direction of their association Z-score.
                 $colorval = ($is_ld && defined $z)
                     ? cap_num(($z < 0 ? -1 : $z > 0 ? 1 : 0) * $ld_r2, -1, 1)
                     : 0;
@@ -402,6 +403,7 @@ write_gnuplot(
     ld_marker_color => $opt{ld_marker_color},
     ld_display_mode => $opt{ld_display_mode},
     ld_population   => $opt{ld_population},
+    ld_reference_panel => $opt{ld_reference_panel},
     ld_reference_snp=> $ld_reference_snp,
     ld_heatmap_colors => \@ld_heatmap_colors,
     ld_r2_points    => scalar(grep { exists $ld_r2_for{$_} && exists $found_ld_snp{$_} } keys %ld_r2_for),
@@ -434,6 +436,7 @@ print {$mf} join("\t", 'ld_marker_color', $opt{ld_marker_color}), "\n";
 print {$mf} join("\t", 'ld_display_mode', $opt{ld_display_mode}), "\n";
 print {$mf} join("\t", 'ld_r2_values', ($opt{ld_r2_values} // '')), "\n";
 print {$mf} join("\t", 'ld_population', $opt{ld_population}), "\n";
+print {$mf} join("\t", 'ld_reference_panel', $opt{ld_reference_panel}), "\n";
 print {$mf} join("\t", 'ld_reference_snp', $ld_reference_snp), "\n";
 print {$mf} join("\t", 'ld_heatmap_colors', join(',', @ld_heatmap_colors)), "\n";
 print {$mf} join("\t", 'signed_r2_coloring', $use_signed_r2), "\n";
@@ -509,8 +512,8 @@ sub write_gnuplot {
     }
     my $draw_ld_markers = $args{ld_points}
         && $args{ld_display_mode} =~ /^(?:markers|both)$/;
-    # In heatmap mode LD is encoded directly in the existing association
-    # colorbar as signed R2; do not add a second LD inset/overlay scale.
+    # In signed-r2 mode the existing colorbar encodes r2 * sign(Z), so a
+    # second 0..1 LD inset would be ambiguous and is intentionally omitted.
     my $draw_ld_heatmap = $args{ld_r2_points}
         && !$args{use_signed_r2}
         && $args{ld_display_mode} =~ /^(?:heatmap|both)$/;
@@ -627,7 +630,9 @@ sub write_gnuplot {
         if ($args{use_zcolors}) {
             my ($cbmin, $cbmax, $cbticks, $cblabel, $palette) =
                 $args{use_signed_r2}
-                  ? (-1, 1, "('-1' -1, '0' 0, '1' 1)", 'Signed R^2 (sign(Z) x LD R^2)',
+                  ? (-1, 1, "('-1' -1, '0' 0, '1' 1)",
+                     'Signed LD r^2 (r^2 x sign(Z); ' . ($args{ld_population} || 'EUR')
+                         . '; ' . ($args{ld_reference_panel} || '1000 Genomes Phase 3 / PLINK2') . ')',
                      "(-1 '#63d67f', -0.5 '#63d8d2', 0 '#ffbf00', 0.5 '#ff5b00', 1 '#df1f2d')")
                   : (-8, 8, "('-8' -8, '0' 0, '8' 8)", ($args{colorbar_label} || 'Effect metric'),
                      "(-8 '#63d67f', -4 '#63d8d2', 0 '#ffbf00', 4 '#ff5b00', 8 '#df1f2d')");
@@ -685,7 +690,8 @@ sub write_ld_heatmap_inset {
         print {$gp} "set object $id rect from graph $left,$y0 to graph $right,$y1 fc rgb '$color' fillstyle solid 1.0 border lc rgb '$color' front\n";
     }
     my $title = 'LD r^2 to ' . ($args->{ld_reference_snp} || $args->{snp})
-        . ' (' . ($args->{ld_population} || 'EUR') . ')';
+        . ' (' . ($args->{ld_population} || 'EUR') . '; '
+        . ($args->{ld_reference_panel} || '1000 Genomes Phase 3 / PLINK2') . ')';
     print {$gp} "set label 8900 '" . escape_gp($title) . "' at graph " . (($x0 + $x1) / 2) . "," . ($y1 + 0.022) . " center front font ',9' tc rgb '#222222'\n";
     print {$gp} "set label 8901 '0' at graph $x0," . ($y0 - 0.010) . " center front font ',8' tc rgb '#222222'\n";
     print {$gp} "set label 8902 '0.5' at graph " . (($x0 + $x1) / 2) . "," . ($y0 - 0.010) . " center front font ',8' tc rgb '#222222'\n";
