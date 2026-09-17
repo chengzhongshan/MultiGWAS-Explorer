@@ -27,6 +27,40 @@ ensure_homebrew() {
   fi
 }
 
+ensure_macports() {
+  local version="2.12.5"
+  local package="MacPorts-${version}-15-Sequoia.pkg"
+  local expected_sha256="10a048e235ba252eb31ca5030dbf560409ea73cacb3267a00e3983205e9b0e36"
+  local package_path="${PIPELINE_ROOT}/tools/${package}"
+  local actual_sha256=""
+
+  if [ -x /opt/local/bin/port ]; then
+    prepend_path /opt/local/sbin
+    prepend_path /opt/local/bin
+    return 0
+  fi
+  [ "$(sw_vers -productVersion | cut -d. -f1)" = "15" ] \
+    || die "The pinned MacPorts fallback supports Intel macOS 15; set PIPELINE_MACOS_PACKAGE_MANAGER=homebrew to override"
+  log "Installing verified MacPorts ${version} for Intel macOS 15"
+  download_url \
+    "https://distfiles.macports.org/MacPorts/${package}" \
+    "${package_path}"
+  if command_exists sha256sum; then
+    actual_sha256="$(sha256sum "${package_path}" | awk '{print $1}')"
+  else
+    actual_sha256="$(shasum -a 256 "${package_path}" | awk '{print $1}')"
+  fi
+  [ "${actual_sha256}" = "${expected_sha256}" ] \
+    || die "MacPorts installer checksum mismatch: ${package_path}"
+  sudo /usr/sbin/installer -pkg "${package_path}" -target /
+  prepend_path /opt/local/sbin
+  prepend_path /opt/local/bin
+}
+
+macports_cmd() {
+  sudo /opt/local/bin/port -N "$@"
+}
+
 brew_cmd() {
   if [ -x /opt/homebrew/bin/brew ]; then
     /usr/bin/arch -arm64 /opt/homebrew/bin/brew "$@"
@@ -55,6 +89,8 @@ binary_supports_current_arch() {
 select_macos_python() {
   local cand=""
   for cand in \
+    /opt/local/bin/python3.12 \
+    /opt/local/bin/python3 \
     /opt/homebrew/bin/python3 \
     /opt/homebrew/opt/python@3.14/bin/python3 \
     /opt/homebrew/opt/python@3.13/bin/python3 \
@@ -82,15 +118,53 @@ PY
 }
 
 ensure_xcode_clt
-ensure_homebrew
+macos_package_manager="${PIPELINE_MACOS_PACKAGE_MANAGER:-}"
+if [ -z "${macos_package_manager}" ]; then
+  if [ "$(uname -m)" = "x86_64" ] && [ "$(sw_vers -productVersion | cut -d. -f1)" -ge 15 ]; then
+    macos_package_manager="macports"
+  else
+    macos_package_manager="homebrew"
+  fi
+fi
 
-log "Installing macOS packages with Homebrew"
-brew_cmd update
-brew_cmd install bash curl gd htslib imagemagick openjdk openssl@3 pkg-config python wget
-export OPENSSL_PREFIX="$(brew_cmd --prefix openssl@3)"
+case "${macos_package_manager}" in
+  macports)
+    ensure_macports
+    log "Installing Intel macOS packages with MacPorts"
+    macports_cmd selfupdate
+    macports_cmd install \
+      bash curl gd2 htslib ImageMagick openjdk21 openssl pkgconfig \
+      python312 py312-pip wget
+    macports_cmd install gnuplot \
+      +pangocairo -aquaterm -luaterm -qt -qt5 -wxwidgets -x11
+    macports_cmd select --set python3 python312
+    macports_cmd select --set pip3 pip312
+    export OPENSSL_PREFIX="/opt/local"
+    export PKG_CONFIG_PATH="/opt/local/lib/pkgconfig:/opt/local/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
+    export CPPFLAGS="-I/opt/local/include${CPPFLAGS:+ ${CPPFLAGS}}"
+    export LDFLAGS="-L/opt/local/lib${LDFLAGS:+ ${LDFLAGS}}"
+    if [ -d /Library/Java/JavaVirtualMachines/jdk-21-macports.jdk/Contents/Home ]; then
+      export JAVA_HOME=/Library/Java/JavaVirtualMachines/jdk-21-macports.jdk/Contents/Home
+      prepend_path "${JAVA_HOME}/bin"
+    fi
+    ;;
+  homebrew)
+    ensure_homebrew
+    log "Installing macOS packages with Homebrew"
+    brew_cmd update
+    brew_cmd install bash curl gd htslib imagemagick openjdk openssl@3 pkg-config python wget
+    export OPENSSL_PREFIX="$(brew_cmd --prefix openssl@3)"
+    ;;
+  *)
+    die "Unsupported PIPELINE_MACOS_PACKAGE_MANAGER '${macos_package_manager}'; use homebrew or macports"
+    ;;
+esac
+
 prepend_path "${PIPELINE_LOCAL_DIR}/bin"
 if ! command_exists gnuplot || ! gnuplot -e 'set terminal pngcairo' >/dev/null 2>&1; then
-  if [ "${PIPELINE_MACOS_GNUPLOT:-headless}" = brew ]; then
+  if [ "${macos_package_manager}" = "macports" ]; then
+    die "MacPorts gnuplot is installed but does not provide the pngcairo terminal"
+  elif [ "${PIPELINE_MACOS_GNUPLOT:-headless}" = brew ]; then
     brew_cmd install gnuplot
   else
     brew_cmd install cairo pango

@@ -145,9 +145,11 @@ can satisfy dependencies; newly installed modules stay under `local/perl5-<platf
 
 ### macOS
 
-The installer supports Intel and Apple Silicon, provisions OpenJDK, and builds
-a local gnuplot without Qt when no PNG-capable gnuplot is available. This avoids
-lengthy GUI dependency builds on Intel Macs.
+The installer supports Intel and Apple Silicon and provisions OpenJDK. Apple
+Silicon uses Homebrew; Intel macOS 15 uses a pinned, checksum-verified MacPorts
+installer because current Homebrew releases no longer support Intel macOS.
+Set `PIPELINE_MACOS_PACKAGE_MANAGER=homebrew` only to override this selection
+for an Intel machine with a separately maintained Homebrew installation.
 
 ```bash
 bash install/install_macos.sh

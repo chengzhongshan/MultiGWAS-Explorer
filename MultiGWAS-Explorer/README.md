@@ -714,9 +714,11 @@ macOS:
 
 The macOS installer is intended to be run from the nested pipeline directory on either
 Apple Silicon or Intel macOS. It creates a repo-local Python and Perl runtime,
-uses Homebrew for compiled tools, configures SASPy for SAS OnDemand for
-Academics, and runs the same dependency smoke test used by the other native
-installers.
+uses Homebrew on Apple Silicon and MacPorts on Intel macOS 15 for compiled
+tools, configures SASPy for SAS OnDemand for Academics, and runs the same
+dependency smoke test used by the other native installers. Current Homebrew
+releases no longer support Intel macOS, so the Intel path installs a pinned
+MacPorts package only after verifying its published SHA-256 checksum.
 
 Prerequisites:
 
@@ -726,11 +728,15 @@ Prerequisites:
 xcode-select --install
 ```
 
-- Homebrew. On Apple Silicon, the installer prefers ARM Homebrew under
+- Homebrew on Apple Silicon. The installer prefers ARM Homebrew under
   `/opt/homebrew`; if only Intel Homebrew under `/usr/local` is available, the
   script warns and uses that detected install.
-- The installer provisions Homebrew OpenJDK. Set `SASPY_JAVA` or `JAVA_HOME`
-  to use a different JDK. SASPy uses Java to start the SAS ODA IOM bridge.
+- On Intel macOS 15, the installer provisions MacPorts automatically. Set
+  `PIPELINE_MACOS_PACKAGE_MANAGER=homebrew` only if you separately maintain a
+  working Intel Homebrew installation.
+- The installer provisions OpenJDK through the selected package manager. Set
+  `SASPY_JAVA` or `JAVA_HOME` to use a different JDK. SASPy uses Java to start
+  the SAS ODA IOM bridge.
 - A SAS OnDemand for Academics account if you want to run the SAS-backed
   plotting path. The local gunplot path does not need SAS ODA credentials.
 
@@ -742,9 +748,9 @@ bash install/install_macos.sh
 
 What this script does:
 
-- installs or verifies Homebrew packages:
-  - `bash`, `curl`, `gd`, `htslib`, `imagemagick`,
-    `openjdk`, `pkg-config`, `python`, and `wget`
+- installs or verifies the required Homebrew or MacPorts packages, including
+  Bash, curl, GD, htslib, ImageMagick, OpenJDK, OpenSSL, pkg-config, Python,
+  wget, and gnuplot
 - reuses gnuplot if it supports `pngcairo`; otherwise builds a checksum-verified
   gnuplot 6.0.4 locally with Cairo/Pango and without Qt. This avoids long GUI
   dependency builds on Intel Macs. Set `PIPELINE_MACOS_GNUPLOT=brew` to request
@@ -757,7 +763,7 @@ What this script does:
 - copies SASPy Java assets from
   `install/saspy-java-supplement/java/` into the active repo-local SASPy
   install before writing `saspy/sascfg_personal.py`
-- uses `bgzip` / `tabix` from Homebrew when available
+- uses `bgzip` / `tabix` from the selected package manager when available
 - runs `install/check_pipeline_install.sh`
 
 The bundled SASPy Java supplement is important on macOS. Some current SASPy
