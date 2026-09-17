@@ -1918,7 +1918,7 @@ sub compose_png_grid {
     for my $path (@images) {
         open my $fh, '<', $path or die "Cannot read $path: $!\n";
         binmode $fh;
-        my $img = GD::Image->newFromPng($fh, 1)
+        my $img = GD::Image->new($fh)
             or die "Cannot decode PNG $path\n";
         close $fh;
         push @gd_images, $img;

@@ -248,7 +248,7 @@ sub render_panel {
         @plot_clauses = (
             qq{"$data_path" using 2:1:3:4 with xerrorbars lw 1.2 lc rgb "#4f67b0"},
             qq{"" using 2:1 with points pt 7 ps $point_size lc rgb "#4f67b0"},
-            qq{"" using ((\$5 == 1) ? \$2 : 1/0):1:7 with labels center tc rgb "#111111" font "Sans,@{[$args{y_font_size} + 1]}"},
+            qq{"" using 2:1:((\$5 == 1) ? "*" : "") with labels center tc rgb "#111111" font "Sans,@{[$args{y_font_size} + 1]}"},
         );
     } else {
         @plot_clauses = (
@@ -258,7 +258,7 @@ sub render_panel {
             qq{"" using ((strcol(6) eq "DIFFERENTIAL") ? \$2 : 1/0):1 with points pt 7 ps $point_size lc rgb "#c0504d"},
             qq{"" using ((strcol(6) ne "COMMON" && strcol(6) ne "DIFFERENTIAL") ? \$2 : 1/0):1:3:4 with xerrorbars lw 1.2 lc rgb "#666666"},
             qq{"" using ((strcol(6) ne "COMMON" && strcol(6) ne "DIFFERENTIAL") ? \$2 : 1/0):1 with points pt 7 ps $point_size lc rgb "#666666"},
-            qq{"" using ((\$5 == 1) ? \$2 : 1/0):1:7 with labels center tc rgb "#111111" font "Sans,@{[$args{y_font_size} + 1]}"},
+            qq{"" using 2:1:((\$5 == 1) ? "*" : "") with labels center tc rgb "#111111" font "Sans,@{[$args{y_font_size} + 1]}"},
         );
     }
     my @separator_cmds;

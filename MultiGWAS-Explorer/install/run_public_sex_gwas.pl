@@ -85,7 +85,7 @@ sub verify_images {
   for my $name (@names) {
    my $path="$folder/$name";
    open my $fh,'<:raw',$path or die $!;
-   my $im=GD::Image->newFromPng($fh,1) or die "Invalid PNG: $path\n";
+   my $im=GD::Image->new($fh) or die "Invalid PNG: $path\n";
    close $fh;
    die "Unexpectedly small PNG: $path\n" if $im->width<100 || $im->height<100;
    my $family=$name=~/forest/i?'forest':$name=~/gtf/i?'local_gtf':$name=~/local/i?'local_manhattan':'manhattan';

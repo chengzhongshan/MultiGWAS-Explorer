@@ -15,7 +15,7 @@ my $rc=system($^X,"$Bin/../DiffGWASDeps/gnuplot/pdl_gunplot_forest.pl",
  '--track-p-vars','P','--width',900,'--height',420);
 is($rc,0,'forest renderer succeeds');
 open my $fh,'<:raw',"$dir/forest_single_snp.png" or die $!;
-my $im=GD::Image->newFromPng($fh,1) or die 'Invalid PNG'; close $fh;
+my $im=GD::Image->new($fh) or die 'Invalid PNG'; close $fh;
 # Exclude the plot borders and data area: decoding alone cannot detect lost text.
 cmp_ok(ink($im,20,40,140,360),'>',20,'cohort labels are visible in the left margin');
 cmp_ok(ink($im,220,385,680,410),'>',20,'x-axis title is visible below the plot');
