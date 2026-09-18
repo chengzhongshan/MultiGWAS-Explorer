@@ -433,8 +433,11 @@ For a new project, copy/adapt the script templates in this skill's `scripts/` fo
 - For local GTF reruns, also verify the SAS log reports a non-zero exon count.
 - Keep LD rendering disabled unless the request explicitly asks for it. For an
   LD heatmap, preserve numeric HaploReg r2 values, use a sequential palette and
-  a separately titled `LD r2 (population)` inset, and retain the association
-  Z-score palette/legend unchanged. Verify both legends when both encodings are
+  a separately titled `LD r2 to reference (population)` inset, and retain the
+  association Z-score palette/legend unchanged. For multiple query SNPs in one
+  locus, use only one query as the LD reference (the first by default, or the
+  explicit `--local-ld-reference-snp`/`--ld-reference-snp`) and never merge r2
+  values from multiple references. Verify both legends when both encodings are
   present.
 - For forest plots, verify the requested top-hit CSV, manifest TSV, PNG panel
   count, and left/right y-axis labeling mode.

@@ -30,6 +30,30 @@ effects, and generate shareable genome-wide and local visualizations.
   `--target-snps`.
 - Supports both direct command-line use and MCP-driven orchestration.
 
+## Cleaning temporary files
+
+After pipeline jobs finish, preview disposable local intermediates with:
+
+```bash
+perl clean_pipeline_temporary_files.pl --workdir .
+```
+
+The default minimum age is 24 hours. To clean immediately after **all jobs
+using that directory have stopped**, preview and then apply:
+
+```bash
+perl clean_pipeline_temporary_files.pl --workdir . --min-age-hours 0
+perl clean_pipeline_temporary_files.pl --workdir . --min-age-hours 0 --apply
+```
+
+Deletion is permanent and limited to recognized generated scripts, temporary
+subsets, helper JSON files, and flat upload staging directories. Final figures,
+reports, run directories/logs, inputs, configurations, reusable caches,
+Git-tracked files, and symlinks are preserved. Run this command separately for
+each output directory; it does not clean remote SAS ODA storage. Keep the
+temporary scripts when investigating a failed run. The script does not detect
+running jobs; do not invoke cleanup concurrently with the pipeline.
+
 ## Main Entry Points
 
 - `auto_prepare_and_run_diff_gwas.pl`
