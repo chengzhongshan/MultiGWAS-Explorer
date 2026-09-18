@@ -2926,7 +2926,7 @@ sub build_runner_config {
     my $default_gtf_colorbar_label = (
         $highlight_high_ld_snps
           && $local_ld_display_mode =~ /^(?:heatmap|both)$/i
-    ) ? 'Signed LD r2 (r2 x sign(Z); 1000 Genomes Phase 3 / PLINK2)'
+    ) ? 'Signed LD r2 (r2 x sign(Z), 1000 Genomes Phase 3 / PLINK2)'
       : infer_effect_metric_label_from_vars(map { $_->{zvar} } @selected_tracks);
 
     my @focus_tracks = @selected_std_tracks ? @selected_std_tracks : @selected_group_tracks;
@@ -3196,8 +3196,8 @@ sub build_runner_config {
         GTF_LD_HEATMAP_COLORS => $local_ld_heatmap_colors,
         GTF_LD_HEATMAP_LEGEND_TITLE => (
             length($local_ld_reference_snp)
-              ? "Signed LD r2 to $local_ld_reference_snp ($local_ld_population_label; 1000G Phase 3 / PLINK2)"
-              : "Signed LD r2 ($local_ld_population_label; 1000G Phase 3 / PLINK2)"
+              ? "Signed LD r2 to $local_ld_reference_snp ($local_ld_population_label, 1000G Phase 3 / PLINK2)"
+              : "Signed LD r2 ($local_ld_population_label, 1000G Phase 3 / PLINK2)"
         ),
         HIGHLIGHT_HIGH_LD_SNPS => $highlight_high_ld_snps,
         LOCAL_LD_CACHE_TSV => (

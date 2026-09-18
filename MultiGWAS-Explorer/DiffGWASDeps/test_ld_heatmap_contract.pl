@@ -111,6 +111,13 @@ my $sas_auto_path = File::Spec->catfile($root, 'auto_prepare_and_run_diff_gwas.p
 open my $sas_auto_fh, '<:raw', $sas_auto_path or die "Cannot read $sas_auto_path: $!\n";
 my $sas_auto_text = do { local $/; <$sas_auto_fh> };
 close $sas_auto_fh;
+for my $unsafe_label (
+    'sign(Z); 1000 Genomes',
+    '$local_ld_population_label; 1000G',
+) {
+    die "SAS label defaults contain an unquoted statement-ending semicolon: $unsafe_label\n"
+        if index($sas_auto_text, $unsafe_label) >= 0;
+}
 for my $forbidden (
     'query_snps => join(\',\', @configured_target_snps)',
     'local_ld_cache_is_multi',
