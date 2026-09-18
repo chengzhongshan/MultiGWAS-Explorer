@@ -47,12 +47,14 @@ perl clean_pipeline_temporary_files.pl --workdir . --min-age-hours 0 --apply
 ```
 
 Deletion is permanent and limited to recognized generated scripts, temporary
-subsets, helper JSON files, and flat upload staging directories. Final figures,
-reports, run directories/logs, inputs, configurations, reusable caches,
-Git-tracked files, and symlinks are preserved. Run this command separately for
-each output directory; it does not clean remote SAS ODA storage. Keep the
-temporary scripts when investigating a failed run. The script does not detect
-running jobs; do not invoke cleanup concurrently with the pipeline.
+subsets, helper JSON files, flat upload staging directories, and timestamped
+`run_local_hits_with_gtf_YYYYMMDD_HHMMSS` diagnostic directories (including
+their `_partN` directories). Final figures and reports stored outside those run
+directories, inputs, configurations, reusable caches, Git-tracked files, and
+symlinks are preserved. Run this command separately for each output directory;
+it does not clean remote SAS ODA storage. Keep the run directories when
+investigating a failed run. The script does not detect running jobs; do not
+invoke cleanup concurrently with the pipeline.
 
 ## Main Entry Points
 

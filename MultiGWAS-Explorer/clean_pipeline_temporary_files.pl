@@ -17,10 +17,11 @@ Add --apply to permanently delete the listed files. After ALL pipeline jobs
 using this directory have stopped, --min-age-hours 0 includes recent files.
 Run once per output/work directory. No SAS ODA remote files are touched.
 
-Only known generated scripts, intermediate subsets, helper JSON files and
-timestamped upload staging directories are considered. Git-tracked files,
-symlinks, final results, run/log directories, configs, inputs and caches are
-preserved. Unknown files inside an upload directory preserve that directory.
+Only known generated scripts, intermediate subsets, helper JSON files,
+timestamped upload staging directories, and timestamped
+run_local_hits_with_gtf directories are considered. Git-tracked files,
+symlinks, final results outside those run directories, configs, inputs and
+caches are preserved. Unknown files inside an upload directory preserve it.
 HELP
     exit 0;
 }
@@ -49,6 +50,7 @@ my $stamp = qr/\d{8}_\d{6}/;
 sub temporary_file {
     my ($name) = @_;
     return $name =~ /\A(?:sas_inline_(?:code|runner|result)|sas_submit_(?:result|worker_result|worker_code))_[A-Za-z0-9]{4}\.(?:sas|py|json)\z/
+        || $name =~ /\Asas_action_(?:result_[A-Za-z0-9]{4}\.json|runner_[A-Za-z0-9]{4}\.py)\z/
         || $name =~ /\A(?:auto_(?:gtf|wide)_import_(?:single_snp|local_hits_with_gtf)|run_sas_local_debug_local_top_hits_with_gtf|run_sas_oda_(?:local_top_hits_with_gtf|single_snp_with_gtf))\.$stamp(?:\.part\d+)?\.sas\z/
         || $name =~ /\A(?:local_gtf_subset_local_hits|target_snp_augmented_local_(?:gtf|mh))_$stamp\.tsv(?:\.gz)?\z/
         || $name =~ /\Asingle_snp_ld_augmented_rs\d+_$stamp\.tsv\.gz\z/;
@@ -63,10 +65,46 @@ sub eligible {
 opendir my $dh, '.' or die "Cannot list $root: $!\n";
 my @names = sort readdir $dh;
 closedir $dh;
+sub collect_run_tree {
+    my ($top) = @_;
+    my (@tree_files, @tree_dirs);
+    my $valid = 1;
+    my $walk;
+    $walk = sub {
+        my ($dir) = @_;
+        my @dir_st = lstat $dir;
+        if (!@dir_st || -l _ || !-d _ || $dir_st[9] > $cutoff) {
+            $valid = 0;
+            return;
+        }
+        opendir my $run_dh, $dir or die "Cannot list $dir: $!\n";
+        my @children = grep { $_ ne '.' && $_ ne '..' } readdir $run_dh;
+        closedir $run_dh;
+        for my $child (@children) {
+            my $path = "$dir/$child";
+            if (-l $path) { $valid = 0; next; }
+            if (-d $path) { $walk->($path); next; }
+            if (-f $path && eligible($path)) { push @tree_files, $path; next; }
+            $valid = 0;
+        }
+        push @tree_dirs, $dir;
+    };
+    $walk->($top);
+    return $valid ? (\@tree_files, \@tree_dirs) : (undef, undef);
+}
+
 my (@files, @dirs);
 for my $name (@names) {
     next if -l $name;
     if (temporary_file($name) && eligible($name)) { push @files, $name; next; }
+    if (-d $name && $name =~ /\Arun_local_hits_with_gtf_$stamp(?:_part\d+)?\z/) {
+        my ($run_files, $run_dirs) = collect_run_tree($name);
+        if ($run_files) {
+            push @files, @$run_files;
+            push @dirs, @$run_dirs;
+        }
+        next;
+    }
     next unless -d $name && $name =~ /\Aupload_(?:local_hits_with_gtf_manifest|top_hits_batches|manhattan_png_macro|manhattan_subset|forest_macros|forest_top_hits_csv|single_snp_with_gtf_support|local_hits_support|local_hits_subset|local_hits_requested_csv)_$stamp(?:_try\d+)?\z/;
     opendir my $stage, $name or die "Cannot list $name: $!\n";
     my @children = grep { $_ ne '.' && $_ ne '..' } readdir $stage;
@@ -85,10 +123,10 @@ for my $path (sort @files) {
     print(($apply ? 'DELETE' : 'WOULD DELETE'), "\t$path\n");
     unlink $path or die "Cannot remove $path: $!\n" if $apply;
 }
-for my $path (sort @dirs) {
+for my $path (@dirs) {
     print(($apply ? 'RMDIR' : 'WOULD RMDIR'), "\t$path\n");
     rmdir $path or die "Cannot remove empty $path: $!\n" if $apply;
 }
-printf "%s: %d files, %d empty staging directories, %.2f MiB.\n",
+printf "%s: %d files, %d directories, %.2f MiB.\n",
     ($apply ? 'Removed' : 'Preview'), scalar(@files), scalar(@dirs), $bytes / 1048576;
 print "No files deleted. Use --apply after all pipeline jobs have stopped.\n" unless $apply;
