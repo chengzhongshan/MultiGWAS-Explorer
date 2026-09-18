@@ -57,6 +57,15 @@ ensure_macports() {
   prepend_path /opt/local/bin
 }
 
+persist_github_actions_path() {
+  local dir=""
+  [ -n "${GITHUB_PATH:-}" ] || return 0
+  for dir in "$@"; do
+    [ -d "${dir}" ] || continue
+    printf '%s\n' "${dir}" >> "${GITHUB_PATH}"
+  done
+}
+
 macports_cmd() {
   sudo /opt/local/bin/port -N "$@"
 }
@@ -130,6 +139,10 @@ fi
 case "${macos_package_manager}" in
   macports)
     ensure_macports
+    # GitHub Actions starts every workflow step in a fresh non-login shell.
+    # Publish the MacPorts paths so the following rendering step can find the
+    # dependencies that this step just installed.
+    persist_github_actions_path /opt/local/bin /opt/local/sbin
     log "Installing Intel macOS packages with MacPorts"
     macports_cmd selfupdate
     macports_cmd install \
