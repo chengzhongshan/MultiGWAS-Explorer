@@ -335,6 +335,24 @@ perl ./auto_prepare_and_run_diff_gwas.pl \
   --target-snps rs185665940
 ```
 
+### Forest gene labels
+
+Explicit `--target-snps` requests also annotate missing genes from the cached
+GTF for the resolved reference build (for example, hg19 uses
+`cache/gtf/gencode.v49lift37.annotation.gtf.gz`). Manual
+`--target-snp-genes rs185665940:GENE` labels take priority. Otherwise the lookup
+prefers overlapping protein-coding genes, then other overlapping genes, then
+the nearest protein-coding gene, then the nearest other gene on that chromosome.
+These are positional annotations, not evidence of a causal gene. Missing
+annotation remains `NA`; chromosome 23 is matched to GTF chromosome X.
+
+The SAS right-side labels share the SNP row coordinates, so repeated genes or
+`NA` values appear on each corresponding row instead of collapsing into one
+category. Forest steps regenerate their top-hit CSV by default. Rerun an old
+plot with `--force` to refresh annotations; set `REUSE_FOREST_TOP_HITS_CSV=1`
+only when intentionally retaining an existing CSV. The GTF must already be
+cached, for example by the local-GTF plotting step.
+
 ## Supplementary Table Regeneration
 
 The manuscript-table helper now treats the supplementary common-hit and
@@ -553,6 +571,32 @@ launching a pipeline Perl script, so stale DLLs cannot be loaded first.
 SASPy ODA also needs a Java runtime. Install a Windows JDK and set `JAVA_HOME`
 or `SASPY_JAVA_WIN` before installing. The smoke test runs Java and reports a
 missing or unusable executable, but does not open an actual ODA session.
+
+The Cygwin repair harness also regenerates `saspy/sascfg_personal.py` for the
+current checkout. Moving or copying a local Python environment can leave an
+empty Java setting or absolute JAR paths pointing at the previous checkout;
+Perl imports can pass while SASPy login hangs. The installation check now
+verifies the Java setting and every configured JAR path. After repair, test
+your saved ODA credentials without putting passwords on the command line:
+
+```bash
+source install/common.sh
+activate_perl_env
+activate_python_env
+perl run_sas_codes_or_script_in_ODA.pl --check-sas-oda-login-only
+```
+
+For a prepared public sex-GWAS test directory, validate all four remote SAS
+plot families and downloaded PNGs with:
+
+```bash
+perl install/run_public_sex_gwas.pl --output-dir public-gwas-test \
+  --phase plots --backend sas
+```
+
+This test disables gnuplot fallback. The SAS local-GTF runner passes the
+resolved reference build to the annotation extractor, including `hg19` for
+the public schizophrenia data and the GENCODE GRCh37/lift37 annotation.
 
 ### Ubuntu / Linux Pipeline Install
 

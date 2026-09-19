@@ -171,7 +171,7 @@ my ($header, $rows) = build_export_rows(
     focus_pvar      => $focus_pvar,
     target_snp_genes => ($opt{target_snp_genes} || $runner->{TARGET_SNP_GENES} || ''),
     gene_annotation_gtf => $gene_annotation_gtf,
-    annotate_missing_genes => length($target_snps) ? 0 : 1,
+    annotate_missing_genes => 1,
 );
 
 write_csv(

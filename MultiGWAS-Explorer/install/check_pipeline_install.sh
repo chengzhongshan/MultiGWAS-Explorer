@@ -40,6 +40,10 @@ fi
 "${PIPELINE_PYTHON_BIN}" - <<'PY'
 import PIL
 import saspy
+import os
+import shutil
+import subprocess
+import sys
 print("python imports ok")
 cfg_names = None
 try:
@@ -51,6 +55,25 @@ except Exception:
     personal_cfg = None
 if not cfg_names or 'oda' not in cfg_names:
     raise SystemExit("saspy ODA config was not provisioned in the repo-local install")
+oda_cfg = getattr(personal_cfg, 'oda', None)
+if not isinstance(oda_cfg, dict):
+    raise SystemExit("saspy ODA profile is missing its oda configuration dictionary")
+if not oda_cfg.get('java'):
+    raise SystemExit("saspy ODA profile has no Java executable; rerun the platform installer")
+if 'saspyiom.jar' not in (oda_cfg.get('classpath') or ''):
+    raise SystemExit("saspy ODA profile has no usable IOM classpath; rerun the platform installer")
+def local_path(path):
+    if sys.platform == 'cygwin' and len(path) > 2 and path[1] == ':':
+        return subprocess.check_output(['cygpath', '-u', path], text=True).strip()
+    return path
+
+java_path = local_path(oda_cfg['java'])
+if not os.path.isfile(java_path) and not shutil.which(java_path):
+    raise SystemExit("saspy ODA Java path does not exist; rerun the platform installer")
+separator = ';' if sys.platform in ('cygwin', 'win32') else ':'
+for jar in oda_cfg['classpath'].split(separator):
+    if jar and not os.path.isfile(local_path(jar)):
+        raise SystemExit("saspy ODA classpath contains a missing JAR; rerun the platform installer: " + jar)
 PY
 
 if command_exists cygpath; then
@@ -90,9 +113,11 @@ perl DiffGWASDeps/test_ld_cache_queries.pl >/dev/null
 perl install/test_sort_long_gwas.pl >/dev/null
 perl install/test_precomputed_paths.pl >/dev/null
 perl install/test_forest_text.pl
+perl install/test_requested_hit_genes.pl
 "${BASH:-bash}" -n DiffGWASDeps/run_sas_oda_manhattan4diffgwas_download_png.sh
 "${BASH:-bash}" -n DiffGWASDeps/run_sas_oda_local_top_hits_manhattan_download_png.sh
 "${BASH:-bash}" -n DiffGWASDeps/run_sas_oda_local_top_hits_with_gtf_download_html.sh
+"${BASH:-bash}" -n DiffGWASDeps/run_sas_oda_top_hits_forest_plot_download_html.sh
 
 log "Pipeline dependency smoke test completed successfully"
 log "Local dependencies and synthetic plotting passed; SAS ODA login was not tested"

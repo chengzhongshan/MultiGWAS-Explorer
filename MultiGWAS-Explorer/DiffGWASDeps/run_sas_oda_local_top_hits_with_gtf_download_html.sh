@@ -1580,6 +1580,7 @@ if [[ ${#gtf_region_args[@]} -gt 0 ]]; then
     echo "[prep] Building local GTF subset from ${gtf_region_source:-region list} using window ${LOCAL_GTF_WINDOW_BP}..."
     gtf_subset_cmd=(
       perl "${GTF_SUBSET_HELPER}"
+      --reference-build "${REFERENCE_BUILD}"
       --gtf-url "${GTF_GZ_URL}"
       --cache-dir "${GTF_CACHE_DIR}"
       --output "${LOCAL_GTF_SUBSET}"

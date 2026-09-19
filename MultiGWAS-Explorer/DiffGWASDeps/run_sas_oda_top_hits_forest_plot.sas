@@ -148,6 +148,8 @@ run;
 %mend;
 
 %macro render_forest_panel(track_order=, track_id=, track_label=, beta_var=, se_var=, p_var=);
+  %local forest_panel_n forest_sep_values;
+  %let forest_sep_values=;
   data forest_panel_pre;
     set forest_hits;
     length forest_marker $128 forest_gene_label $256 forest_hit_class2 $32;

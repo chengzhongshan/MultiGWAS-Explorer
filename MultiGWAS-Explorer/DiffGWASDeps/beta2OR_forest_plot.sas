@@ -159,13 +159,10 @@ yaxis label="&marker_label" labelattrs=(size=&both_y_font_size) valueattrs=(size
 refline &y_refline_values / axis=y lineattrs=(&y_refline_lineattrs);
 %end;
 
-*Draw y2axis with a different variable used to label y2axis with italic font on the right;
-*Note: the same x but different y variables are used to only draw dots by group;
+*Align labels to SNP rows so repeated genes or NA values cannot collapse categories;
 %if %length(&y2axis_ticket_var)>0 %then %do;
-*Note: decrease the dot size to minimum, as we only want the addition of y2axis;
-scatter x=effect y=&y2axis_ticket_var /y2axis group=grp markerattrs=(symbol=circleFilled size=0.1) grouporder=ASCENDING attrid=grp;
-y2axis labelattrs=(size=&both_y_font_size style=italic) valueattrs=(size=&both_y_font_size style=italic) type=discrete display=(nolabel noticks)           
-            offsetmax=&yoffsetmax offsetmin=&yoffsetmin grid gridattrs=(color=gray pattern=thindot thickness=1);
+yaxistable &y2axis_ticket_var / y=new_grp_var position=right location=outside
+  nolabel valueattrs=(size=&both_y_font_size style=italic);
 %end;
 
 %if &autolegend=1 %then %do;

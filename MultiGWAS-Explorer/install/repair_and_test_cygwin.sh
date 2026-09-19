@@ -19,6 +19,7 @@ log "Perl archname: $(perl -MConfig -e 'print $Config{archname}')"
 ensure_perl_abi_compatible
 activate_perl_env
 activate_python_env
+configure_saspy_oda_profile
 ensure_cpanm
 
 # A Perl ABI change resets the complete repo-local module tree above. Install
