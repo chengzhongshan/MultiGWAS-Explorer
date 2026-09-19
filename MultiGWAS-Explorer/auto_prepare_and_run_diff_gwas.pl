@@ -807,7 +807,7 @@ if ($source_mode eq 'raw_pgc_vcf_sumstats') {
       {
         name        => 'sort_long',
         description => 'Sort merged long GWAS by coordinate and create bgzip/tabix outputs',
-        command     => qq{"$bash_path" -lc 'cd "$workdir" && INPUT_GZ="$generated->{merge_output}" OUTPUT_GZ="$generated->{sorted_output}" EXCLUDED_GZ="$generated->{excluded_output}" TMPDIR_SORT="$generated->{sort_tmpdir}" "$deps_dir/sort_long_gwas_by_coord.sh"'},
+        command     => qq{"$bash_path" -lc 'cd "$workdir" && HTSBIN="$workdir/local/bin" PATH="$workdir/local/bin:\$PATH" INPUT_GZ="$generated->{merge_output}" OUTPUT_GZ="$generated->{sorted_output}" EXCLUDED_GZ="$generated->{excluded_output}" TMPDIR_SORT="$generated->{sort_tmpdir}" "$deps_dir/sort_long_gwas_by_coord.sh"'},
         outputs     => [ $generated->{sorted_output}, "$generated->{sorted_output}.tbi", $generated->{excluded_output} ],
       },
       {

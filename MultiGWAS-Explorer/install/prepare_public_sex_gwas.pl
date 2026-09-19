@@ -40,10 +40,13 @@ for my $f (@files) {
  my $url="https://ndownloader.figshare.com/files/$id";
  my $downloaded=0;
  if (!-f $path) {
-  die "Missing source file: $path\n" if $reuse;
-  $path.='.part';
-  print "Downloading $url\n";
-  system('curl','--fail','--location','--retry','3','--output',$path,$url)==0
+ die "Missing source file: $path\n" if $reuse;
+ $path.='.part';
+ print "Downloading $url\n";
+  my @curl = ('curl','--fail','--location','--retry','3');
+  push @curl, '--insecure'
+    if ($ENV{PIPELINE_CURL_INSECURE} // '') =~ /^(?:1|true|yes|y|on)$/i;
+  system(@curl,'--output',$path,$url)==0
     or die "Download failed: $url\n";
   $downloaded=1;
  }
