@@ -528,6 +528,18 @@ of Linux-built repo-local Perl modules from a Cygwin shell, which caused
 stack now avoids that by preferring `local/perl5-cygwin/` on portable Cygwin
 instead of sharing one generic `local/perl5/` tree across operating systems.
 
+If portable Cygwin later upgrades Perl, rerun `bash install/install_cygwin.sh`
+before starting the pipeline. The installer load-tests and, when necessary,
+rebuilds `Inline::Python`, `Compress::Raw::Zlib`, `Compress::Raw::Bzip2`, and
+their `IO::Compress`/`IO::Uncompress` modules against the active Cygwin Perl.
+This repairs errors that mention a missing `Zlib.dll`, `Bzip2.dll`, or an older
+`cygperl` DLL. Confirm the repaired environment with:
+
+```bash
+bash install/check_pipeline_install.sh
+bash install/run_plotting_example.sh
+```
+
 SASPy ODA also needs a Java runtime. Install a Windows JDK and set `JAVA_HOME`
 or `SASPY_JAVA_WIN` before installing. The smoke test runs Java and reports a
 missing or unusable executable, but does not open an actual ODA session.

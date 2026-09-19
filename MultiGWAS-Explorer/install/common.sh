@@ -819,6 +819,14 @@ install_cygwin_legacy_perl_deps() {
     fi
     modules+=(Inline::Python)
   fi
+  if ! perl -MCompress::Raw::Zlib -MIO::Uncompress::Gunzip -e1 >/dev/null 2>&1; then
+    # These XS modules can also remain linked to the previous cygperl DLL when
+    # the portable Cygwin runtime upgrades Perl in place.
+    modules+=(Compress::Raw::Zlib IO::Compress::Gzip)
+  fi
+  if ! perl -MCompress::Raw::Bzip2 -MIO::Uncompress::Bunzip2 -e1 >/dev/null 2>&1; then
+    modules+=(Compress::Raw::Bzip2 IO::Compress::Bzip2)
+  fi
   [ "${#modules[@]}" -gt 0 ] || return 0
   log "Repairing Cygwin Perl compatibility modules: ${modules[*]}"
   perl "${PIPELINE_CPANM_BIN}" \
@@ -828,6 +836,9 @@ install_cygwin_legacy_perl_deps() {
     --reinstall \
     "${modules[@]}"
   activate_perl_env
+  perl -MJSON -MInline::Python -e1
+  perl -MCompress::Raw::Zlib -MIO::Uncompress::Gunzip -e1
+  perl -MCompress::Raw::Bzip2 -MIO::Uncompress::Bunzip2 -e1
 }
 
 install_pdl_perl_deps() {
