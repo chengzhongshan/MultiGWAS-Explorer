@@ -541,6 +541,10 @@ bash install/check_pipeline_install.sh
 bash install/run_plotting_example.sh
 ```
 
+To repair all known Cygwin Perl-upgrade issues and run both checks in one pass,
+use `bash install/repair_and_test_cygwin.sh`. Complete output is retained in
+`cygwin-repair-test.log` for troubleshooting.
+
 SASPy ODA also needs a Java runtime. Install a Windows JDK and set `JAVA_HOME`
 or `SASPY_JAVA_WIN` before installing. The smoke test runs Java and reports a
 missing or unusable executable, but does not open an actual ODA session.
