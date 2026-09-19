@@ -67,6 +67,9 @@ pdl_version="$(perl -MPDL -e 'print $PDL::VERSION')" || die "PDL cannot load. Us
 log "GD version: $gd_version"
 log "PDL version: $pdl_version"
 perl -e "require JSON::PP; require JSON::MaybeXS; require File::Which; require DBI; require DBD::SQLite; require GD; require Mojolicious::Lite; require MCP::Server; require PDL; require Text::CSV; 1;" >/dev/null
+if command_exists uname && uname -s | grep -qi '^CYGWIN'; then
+  perl -e "require JSON; require Inline::Python; 1;" >/dev/null
+fi
 perl -I DiffGWASDeps -MSAS_ODA_Runner -e "print qq{SAS_ODA_Runner ok\n};"
 perl -MIO::Socket::SSL -MNet::SSLeay -MHTTP::Tiny -e 'my ($ok, $why) = HTTP::Tiny->can_ssl; die "Perl HTTPS unavailable: $why\n" unless $ok; print "Perl HTTPS support ok\n";'
 perl DiffGWASDeps/test_sas_oda_debug_macro_guard.pl >/dev/null

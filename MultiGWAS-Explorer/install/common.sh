@@ -789,9 +789,44 @@ install_perl_deps() {
   if [ "${needs_pdl}" -eq 1 ]; then
     install_pdl_perl_deps
   fi
+  install_cygwin_legacy_perl_deps
   if [ -n "${cpanfile_to_use}" ] && [ "${cpanfile_to_use}" != "${PIPELINE_CPANFILE}" ]; then
     rm -f "${cpanfile_to_use}"
   fi
+  activate_perl_env
+}
+
+install_cygwin_legacy_perl_deps() {
+  local modules=()
+  local perl_lib="${PIPELINE_PERL_LOCAL_DIR}/lib/perl5"
+  if ! command_exists uname || ! uname -s | grep -qi '^CYGWIN'; then
+    return 0
+  fi
+  activate_perl_env
+  if ! perl -MJSON -e1 >/dev/null 2>&1; then
+    modules+=(JSON)
+  fi
+  if ! perl -MInline::Python -e1 >/dev/null 2>&1; then
+    # Inline::Python is a compiled module. After a Cygwin Perl upgrade, an
+    # existing local build can still be present but linked to an old cygperl DLL.
+    rm -rf "${PIPELINE_ROOT}/_Inline"
+    if [ -d "${perl_lib}" ]; then
+      find "${perl_lib}" \( \
+        -path '*/auto/Inline/Python' -o \
+        -path '*/Inline/Python.pm' -o \
+        -path '*/Inline/Python.pod' \
+      \) -exec rm -rf {} +
+    fi
+    modules+=(Inline::Python)
+  fi
+  [ "${#modules[@]}" -gt 0 ] || return 0
+  log "Repairing Cygwin Perl compatibility modules: ${modules[*]}"
+  perl "${PIPELINE_CPANM_BIN}" \
+    --mirror "${PIPELINE_CPAN_MIRROR}" --mirror-only \
+    --local-lib "${PIPELINE_PERL_LOCAL_DIR}" \
+    --notest \
+    --reinstall \
+    "${modules[@]}"
   activate_perl_env
 }
 
