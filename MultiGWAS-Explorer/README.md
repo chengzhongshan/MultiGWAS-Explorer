@@ -348,7 +348,9 @@ annotation remains `NA`; chromosome 23 is matched to GTF chromosome X.
 
 The SAS right-side labels share the SNP row coordinates, so repeated genes or
 `NA` values appear on each corresponding row instead of collapsing into one
-category. Forest steps regenerate their top-hit CSV by default. Rerun an old
+category. Both SAS and gnuplot forest steps regenerate their top-hit CSV by
+default, including CSVs created before explicit-SNP annotation was enabled.
+The gnuplot path also refreshes panels when that CSV changes. Rerun an old
 plot with `--force` to refresh annotations; set `REUSE_FOREST_TOP_HITS_CSV=1`
 only when intentionally retaining an existing CSV. The GTF must already be
 cached, for example by the local-GTF plotting step.

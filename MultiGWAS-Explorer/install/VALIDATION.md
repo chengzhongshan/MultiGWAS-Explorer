@@ -131,6 +131,22 @@ The final forest SAS log had no ERROR, FATAL, or WARNING diagnostics. The
 earlier all-NA rendering was retained locally as a repeated-label regression
 artifact; test images and public GWAS data are not committed.
 
+## Gnuplot forest follow-up (2026-09-19)
+
+The gnuplot panels still used a pre-fix CSV with empty gene fields. Unlike the
+SAS macro, the gnuplot renderer already assigned right-axis labels to numeric
+SNP row coordinates; its remaining problem was unconditional cache reuse.
+The gnuplot wrapper now regenerates the CSV by default, with intentional reuse
+available through `REUSE_FOREST_TOP_HITS_CSV=1`. Regenerated CSVs trigger panel
+and combined-image rendering explicitly, even if file timestamps coincide.
+
+A public sex-GWAS forest rerun without `--force` refreshed the old CSV and both
+panels. The combined image was inspected: ZSCAN12, CYP26B1, and TENM1 are
+visible and aligned with the correct SNPs in both sexes. The extended
+`install/test_forest_text.pl` passed eight checks, including repeated gene
+names at distinct row coordinates and nonblank text in all three right-margin
+row regions.
+
 ## Limits
 
 The CI smoke checks do not authenticate to SAS OnDemand, upload data, validate full

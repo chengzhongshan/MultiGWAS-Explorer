@@ -698,7 +698,9 @@ sub plot_forest {
     $top_hits_csv_name = gunplotize_name($top_hits_csv_name);
     my $top_hits_csv_path = File::Spec->catfile($args{output_dir}, $top_hits_csv_name);
 
-    if ($args{force} || !-s $top_hits_csv_path) {
+    my $reuse_forest_csv = ($ENV{REUSE_FOREST_TOP_HITS_CSV} // '0') eq '1';
+    my $regenerate_csv = $args{force} || !$reuse_forest_csv || !-s $top_hits_csv_path;
+    if ($regenerate_csv) {
         my @cmd = (
             $^X,
             File::Spec->catfile($Bin, 'DiffGWASDeps', 'generate_requested_top_hits_csv.pl'),
@@ -727,7 +729,7 @@ sub plot_forest {
         print "[skip] reusing existing gunplot forest top-hit CSV $top_hits_csv_path\n";
     }
 
-    my $need_render = $args{force} || !-s $manifest_path;
+    my $need_render = $regenerate_csv || !-s $manifest_path;
     if (!$need_render) {
         my @panels = read_forest_manifest_rows($manifest_path);
         my @expected_pngs = map { File::Spec->catfile($args{output_dir}, $_->{png_file}) }
@@ -780,7 +782,7 @@ sub plot_forest {
     my $combined_png = '';
     if (@images > 1) {
         $combined_png = $out_prefix_path . '_combined.png';
-        if ($args{force} || !target_is_newer_than_inputs($combined_png, map { $_->{image} } @images)) {
+        if ($need_render || !target_is_newer_than_inputs($combined_png, map { $_->{image} } @images)) {
             compose_png_grid(
                 output_png => $combined_png,
                 images     => [ map { $_->{image} } @images ],

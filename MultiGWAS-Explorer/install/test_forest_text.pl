@@ -19,6 +19,27 @@ my $im=GD::Image->new($fh) or die 'Invalid PNG'; close $fh;
 # Exclude the plot borders and data area: decoding alone cannot detect lost text.
 cmp_ok(ink($im,20,40,140,360),'>',20,'cohort labels are visible in the left margin');
 cmp_ok(ink($im,220,385,680,410),'>',20,'x-axis title is visible below the plot');
+open $csv,'>',"$dir/multi.csv" or die $!;
+print {$csv} "SNP,gene,hit_class,BETA,SE,P\n",
+ "rs1,ZSCAN12,DIFFERENTIAL,0.1,0.05,0.04\n",
+ "rs2,ZSCAN12,DIFFERENTIAL,0.2,0.05,0.01\n",
+ "rs3,TENM1,DIFFERENTIAL,-0.1,0.05,0.04\n";
+close $csv;
+$rc=system($^X,"$Bin/../DiffGWASDeps/gnuplot/pdl_gunplot_forest.pl",
+ '--csv',"$dir/multi.csv",'--out-prefix',"$dir/multi",'--track-ids','TEST',
+ '--track-labels','Test_cohort','--track-beta-vars','BETA','--track-se-vars','SE',
+ '--track-p-vars','P','--width',900,'--height',420);
+is($rc,0,'multi-SNP forest renderer succeeds');
+open my $gp,'<',"$dir/multi_TEST.gp" or die $!;
+my $script=do {local $/; <$gp>}; close $gp;
+like($script,qr/set y2tics[^\n]*"ZSCAN12" 1, "ZSCAN12" 2, "TENM1" 3/,
+ 'right-axis gene symbols retain distinct SNP row coordinates');
+open $fh,'<:raw',"$dir/multi_TEST.png" or die $!;
+$im=GD::Image->new($fh) or die 'Invalid multi-SNP PNG'; close $fh;
+for my $band ([40,140],[140,250],[250,360]) {
+ cmp_ok(ink($im,730,$band->[0],890,$band->[1]),'>',20,
+  "gene label visible in right-margin row $band->[0]-$band->[1]");
+}
 done_testing;
 sub ink {
  my ($im,$x0,$y0,$x1,$y1)=@_; my $n=0;
