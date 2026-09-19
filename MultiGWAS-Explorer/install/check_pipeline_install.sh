@@ -63,7 +63,9 @@ fi
 "$java_bin" -version || die "Java could not start: ${java_bin}"
 
 gd_version="$(perl -MGD -e 'print $GD::VERSION')" || die "GD cannot load. Use the Perl/Cygwin installation that built local modules, or reinstall dependencies with the current Perl."
-pdl_version="$(perl -MPDL -e 'print $PDL::VERSION')" || die "PDL cannot load. Use the Perl/Cygwin installation that built local modules, or reinstall dependencies with the current Perl."
+pdl_version="$(perl -MPDL -e 'my $x = sequence(3); die "PDL arithmetic failed\n" unless $x->at(2) == 2; print $PDL::VERSION')" \
+  || die "PDL cannot load and run arithmetic. Reinstall dependencies with the current Perl/Cygwin installation."
+[ -n "${pdl_version}" ] || die "PDL returned an empty version; reinstall dependencies with the current Perl/Cygwin installation."
 log "GD version: $gd_version"
 log "PDL version: $pdl_version"
 perl -e "require JSON::PP; require JSON::MaybeXS; require File::Which; require DBI; require DBD::SQLite; require GD; require Mojolicious::Lite; require MCP::Server; require PDL; require Text::CSV; 1;" >/dev/null

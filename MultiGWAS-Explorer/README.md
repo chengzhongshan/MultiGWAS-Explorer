@@ -530,8 +530,9 @@ instead of sharing one generic `local/perl5/` tree across operating systems.
 
 If portable Cygwin later upgrades Perl, rerun `bash install/install_cygwin.sh`
 before starting the pipeline. The installer load-tests and, when necessary,
-rebuilds `Inline::Python`, `Compress::Raw::Zlib`, `Compress::Raw::Bzip2`, and
-their `IO::Compress`/`IO::Uncompress` modules against the active Cygwin Perl.
+rebuilds `PDL`, `Inline::Python`, `Compress::Raw::Zlib`,
+`Compress::Raw::Bzip2`, and their `IO::Compress`/`IO::Uncompress` modules
+against the active Cygwin Perl.
 This repairs errors that mention a missing `Zlib.dll`, `Bzip2.dll`, or an older
 `cygperl` DLL. Confirm the repaired environment with:
 

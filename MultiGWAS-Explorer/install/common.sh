@@ -822,9 +822,21 @@ install_cygwin_legacy_perl_deps() {
   if ! perl -MCompress::Raw::Zlib -MIO::Uncompress::Gunzip -e1 >/dev/null 2>&1; then
     # These XS modules can also remain linked to the previous cygperl DLL when
     # the portable Cygwin runtime upgrades Perl in place.
+    if [ -d "${perl_lib}" ]; then
+      find "${perl_lib}" \( \
+        -path '*/auto/Compress/Raw/Zlib' -o \
+        -path '*/Compress/Raw/Zlib.pm' \
+      \) -exec rm -rf {} +
+    fi
     modules+=(Compress::Raw::Zlib IO::Compress::Gzip)
   fi
   if ! perl -MCompress::Raw::Bzip2 -MIO::Uncompress::Bunzip2 -e1 >/dev/null 2>&1; then
+    if [ -d "${perl_lib}" ]; then
+      find "${perl_lib}" \( \
+        -path '*/auto/Compress/Raw/Bzip2' -o \
+        -path '*/Compress/Raw/Bzip2.pm' \
+      \) -exec rm -rf {} +
+    fi
     modules+=(Compress::Raw::Bzip2 IO::Compress::Bzip2)
   fi
   [ "${#modules[@]}" -gt 0 ] || return 0
@@ -841,19 +853,35 @@ install_cygwin_legacy_perl_deps() {
   perl -MCompress::Raw::Bzip2 -MIO::Uncompress::Bunzip2 -e1
 }
 
+perl_pdl_is_usable() {
+  perl -MPDL -e 'my $x = sequence(3); die "PDL arithmetic failed\n" unless $x->at(2) == 2; 1;' \
+    >/dev/null 2>&1
+}
+
 install_pdl_perl_deps() {
-  if perl -MPDL -e1 >/dev/null 2>&1; then
+  local perl_lib="${PIPELINE_PERL_LOCAL_DIR}/lib/perl5"
+  if perl_pdl_is_usable; then
     log "PDL is already installed and loadable"
     return 0
+  fi
+  if command_exists uname && uname -s | grep -qi '^CYGWIN' && [ -d "${perl_lib}" ]; then
+    find "${perl_lib}" -depth \( \
+      -path '*/auto/PDL' -o \
+      -path '*/PDL' -o \
+      -path '*/PDL.pm' \
+    \) -exec rm -rf {} +
   fi
   log "Installing PDL with extended Cygwin-friendly build timeouts"
   MAKEFLAGS="${MAKEFLAGS:--j$(num_cpus)}" perl "${PIPELINE_CPANM_BIN}" \
     --mirror "${PIPELINE_CPAN_MIRROR}" --mirror-only \
     --local-lib "${PIPELINE_PERL_LOCAL_DIR}" \
     --notest \
+    --reinstall \
     --configure-timeout 900 \
     --build-timeout 7200 \
     PDL
+  activate_perl_env
+  perl_pdl_is_usable || die "PDL still cannot run arithmetic after rebuilding"
 }
 
 ensure_local_hts_tools() {
