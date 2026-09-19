@@ -871,6 +871,16 @@ install_pdl_perl_deps() {
       -path '*/PDL.pm' \
     \) -exec rm -rf {} +
   fi
+  log "Refreshing Devel::CheckLib before configuring PDL"
+  perl "${PIPELINE_CPANM_BIN}" \
+    --mirror "${PIPELINE_CPAN_MIRROR}" --mirror-only \
+    --local-lib "${PIPELINE_PERL_LOCAL_DIR}" \
+    --notest \
+    --reinstall \
+    Devel::CheckLib
+  perl -MDevel::CheckLib -e \
+    'die "Devel::CheckLib did not define check_lib\n" unless defined &Devel::CheckLib::check_lib' \
+    || die "Devel::CheckLib cannot initialize with the active Cygwin compiler"
   log "Installing PDL with extended Cygwin-friendly build timeouts"
   MAKEFLAGS="${MAKEFLAGS:--j$(num_cpus)}" perl "${PIPELINE_CPANM_BIN}" \
     --mirror "${PIPELINE_CPAN_MIRROR}" --mirror-only \
