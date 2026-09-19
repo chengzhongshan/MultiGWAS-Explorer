@@ -17,6 +17,7 @@ if [ -z "${PIPELINE_PLATFORM_TAG}" ]; then
   esac
 fi
 PIPELINE_PERL_LOCAL_DIR="${PIPELINE_PERL_LOCAL_DIR:-${PIPELINE_LOCAL_DIR}/perl5${PIPELINE_PLATFORM_TAG:+-${PIPELINE_PLATFORM_TAG}}}"
+PIPELINE_PERL_ABI_STAMP="${PIPELINE_PERL_LOCAL_DIR}/.perl-abi"
 PIPELINE_VENV_DIR="${PIPELINE_ROOT}/.venv-pipeline"
 PIPELINE_PYTHON_RECORD_FILE="${PIPELINE_VENV_DIR}/.python-bin"
 PIPELINE_REQUIREMENTS_FILE="${PIPELINE_INSTALL_DIR}/requirements-pipeline.txt"
@@ -164,6 +165,93 @@ perl_arch_matches_current() {
       ;;
   esac
   return 1
+}
+
+current_perl_abi_signature() {
+  command_exists perl || die "Perl is required before installing pipeline dependencies"
+  perl -MConfig -e '
+    my @keys = qw(
+      version api_versionstring archname useithreads usemultiplicity use64bitint
+      dlext libperl cc ccversion gccversion
+    );
+    print "perl_executable=$^X\n";
+    print "perl_version=$^V\n";
+    print join("", map { "$_=" . ($Config{$_} // "") . "\n" } @keys);
+  '
+}
+
+perl_local_tree_has_payload() {
+  [ -d "${PIPELINE_PERL_LOCAL_DIR}" ] || return 1
+  find "${PIPELINE_PERL_LOCAL_DIR}" -mindepth 1 \
+    ! -path "${PIPELINE_PERL_ABI_STAMP}" -print -quit 2>/dev/null | grep -q .
+}
+
+write_perl_abi_stamp() {
+  mkdir -p "${PIPELINE_PERL_LOCAL_DIR}"
+  current_perl_abi_signature > "${PIPELINE_PERL_ABI_STAMP}"
+}
+
+perl_local_abi_matches_current() {
+  local expected="" installed=""
+  [ -f "${PIPELINE_PERL_ABI_STAMP}" ] || return 1
+  expected="$(current_perl_abi_signature)"
+  installed="$(cat "${PIPELINE_PERL_ABI_STAMP}")"
+  [ "${installed}" = "${expected}" ]
+}
+
+validate_perl_local_dir_for_reset() {
+  case "${PIPELINE_PERL_LOCAL_DIR}" in
+    "${PIPELINE_LOCAL_DIR}/perl5"|"${PIPELINE_LOCAL_DIR}/perl5-"*) return 0 ;;
+    *) die "Refusing to replace unexpected Perl dependency path: ${PIPELINE_PERL_LOCAL_DIR}" ;;
+  esac
+}
+
+ensure_perl_abi_compatible() {
+  local backup="" timestamp=""
+  if [ ! -d "${PIPELINE_PERL_LOCAL_DIR}" ]; then
+    write_perl_abi_stamp
+    return 0
+  fi
+  if perl_local_abi_matches_current; then
+    return 0
+  fi
+  if ! perl_local_tree_has_payload && [ ! -f "${PIPELINE_PERL_ABI_STAMP}" ]; then
+    write_perl_abi_stamp
+    return 0
+  fi
+
+  validate_perl_local_dir_for_reset
+  timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
+  backup="${PIPELINE_PERL_LOCAL_DIR}.incompatible-${timestamp}"
+  [ ! -e "${backup}" ] || backup="${backup}-$$"
+  warn "The repo-local Perl modules were built by a different or unrecorded Perl ABI."
+  warn "Archiving the complete dependency tree at ${backup} before a clean rebuild."
+  mv -- "${PIPELINE_PERL_LOCAL_DIR}" "${backup}"
+  write_perl_abi_stamp
+}
+
+perl_abi_repair_command() {
+  case "${PIPELINE_PLATFORM_TAG}" in
+    cygwin) printf '%s\n' "bash install/repair_and_test_cygwin.sh" ;;
+    linux)  printf '%s\n' "bash install/install_ubuntu.sh" ;;
+    darwin) printf '%s\n' "bash install/install_macos.sh" ;;
+    *)      printf '%s\n' "the installer for this platform" ;;
+  esac
+}
+
+require_perl_abi_compatible() {
+  if [ ! -d "${PIPELINE_PERL_LOCAL_DIR}" ]; then
+    write_perl_abi_stamp
+    return 0
+  fi
+  if perl_local_abi_matches_current; then
+    return 0
+  fi
+  if ! perl_local_tree_has_payload && [ ! -f "${PIPELINE_PERL_ABI_STAMP}" ]; then
+    write_perl_abi_stamp
+    return 0
+  fi
+  die "Repo-local Perl modules do not match $(perl -e 'print $^V'). Run: $(perl_abi_repair_command)"
 }
 
 download_url() {
@@ -723,6 +811,7 @@ create_python_venv() {
 activate_perl_env() {
   local base="${PIPELINE_PERL_LOCAL_DIR}/lib/perl5"
   local arch
+  require_perl_abi_compatible
   # Include the target in PERL5LIB even on the first installation, before CPAN
   # creates it. Configure/build subprocesses must see newly installed modules.
   mkdir -p "$base"
@@ -762,6 +851,7 @@ install_perl_deps() {
   local modules=()
   local regular_modules=()
   local needs_pdl=0
+  ensure_perl_abi_compatible
   activate_perl_env
   activate_python_env
   ensure_cpanm

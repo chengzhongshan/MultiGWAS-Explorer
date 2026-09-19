@@ -520,30 +520,35 @@ Cygwin runtime, which avoids locked-DLL failures. The Windows package set now
 uses prebuilt `perl-DBI`, `perl-DBD-SQLite`, and `perl-Text-CSV` packages for
 the SQLite-backed HaploReg cache tools.
 
-The Windows/Cygwin install path now intentionally keeps its repo-local Perl
-modules separate from Linux and macOS builds. During cross-platform validation,
-the main failure was not simply "missing GD headers"; it was accidental reuse
-of Linux-built repo-local Perl modules from a Cygwin shell, which caused
-`GD.pm` and `Compress::Raw::Zlib` version mismatches. The installer/runtime
-stack now avoids that by preferring `local/perl5-cygwin/` on portable Cygwin
-instead of sharing one generic `local/perl5/` tree across operating systems.
+The Windows/Cygwin install path keeps its repo-local Perl modules separate from
+Linux and macOS builds. It also records the complete Perl binary ABI in
+`local/perl5-cygwin/.perl-abi`, including the Perl version, API version,
+architecture, thread/multiplicity settings, compiler, and linked Perl library.
+Checking only the architecture is insufficient: Perl 5.40 and 5.44 can both
+report `x86_64-cygwin-threads-multi` while their compiled CPAN modules require
+different `cygperl` DLLs.
 
-If portable Cygwin later upgrades Perl, rerun `bash install/install_cygwin.sh`
-before starting the pipeline. The installer load-tests and, when necessary,
-rebuilds `PDL`, `Inline::Python`, `Compress::Raw::Zlib`,
-`Compress::Raw::Bzip2`, and their `IO::Compress`/`IO::Uncompress` modules
-against the active Cygwin Perl.
-This repairs errors that mention a missing `Zlib.dll`, `Bzip2.dll`, or an older
-`cygperl` DLL. Confirm the repaired environment with:
+If portable Cygwin upgrades or replaces Perl, rerun the installer before
+starting the pipeline. An unstamped or ABI-mismatched local dependency tree is
+moved intact to `local/perl5-cygwin.incompatible-<timestamp>/`; the installer
+then rebuilds the complete `cpanfile` dependency set with the active Perl. This
+global reset covers all compiled dependencies, including transitive modules,
+rather than trying to predict each incompatible XS module from the first error.
+It explains why a clean GitHub Actions Windows runner can pass while a local
+installation upgraded in place fails successively in Zlib, File::Map, PDL, or
+another module. Confirm the rebuilt environment with:
 
 ```bash
 bash install/check_pipeline_install.sh
 bash install/run_plotting_example.sh
 ```
 
-To repair all known Cygwin Perl-upgrade issues and run both checks in one pass,
-use `bash install/repair_and_test_cygwin.sh`. Complete output is retained in
-`cygwin-repair-test.log` for troubleshooting.
+To perform the ABI check, rebuild when required, and run both checks in one
+pass, use `bash install/repair_and_test_cygwin.sh`. Complete output is retained
+in `cygwin-repair-test.log` for troubleshooting. Installer and validation
+environment activation refuses a mismatched tree and prints this repair
+command. Run one of those entry points after changing Cygwin Perl and before
+launching a pipeline Perl script, so stale DLLs cannot be loaded first.
 
 SASPy ODA also needs a Java runtime. Install a Windows JDK and set `JAVA_HOME`
 or `SASPY_JAVA_WIN` before installing. The smoke test runs Java and reports a

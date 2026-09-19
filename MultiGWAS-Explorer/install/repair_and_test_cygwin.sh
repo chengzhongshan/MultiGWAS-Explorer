@@ -16,15 +16,13 @@ log "Cygwin repair log: ${log_file}"
 log "Perl version: $(perl -e 'print $^V')"
 log "Perl archname: $(perl -MConfig -e 'print $Config{archname}')"
 
+ensure_perl_abi_compatible
 activate_perl_env
 activate_python_env
 ensure_cpanm
 
-# Repair modules that can prevent cpanm or the main cpanfile pass from loading.
-install_cygwin_legacy_perl_deps
-install_pdl_perl_deps
-
-# Fill in all remaining pipeline and server dependencies, then validate them.
+# A Perl ABI change resets the complete repo-local module tree above. Install
+# the full dependency contract as one coherent build before validating it.
 install_perl_deps
 ensure_local_hts_tools
 bash "${SCRIPT_DIR}/check_pipeline_install.sh"

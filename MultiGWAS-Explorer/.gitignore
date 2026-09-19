@@ -6,7 +6,8 @@ _authinfo
 .vagrant/
 install/cache/
 tools/
-example-output/
+example-output*/
+public-gwas-test*/
 *.sif
 
 run_local_hits_*/
