@@ -73,7 +73,8 @@ my $spec={
  groups=>[{tag=>'EUR_FEMALE',files=>[$files[0][0],$files[1][0]]},
            {tag=>'EUR_MALE',files=>[$files[2][0],$files[3][0]]}],
  pairs=>[{pair_tag=>'EUR_FEMALE_vs_MALE',group1=>'EUR_FEMALE',
-          group2=>'EUR_MALE',prefix=>'EUR',label=>'EUR'}],
+          group2=>'EUR_MALE',prefix=>'EUR',label=>'EUR female vs male',
+          gtf_label=>'EUR_FEMALE_vs_MALE'}],
 };
 if (defined($plink2_1kg_pfile) || defined($plink2)) {
  die "Provide both --plink2-1kg-pfile and --plink2\n"

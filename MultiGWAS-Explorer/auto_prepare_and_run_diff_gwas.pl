@@ -574,6 +574,7 @@ die "--local-ld-marker-symbol must be star, plus, cross, circle, square, triangl
     unless $local_ld_marker_symbol =~ /^(?:star|plus|cross|circle|square|triangle|diamond)$/;
 die "--local-ld-marker-color must be a named color or #RRGGBB\n"
     unless $local_ld_marker_color =~ /^(?:#[0-9A-Fa-f]{6}|[A-Za-z][A-Za-z0-9_-]*)$/;
+my %local_ld_cache_by_snp;
 if ($highlight_high_ld_snps
     && $local_plot_requested
     && !$generate_spec_only
@@ -606,6 +607,30 @@ if ($highlight_high_ld_snps
         }
         else {
             warn "[warn] Direct 1000 Genomes local LD is unavailable; HaploReg4 will be used only as a backup when web fallback is enabled.\n";
+        }
+    }
+    $local_ld_cache_by_snp{lc $local_ld_reference_snp} = $local_ld_cache
+        if length($local_ld_reference_snp) && length($local_ld_cache);
+    if ($local_ld_display_mode eq 'heatmap'
+        && $top_hit_ld_source eq 'PLINK2_1KG'
+        && @configured_target_snps > 1) {
+        for my $query_snp (@configured_target_snps) {
+            next if length($local_ld_cache_by_snp{lc $query_snp} // '');
+            my ($target_cache, $target_ok) = resolve_plink2_ld_cache_for_plot(
+                query_snp   => $query_snp,
+                populations => $local_ld_population_override,
+                min_r2      => $local_ld_r2_threshold_override,
+                window_kb   => cfg_or($spec, 'local_ld_window_kb', cfg_or($spec, 'top_hit_ld_window_kb', 1000)),
+                pfile       => $top_hit_ld_pfile,
+                bfile       => $top_hit_ld_bfile,
+                plink2      => $top_hit_ld_plink2,
+                output_dir  => $output_dir,
+                force       => $force,
+            );
+            die "Could not build the direct PLINK2 LD cache for $query_snp.\n"
+                unless $target_ok && length($target_cache);
+            $local_ld_cache_by_snp{lc $query_snp} = $target_cache;
+            print "[prep] Direct PLINK2/1000 Genomes local-LD cache for $query_snp: $target_cache\n";
         }
     }
     if ($local_ld_display_mode ne 'heatmap' && !length($local_ld_snps_override)) {
@@ -731,12 +756,14 @@ my $local_gtf_expected_csv_basename = $runner_cfg->{LOCAL_TOP_HITS_CSV_BASENAME}
   || (($runner_cfg->{LOCAL_OUTPUT_PREFIX} || "${project_tag}_SAS_local_top_hits_manhattan") . "_top_hits.csv");
 my $single_target_gtf_snp = '';
 my $target_gtf_snp_count = 0;
+my @target_gtf_snps;
 if (defined($runner_cfg->{TARGET_SNP_LIST}) && length($runner_cfg->{TARGET_SNP_LIST})) {
     my @target_snps = grep { length($_) } map {
         my $snp = $_;
         $snp =~ s/^\s+|\s+$//g;
         $snp;
     } split /,/, $runner_cfg->{TARGET_SNP_LIST};
+    @target_gtf_snps = @target_snps;
     $target_gtf_snp_count = scalar @target_snps;
     my $target_tag;
     if (@target_snps == 1) {
@@ -789,12 +816,49 @@ if (defined $env_skip_data_upload) {
 my @step_defs;
 my $local_gtf_command = qq{"$bash_path" -lc 'cd "$workdir" && RUNNER_CONFIG_JSON="$generated->{runner_config}" SESSION_ID="$runner_session" OPEN_RESULT="$open_result" CLEAN_ODA_INPUT="$plot_clean_oda_input" SKIP_DATA_UPLOAD="$plot_skip_upload" KEEP_REMOTE_PLOT_DATA="$keep_remote_plot_data" EMIT_LOCAL_SAS_DEBUG="$emit_local_sas_scripts" LOCAL_SAS_DEBUG_ONLY="$local_sas_only" "$deps_dir/run_sas_oda_local_top_hits_with_gtf_download_html.sh"'};
 my $local_gtf_description = 'Run the local GTF-backed SAS ODA plot';
+my @local_gtf_outputs = (
+    "$Bin/" . ($runner_cfg->{OUTPUT_HTML_BASENAME} || "${project_tag}_SAS_local_top_hits_with_gtf.html"),
+    "$Bin/$local_gtf_expected_csv_basename",
+);
 if (length($single_target_gtf_snp) && !$local_sas_only) {
     my $single_window = $runner_cfg->{LOCAL_GTF_WINDOW_BP} || $runner_cfg->{LOCAL_WINDOW_BP} || '1e7';
     my $single_html = $runner_cfg->{OUTPUT_HTML_BASENAME} || "${project_tag}_SAS_local_top_hits_with_gtf.html";
     $local_gtf_command = qq{"$bash_path" -lc 'cd "$workdir" && RUNNER_CONFIG_JSON="$generated->{runner_config}" SESSION_ID="$runner_session" TARGET_SNP="$single_target_gtf_snp" LOCAL_WINDOW_BP="$single_window" OUTPUT_HTML_BASENAME="$single_html" SINGLE_SNP_ALLOW_GENERIC_OUTPUT_BASENAME=1 SINGLE_SNP_TOP_HITS_CSV_BASENAME="$local_gtf_expected_csv_basename" OPEN_RESULT="$open_result" CLEAN_ODA_INPUT="$clean_oda_input" CLEAN_ODA_MACROS=0 "$deps_dir/run_sas_oda_single_snp_with_gtf_download_html.sh"'};
     $local_gtf_description = 'Run the fast single-target GTF-backed SAS ODA plot';
     print "[info] Using fast single-SNP SAS ODA local-GTF runner for $single_target_gtf_snp.\n";
+}
+elsif ($target_gtf_snp_count > 1
+    && $local_ld_display_mode eq 'heatmap'
+    && !$local_sas_only
+    && !grep { !length($local_ld_cache_by_snp{lc $_} // '') } @target_gtf_snps) {
+    my $output_base = $runner_cfg->{OUTPUT_HTML_BASENAME}
+      || "${project_tag}_SAS_local_top_hits_with_gtf.html";
+    $output_base =~ s/\.html$//i;
+    my $single_window = $runner_cfg->{LOCAL_GTF_WINDOW_BP}
+      || $runner_cfg->{LOCAL_WINDOW_BP} || '1e7';
+    my @target_commands;
+    @local_gtf_outputs = ();
+    for my $target_snp (@target_gtf_snps) {
+        die "Unsafe target SNP for SAS command: $target_snp\n"
+          unless $target_snp =~ /^[A-Za-z0-9_.:-]+$/;
+        my $safe_target = $target_snp;
+        $safe_target =~ s/[^A-Za-z0-9._-]/_/g;
+        my $target_html = "${output_base}_${safe_target}.html";
+        my $target_csv = "${output_base}_${safe_target}_top_hit.csv";
+        my $target_cache = $local_ld_cache_by_snp{lc $target_snp};
+        my $legend_population = uc(trim($local_ld_population_override || 'EUR'));
+        my $legend = "Signed LD r2 to $target_snp ($legend_population, 1000G Phase 3 / PLINK2)";
+        push @target_commands,
+          qq{RUNNER_CONFIG_JSON="$generated->{runner_config}" SESSION_ID="$runner_session" TARGET_SNP="$target_snp" LOCAL_WINDOW_BP="$single_window" OUTPUT_HTML_BASENAME="$target_html" SINGLE_SNP_ALLOW_GENERIC_OUTPUT_BASENAME=1 SINGLE_SNP_TOP_HITS_CSV_BASENAME="$target_csv" GTF_LABEL_SNPS="$target_snp" GTF_LD_DISPLAY_MODE="heatmap" GTF_LD_R2_CACHE="$target_cache" GTF_LD_REFERENCE_SNP="$target_snp" GTF_LD_HEATMAP_LEGEND_TITLE="$legend" OPEN_RESULT="$open_result" CLEAN_ODA_INPUT="$clean_oda_input" CLEAN_ODA_MACROS=0 "$deps_dir/run_sas_oda_single_snp_with_gtf_download_html.sh"};
+        push @local_gtf_outputs,
+          "$Bin/$target_html",
+          "$Bin/${output_base}_${safe_target}.png",
+          "$Bin/$target_csv";
+    }
+    $local_gtf_command = qq{"$bash_path" -lc 'cd "$workdir" && }
+      . join(' && ', @target_commands) . q{'};
+    $local_gtf_description = 'Run one signed-LD GTF-backed SAS ODA plot per target';
+    print "[info] Using per-target SAS ODA local-GTF runners so each of $target_gtf_snp_count loci has its own signed-LD cache and colorbar.\n";
 }
 elsif ($target_gtf_snp_count > 1) {
     print "[info] Using multi-target SAS ODA local-GTF runner for $target_gtf_snp_count target SNPs; overlapping SNP-centered windows will share one locus plot.\n";
@@ -925,10 +989,7 @@ if (!$skip_plots) {
         name        => 'plot_local_gtf',
         description => $local_gtf_description,
         command     => $local_gtf_command,
-        outputs     => $local_sas_only ? [] : [
-            "$Bin/" . ($runner_cfg->{OUTPUT_HTML_BASENAME} || "${project_tag}_SAS_local_top_hits_with_gtf.html"),
-            "$Bin/$local_gtf_expected_csv_basename",
-        ],
+        outputs     => $local_sas_only ? [] : \@local_gtf_outputs,
         cache_key   => $local_sas_only ? '' : $local_gtf_request_key,
         cache_file  => $local_sas_only ? '' : $local_gtf_request_cache_file,
         enabled     => $wanted{local_gtf} ? 1 : 0,

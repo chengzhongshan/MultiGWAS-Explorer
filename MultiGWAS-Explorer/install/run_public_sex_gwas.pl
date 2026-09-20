@@ -86,6 +86,7 @@ if ($phase eq 'all' || $phase eq 'plots') {
    '--local-ld-r2-threshold','0.1',
    '--no-gnuplot-fallback-on-sas-space','--no-gnuplot-fallback-on-sas-failure');
   verify_images('SAS');
+  verify_sas_target_gtf($targets);
  }
 }
 sub verify_images {
@@ -166,6 +167,26 @@ sub verify_gnuplot_signed_ld {
  }
  print "PASS: gnuplot local-GTF panels use PLINK2 Phase 3 r2 x sign(Z)\n";
 }
+sub verify_sas_target_gtf {
+ my ($targets)=@_;
+ require GD;
+ open my $sf,'<',$spec or die $!;
+ my $cfg=decode_json(do {local $/;<$sf>}); close $sf;
+ my $prefix=$cfg->{project_tag}.'_SAS_local_top_hits_with_gtf_';
+ my @folders=($out,abs_path('.'));
+ for my $snp (split /,/,$targets) {
+  (my $safe_snp=$snp)=~s/[^A-Za-z0-9._-]/_/g;
+  my $name=$prefix.$safe_snp.'.png';
+  my ($path)=grep {-s $_} map {"$_/$name"} @folders;
+  die "Missing target-specific SAS local-GTF PNG for $snp: $name\n" unless $path;
+  open my $fh,'<:raw',$path or die $!;
+  my $im=GD::Image->new($fh) or die "Invalid target-specific SAS PNG: $path\n";
+  close $fh;
+  die "Unexpectedly small target-specific SAS PNG: $path\n"
+   if $im->width<100 || $im->height<100;
+ }
+ print "PASS: SAS produced one target-specific local-GTF panel per SNP\n";
+}
 if ($phase eq 'images') {
  if ($backend eq 'gnuplot' || $backend eq 'both') {
   verify_images('GUNPLOT');
@@ -173,7 +194,12 @@ if ($phase eq 'images') {
   my $targets=<$tf>; close $tf; chomp $targets;
   verify_gnuplot_signed_ld($targets);
  }
- verify_images('SAS') if $backend eq 'sas' || $backend eq 'both';
+ if ($backend eq 'sas' || $backend eq 'both') {
+  verify_images('SAS');
+  open my $tf,'<',"$out/targets.txt" or die "Run --phase validate first: $!\n";
+  my $targets=<$tf>; close $tf; chomp $targets;
+  verify_sas_target_gtf($targets);
+ }
 }
 if ($phase eq 'all' || $phase eq 'plots' || $phase eq 'images') {
  system($^X,"$Bin/build_public_gwas_gallery.pl",'--output-dir',$out)==0

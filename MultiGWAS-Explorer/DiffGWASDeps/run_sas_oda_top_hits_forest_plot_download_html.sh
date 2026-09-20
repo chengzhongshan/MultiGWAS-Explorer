@@ -224,7 +224,7 @@ delete_remote_file_quiet() {
 
 generate_requested_top_hits_csv_locally() {
   [[ -x "${LOCAL_TOP_HITS_CSV_HELPER}" || -f "${LOCAL_TOP_HITS_CSV_HELPER}" ]] || return 1
-  if [[ "${TOP_HIT_SELECTION_METHOD^^}" == "LD" && -z "${TARGET_SNP_LIST}" ]]; then
+  if [[ "$(printf '%s' "${TOP_HIT_SELECTION_METHOD}" | tr '[:lower:]' '[:upper:]')" == "LD" && -z "${TARGET_SNP_LIST}" ]]; then
     local ld_source_csv="${TOP_HIT_LD_SOURCE_CSV:-}"
     if [[ -z "${ld_source_csv}" && -n "${LOCAL_TOP_HITS_CSV_BASENAME:-}" ]]; then
       ld_source_csv="${WORKDIR}/${LOCAL_TOP_HITS_CSV_BASENAME}"

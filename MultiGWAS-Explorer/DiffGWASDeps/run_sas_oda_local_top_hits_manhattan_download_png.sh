@@ -127,11 +127,11 @@ GTF_LD_DISPLAY_MODE="${GTF_LD_DISPLAY_MODE:-none}"
 GTF_LD_R2_VALUES="${GTF_LD_R2_VALUES:-}"
 GTF_LD_HEATMAP_COLORS="${GTF_LD_HEATMAP_COLORS:-CXF7FBFF CX6BAED6 CX54278F}"
 GTF_LD_HEATMAP_LEGEND_TITLE="${GTF_LD_HEATMAP_LEGEND_TITLE:-LD r2 (EUR)}"
-case "${GTF_LD_DISPLAY_MODE,,}" in
+case "$(printf '%s' "${GTF_LD_DISPLAY_MODE}" | tr '[:upper:]' '[:lower:]')" in
   none|markers|heatmap|both) ;;
   *) echo "ERROR: Unsupported GTF_LD_DISPLAY_MODE=${GTF_LD_DISPLAY_MODE}" >&2; exit 2 ;;
 esac
-case "${GTF_LD_MARKER_SYMBOL,,}" in
+case "$(printf '%s' "${GTF_LD_MARKER_SYMBOL}" | tr '[:upper:]' '[:lower:]')" in
   star) GTF_LD_MARKER_CHAR='%str(*)' ;;
   plus) GTF_LD_MARKER_CHAR='+' ;;
   cross) GTF_LD_MARKER_CHAR='x' ;;
@@ -575,7 +575,7 @@ generate_requested_top_hits_csv_locally() {
   echo "[prep] Generating requested local-top-hit CSV locally..."
   local candidate_dist_bp="${TOP_HIT_DIST_BP}"
   local candidate_max_hits="${TOP_HIT_MAX_LOCI}"
-  if [[ "${TOP_HIT_SELECTION_METHOD^^}" == "LD" && -z "${TARGET_SNP_LIST}" ]]; then
+  if [[ "$(printf '%s' "${TOP_HIT_SELECTION_METHOD}" | tr '[:lower:]' '[:upper:]')" == "LD" && -z "${TARGET_SNP_LIST}" ]]; then
     candidate_dist_bp="0"
     candidate_max_hits="0"
     echo "[prep] Generating all MAF-passing significant candidates; SAS will perform LD clumping."
@@ -916,12 +916,42 @@ fi
 # staging, submission, download, and cleanup to prevent cross-job corruption.
 mkdir -p "${WORKDIR}/cache"
 SAS_ODA_PIPELINE_LOCK_FILE="${SAS_ODA_PIPELINE_LOCK_FILE:-${WORKDIR}/cache/sas_oda_pipeline.lock}"
-exec 9>"${SAS_ODA_PIPELINE_LOCK_FILE}"
 echo "[lock] Waiting for exclusive SAS ODA pipeline access: ${SAS_ODA_PIPELINE_LOCK_FILE}"
-flock -w "${SAS_ODA_PIPELINE_LOCK_TIMEOUT_SECONDS:-14400}" 9 || {
-  echo "ERROR: Timed out waiting for the SAS ODA pipeline lock." >&2
-  exit 1
-}
+if command -v flock >/dev/null 2>&1; then
+  exec 9>"${SAS_ODA_PIPELINE_LOCK_FILE}"
+  flock -w "${SAS_ODA_PIPELINE_LOCK_TIMEOUT_SECONDS:-14400}" 9 || {
+    echo "ERROR: Timed out waiting for the SAS ODA pipeline lock." >&2
+    exit 1
+  }
+else
+  # macOS ships Bash 3.2 without the Linux flock utility.  An atomic mkdir
+  # provides the same cross-process exclusion for the local ODA runner.
+  SAS_ODA_PIPELINE_LOCK_DIR="${SAS_ODA_PIPELINE_LOCK_FILE}.d"
+  lock_waited=0
+  lock_timeout="${SAS_ODA_PIPELINE_LOCK_TIMEOUT_SECONDS:-14400}"
+  while ! mkdir "${SAS_ODA_PIPELINE_LOCK_DIR}" 2>/dev/null; do
+    if [[ -r "${SAS_ODA_PIPELINE_LOCK_DIR}/pid" ]]; then
+      read -r lock_owner < "${SAS_ODA_PIPELINE_LOCK_DIR}/pid" || lock_owner=''
+      if [[ "${lock_owner}" =~ ^[0-9]+$ ]] && ! kill -0 "${lock_owner}" 2>/dev/null; then
+        rm -f "${SAS_ODA_PIPELINE_LOCK_DIR}/pid"
+        rmdir "${SAS_ODA_PIPELINE_LOCK_DIR}" 2>/dev/null || true
+        continue
+      fi
+    fi
+    if (( lock_waited >= lock_timeout )); then
+      echo "ERROR: Timed out waiting for the SAS ODA pipeline lock." >&2
+      exit 1
+    fi
+    sleep 1
+    lock_waited=$((lock_waited + 1))
+  done
+  printf '%s\n' "$$" > "${SAS_ODA_PIPELINE_LOCK_DIR}/pid"
+  cleanup_sas_oda_pipeline_lock() {
+    rm -f "${SAS_ODA_PIPELINE_LOCK_DIR}/pid"
+    rmdir "${SAS_ODA_PIPELINE_LOCK_DIR}" 2>/dev/null || true
+  }
+  trap cleanup_sas_oda_pipeline_lock EXIT HUP INT TERM
+fi
 echo "[lock] Acquired exclusive SAS ODA pipeline access."
 
 echo "[1/5] Uploading and verifying SAS include dependencies..."
@@ -1110,7 +1140,7 @@ fi
 echo "Verified PNG:  ${PNG_OUT} ($(wc -c < "${PNG_OUT}") bytes)"
 echo "Verified HTML: ${HTML_OUT} ($(wc -c < "${HTML_OUT}") bytes)"
 echo "Verified CSV:  ${CSV_OUT} ($(wc -c < "${CSV_OUT}") bytes)"
-if [[ "${TOP_HIT_SELECTION_METHOD^^}" == "LD" && -s "${LD_AUDIT_OUT}" ]]; then
+if [[ "$(printf '%s' "${TOP_HIT_SELECTION_METHOD}" | tr '[:lower:]' '[:upper:]')" == "LD" && -s "${LD_AUDIT_OUT}" ]]; then
   echo "Verified LD audit: ${LD_AUDIT_OUT} ($(wc -c < "${LD_AUDIT_OUT}") bytes)"
 fi
 

@@ -2735,21 +2735,22 @@ window-wide LD. Use the local PLINK2 reference for reproducible GTF plots.
 ### Regression-prevention rule: one LD reference per plotted locus
 
 A signed-LD heatmap has meaning only when every displayed r² value is measured
-against one named reference SNP. For a list of nearby target SNPs whose windows
-are packed into one SAS locus plot, the runner must therefore:
+against one named reference SNP. For a list of target SNPs requested in one
+SAS plotting step, the runner must therefore:
 
-1. choose one explicit reference (`--local-ld-reference-snp`, or the first
-   target when the option is omitted);
-2. run PLINK2 once with that reference;
-3. retain the reference in `GTF_LD_REFERENCE_SNP`; and
-4. calculate each track's color as `r² * sign(Z)`, with a fixed range from
+1. choose one explicit LD reference for each plotted locus;
+2. run PLINK2 once for each reference;
+3. retain that reference in `GTF_LD_REFERENCE_SNP`; and
+4. calculate each panel's color as `r² * sign(Z)`, with a fixed range from
    `-1` through `0` to `1`.
 
 Do not merge LD rows calculated from several query SNPs into one heatmap and
 then clear the reference name. A value in that union no longer answers the
 question "LD to which variant?" and can silently change the scientific meaning
-of the color scale. If requested SNPs represent separate loci, run one command
-per locus so each output has its own explicit reference.
+of the color scale. The SAS automation therefore runs the single-target GTF
+runner once per requested SNP when heatmap mode and direct PLINK2 LD are used.
+Each output has its own LD cache, reference label, signed colorbar, and adjacent
+gene track.
 
 This command is the real-data regression check for the overlapping
 `rs2070788`/`rs383510` locus:
@@ -2764,12 +2765,10 @@ perl auto_prepare_and_run_diff_gwas.pl \
   --local-ld-r2-threshold 0.2
 ```
 
-Unless `--local-ld-reference-snp` is supplied, the expected log and generated
-runner config identify `rs2070788` as the reference. The uploaded GWAS subset
-must contain numeric `LD_R2`; the reference row must have `LD_R2=1`; and the
-final SAS PNG must label both target SNPs and show a signed colorbar titled
-`Signed LD r2 to rs2070788` with limits `-1` and `1`. Run the focused Perl
-contract test before submission:
+The expected run produces one SAS PNG for each target. Each uploaded GWAS
+subset must contain numeric `LD_R2`; its reference row must have `LD_R2=1`;
+and each PNG must show a signed colorbar titled for its own target, with limits
+`-1` and `1`. Run the focused Perl contract test before submission:
 
 ```bash
 perl DiffGWASDeps/test_ld_heatmap_contract.pl

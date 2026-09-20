@@ -126,4 +126,32 @@ for my $forbidden (
         if index($sas_auto_text, $forbidden) >= 0;
 }
 
+for my $token (
+    'my %local_ld_cache_by_snp',
+    'run_sas_oda_single_snp_with_gtf_download_html.sh',
+    'GTF_LD_R2_CACHE="$target_cache"',
+    'GTF_LD_REFERENCE_SNP="$target_snp"',
+    'GTF_LD_DISPLAY_MODE="heatmap"',
+    'Signed LD r2 to $target_snp',
+) {
+    die "SAS multi-target orchestration is missing its per-target LD contract: $token\n"
+        unless index($sas_auto_text, $token) >= 0;
+}
+
+for my $shell (qw(
+    run_sas_oda_local_top_hits_manhattan_download_png.sh
+    run_sas_oda_local_top_hits_with_gtf_download_html.sh
+    run_sas_oda_single_snp_with_gtf_download_html.sh
+    run_sas_oda_top_hits_forest_plot_download_html.sh
+)) {
+    my $path = File::Spec->catfile($Bin, $shell);
+    open my $fh, '<:raw', $path or die "Cannot read $path: $!\n";
+    my $text = do { local $/; <$fh> };
+    close $fh;
+    die "$shell uses Bash 4 case conversion and will fail in macOS Bash 3.2\n"
+        if $text =~ /\$\{[^}\n]+(?:,,|\^\^)[^}\n]*\}/;
+    die "$shell uses mapfile, which is unavailable in macOS Bash 3.2\n"
+        if $text =~ /(?:^|\n)\s*mapfile\b/;
+}
+
 print "SAS/gnuplot optional LD heatmap contract: PASS\n";

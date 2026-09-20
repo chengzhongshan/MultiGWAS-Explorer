@@ -1,11 +1,12 @@
 # Mac installation and schizophrenia example test — 2026-09-20
 
 Repository: https://github.com/chengzhongshan/MultiGWAS-Explorer  
-Tested branch: `main` at `942771a`, plus the native PLINK2 path fix recorded with this report  
+Tested branch: `main`, including the macOS, PLINK2, and SAS ODA fixes recorded below
 Host: Apple Silicon (arm64), macOS 26.6.2, 18 GiB RAM
 
 Status: **PASS** for a fresh native macOS installation and the complete public
-PGC schizophrenia female-versus-male GWAS example with the gnuplot backend.
+PGC schizophrenia female-versus-male GWAS example with both gnuplot and SAS
+ODA backends.
 
 ## Installation
 
@@ -30,7 +31,18 @@ PGC schizophrenia female-versus-male GWAS example with the gnuplot backend.
 - Target loci: `rs2232429` (ZSCAN12), `rs185665940` (CYP26B1), and
   `rs62604261` (TENM1).
 - Genome-wide Manhattan, local Manhattan, local GTF, and forest plot families
-  all rendered and decoded successfully.
+  all rendered and decoded successfully with both plotting backends.
+
+## SAS ODA validation
+
+- SAS ODA authentication and remote execution passed from this Mac.
+- The genome-wide Manhattan plot, local Manhattan plot, three target-specific
+  local GTF plots, and two forest panels downloaded and decoded successfully.
+- Each target-specific GTF panel contains adjacent genes and its own signed
+  `r2 * sign(Z)` colorbar from `-1` to `1`, referenced to the SNP named in the
+  panel: `rs2232429`, `rs185665940`, or `rs62604261`.
+- The gallery manifest contains seven validated SAS figures and the generated
+  gallery displays them alongside the gnuplot results.
 
 ## Phase 3 LD validation
 
@@ -50,15 +62,20 @@ PGC schizophrenia female-versus-male GWAS example with the gnuplot backend.
   multi-member regression (`4fe1085`).
 - Added cross-platform auto-detection of `cache/plink2_bin/plink2` on
   macOS/Linux and `plink2.exe` on Windows; updated setup documentation.
+- Replaced Bash 4-only case conversion and `mapfile` use in SAS wrappers so
+  they run under the Bash 3.2 supplied with macOS; added a portable lock when
+  the Linux `flock` command is unavailable.
+- Changed multi-target SAS heatmaps to build and use one PLINK2 LD cache per
+  target. Each target now runs through the single-locus GTF path, preserving
+  both the target-specific signed-LD scale and the adjacent gene track.
 
 ## Results
 
 - Gallery: `MultiGWAS-Explorer/public-gwas-test/results.html`
 - Numerical report: `MultiGWAS-Explorer/public-gwas-test/numeric_validation.json`
 - Image report: `MultiGWAS-Explorer/public-gwas-test/image_validation_gunplot.json`
+- SAS image report: `MultiGWAS-Explorer/public-gwas-test/image_validation_sas.json`
 - Figures and signed-LD manifests:
   `MultiGWAS-Explorer/public-gwas-test/PUBLIC_SCZ_EUR_SEX_GUNPLOT_*`
 
-SAS ODA was outside this local Mac test because it requires configured remote
-ODA credentials. The native gnuplot workflow and its scientific validation
-completed without SAS fallback.
+The SAS ODA and native gnuplot workflows both completed without fallback.

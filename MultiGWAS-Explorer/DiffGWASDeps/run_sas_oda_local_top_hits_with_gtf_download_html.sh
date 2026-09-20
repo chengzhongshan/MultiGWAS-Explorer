@@ -280,11 +280,11 @@ augment_data_gz_with_ld_r2_column() {
   DATA_GZ="${out}"
   REMOTE_DATA_BASENAME="$(basename "${out}")"
 }
-case "${GTF_LD_DISPLAY_MODE,,}" in
+case "$(printf '%s' "${GTF_LD_DISPLAY_MODE}" | tr '[:upper:]' '[:lower:]')" in
   none|markers|heatmap|both) ;;
   *) echo "ERROR: Unsupported GTF_LD_DISPLAY_MODE=${GTF_LD_DISPLAY_MODE}" >&2; exit 2 ;;
 esac
-case "${GTF_LD_MARKER_SYMBOL,,}" in
+case "$(printf '%s' "${GTF_LD_MARKER_SYMBOL}" | tr '[:upper:]' '[:lower:]')" in
   star) GTF_LD_MARKER_CHAR='%str(*)' ;;
   plus) GTF_LD_MARKER_CHAR='+' ;;
   cross) GTF_LD_MARKER_CHAR='x' ;;
@@ -1191,7 +1191,7 @@ generate_requested_top_hits_csv_locally() {
   echo "[prep] Generating requested local-top-hit CSV locally..."
   local candidate_dist_bp="${TOP_HIT_DIST_BP}"
   local candidate_max_hits="${TOP_HIT_MAX_LOCI}"
-  if [[ "${TOP_HIT_SELECTION_METHOD^^}" == "LD" && -z "${TARGET_SNP_LIST}" ]]; then
+  if [[ "$(printf '%s' "${TOP_HIT_SELECTION_METHOD}" | tr '[:lower:]' '[:upper:]')" == "LD" && -z "${TARGET_SNP_LIST}" ]]; then
     candidate_dist_bp="0"
     candidate_max_hits="0"
     echo "[prep] Generating all MAF-passing significant candidates; SAS will perform LD clumping."
@@ -1480,7 +1480,9 @@ gtf_region_source=""
 gtf_region_args=()
 if [[ -s "${CSV_OUT}" ]]; then
   gtf_region_source="${CSV_OUT}"
-  mapfile -t gtf_region_args < <(
+  while IFS= read -r gtf_region_arg; do
+    gtf_region_args+=("${gtf_region_arg}")
+  done < <(
     perl -e '
       use strict;
       use warnings;
@@ -1518,7 +1520,9 @@ elif [[ -n "${TARGET_SNP_LIST}" ]]; then
   exit 1
 elif [[ -n "${VERIFY_TOP_HITS_TSV}" && -s "${VERIFY_TOP_HITS_TSV}" ]]; then
   gtf_region_source="${VERIFY_TOP_HITS_TSV}"
-  mapfile -t gtf_region_args < <(
+  while IFS= read -r gtf_region_arg; do
+    gtf_region_args+=("${gtf_region_arg}")
+  done < <(
     perl -e '
       use strict;
       use warnings;
@@ -1708,7 +1712,7 @@ render_gtf_runner \
 if [[ "${LOCAL_TOP_HITS_CSV_PREGENERATED}" != "1" ]] && ! generate_requested_top_hits_csv_locally; then
   echo "WARNING: Local MAF-aware top-hit CSV generation did not succeed. The wrapper will fall back to the prep-only SAS export path if needed." >&2
 fi
-if [[ "${TOP_HIT_SELECTION_METHOD^^}" == "LD" && -z "${TARGET_SNP_LIST}" && -s "${CSV_OUT}" ]]; then
+if [[ "$(printf '%s' "${TOP_HIT_SELECTION_METHOD}" | tr '[:lower:]' '[:upper:]')" == "LD" && -z "${TARGET_SNP_LIST}" && -s "${CSV_OUT}" ]]; then
   LOCAL_TOP_HITS_INPUT_CSV_BASENAME="${LOCAL_TOP_HITS_CSV_BASENAME}"
   render_gtf_runner \
     "${RUN_SAS_RENDERED}" \
@@ -1870,7 +1874,7 @@ generate_top_hits_csv_for_batching() {
     --download-file "~/${LOCAL_TOP_HITS_CSV_BASENAME}" \
     --download-local-path "${CSV_OUT}" \
     --output-prefix "download_local_hits_with_gtf_prep_csv_${stamp}" || true
-  if [[ "${TOP_HIT_SELECTION_METHOD^^}" == "LD" ]]; then
+  if [[ "$(printf '%s' "${TOP_HIT_SELECTION_METHOD}" | tr '[:lower:]' '[:upper:]')" == "LD" ]]; then
     run_oda_helper \
       --download-file "~/${TOP_HIT_LD_AUDIT_BASENAME}" \
       --download-local-path "${LD_AUDIT_OUT}" \
@@ -1978,7 +1982,7 @@ if [[ "${ODA_TRANSFER_MANIFEST_ONLY:-0}" == "1" ]]; then
 fi
 
 if [[ "${#bulk_upload_args[@]}" -gt 0 ]]; then
-  echo "[1-3/5] Upload manifest contains $(("${#bulk_upload_args[@]}" / 2)) file(s); transferring/reusing them in one SASPy connection..."
+  echo "[1-3/5] Upload manifest contains $(( ${#bulk_upload_args[@]} / 2 )) file(s); transferring/reusing them in one SASPy connection..."
   bulk_reuse_arg="--skip-upload-if-same"
   if [[ "${platform_is_linux}" == "1" && "${FORCE_DYNAMIC_GTF_SUPPORT_UPLOADS_ON_LINUX}" == "1" ]]; then
     bulk_reuse_arg="--no-skip-upload-if-same"
@@ -2151,7 +2155,7 @@ fi
 GTF_SUBMIT_MAX_ATTEMPTS="${GTF_SUBMIT_MAX_ATTEMPTS:-5}"
 GTF_SUBMIT_RETRY_SLEEP_SECONDS="${GTF_SUBMIT_RETRY_SLEEP_SECONDS:-10}"
 BATCH_SIZE="${LOCAL_MAX_HITS_PER_FIG:-4}"
-if [[ "${TOP_HIT_SELECTION_METHOD^^}" == "LD" && -z "${TARGET_SNP_LIST}" ]]; then
+if [[ "$(printf '%s' "${TOP_HIT_SELECTION_METHOD}" | tr '[:lower:]' '[:upper:]')" == "LD" && -z "${TARGET_SNP_LIST}" ]]; then
   echo "[prep] Running LD clumping before local-GTF batching."
   generate_top_hits_csv_for_batching || true
 elif [[ ! -s "${CSV_OUT}" ]]; then
@@ -2505,7 +2509,7 @@ fi
 if [[ ! -s "${CSV_OUT}" ]]; then
   download_outputs_args+=(--download-file "~/${LOCAL_TOP_HITS_CSV_BASENAME}" --download-local-path "${CSV_OUT}")
 fi
-if [[ "${TOP_HIT_SELECTION_METHOD^^}" == "LD" && ! -s "${LD_AUDIT_OUT}" ]]; then
+if [[ "$(printf '%s' "${TOP_HIT_SELECTION_METHOD}" | tr '[:lower:]' '[:upper:]')" == "LD" && ! -s "${LD_AUDIT_OUT}" ]]; then
   download_outputs_args+=(--download-file "~/${TOP_HIT_LD_AUDIT_BASENAME}" --download-local-path "${LD_AUDIT_OUT}")
 fi
 if [[ -n "${remote_png_path}" && ! -s "${PNG_OUT}" ]]; then
@@ -2546,7 +2550,7 @@ if ! delivered_gtf_artifact_ready; then
 fi
 
 echo "Verified HTML: ${HTML_OUT} ($(wc -c < "${HTML_OUT}") bytes)"
-if [[ "${TOP_HIT_SELECTION_METHOD^^}" == "LD" && -s "${LD_AUDIT_OUT}" ]]; then
+if [[ "$(printf '%s' "${TOP_HIT_SELECTION_METHOD}" | tr '[:lower:]' '[:upper:]')" == "LD" && -s "${LD_AUDIT_OUT}" ]]; then
   echo "Verified LD audit: ${LD_AUDIT_OUT} ($(wc -c < "${LD_AUDIT_OUT}") bytes)"
 fi
 
