@@ -355,7 +355,10 @@ sub open_reader {
             open $fh, '-|', $cmd or die "Cannot read gzip input $path with gzip -dc: $!\n";
         }
         else {
-            $fh = IO::Uncompress::Gunzip->new($path)
+            # BGZF is a concatenation of gzip members. Without MultiStream,
+            # target lookup stops after the first BGZF block and can falsely
+            # report that later SNPs are absent from an indexed input.
+            $fh = IO::Uncompress::Gunzip->new($path, MultiStream => 1)
               or die "Cannot open gzip input $path: $GunzipError\n";
         }
     }

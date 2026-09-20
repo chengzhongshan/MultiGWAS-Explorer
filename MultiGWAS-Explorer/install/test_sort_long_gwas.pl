@@ -39,3 +39,37 @@ open my $mf,'<',"$dir/std.manifest.tsv" or die $!;
 my $metrics=do {local $/;<$mf>};close $mf;
 die "Standardized output was not indexed\n" unless $metrics=~/^index_status\tcreated$/m;
 print "PASS: standardized differential output has a tabix index\n";
+
+# Force the target beyond the first BGZF member. The locus extractor must scan
+# every member to discover its coordinates before issuing the indexed query.
+my $bgzf_diff="CHR\tBP\tSNP\tPAIR_TAG\tDIFF_Z\tDIFF_P\n";
+for my $i (1..12000) {
+ $bgzf_diff .= "1\t$i\trs$i\tPAIR\t0.1\t0.9\n";
+}
+$bgzf_diff .= "6\t28359632\trsTargetAfterFirstBlock\tPAIR\t2\t0.01\n";
+gzip(\$bgzf_diff=>"$dir/bgzf-diff.gz") or die $GzipError;
+system($^X,"$Bin/../DiffGWASDeps/standardize_diff_gwas_zscore.pl",
+ '--input',"$dir/bgzf-diff.gz",'--output',"$dir/bgzf-std.gz",'--manifest',"$dir/bgzf-std.manifest.tsv")==0
+ or die "BGZF standardization failed\n";
+system($^X,"$Bin/../DiffGWASDeps/extract_single_snp_wide_diff_gwas.pl",
+ '--input',"$dir/bgzf-std.gz",'--target-snp','rsTargetAfterFirstBlock','--window-bp','100',
+ '--output',"$dir/bgzf-target.gz",'--manifest',"$dir/bgzf-target.manifest.tsv",
+ '--output-dir',$dir,'--base-cols','CHR,BP,SNP','--pair-col','PAIR_TAG',
+ '--value-fields','DIFF_P','--pair-map','PAIR=PAIR','--prefix-order','PAIR')==0
+ or die "BGZF target lookup failed\n";
+open my $bgzf_manifest,'<',"$dir/bgzf-target.manifest.tsv" or die $!;
+my $bgzf_metrics=do {local $/;<$bgzf_manifest>};close $bgzf_manifest;
+die "Target after the first BGZF member was not preserved\n"
+ unless $bgzf_metrics=~/^target_row_found_in_window\t1$/m;
+print "PASS: target lookup scans all BGZF members before the tabix query\n";
+system($^X,"$Bin/../DiffGWASDeps/extract_significant_diff_gwas.pl",
+ '--input',"$dir/bgzf-std.gz",'--output',"$dir/bgzf-wide.gz",
+ '--manifest',"$dir/bgzf-wide.manifest.tsv",'--threshold','0.05',
+ '--base-cols','CHR,BP,SNP','--pair-col','PAIR_TAG','--value-fields','DIFF_P',
+ '--filter-fields','DIFF_P','--pair-map','PAIR=PAIR','--prefix-order','PAIR')==0
+ or die "BGZF wide-subset extraction failed\n";
+open my $wide_manifest,'<',"$dir/bgzf-wide.manifest.tsv" or die $!;
+my $wide_metrics=do {local $/;<$wide_manifest>};close $wide_manifest;
+die "Wide-subset extraction stopped before the last BGZF member\n"
+ unless $wide_metrics=~/^rows_read\t12001$/m && $wide_metrics=~/^rows_written\t1$/m;
+print "PASS: wide-subset extraction scans all BGZF members\n";

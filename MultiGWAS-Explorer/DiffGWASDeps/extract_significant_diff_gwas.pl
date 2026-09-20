@@ -310,7 +310,10 @@ sub open_reader {
             open $fh, '-|', $cmd or die "Cannot read gzip input $path with gzip -dc: $!\n";
         }
         else {
-            $fh = IO::Uncompress::Gunzip->new($path)
+            # Standardized pipeline inputs are BGZF files (concatenated gzip
+            # members). Read every member so chromosome data after the first
+            # block is not silently omitted from the plotting-wide subset.
+            $fh = IO::Uncompress::Gunzip->new($path, MultiStream => 1)
               or die "Cannot open gzip input $path: $GunzipError\n";
         }
     }
