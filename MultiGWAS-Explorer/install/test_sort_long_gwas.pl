@@ -18,10 +18,6 @@ my @lines=<$fh>;
 $fh->close or die "Cannot close sorted gzip\n";
 die "Wrong sorted content\n" unless join('',@lines) eq "#CHR\tBP\tSNP\n1\t10\trs1\n1\t20\trs2\n23\t200\trs3\n";
 my $indexed="$dir/sorted.gz";
-if ($^O eq 'cygwin') {
- open my $cp,'-|','cygpath','-w',$indexed or die $!;
- $indexed=<$cp>; chomp $indexed; close $cp or die 'cygpath failed';
-}
 for my $region ('1:1-30','23:1-300') {
  open my $tab,'-|','tabix',$indexed,$region or die $!;
  my @rows=<$tab>;
@@ -73,3 +69,20 @@ my $wide_metrics=do {local $/;<$wide_manifest>};close $wide_manifest;
 die "Wide-subset extraction stopped before the last BGZF member\n"
  unless $wide_metrics=~/^rows_read\t12001$/m && $wide_metrics=~/^rows_written\t1$/m;
 print "PASS: wide-subset extraction scans all BGZF members\n";
+
+my $gtf=<<'GTF';
+##gtf-version 3
+chr1	test	gene	100	200	.	+	.	gene_id "ENSG000001"; gene_name "GENE1"; gene_type "protein_coding";
+chr2	test	gene	100	200	.	+	.	gene_id "ENSG000002"; gene_name "GENE2"; gene_type "protein_coding";
+GTF
+gzip(\$gtf=>"$dir/fixture.gtf.gz") or die $GzipError;
+system($^X,"$Bin/../DiffGWASDeps/extract_gencode_gtf_subset.pl",
+ '--gtf-gz',"$dir/fixture.gtf.gz",'--reference-build','hg38',
+ '--region','1:50:250','--output',"$dir/gtf-subset.tsv")==0
+ or die "Indexed GTF extraction failed\n";
+open my $gtf_subset,'<',"$dir/gtf-subset.tsv" or die $!;
+my $gtf_text=do {local $/;<$gtf_subset>};close $gtf_subset;
+die "Expected GTF gene was not extracted\n" unless $gtf_text=~/\bGENE1\b/;
+die "Out-of-region GTF gene was extracted\n" if $gtf_text=~/\bGENE2\b/;
+die "GTF tabix index was not created\n" unless -s "$dir/fixture.gtf.bgz.tbi";
+print "PASS: native bgzip/tabix build and query the indexed GTF with POSIX paths\n";

@@ -263,8 +263,8 @@ sub open_gtf_input {
     my $tabix = find_executable($args{tabix_bin}, 'tabix');
     my $bgzip = find_executable($args{bgzip_bin}, 'bgzip');
     unless ($tabix && $bgzip) {
-        die "tabix and bgzip are required for GTF extraction. Put them in DiffGWASDeps, "
-          . "the pipeline root, local/bin, or PATH; alternatively set --tabix-bin/--bgzip-bin.\n";
+        die "tabix and bgzip are required for GTF extraction. Put native tools in "
+          . "local/bin or PATH; alternatively set --tabix-bin/--bgzip-bin.\n";
     }
 
     my $indexed = prepare_bgzf_gtf(
@@ -274,7 +274,7 @@ sub open_gtf_input {
     );
     return unless $indexed && -s $indexed && -s "$indexed.tbi";
 
-    open my $list_fh, '-|', $tabix, '-l', to_native_path($indexed)
+    open my $list_fh, '-|', $tabix, '-l', $indexed
       or do {
           die "[tabix] Could not list indexed GTF contigs from $indexed.\n";
       };
@@ -304,7 +304,7 @@ sub open_gtf_input {
     }
     return unless @queries;
 
-    open my $query_fh, '-|', $tabix, to_native_path($indexed), @queries
+    open my $query_fh, '-|', $tabix, $indexed, @queries
       or do {
           die "[tabix] Could not start indexed GTF query for $indexed.\n";
       };
@@ -435,7 +435,7 @@ sub prepare_bgzf_gtf {
     unlink $tmp_sorted;
     die "bgzip failed while creating $tmp_bgz\n" unless $? == 0 && -s $tmp_bgz;
 
-    system { $args{tabix} } $args{tabix}, '-f', '-p', 'gff', to_native_path($tmp_bgz);
+    system { $args{tabix} } $args{tabix}, '-f', '-p', 'gff', $tmp_bgz;
     die "tabix failed while indexing $tmp_bgz\n" unless $? == 0 && -s $tmp_tbi;
     unlink $indexed if -e $indexed;
     unlink "$indexed.tbi" if -e "$indexed.tbi";
@@ -448,11 +448,17 @@ sub prepare_bgzf_gtf {
 sub find_executable {
     my ($explicit, $name) = @_;
     if (defined $explicit && length $explicit) {
+        if ($^O !~ /^(?:cygwin|MSWin32)$/i && $explicit =~ /\.exe$/i) {
+            warn "[tabix] Refusing Windows executable on $^O: $explicit\n";
+            return;
+        }
         return $explicit if -f $explicit && -x $explicit;
         warn "[tabix] Configured $name executable is unavailable: $explicit\n";
         return;
     }
-    my @suffixes = $^O =~ /MSWin32/i ? ('', '.exe', '.bat', '.cmd') : ('', '.exe');
+    my @suffixes = $^O =~ /MSWin32/i ? ('', '.exe', '.bat', '.cmd')
+      : $^O =~ /cygwin/i ? ('', '.exe')
+      : ('');
     my @dirs = (
         $Bin,
         File::Spec->catdir($Bin, File::Spec->updir()),
@@ -467,38 +473,6 @@ sub find_executable {
         }
     }
     return;
-}
-
-my $PATH_TRANSLATOR;  # cached path to wslpath/cygpath, computed once
-
-sub to_native_path {
-    # Native Windows tabix.exe (unlike a POSIX-aware bgzip that only
-    # streams via stdin/stdout) receives an explicit file path and calls
-    # into the Windows C runtime to open it, which does not understand
-    # POSIX-style paths like /mnt/e/... or /cygdrive/e/.... Convert to a
-    # Windows-style path (E:\...) before handing it to tabix.
-    my ($path) = @_;
-    return $path unless defined $path && length $path;
-    return $path if $path =~ m{^[A-Za-z]:[\\/]};  # already Windows-style
-
-    if (!defined $PATH_TRANSLATOR) {
-        $PATH_TRANSLATOR = '';
-        for my $bin (qw(wslpath cygpath)) {
-            my $found = find_executable('', $bin);
-            if ($found) {
-                $PATH_TRANSLATOR = $found;
-                last;
-            }
-        }
-    }
-    return $path unless length $PATH_TRANSLATOR;
-
-    open my $translate_fh, '-|', $PATH_TRANSLATOR, '-w', $path
-      or return $path;
-    my $win_path = <$translate_fh> // '';
-    close $translate_fh;
-    chomp $win_path;
-    return length $win_path ? $win_path : $path;
 }
 
 sub parse_gtf_attributes {

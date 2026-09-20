@@ -379,8 +379,7 @@ sub open_window_reader {
         my @regions = $stats->{target_lookup_mode} && $stats->{target_lookup_mode} eq 'hint'
           ? candidate_regions($raw_chr, $start, $end)
           : ("$raw_chr:$start-$end");
-        my $tool_path = path_for_hts_tool($tabix, $path);
-        my $cmd = join(' ', shell_quote($tabix), shell_quote($tool_path), map { shell_quote($_) } @regions);
+        my $cmd = join(' ', shell_quote($tabix), shell_quote($path), map { shell_quote($_) } @regions);
         open my $fh, '-|', $cmd or die "Cannot tabix-query $path: $!\n";
         $stats->{region_query_mode} = 'tabix';
         return $fh;
@@ -420,31 +419,18 @@ sub prefer_shell_gzip {
 
 sub resolve_hts_tool {
     my ($dir, $tool) = @_;
-    for my $candidate (
-        (defined $dir && length $dir ? ("$dir/$tool", "$dir/$tool.exe") : ()),
-        ($^O =~ /cygwin/i ? ("$Bin/$tool.exe", "$Bin/$tool") : ("$Bin/$tool", "$Bin/$tool.exe")),
-        $tool,
-        "$tool.exe",
-    ) {
+    my @names = ($tool);
+    push @names, "$tool.exe" if $^O =~ /^(?:cygwin|MSWin32)$/i;
+    my @candidates = (
+        (defined $dir && length $dir ? map { "$dir/$_" } @names : ()),
+        (map { "$Bin/$_" } @names),
+        @names,
+    );
+    for my $candidate (@candidates) {
         next unless defined $candidate && length $candidate;
         return $candidate if -x $candidate || command_exists($candidate);
     }
     return undef;
-}
-
-sub path_for_hts_tool {
-    my ($tool, $path) = @_;
-    return $path unless $^O =~ /cygwin/i && $tool =~ /\.exe$/i;
-
-    open my $cygpath, '-|', 'cygpath', '-w', $path
-      or die "Cannot convert Cygwin path for Windows executable $tool: $!\n";
-    my $windows_path = <$cygpath>;
-    close $cygpath
-      or die "cygpath failed while converting $path for $tool\n";
-    die "cygpath returned no Windows path for $path\n"
-      unless defined($windows_path) && length($windows_path);
-    $windows_path =~ s/[\r\n]+\z//;
-    return $windows_path;
 }
 
 sub command_exists {

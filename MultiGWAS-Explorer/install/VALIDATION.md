@@ -176,6 +176,22 @@ PLINK variant IDs containing semicolon-separated aliases are expanded by the
 normalizer, while the missing-ID sentinel `.` is discarded. This allows GWAS
 rsIDs to match any valid reference alias without generating unusable proxies.
 
+## Native htslib validation (2026-09-20)
+
+The repository no longer tracks `DiffGWASDeps/bgzip.exe` or
+`DiffGWASDeps/tabix.exe`. Ubuntu resolves the native `tabix` package installed
+by `install/install_ubuntu.sh`; Cygwin either uses a native package or builds
+htslib 1.20 under the ignored `local/bin/` directory. Tool resolvers only
+consider `.exe` suffixes on Windows/Cygwin, and platform installers no longer
+put `DiffGWASDeps/` on `PATH` to locate htslib programs.
+
+The Cygwin Perl 5.44 dependency smoke test passed after this change. Its htslib
+regression used locally built htslib 1.20 and POSIX paths directly, including a
+temporary directory containing spaces. It created/query-tested GWAS tabix
+indexes, found a target beyond the first BGZF member, built an indexed
+synthetic GTF, and returned only the expected gene. The GitHub installation
+workflow remains the clean-host validation for Ubuntu, Docker, and Apptainer.
+
 ## Limits
 
 The CI smoke checks do not authenticate to SAS OnDemand, upload data, validate full

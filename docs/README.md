@@ -87,10 +87,10 @@ powershell -NoProfile -ExecutionPolicy Bypass `
   -AllowInsecureDownloads
 ```
 
-The pipeline also ships Windows `bgzip.exe` / `tabix.exe` under
-`DiffGWASDeps/` and places that directory on the portable-Cygwin runtime path.
-The installer can still download htslib 1.20 into `tools/` and build newer
-repo-local copies when needed.
+The repository does not ship Windows `bgzip.exe` / `tabix.exe` binaries.
+Portable Cygwin builds native copies under `local/bin/` when required, while
+Ubuntu installs the native `tabix` package. The generated `local/` directory is
+host-specific, excluded from Git, and must not be copied between platforms.
 
 After installation, open the portable shell with:
 
@@ -298,7 +298,7 @@ perl ./auto_prepare_and_run_diff_gwas.pl \
 ```
 
 Explicit target-SNP local-GTF runs create their requested-target CSV
-before indexed GTF extraction, use bundled tabix/bgzip by default on Windows,
+before indexed GTF extraction, use platform-native tabix/bgzip,
 and prepare all known ODA uploads as one manifest. Existing local-GTF output is
 reused only when its request key matches the current target/configuration, so a
 new target no longer requires `--force` merely to avoid an unrelated result.

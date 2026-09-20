@@ -28,7 +28,7 @@ Start in the inner `MultiGWAS-Explorer` directory containing `install/`:
 . install/common.sh
 activate_perl_env
 activate_python_env
-export PATH="$PIPELINE_ROOT/local/bin:$PIPELINE_ROOT/DiffGWASDeps:$PATH"
+export PATH="$PIPELINE_ROOT/local/bin:$PATH"
 bash install/check_pipeline_install.sh
 
 perl install/run_public_sex_gwas.pl \

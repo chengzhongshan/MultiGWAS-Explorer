@@ -253,9 +253,10 @@ Before running a workflow, identify:
    both the local-Manhattan and local-GTF outputs, and verify that an ordinary
    run without the option contains no LD-marker layer.
 
-   Use tabix for GTF interval extraction by default. On Windows/Cygwin, prefer
-   the bundled `DiffGWASDeps/tabix.exe` and `DiffGWASDeps/bgzip.exe`; otherwise
-   resolve the repository or system installations. Build and cache a sorted
+   Use tabix for GTF interval extraction by default. Resolve only host-native
+   tools from `local/bin` or `PATH`: the installer builds htslib under Cygwin
+   when needed, and Ubuntu uses its `tabix` package. Never commit or reuse
+   `bgzip`/`tabix` binaries across operating systems. Build and cache a sorted
    BGZF GTF plus `.tbi` once, merge overlapping query regions, and retain an
    exact interval-overlap check on returned rows. Use the sequential gzip scan
    only when the caller explicitly requests `--no-use-tabix`.

@@ -98,15 +98,7 @@ my $index_status = 'disabled';
 if ($can_index_output) {
     my $seq_col = $idx{CHR} + 1;
     my $bp_col  = $idx{BP} + 1;
-    my $index_input = $output;
-    if ($^O eq 'cygwin') {
-        open my $cp, '-|', '/usr/bin/cygpath', '-m', $output or die "Cannot run cygpath: $!\n";
-        $index_input = <$cp>;
-        close $cp or die "cygpath failed for $output\n";
-        die "cygpath returned an empty path\n" unless defined $index_input && length $index_input;
-        $index_input =~ s/[\r\n]+$//;
-    }
-    if (system($tabix, '-f', '-s', $seq_col, '-b', $bp_col, '-e', $bp_col, '-S', 1, $index_input) == 0) {
+    if (system($tabix, '-f', '-s', $seq_col, '-b', $bp_col, '-e', $bp_col, '-S', 1, $output) == 0) {
         $index_status = 'created';
     }
     else {
@@ -162,10 +154,12 @@ print "Index:        $output.tbi\n" if $index_status eq 'created';
 
 sub resolve_hts_tool {
     my ($dir, $tool) = @_;
-    for my $candidate (
-        (defined $dir && length $dir ? ("$dir/$tool", "$dir/$tool.exe") : ()),
-        $tool,
-    ) {
+    my @names = ($tool);
+    push @names, "$tool.exe" if $^O =~ /^(?:cygwin|MSWin32)$/i;
+    my @candidates = defined $dir && length $dir
+      ? ((map { "$dir/$_" } @names), @names)
+      : @names;
+    for my $candidate (@candidates) {
         next unless defined $candidate && length $candidate;
         return $candidate if -x $candidate || command_exists($candidate);
     }

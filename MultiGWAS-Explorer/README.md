@@ -429,10 +429,9 @@ personal `PERL5LIB` or a globally preconfigured Python:
   `local/perl5-cygwin/`, `local/perl5-linux/`, or `local/perl5-darwin/`
 - Python packages such as `saspy` and `Pillow` are installed under
   `.venv-pipeline/`
-- on Windows/Cygwin, the bundled `DiffGWASDeps/bgzip.exe` and
-  `DiffGWASDeps/tabix.exe` are placed first on `PATH`; other platforms use
-  system packages or the copies built under `local/bin/` by
-  `install/build_local_htslib.sh`
+- `bgzip` and `tabix` are never shipped as platform-specific binaries; each
+  platform uses its system package or native copies built under `local/bin/`
+  by `install/build_local_htslib.sh`
 
 Recommended entry points:
 
@@ -455,20 +454,18 @@ powershell -NoProfile -ExecutionPolicy Bypass `
   -PortableRoot "$env:USERPROFILE\CygwinPortablePipeline"
 ```
 
-The repository includes tested Windows executables at
-`DiffGWASDeps/bgzip.exe` and `DiffGWASDeps/tabix.exe`. The Windows package list
-also includes the Cygwin headers needed to build a newer local htslib when the
-bundled tools cannot be used:
+The repository intentionally does not include Windows `bgzip.exe` or
+`tabix.exe` binaries because they cannot run in Ubuntu containers. The Windows
+package list includes the Cygwin headers needed to build native local htslib:
 `libbz2-devel`, `libcurl-devel`, `liblzma-devel`, `libssl-devel`, and
 `zlib-devel`. If `tools/htslib-1.20.tar.bz2` is not already present, the
 installer downloads the expected upstream htslib release before building
 `local/bin/bgzip.exe` and `local/bin/tabix.exe`.
 
-When `bgzip_tabix_diff_gwas.pl` runs under Cygwin with those Windows
-executables, it now resolves the `.exe` files explicitly, omits the unsupported
-`bgzip -@ 4` option, and converts the BGZF path to native Windows form with
-`cygpath -w` before invoking `tabix.exe`. Native Cygwin/Linux htslib tools
-continue to receive POSIX paths and retain threaded bgzip compression.
+The generated Cygwin executables are local installation artifacts and are
+excluded from Git. Cygwin and Linux htslib tools receive POSIX paths and use
+threaded bgzip compression. Do not copy `local/` between operating systems;
+rerun the platform installer so compiled tools and Perl modules match the host.
 
 If the machine sits behind TLS interception and Cygwin `curl` reports a
 self-signed certificate chain while bootstrapping `cpanm` or htslib, rerun with
@@ -2437,8 +2434,8 @@ values with `--local-ld-r2-values rs1:0.92,rs2:0.81`. The gnuplot equivalent is
 `--ld-heatmap-colors` list of `#RRGGBB` values.
 
 `DiffGWASDeps/extract_gencode_gtf_subset.pl` requires indexed extraction by
-default. It locates `tabix` and `bgzip` in `DiffGWASDeps/`, the repository root,
-`local/bin/`, or `PATH`, builds a sorted BGZF GTF plus `.tbi` once when needed,
+default. It locates platform-native `tabix` and `bgzip` in `local/bin/` or
+`PATH`, builds a sorted BGZF GTF plus `.tbi` once when needed,
 and queries only the merged target regions. Use `--no-use-tabix` only as an
 explicit slow compatibility fallback. The exact overlap is still checked by
 the extractor after the tabix GFF query, so an additional bedtools pass is not
