@@ -150,12 +150,12 @@ my $ld_audit_file_override = '';
 my $ld_cache_override = '';
 my $ld_reference_snp_override = '';
 my $ld_population_override = '';
-my $ld_r2_threshold_override = 0;
+my $ld_r2_threshold_override;
 my $ld_web_fallback = 1;
 my $highlight_high_ld_snps = 0;
 my $ld_marker_symbol = 'star';
 my $ld_marker_color = 'black';
-my $ld_display_mode = 'none';
+my $ld_display_mode;
 my $ld_r2_values_override = '';
 my $ld_heatmap_colors = '#f7fbff,#6baed6,#54278f';
 my $get_common_associations = '';
@@ -230,18 +230,10 @@ $ld_population_override = uc($ld_population_override || '');
 die "--ld-population must be AFR, AMR, ASN/EAS, EUR, MAJOR4, or a comma/plus-separated list of those populations\n"
     if length($ld_population_override)
        && !valid_local_ld_population_spec($ld_population_override);
-die "--ld-r2-threshold must be between 0 and 1\n"
-    unless $ld_r2_threshold_override >= 0 && $ld_r2_threshold_override <= 1;
 $manhattan_differential_p_mode_override = lc(trim($manhattan_differential_p_mode_override));
 die "--manhattan-differential-p-mode must be raw or standardized\n"
     if length($manhattan_differential_p_mode_override)
        && $manhattan_differential_p_mode_override !~ /^(?:raw|standardized)$/;
-$ld_display_mode = lc(trim($ld_display_mode || 'none'));
-die "--ld-display-mode must be none, markers, heatmap, or both\n"
-    unless $ld_display_mode =~ /^(?:none|markers|heatmap|both)$/;
-$ld_display_mode = 'markers'
-    if $ld_display_mode eq 'none' && ($highlight_high_ld_snps || length(trim($ld_snps_override)));
-$highlight_high_ld_snps = 1 if $ld_display_mode ne 'none';
 $ld_marker_symbol = lc(trim($ld_marker_symbol || 'star'));
 die "--ld-marker-symbol must be star, plus, cross, circle, square, triangle, or diamond\n"
     unless $ld_marker_symbol =~ /^(?:star|plus|cross|circle|square|triangle|diamond)$/;
@@ -278,6 +270,19 @@ my %requested = normalize_requested_plots($plots, \@step_args);
 die "No gunplot plot steps were requested.\n" unless grep { $requested{$_} } qw(plot_manhattan plot_local_manhattan plot_local_gtf plot_forest);
 
 my $spec = load_json($spec_file);
+$ld_r2_threshold_override = 0 + (
+    defined($ld_r2_threshold_override)
+      ? $ld_r2_threshold_override
+      : ($spec->{local_ld_r2_threshold} // 0)
+);
+die "--ld-r2-threshold must be between 0 and 1\n"
+    unless $ld_r2_threshold_override >= 0 && $ld_r2_threshold_override <= 1;
+$ld_display_mode = lc(trim($ld_display_mode // $spec->{local_ld_display_mode} // 'none'));
+die "--ld-display-mode must be none, markers, heatmap, or both\n"
+    unless $ld_display_mode =~ /^(?:none|markers|heatmap|both)$/;
+$ld_display_mode = 'markers'
+    if $ld_display_mode eq 'none' && ($highlight_high_ld_snps || length(trim($ld_snps_override)));
+$highlight_high_ld_snps = 1 if $ld_display_mode ne 'none';
 $ld_population_override = uc(
     $ld_population_override || $spec->{local_ld_population} || 'EUR'
 );
@@ -594,6 +599,7 @@ sub run_upstream_preprocessing {
         File::Spec->catfile($Bin, 'auto_prepare_and_run_diff_gwas.pl'),
         '--spec', $args{spec_file},
         '--step', 'extract_wide_subset',
+        '--local-ld-display-mode', 'none',
     );
     push @cmd, '--force' if $args{force};
     if ($args{display_gwas_override}) {
@@ -1594,6 +1600,8 @@ sub plot_local_series {
         );
         push @cmd, ('--ld-reference-snp', $ld_reference_snp);
         push @cmd, ('--ld-r2-file', $ld_r2_file) if @ld_snps;
+        push @cmd, ('--ld-source-file', $locus_ld_cache)
+            if length(trim($locus_ld_cache // ''));
         if ($args{highlight_high_ld_snps}) {
             push @cmd, ('--ld-marker-symbol', ($args{ld_marker_symbol} || 'star'));
             push @cmd, ('--ld-marker-color', ($args{ld_marker_color} || 'black'));

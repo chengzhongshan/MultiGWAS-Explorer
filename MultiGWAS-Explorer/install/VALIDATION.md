@@ -147,6 +147,35 @@ visible and aligned with the correct SNPs in both sexes. The extended
 names at distinct row coordinates and nonblank text in all three right-margin
 row regions.
 
+## PLINK2 signed-LD GTF validation (2026-09-19)
+
+The public schizophrenia-by-sex spec requested heatmap LD, but both top-level
+wrappers initialized the display mode to `none`, preventing the spec value
+from taking effect. The LD threshold had the same command-line-default issue.
+Both values now inherit from the spec unless explicitly overridden. Gnuplot's
+preprocessing subprocess disables plotting-only LD work, avoiding a redundant
+whole-reference calculation before per-locus LD begins.
+
+The official phased 1000 Genomes Phase 3 GRCh37 reference was prepared locally
+with PLINK2 2.0 a.6.39. EUR selection retained 503 samples. Direct phased LD
+at `r2 >= 0.1` succeeded for all three loci. The regenerated manifests report:
+
+| SNP | Signed mode | Plotted reference/proxy variants |
+| --- | --- | ---: |
+| rs2232429 | `r2 x sign(Z)` | 689 |
+| rs185665940 | `r2 x sign(Z)` | 9 |
+| rs62604261 | `r2 x sign(Z)` | 22 |
+
+All three PNGs were visually inspected and show the signed -1 to 1 colorbar.
+Manifest provenance now records both the compact plotting TSV and its direct
+`.plink2_1kg_phase3.tsv` source. The public image-validation phase rejects
+missing heatmap mode, unsigned coloring, a reference-only result, or a source
+other than the PLINK2 Phase 3 cache.
+
+PLINK variant IDs containing semicolon-separated aliases are expanded by the
+normalizer, while the missing-ID sentinel `.` is discarded. This allows GWAS
+rsIDs to match any valid reference alias without generating unusable proxies.
+
 ## Limits
 
 The CI smoke checks do not authenticate to SAS OnDemand, upload data, validate full

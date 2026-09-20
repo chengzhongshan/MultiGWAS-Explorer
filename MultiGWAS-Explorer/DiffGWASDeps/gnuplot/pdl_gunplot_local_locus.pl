@@ -30,6 +30,7 @@ Options:
   --ld-r2-values MAP       Comma-separated SNP:r2 values for LD proxies.
   --ld-r2-file FILE        Two-column SNP/R2 TSV. Preferred for large LD sets
                            because it avoids operating-system argument limits.
+  --ld-source-file FILE    Source cache used to derive the plotted LD values.
   --ld-population POP      Population label shown with the signed LD r2 scale;
                            MAJOR4 means EUR+AFR+AMR+EAS (default: EUR).
   --ld-reference-panel TXT Reference-panel label shown with the LD r2 scale
@@ -80,6 +81,7 @@ GetOptions(
     'ld-display-mode=s'  => \$opt{ld_display_mode},
     'ld-r2-values=s'     => \$opt{ld_r2_values},
     'ld-r2-file=s'       => \$opt{ld_r2_file},
+    'ld-source-file=s'   => \$opt{ld_source_file},
     'ld-population=s'    => \$opt{ld_population},
     'ld-reference-panel=s' => \$opt{ld_reference_panel},
     'ld-heatmap-colors=s'=> \$opt{ld_heatmap_colors},
@@ -380,6 +382,9 @@ if ($has_gtf) {
 
 my $sig_y = safe_neglog10($opt{sig});
 my $gene_height = $has_gtf ? max_num(6.0, 1.8 * gene_lane_count($gene_tsv)) : 0;
+my $ld_r2_points = scalar(grep {
+    exists $ld_r2_for{$_} && exists $found_ld_snp{$_}
+} keys %ld_r2_for);
 write_gnuplot(
     gp_file     => $gp_file,
     png_file    => $png_file,
@@ -406,7 +411,7 @@ write_gnuplot(
     ld_reference_panel => $opt{ld_reference_panel},
     ld_reference_snp=> $ld_reference_snp,
     ld_heatmap_colors => \@ld_heatmap_colors,
-    ld_r2_points    => scalar(grep { exists $ld_r2_for{$_} && exists $found_ld_snp{$_} } keys %ld_r2_for),
+    ld_r2_points    => $ld_r2_points,
     gene_height => $gene_height,
     use_zcolors => ($has_gtf && $has_zcols ? 1 : 0),
     use_signed_r2 => ($has_gtf && $use_signed_r2 ? 1 : 0),
@@ -435,6 +440,9 @@ print {$mf} join("\t", 'ld_marker_symbol', lc($opt{ld_marker_symbol})), "\n";
 print {$mf} join("\t", 'ld_marker_color', $opt{ld_marker_color}), "\n";
 print {$mf} join("\t", 'ld_display_mode', $opt{ld_display_mode}), "\n";
 print {$mf} join("\t", 'ld_r2_values', ($opt{ld_r2_values} // '')), "\n";
+print {$mf} join("\t", 'ld_r2_file', ($opt{ld_r2_file} // '')), "\n";
+print {$mf} join("\t", 'ld_source_file', ($opt{ld_source_file} // '')), "\n";
+print {$mf} join("\t", 'ld_r2_points', $ld_r2_points), "\n";
 print {$mf} join("\t", 'ld_population', $opt{ld_population}), "\n";
 print {$mf} join("\t", 'ld_reference_panel', $opt{ld_reference_panel}), "\n";
 print {$mf} join("\t", 'ld_reference_snp', $ld_reference_snp), "\n";

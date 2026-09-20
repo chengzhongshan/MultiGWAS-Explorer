@@ -107,12 +107,12 @@ my $local_ld_audit_file_override = '';
 my $local_ld_cache_override = '';
 my $local_ld_reference_snp_override = '';
 my $local_ld_population_override = '';
-my $local_ld_r2_threshold_override = 0;
+my $local_ld_r2_threshold_override;
 my $local_ld_web_fallback = 1;
 my $highlight_high_ld_snps = 0;
 my $local_ld_marker_symbol = 'star';
 my $local_ld_marker_color = 'black';
-my $local_ld_display_mode = 'none';
+my $local_ld_display_mode;
 my $local_ld_r2_values_override = '';
 my $local_ld_heatmap_colors = 'CXF7FBFF CX6BAED6 CX54278F';
 my $exclude_non_protein_coding_genes_in_local_gtf = 0;
@@ -287,8 +287,6 @@ $local_ld_population_override = uc($local_ld_population_override || '');
 die "--local-ld-population must be AFR, AMR, ASN/EAS, EUR, MAJOR4, or a comma/plus-separated list of those populations\n"
     if length($local_ld_population_override)
        && !valid_local_ld_population_spec($local_ld_population_override);
-die "--local-ld-r2-threshold must be between 0 and 1\n"
-    unless $local_ld_r2_threshold_override >= 0 && $local_ld_r2_threshold_override <= 1;
 
 my $cli_raw_column_aliases = load_alias_override_file($raw_column_alias_config);
 
@@ -322,6 +320,13 @@ if (!length $spec_file && length $gwas_dir) {
 
 die "--spec is required (or provide --gwas-dir to generate one)\n" unless length $spec_file;
 my $spec = load_json($spec_file);
+$local_ld_r2_threshold_override = 0 + (
+    defined($local_ld_r2_threshold_override)
+      ? $local_ld_r2_threshold_override
+      : ($spec->{local_ld_r2_threshold} // 0)
+);
+die "--local-ld-r2-threshold must be between 0 and 1\n"
+    unless $local_ld_r2_threshold_override >= 0 && $local_ld_r2_threshold_override <= 1;
 $manhattan_fig_width_override ||= $figure_width_override;
 $manhattan_fig_height_override ||= $figure_height_override;
 $local_manhattan_fig_width_override ||= $figure_width_override;
@@ -558,7 +563,7 @@ my $local_plot_requested =
     || (!$skip_plots && ($plots || '') =~ /(?:^|,)local_(?:manhattan|gtf)(?:,|$)/);
 $highlight_high_ld_snps = 1
     if length($local_ld_snps_override) || length(cfg_or($spec, 'local_ld_snps', ''));
-$local_ld_display_mode = lc(trim($local_ld_display_mode || 'none'));
+$local_ld_display_mode = lc(trim($local_ld_display_mode // $spec->{local_ld_display_mode} // 'none'));
 die "--local-ld-display-mode must be none, markers, heatmap, or both\n"
     unless $local_ld_display_mode =~ /^(?:none|markers|heatmap|both)$/;
 $local_ld_display_mode = 'markers'

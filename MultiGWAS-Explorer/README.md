@@ -600,6 +600,23 @@ This test disables gnuplot fallback. The SAS local-GTF runner passes the
 resolved reference build to the annotation extractor, including `hg19` for
 the public schizophrenia data and the GENCODE GRCh37/lift37 annotation.
 
+The public schizophrenia GTF example requires the official phased 1000
+Genomes Phase 3 GRCh37 reference for reproducible EUR LD. Put a PLINK2 Windows
+binary at `cache/plink2_bin/plink2.exe`, then download and prepare the full
+reference (roughly 10 GB including the decompressed PGEN):
+
+```bash
+bash DiffGWASDeps/prepare_plink2_1kg_phase3_reference.sh \
+  --whole \
+  --output-dir cache/plink2_1kg_phase3 \
+  --plink2 cache/plink2_bin/plink2.exe
+```
+
+The files come from the official [PLINK2 resources page](https://www.cog-genomics.org/plink/2.0/resources)
+and remain outside Git. The public example auto-detects these standard cache
+paths during `--phase prepare`; custom paths can be supplied explicitly with
+`--plink2-1kg-pfile` and `--plink2`.
+
 ### Ubuntu / Linux Pipeline Install
 
 Recommended host systems:
@@ -2792,6 +2809,14 @@ perl install/run_public_sex_gwas.pl \
   --plink2-1kg-pfile /data/1kg/all_phase3 \
   --plink2 /opt/plink2/plink2
 ```
+
+For gnuplot, `local_ld_display_mode` and `local_ld_r2_threshold` in the spec
+are honored unless command-line values override them. The public example also
+passes `--ld-display-mode heatmap` explicitly and validates every local-GTF
+manifest: signed coloring must be enabled, at least one non-reference proxy
+must be plotted, and `ld_source_file` must identify a direct PLINK2 Phase 3
+cache. This prevents a decoded but non-LD-colored PNG from being reported as a
+successful scientific validation.
 
 When a large-window local GTF rerun looks like it "finished" but the HTML
 contains blank regions, check the saved `run_local_hits_with_gtf_*/output.html.info.txt`

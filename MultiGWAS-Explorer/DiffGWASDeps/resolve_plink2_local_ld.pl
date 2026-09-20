@@ -136,14 +136,22 @@ sub parse_report {
         $b = $f[5] if !defined($b) && @f >= 7;
         $r2 = $f[6] if !defined($r2) && @f >= 7;
         next unless defined($a) && defined($b) && defined($r2);
-        # PLINK reference panels may contain rsIDs, chr:pos IDs, or other
-        # stable variant identifiers; retain any non-empty IDs.
-        next unless length($a) && length($b);
+        # PLINK can store multiple aliases in one semicolon-delimited ID.
+        # Expand them so a GWAS rsID can match any alias, and discard the
+        # missing-ID sentinel instead of emitting an unusable proxy named '.'.
+        my @a_ids = grep { length && $_ ne '.' } split /;/, $a;
+        my @b_ids = grep { length && $_ ne '.' } split /;/, $b;
+        next unless @a_ids && @b_ids;
         next unless $r2 =~ /^(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i;
         next unless $r2 >= $threshold;
-        my $proxy = lc($a) eq lc($ref) ? $b : (lc($b) eq lc($ref) ? $a : undef);
-        next unless defined $proxy;
-        $best{$proxy} = 0 + $r2 if !exists($best{$proxy}) || $r2 > $best{$proxy};
+        my $a_is_ref = grep { lc($_) eq lc($ref) } @a_ids;
+        my $b_is_ref = grep { lc($_) eq lc($ref) } @b_ids;
+        my @proxies = $a_is_ref ? @b_ids : ($b_is_ref ? @a_ids : ());
+        for my $proxy (@proxies) {
+            next if lc($proxy) eq lc($ref);
+            $best{$proxy} = 0 + $r2
+                if !exists($best{$proxy}) || $r2 > $best{$proxy};
+        }
     }
     if (defined $out_path) {
         make_path(dirname($out_path)) unless -d dirname($out_path);
