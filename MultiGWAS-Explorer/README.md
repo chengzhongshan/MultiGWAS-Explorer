@@ -598,21 +598,23 @@ resolved reference build to the annotation extractor, including `hg19` for
 the public schizophrenia data and the GENCODE GRCh37/lift37 annotation.
 
 The public schizophrenia GTF example requires the official phased 1000
-Genomes Phase 3 GRCh37 reference for reproducible EUR LD. Put a PLINK2 Windows
-binary at `cache/plink2_bin/plink2.exe`, then download and prepare the full
+Genomes Phase 3 GRCh37 reference for reproducible EUR LD. Put the native
+PLINK2 binary at `cache/plink2_bin/plink2` on macOS/Linux or
+`cache/plink2_bin/plink2.exe` on Windows, then download and prepare the full
 reference (roughly 10 GB including the decompressed PGEN):
 
 ```bash
 bash DiffGWASDeps/prepare_plink2_1kg_phase3_reference.sh \
   --whole \
   --output-dir cache/plink2_1kg_phase3 \
-  --plink2 cache/plink2_bin/plink2.exe
+  --plink2 cache/plink2_bin/plink2
 ```
 
 The files come from the official [PLINK2 resources page](https://www.cog-genomics.org/plink/2.0/resources)
 and remain outside Git. The public example auto-detects these standard cache
-paths during `--phase prepare`; custom paths can be supplied explicitly with
-`--plink2-1kg-pfile` and `--plink2`.
+paths and either platform-specific executable name during `--phase prepare`;
+custom paths can be supplied explicitly with `--plink2-1kg-pfile` and
+`--plink2`.
 
 ### Ubuntu / Linux Pipeline Install
 

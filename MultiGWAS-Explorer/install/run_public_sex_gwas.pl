@@ -39,11 +39,12 @@ $|=1;
 if (!defined($plink2_1kg_pfile) && !defined($plink2)) {
  my $candidate_pfile=abs_path('cache/plink2_1kg_phase3/all_phase3')
    || 'cache/plink2_1kg_phase3/all_phase3';
- my $candidate_plink=abs_path('cache/plink2_bin/plink2.exe')
-   || 'cache/plink2_bin/plink2.exe';
+ my @plink_names=$^O eq 'MSWin32' ? qw(plink2.exe plink2) : qw(plink2 plink2.exe);
+ my ($candidate_plink)=map { abs_path("cache/plink2_bin/$_") }
+   grep { -f "cache/plink2_bin/$_" } @plink_names;
  if (-s "$candidate_pfile.pgen"
      && (-s "$candidate_pfile.pvar" || -s "$candidate_pfile.pvar.zst")
-     && -s "$candidate_pfile.psam" && -f $candidate_plink) {
+     && -s "$candidate_pfile.psam" && defined($candidate_plink)) {
   ($plink2_1kg_pfile,$plink2)=($candidate_pfile,$candidate_plink);
   print "Using repository-local PLINK2 Phase 3 reference: $candidate_pfile\n";
  }
