@@ -18,7 +18,9 @@ ensure_xcode_clt() {
 ensure_homebrew() {
   if ! command_exists brew; then
     log "Installing Homebrew"
-    NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+    # Use macOS curl for the bootstrap. Conda/Anaconda commonly places its own
+    # curl first on PATH with a private CA bundle that cannot validate GitHub.
+    NONINTERACTIVE=1 /bin/bash -c "$(/usr/bin/curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
   fi
   if [ -x /opt/homebrew/bin/brew ]; then
     eval "$(/opt/homebrew/bin/brew shellenv)"
@@ -165,13 +167,28 @@ case "${macos_package_manager}" in
     ensure_homebrew
     log "Installing macOS packages with Homebrew"
     brew_cmd update
-    brew_cmd install bash curl gd htslib imagemagick openjdk openssl@3 pkg-config python wget
+    brew_cmd install bash curl gd htslib imagemagick openjdk openssl@3 perl pkg-config python wget
+    homebrew_prefix="$(brew_cmd --prefix)"
+    # Prefer Homebrew's trusted curl and current Perl over environment-specific
+    # copies. macOS 26 system Perl can crash while loading freshly built PDL XS
+    # modules, and an Anaconda curl may use an incompatible certificate store.
+    prepend_path "${homebrew_prefix}/opt/curl/bin"
+    prepend_path "${homebrew_prefix}/opt/perl/bin"
+    persist_github_actions_path \
+      "${homebrew_prefix}/opt/perl/bin" \
+      "${homebrew_prefix}/opt/curl/bin" \
+      "${homebrew_prefix}/bin"
     export OPENSSL_PREFIX="$(brew_cmd --prefix openssl@3)"
     ;;
   *)
     die "Unsupported PIPELINE_MACOS_PACKAGE_MANAGER '${macos_package_manager}'; use homebrew or macports"
     ;;
 esac
+
+if [ "${macos_package_manager}" = "homebrew" ]; then
+  mkdir -p "${PIPELINE_LOCAL_DIR}/bin"
+  ln -sfn "$(command -v perl)" "${PIPELINE_LOCAL_DIR}/bin/perl"
+fi
 
 prepend_path "${PIPELINE_LOCAL_DIR}/bin"
 if ! command_exists gnuplot || ! gnuplot -e 'set terminal pngcairo' >/dev/null 2>&1; then

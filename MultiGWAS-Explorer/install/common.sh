@@ -25,7 +25,7 @@ PIPELINE_CPANFILE="${PIPELINE_ROOT}/cpanfile"
 PIPELINE_HTSLIB_VERSION="${PIPELINE_HTSLIB_VERSION:-1.20}"
 PIPELINE_HTSLIB_URL="${PIPELINE_HTSLIB_URL:-https://github.com/samtools/htslib/releases/download/${PIPELINE_HTSLIB_VERSION}/htslib-${PIPELINE_HTSLIB_VERSION}.tar.bz2}"
 PIPELINE_CPANM_BIN=""
-PIPELINE_CPAN_MIRROR="${PIPELINE_CPAN_MIRROR:-http://www.cpan.org}"
+PIPELINE_CPAN_MIRROR="${PIPELINE_CPAN_MIRROR:-https://cpan.metacpan.org}"
 PIPELINE_PYTHON_BIN="${PIPELINE_PYTHON_BIN:-}"
 
 if [[ "${PIPELINE_INSTALL_DEBUG:-0}" =~ ^(1|true|yes|y|on)$ ]]; then
@@ -811,12 +811,15 @@ create_python_venv() {
 activate_perl_env() {
   local base="${PIPELINE_PERL_LOCAL_DIR}/lib/perl5"
   local arch
+  # A platform installer may pin a compatible Perl here. Put it on PATH before
+  # checking the ABI so later shells do not fall back to an incompatible
+  # system Perl and reject the repo-local compiled modules.
+  prepend_path "${PIPELINE_LOCAL_DIR}/bin"
   require_perl_abi_compatible
   # Include the target in PERL5LIB even on the first installation, before CPAN
   # creates it. Configure/build subprocesses must see newly installed modules.
   mkdir -p "$base"
   prepend_path "${PIPELINE_PERL_LOCAL_DIR}/bin"
-  prepend_path "${PIPELINE_LOCAL_DIR}/bin"
   if [ -d "${PIPELINE_VENDOR_PERL_DIR}" ]; then
     prepend_env_list PERL5LIB "${PIPELINE_VENDOR_PERL_DIR}"
   fi
