@@ -64,9 +64,11 @@ sub usage {
     return <<"USAGE";
 Usage:
   perl auto_prepare_and_run_diff_gwas_with_gunplot.pl --spec spec.json [options]
+  perl auto_prepare_and_run_diff_gwas_with_gunplot.pl --gwas-dir DIR [options]
   perl auto_prepare_and_run_diff_gwas_with_gunplot.pl --input-merged combined.tsv.gz [options]
 
 Options:
+  --gwas-dir DIR                Auto-detect GWAS inputs in this directory.
   --input-merged FILE           Import a combined cohort/meta GWAS table directly.
   --spec-out FILE.json          Save the generated spec at this path for reuse.
   --plots LIST                  Comma list: manhattan,local_manhattan,local_gtf,forest
@@ -141,6 +143,7 @@ USAGE
 }
 
 my $spec_file = '';
+my $gwas_dir = '';
 my $input_merged = '';
 my $spec_out = '';
 my $plots = 'manhattan,local_manhattan,local_gtf';
@@ -186,6 +189,7 @@ my $help = 0;
 
 GetOptions(
     'spec=s'                  => \$spec_file,
+    'gwas-dir=s'              => \$gwas_dir,
     'input-merged=s'          => \$input_merged,
     'spec-out=s'              => \$spec_out,
     'plots=s'                 => \$plots,
@@ -230,15 +234,16 @@ GetOptions(
     'help!'                   => \$help,
 ) or die usage();
 
-if ($help || (!$spec_file && !$input_merged)) {
+if ($help || (!$spec_file && !$input_merged && !$gwas_dir)) {
     print usage();
     exit($help ? 0 : 1);
 }
-die "--input-merged cannot be combined with --spec\n"
-    if length($input_merged) && length($spec_file);
-die "--spec-out requires --input-merged\n"
-    if length($spec_out) && !length($input_merged);
-if (length $input_merged) {
+die "Choose only one of --spec, --gwas-dir, or --input-merged\n"
+    if (length($spec_file) && (length($input_merged) || length($gwas_dir)))
+        || (length($input_merged) && length($gwas_dir));
+die "--spec-out requires --gwas-dir or --input-merged\n"
+    if length($spec_out) && !length($input_merged) && !length($gwas_dir);
+if (length($input_merged) || length($gwas_dir)) {
     if (length $spec_out) {
         $spec_file = $spec_out;
     }
@@ -250,7 +255,7 @@ if (length $input_merged) {
     run_cmd([
         $^X,
         File::Spec->catfile($Bin, 'auto_prepare_and_run_diff_gwas.pl'),
-        '--input-merged', $input_merged,
+        (length($input_merged) ? ('--input-merged', $input_merged) : ('--gwas-dir', $gwas_dir)),
         '--spec-out', $spec_file,
         '--generate-spec-only',
     ], 'direct merged GWAS import');

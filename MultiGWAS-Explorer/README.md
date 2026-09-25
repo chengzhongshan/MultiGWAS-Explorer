@@ -75,15 +75,20 @@ perl auto_prepare_and_run_diff_gwas_with_gunplot.pl \
   --input-merged /path/to/DS_ALL_and_MP2PRT_plus_meta.gz \
   --spec-out configs/aoa_gunplot.json \
   --plots manhattan --display-gwas Meta
+
+# Or detect the same table in a directory, including a relative directory:
+perl auto_prepare_and_run_diff_gwas_with_gunplot.pl \
+  --gwas-dir AOA_GWAS_Data --plots manhattan --display-gwas Meta
 ```
 
 The generated spec also works with the existing SAS and gnuplot plotting
 commands. Omit `--generate-spec-only` to proceed directly with the pipeline.
 `--input-merged` cannot be combined with `--spec` or `--gwas-dir`.
-The gnuplot entry point also accepts `--input-merged` directly. It saves the
+The gnuplot entry point also accepts `--input-merged` and `--gwas-dir` directly. It saves the
 generated spec at `--spec-out` when provided and writes preprocessing configs
 beside that spec. `--display-gwas Meta` selects the supplied meta-analysis
-track for plotting. Concatenated gzip streams are read in full.
+track for plotting. Relative GWAS directories are resolved before generating
+plot paths, and concatenated gzip streams are read in full.
 
 This is the combined-table format used by the old local AOA workflow: a
 tab-separated file (plain or gzip compressed) with `CHR`, `BP`, `SNP`, and at

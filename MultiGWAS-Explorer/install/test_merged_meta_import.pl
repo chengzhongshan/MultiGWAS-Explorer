@@ -80,7 +80,7 @@ is(scalar @lines, 3, 'rows with missing cohort values retained');
 @row{@header} = @values;
 ok($row{META_P} !~ /\d/, 'missing meta P is not fabricated');
 SKIP: {
-    skip 'gnuplot or PDL is unavailable', 3
+    skip 'gnuplot or PDL is unavailable', 6
         unless system('gnuplot', '--version') == 0 && eval { require PDL; 1 };
     my $gnu_spec = "$dir/gunplot.spec.json";
     is(system($^X, "$Bin/../auto_prepare_and_run_diff_gwas_with_gunplot.pl",
@@ -94,6 +94,22 @@ SKIP: {
         grep { /GUNPLOT_manhattan_display_META_.*\.png$/ } readdir $plot_dh;
     closedir $plot_dh;
     ok(@png && -s $png[0], 'gnuplot writes a nonempty meta Manhattan image');
+    my $relative_gnu_spec = "$dir/relative_gunplot.spec.json";
+    chdir dirname($relative_dir) or die $!;
+    my $relative_gnu_status = system($^X,
+        "$Bin/../auto_prepare_and_run_diff_gwas_with_gunplot.pl",
+        '--gwas-dir', basename($relative_dir), '--spec-out', $relative_gnu_spec,
+        '--plots', 'manhattan', '--display-gwas', 'Meta');
+    chdir $previous_cwd or die $!;
+    is($relative_gnu_status, 0, 'gnuplot accepts a relative GWAS directory from another working directory');
+    my $relative_gnu_cfg = read_json($relative_gnu_spec);
+    is(abs_path($relative_gnu_cfg->{output_dir}), abs_path($relative_dir),
+        'gnuplot generates an absolute output directory');
+    opendir my $relative_plot_dh, $relative_dir or die $!;
+    my @relative_png = map { "$relative_dir/$_" }
+        grep { /GUNPLOT_manhattan_display_META_.*\.png$/ } readdir $relative_plot_dh;
+    closedir $relative_plot_dh;
+    ok(@relative_png && -s $relative_png[0], 'gnuplot renders a meta plot from the relative directory');
 }
 ok(system($^X, $driver, '--input-merged', $input, '--spec', $spec_path,
     '--generate-spec-only') != 0, 'ambiguous input options rejected');
