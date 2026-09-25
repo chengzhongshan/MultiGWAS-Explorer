@@ -367,6 +367,9 @@ for my $override_value (
     }
 }
 $has_runner_override = 1 if $local_max_hits_per_fig_override;
+# A direct import creates a new spec, which may have different display tracks from
+# a cached runner with the same artifact name (for example, a prior Meta-only run).
+$has_runner_override = 1 if length($input_merged) || length($gwas_dir);
 
 if (!$force_upstream && !$has_runner_override && -f $runner_config_local) {
     my $existing_runner = load_json($runner_config_local);
@@ -401,6 +404,39 @@ if (!$reused_existing_runner) {
 
 die "Runner config was not generated: $runner_config_local\n" unless -f $runner_config_local;
 my $runner = load_json($runner_config_local);
+my $plot_runner_config_local = $runner_config_local;
+if (($spec->{source_mode} || '') eq 'merged_gwas_table' && -f $preset_config_local) {
+    my $preset = load_json($preset_config_local);
+    my %alias = (
+        %{ $preset->{alias_map} || {} },
+        %{ $preset->{post_alias_map} || {} },
+    );
+    if (%alias) {
+        for my $key (qw(MANHATTAN_P_VAR TOP_HIT_FOCUS_PVAR)) {
+            my $value = $runner->{$key} || '';
+            $runner->{$key} = $alias{$value} if exists $alias{$value};
+        }
+        if (ref($runner->{MANHATTAN_OTHER_P_VARS}) eq 'ARRAY') {
+            $runner->{MANHATTAN_OTHER_P_VARS} = [
+                map { $alias{$_} || $_ } @{ $runner->{MANHATTAN_OTHER_P_VARS} }
+            ];
+        }
+        for my $key (qw(GTF_ASSOC_PVARS GTF_ZSCORE_VARS)) {
+            $runner->{$key} = join(' ', map { $alias{$_} || $_ }
+                grep { length } split /\s+/, ($runner->{$key} || ''));
+        }
+        if (defined $runner->{TOP_HIT_FILTER_EXPR}) {
+            $runner->{TOP_HIT_FILTER_EXPR} =~ s/\b([A-Za-z][A-Za-z0-9_]*)\b/
+                exists $alias{$1} ? $alias{$1} : $1/ge;
+        }
+        $plot_runner_config_local = File::Spec->catfile(
+            $configs_dir_local, "auto_${artifact_stem}_gunplot_runner.json");
+        open my $plot_fh, '>', $plot_runner_config_local
+            or die "Cannot write $plot_runner_config_local: $!\n";
+        print {$plot_fh} encode_json($runner), "\n";
+        close $plot_fh or die "Cannot close $plot_runner_config_local: $!\n";
+    }
+}
 $runner->{MANHATTAN_FIG_WIDTH} = $manhattan_fig_width_override if $manhattan_fig_width_override;
 $runner->{MANHATTAN_FIG_HEIGHT} = $manhattan_fig_height_override if $manhattan_fig_height_override;
 $runner->{LOCAL_MANHATTAN_FIG_WIDTH} = $local_manhattan_fig_width_override if $local_manhattan_fig_width_override;
@@ -477,7 +513,7 @@ if ($requested{plot_local_manhattan} || $requested{plot_local_gtf}) {
     }
     @hits = collect_top_hits(
         spec_file    => $spec_file,
-        runner_config_path => $runner_config_local,
+        runner_config_path => $plot_runner_config_local,
         output_dir   => $output_dir_local,
         runner       => $runner,
         wide_data    => $wide_data_local,
@@ -614,7 +650,7 @@ if ($requested{plot_forest}) {
             spec_file    => $spec_file,
             output_dir   => $output_dir_local,
             runner       => $runner,
-            runner_config=> $runner_config_local,
+            runner_config=> $plot_runner_config_local,
             wide_data    => $wide_data_local,
             gnuplot      => $gnuplot,
             target_snps  => ($target_snps_override || ($runner->{TARGET_SNP_LIST} || '')),

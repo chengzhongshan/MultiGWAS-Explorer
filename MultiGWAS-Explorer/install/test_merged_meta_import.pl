@@ -80,7 +80,7 @@ is(scalar @lines, 3, 'rows with missing cohort values retained');
 @row{@header} = @values;
 ok($row{META_P} !~ /\d/, 'missing meta P is not fabricated');
 SKIP: {
-    skip 'gnuplot or PDL is unavailable', 6
+    skip 'gnuplot or PDL is unavailable', 9
         unless system('gnuplot', '--version') == 0 && eval { require PDL; 1 };
     my $gnu_spec = "$dir/gunplot.spec.json";
     is(system($^X, "$Bin/../auto_prepare_and_run_diff_gwas_with_gunplot.pl",
@@ -110,6 +110,22 @@ SKIP: {
         grep { /GUNPLOT_manhattan_display_META_.*\.png$/ } readdir $relative_plot_dh;
     closedir $relative_plot_dh;
     ok(@relative_png && -s $relative_png[0], 'gnuplot renders a meta plot from the relative directory');
+    my $default_gnu_spec = "$dir/relative_gunplot_default.spec.json";
+    chdir dirname($relative_dir) or die $!;
+    my $default_gnu_status = system($^X,
+        "$Bin/../auto_prepare_and_run_diff_gwas_with_gunplot.pl",
+        '--gwas-dir', basename($relative_dir), '--spec-out', $default_gnu_spec,
+        '--plots', 'manhattan');
+    chdir $previous_cwd or die $!;
+    is($default_gnu_status, 0, 'default merged gnuplot refreshes Meta-only runner and renders all tracks');
+    my $default_runner = read_json("$dir/auto_" . $relative_spec->{artifact_stem} . '_gunplot_runner.json');
+    is_deeply($default_runner->{MANHATTAN_OTHER_P_VARS},
+        [qw(MP2PRT_DS_ALL_GROUP2_P MP2PRT_DS_ALL_GROUP1_P META_P)],
+        'gnuplot translates cohort aliases to columns in the wide file');
+    my $default_prefix = $default_runner->{OUTPUT_PREFIX};
+    $default_prefix =~ s/_SAS_/_GUNPLOT_/g;
+    ok(-s "$relative_dir/$default_prefix.png",
+        'default merged gnuplot writes a nonempty Manhattan image');
 }
 ok(system($^X, $driver, '--input-merged', $input, '--spec', $spec_path,
     '--generate-spec-only') != 0, 'ambiguous input options rejected');
