@@ -58,6 +58,48 @@ invoke cleanup concurrently with the pipeline.
 
 ## Main Entry Points
 
+### Import an existing AOA combined / meta-analysis table
+
+Use `--input-merged` to select one existing table directly, without supplying
+separate cohort GWAS files or relying on directory auto-detection:
+
+```bash
+perl auto_prepare_and_run_diff_gwas.pl \
+  --input-merged /path/to/DS_ALL_and_MP2PRT_plus_meta.gz \
+  --spec-out configs/aoa_merged.json --generate-spec-only
+perl auto_prepare_and_run_diff_gwas.pl \
+  --spec configs/aoa_merged.json --skip-plots
+
+# Plot the supplied meta-analysis P values directly with gnuplot:
+perl auto_prepare_and_run_diff_gwas_with_gunplot.pl \
+  --input-merged /path/to/DS_ALL_and_MP2PRT_plus_meta.gz \
+  --spec-out configs/aoa_gunplot.json \
+  --plots manhattan --display-gwas Meta
+```
+
+The generated spec also works with the existing SAS and gnuplot plotting
+commands. Omit `--generate-spec-only` to proceed directly with the pipeline.
+`--input-merged` cannot be combined with `--spec` or `--gwas-dir`.
+The gnuplot entry point also accepts `--input-merged` directly. It saves the
+generated spec at `--spec-out` when provided and writes preprocessing configs
+beside that spec. `--display-gwas Meta` selects the supplied meta-analysis
+track for plotting. Concatenated gzip streams are read in full.
+
+This is the combined-table format used by the old local AOA workflow: a
+tab-separated file (plain or gzip compressed) with `CHR`, `BP`, `SNP`, and at
+least two cohort `BETA_<cohort>`, `SE_<cohort>`, `P_<cohort>` blocks. Optional
+`PR_meta`, `BETAR_meta`, and `WEIGHTED_Z_meta` columns are imported as
+`META_P`, `META_BETA`, and `META_Z`. Supplied meta-analysis values are retained;
+the pipeline computes the existing cohort differential comparison separately.
+When both `PR_meta` and `PWZ_meta` exist, the old workflow's `PR_meta` selection
+is preserved. A custom `merged_gwas_table` spec can explicitly select a
+different meta-analysis P column through `merged_extra_tracks`.
+
+This option does not accept a standalone PLINK meta-analysis-only table with
+no cohort BETA/SE/P blocks. It preserves the old combined AOA input contract.
+
+Regression check: `perl install/test_merged_meta_import.pl`.
+
 - `auto_prepare_and_run_diff_gwas.pl`
   High-level automation entry point for config generation, preprocessing, and
   plot submission. It now also accepts `--gwas-dir` for auto-detecting either

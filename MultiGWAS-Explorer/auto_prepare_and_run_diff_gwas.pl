@@ -14,7 +14,7 @@ use IO::Uncompress::Gunzip qw($GunzipError);
 use Digest::MD5 qw(md5_hex);
 use Cwd qw(abs_path);
 use File::Spec;
-use File::Basename qw(basename);
+use File::Basename qw(basename dirname);
 use File::Path qw(make_path);
 use File::Temp qw(tempfile);
 use POSIX qw(strftime);
@@ -36,6 +36,7 @@ BEGIN {
 
 my $spec_file = '';
 my $gwas_dir = '';
+my $input_merged = '';
 my $spec_out = '';
 my $raw_column_alias_config = '';
 my $mode = 'full';
@@ -151,6 +152,7 @@ for my $arg (@ARGV) {
 GetOptions(
     'spec=s'              => \$spec_file,
     'gwas-dir=s'          => \$gwas_dir,
+    'input-merged=s'      => \$input_merged,
     'spec-out=s'          => \$spec_out,
     'raw-column-alias-config=s' => \$raw_column_alias_config,
     'mode=s'              => \$mode,
@@ -290,16 +292,45 @@ die "--local-ld-population must be AFR, AMR, ASN/EAS, EUR, MAJOR4, or a comma/pl
 
 my $cli_raw_column_aliases = load_alias_override_file($raw_column_alias_config);
 
-if (!length $spec_file && length $gwas_dir) {
+die "--input-merged cannot be combined with --spec or --gwas-dir\n"
+    if length($input_merged) && (length($spec_file) || length($gwas_dir));
+
+if (!length $spec_file && (length $gwas_dir || length $input_merged)) {
     my $draft_spec;my $draft_path;
-    ($draft_spec, $draft_path) = infer_spec_from_gwas_dir(
-        gwas_dir              => $gwas_dir,
-        spec_out              => $spec_out,
-        workdir               => script_root_dir(),
-        project_tag_override  => $project_tag_override,
-        artifact_stem_override => $artifact_stem_override,
-        raw_column_aliases    => $cli_raw_column_aliases,
-    );
+    if (length $input_merged) {
+        my $local_input = cygpath_to_win($input_merged);
+        die "Merged GWAS input does not exist: $input_merged\n" unless -f $local_input;
+        my $input_path = $local_input;
+        if ($^O eq 'cygwin' && $input_path =~ /^([A-Za-z]):[\\\/](.*)$/) {
+            my ($drive, $rest) = (lc($1), $2);
+            $rest =~ s{\\}{/}g;
+            $input_path = "/cygdrive/$drive/$rest";
+        }
+        $input_path = normalize_unix_path(abs_path($input_path));
+        my $input_dir = dirname($input_path);
+        ($draft_spec, $draft_path) = infer_merged_spec_from_dir(
+            gwas_dir => $input_dir,
+            workdir => script_root_dir(),
+            configs_dir => script_root_dir() . '/configs',
+            study_prefix => infer_study_prefix_from_dir($input_dir),
+            project_tag_override => $project_tag_override,
+            artifact_stem_override => $artifact_stem_override,
+            spec_out => $spec_out,
+            files => [$input_path],
+        );
+        die "Cannot import merged GWAS input $input_merged: expected CHR/BP/SNP and at least two cohort BETA/SE/P blocks; supplied meta-analysis tracks are optional\n"
+            unless $draft_spec;
+    }
+    else {
+        ($draft_spec, $draft_path) = infer_spec_from_gwas_dir(
+            gwas_dir              => $gwas_dir,
+            spec_out              => $spec_out,
+            workdir               => script_root_dir(),
+            project_tag_override  => $project_tag_override,
+            artifact_stem_override => $artifact_stem_override,
+            raw_column_aliases    => $cli_raw_column_aliases,
+        );
+    }
     print STDERR "WARNING: The draft_path is undefined but the inferred draft spec is available in memory.\n"
       unless defined($draft_path) && length($draft_path) > 0;
     if ($preview_spec) {
@@ -318,7 +349,7 @@ if (!length $spec_file && length $gwas_dir) {
     $spec_file = $draft_path;
 }
 
-die "--spec is required (or provide --gwas-dir to generate one)\n" unless length $spec_file;
+die "--spec is required (or provide --gwas-dir or --input-merged to generate one)\n" unless length $spec_file;
 my $spec = load_json($spec_file);
 $local_ld_r2_threshold_override = 0 + (
     defined($local_ld_r2_threshold_override)
@@ -2995,7 +3026,8 @@ sub build_runner_config {
     ) ? 'Signed LD r2 (r2 x sign(Z), 1000 Genomes Phase 3 / PLINK2)'
       : infer_effect_metric_label_from_vars(map { $_->{zvar} } @selected_tracks);
 
-    my @focus_tracks = @selected_std_tracks ? @selected_std_tracks : @selected_group_tracks;
+    my @focus_tracks = @selected_std_tracks ? @selected_std_tracks
+        : @selected_group_tracks ? @selected_group_tracks : @selected_tracks;
     die "No selectable Manhattan/GTF tracks were resolved for plotting.\n" unless @focus_tracks;
 
     my $primary_focus_track;
@@ -3007,7 +3039,7 @@ sub build_runner_config {
         $primary_focus_track ||= $selected_std_tracks[0];
     }
     else {
-        $primary_focus_track = $selected_group_tracks[0];
+        $primary_focus_track = $focus_tracks[0];
     }
 
     my $top_hit_mode = $get_common_associations
@@ -4317,6 +4349,7 @@ Usage:
 Options:
   --spec FILE.json      Required comparison spec
   --gwas-dir DIR        Scan a directory of potential raw GWAS summary-statistics files and draft a spec JSON
+  --input-merged FILE   Import one combined GWAS table, preserving supplied meta-analysis tracks
   --spec-out FILE.json  Where to write the auto-generated spec JSON
   --raw-column-alias-config FILE.json
                        Optional JSON mapping canonical raw columns like ID/POS/PVAL
@@ -4546,7 +4579,7 @@ Options:
                        Explicit alias for the starting common-association
                        top-hit threshold for any single-GWAS association P.
   --cleanup-shared-plot-data Convenience alias for --step cleanup_shared_plot_data
-  --generate-spec-only  When used with --gwas-dir, write or preview the draft spec and exit
+  --generate-spec-only  With --gwas-dir or --input-merged, write or preview the draft spec and exit
   --project-tag TEXT    Optional override for inferred project_tag during auto-spec generation
   --artifact-stem TEXT  Optional override for inferred artifact_stem during auto-spec generation
   --print-spec-example  Print a full JSON spec example and exit

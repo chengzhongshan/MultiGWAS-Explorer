@@ -48,13 +48,14 @@ use warnings;
 
 use FindBin qw($Bin);
 use Getopt::Long qw(GetOptions);
-use JSON::PP qw(decode_json);
+use JSON::PP qw(decode_json encode_json);
 use GD;
 use Text::ParseWords qw(parse_line);
 use File::Spec;
 use File::Basename qw(basename dirname);
 use File::Copy qw(copy);
 use File::Path qw(make_path);
+use File::Temp qw(tempfile);
 use POSIX qw(strftime ceil);
 use Time::HiRes qw(time);
 use IO::Uncompress::Gunzip qw($GunzipError);
@@ -63,8 +64,11 @@ sub usage {
     return <<"USAGE";
 Usage:
   perl auto_prepare_and_run_diff_gwas_with_gunplot.pl --spec spec.json [options]
+  perl auto_prepare_and_run_diff_gwas_with_gunplot.pl --input-merged combined.tsv.gz [options]
 
 Options:
+  --input-merged FILE           Import a combined cohort/meta GWAS table directly.
+  --spec-out FILE.json          Save the generated spec at this path for reuse.
   --plots LIST                  Comma list: manhattan,local_manhattan,local_gtf,forest
   --step NAME                   Plot step(s): plot_manhattan, plot_local_manhattan, plot_local_gtf, plot_forest
   --force                       Force plot regeneration while reusing valid upstream data.
@@ -137,6 +141,8 @@ USAGE
 }
 
 my $spec_file = '';
+my $input_merged = '';
+my $spec_out = '';
 my $plots = 'manhattan,local_manhattan,local_gtf';
 my @step_args;
 my $force = 0;
@@ -180,6 +186,8 @@ my $help = 0;
 
 GetOptions(
     'spec=s'                  => \$spec_file,
+    'input-merged=s'          => \$input_merged,
+    'spec-out=s'              => \$spec_out,
     'plots=s'                 => \$plots,
     'step=s@'                 => \@step_args,
     'force!'                  => \$force,
@@ -222,9 +230,37 @@ GetOptions(
     'help!'                   => \$help,
 ) or die usage();
 
-if ($help || !$spec_file) {
+if ($help || (!$spec_file && !$input_merged)) {
     print usage();
     exit($help ? 0 : 1);
+}
+die "--input-merged cannot be combined with --spec\n"
+    if length($input_merged) && length($spec_file);
+die "--spec-out requires --input-merged\n"
+    if length($spec_out) && !length($input_merged);
+if (length $input_merged) {
+    if (length $spec_out) {
+        $spec_file = $spec_out;
+    }
+    else {
+        my $fh;
+        ($fh, $spec_file) = tempfile('gunplot_merged_XXXX', SUFFIX => '.spec.json', TMPDIR => 1, UNLINK => 0);
+        close $fh or die "Cannot close generated spec $spec_file: $!\n";
+    }
+    run_cmd([
+        $^X,
+        File::Spec->catfile($Bin, 'auto_prepare_and_run_diff_gwas.pl'),
+        '--input-merged', $input_merged,
+        '--spec-out', $spec_file,
+        '--generate-spec-only',
+    ], 'direct merged GWAS import');
+    my $generated_spec = load_json($spec_file);
+    $generated_spec->{configs_dir} = dirname(localize_path($spec_file));
+    open my $generated_fh, '>', $spec_file
+        or die "Cannot write generated spec $spec_file: $!\n";
+    print {$generated_fh} encode_json($generated_spec), "\n";
+    close $generated_fh or die "Cannot close generated spec $spec_file: $!\n";
+    print "Generated reusable merged GWAS spec: $spec_file\n";
 }
 $ld_population_override = uc($ld_population_override || '');
 die "--ld-population must be AFR, AMR, ASN/EAS, EUR, MAJOR4, or a comma/plus-separated list of those populations\n"

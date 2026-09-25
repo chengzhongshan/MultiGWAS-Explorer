@@ -192,7 +192,7 @@ sub open_reader {
     my ($path) = @_;
     $path = local_path($path);
     if ($path =~ /\.(?:gz|bgz|bgzip)$/i) {
-        my $fh = IO::Uncompress::Gunzip->new($path)
+        my $fh = IO::Uncompress::Gunzip->new($path, MultiStream => 1)
           or die "Cannot open gzip input $path: $GunzipError\n";
         return $fh;
     }
