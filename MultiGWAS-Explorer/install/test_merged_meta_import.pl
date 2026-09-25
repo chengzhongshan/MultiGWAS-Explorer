@@ -3,6 +3,10 @@ use strict;
 use warnings;
 use FindBin qw($Bin);
 use File::Temp qw(tempdir);
+use File::Path qw(make_path);
+use File::Copy qw(copy);
+use File::Basename qw(dirname basename);
+use Cwd qw(abs_path getcwd);
 use JSON::PP qw(encode_json decode_json);
 use IO::Compress::Gzip qw(gzip $GzipError);
 use IO::Uncompress::Gunzip qw(gunzip $GunzipError);
@@ -23,6 +27,25 @@ gzip \join('', @data_lines) => \$second_stream or die $GzipError;
 open my $gz_append, '>>:raw', $input or die $!;
 print {$gz_append} $second_stream;
 close $gz_append or die $!;
+my $relative_dir = "$dir/relative input";
+make_path($relative_dir);
+copy($input, "$relative_dir/combined_meta.gz") or die $!;
+my $previous_cwd = getcwd();
+chdir dirname($relative_dir) or die $!;
+my $relative_spec_path = "$dir/relative.spec.json";
+my $relative_status = system($^X, $driver, '--gwas-dir', basename($relative_dir),
+    '--spec-out', $relative_spec_path, '--generate-spec-only');
+chdir $previous_cwd or die $!;
+is($relative_status, 0, 'relative --gwas-dir generates a spec');
+my $relative_spec = read_json($relative_spec_path);
+is(abs_path($relative_spec->{output_dir}), abs_path($relative_dir),
+    'auto-detected output directory is absolute and independent of the script location');
+$relative_spec->{configs_dir} = "$dir/relative_configs";
+write_json($relative_spec_path, $relative_spec);
+is(system($^X, $driver, '--spec', $relative_spec_path, '--skip-plots',
+    '--step', 'extract_wide_subset'), 0, 'relative directory spec converts from another working directory');
+ok(-s "$relative_dir/" . $relative_spec->{artifact_stem} . '.merged_plotwide.tsv.gz',
+    'wide output is written alongside the input directory');
 my $spec_path = "$dir/import.json";
 is(system($^X, $driver, '--input-merged', $input, '--spec-out', $spec_path,
     '--generate-spec-only'), 0, 'direct import generates a spec without separate cohort files');

@@ -1303,6 +1303,11 @@ sub infer_spec_from_gwas_dir {
     my (%args) = @_;
     my $gwas_dir = normalize_unix_path($args{gwas_dir} // '');
     die "--gwas-dir is required for auto spec generation\n" unless length $gwas_dir;
+    if ($^O eq 'cygwin' && $gwas_dir =~ /^([A-Za-z]):\/(.*)$/) {
+        $gwas_dir = '/cygdrive/' . lc($1) . '/' . $2;
+    }
+    die "GWAS directory does not exist: $gwas_dir\n" unless -d $gwas_dir;
+    $gwas_dir = normalize_unix_path(abs_path($gwas_dir));
     my $workdir = normalize_unix_path($args{workdir} // script_root_dir());
     my $configs_dir = "$workdir/configs";
 
