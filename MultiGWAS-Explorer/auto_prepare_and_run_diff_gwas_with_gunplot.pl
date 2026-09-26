@@ -404,6 +404,10 @@ if (!$reused_existing_runner) {
 
 die "Runner config was not generated: $runner_config_local\n" unless -f $runner_config_local;
 my $runner = load_json($runner_config_local);
+my @manhattan_source_pcols = (
+    $runner->{MANHATTAN_P_VAR},
+    @{ ref($runner->{MANHATTAN_OTHER_P_VARS}) eq 'ARRAY' ? $runner->{MANHATTAN_OTHER_P_VARS} : [] },
+);
 my $plot_runner_config_local = $runner_config_local;
 if (($spec->{source_mode} || '') eq 'merged_gwas_table' && -f $preset_config_local) {
     my $preset = load_json($preset_config_local);
@@ -491,8 +495,11 @@ if ($requested{plot_manhattan}) {
             output_dir => $output_dir_local,
             runner     => $runner,
             wide_data  => $wide_data_local,
+            source_wide_data => $runner->{DATA_GZ},
+            schema_config => $preset_config_local,
+            cache_dir  => File::Spec->catdir($workdir_local, 'cache', 'sas_manhattan'),
             gnuplot    => $gnuplot,
-            pcols      => \@manhattan_pcols,
+            pcols      => \@manhattan_source_pcols,
             labels     => \@new_manhattan_labels,
             remove_x_chr => $remove_x_chr,
             force      => $force,
@@ -717,6 +724,23 @@ sub run_upstream_preprocessing {
 
 sub plot_manhattan {
     my (%args) = @_;
+    my $threshold = $ENV{MANHATTAN_SUBSET_THRESHOLD} || '0.05';
+    (my $threshold_tag = $threshold) =~ s/[^A-Za-z0-9]/_/g;
+    make_path($args{cache_dir}) unless -d $args{cache_dir};
+    my $compact_stem = safe_name($args{runner}{OUTPUT_PREFIX} || 'gunplot_manhattan')
+        . ".p_lt_${threshold_tag}";
+    my $compact_data = File::Spec->catfile($args{cache_dir}, "$compact_stem.tsv.gz");
+    run_cmd([
+        $^X,
+        File::Spec->catfile($Bin, 'DiffGWASDeps', 'prepare_sas_manhattan_plot_input.pl'),
+        '--input', $args{source_wide_data},
+        '--schema-config', $args{schema_config},
+        '--pvars', join(' ', @{ $args{pcols} || [] }),
+        '--threshold', $threshold,
+        '--output', $compact_data,
+        '--schema-out', File::Spec->catfile($args{cache_dir}, "$compact_stem.schema.json"),
+        '--manifest', File::Spec->catfile($args{cache_dir}, "$compact_stem.manifest.json"),
+    ], 'compact genomewide Manhattan input');
     my $output_prefix = gunplotize_name($args{runner}{OUTPUT_PREFIX} || 'gunplot_manhattan');
     my $out_prefix_path = File::Spec->catfile($args{output_dir}, $output_prefix);
     my $png_path = $out_prefix_path . '.png';
@@ -730,11 +754,19 @@ sub plot_manhattan {
     my $thin_mod = defined $args{runner}{GUNPLOT_MANHATTAN_THIN_MOD}
         ? $args{runner}{GUNPLOT_MANHATTAN_THIN_MOD}
         : 10;
-    if (!(!$args{force} && -s $png_path)) {
+    my $plot_manifest = $out_prefix_path . '.manifest.tsv';
+    my $prior = -s $plot_manifest ? read_manifest_tsv($plot_manifest) : {};
+    my $plot_reusable = !$args{force}
+        && ($prior->{input} || '') eq $compact_data
+        && ($prior->{pcols} || '') eq join(',', @{ $args{pcols} || [] })
+        && ($prior->{labels} || '') eq join('|', @{ $args{labels} || [] })
+        && target_is_newer_than_inputs($png_path, $compact_data,
+            File::Spec->catfile($Bin, 'DiffGWASDeps', 'gnuplot', 'pdl_gunplot_manhattan.pl'));
+    if (!$plot_reusable) {
         my @cmd = (
             $^X,
             File::Spec->catfile($Bin, 'DiffGWASDeps', 'gnuplot', 'pdl_gunplot_manhattan.pl'),
-            '--data', $args{wide_data},
+            '--data', $compact_data,
             '--out-prefix', $out_prefix_path,
             '--pcols', join(',', @{ $args{pcols} || [] }),
             '--labels', join('|', @{ $args{labels} || [] }),

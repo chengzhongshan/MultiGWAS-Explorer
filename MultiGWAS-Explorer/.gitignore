@@ -20,6 +20,7 @@ codex_*/
 
 cache/local_gtf_reuse/
 cache/local_manhattan_reuse/
+cache/sas_manhattan/
 cache/gtf/
 cache/plink2_1kg_phase3/
 cache/plink2_bin/

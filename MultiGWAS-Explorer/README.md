@@ -1347,6 +1347,17 @@ perl auto_prepare_and_run_diff_gwas.pl \
   --step plot_local_gtf
 ```
 
+The SAS ODA and gunplot genome-wide Manhattan runners now prepare a cached,
+sorted input locally. It keeps only `CHR`, `BP`, and the displayed P columns,
+and retains a SNP only when at least one displayed P is `< 0.05`. This avoids
+loading and sorting the full GWAS-wide table in SAS `WORK` and speeds up the
+genome-wide gunplot scan. Local Manhattan, local GTF, top-hit, and forest inputs
+are unchanged. The compact file, its import schema, and a row-count manifest
+are in `cache/sas_manhattan/`.
+Set `MANHATTAN_SUBSET_THRESHOLD` to change the threshold for both genome-wide
+backends. For SAS ODA only, `MANHATTAN_COMPACT_INPUT=0` restores the original
+full-input behavior.
+
 Noninteractive first-run SAS ODA credential bootstrap:
 
 ```bash

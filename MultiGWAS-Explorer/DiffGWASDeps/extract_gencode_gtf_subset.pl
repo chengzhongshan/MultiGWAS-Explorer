@@ -4,7 +4,7 @@ use warnings;
 
 use FindBin qw($Bin);
 use lib $Bin;
-use File::Basename qw(basename);
+use File::Basename qw(basename dirname);
 use File::Path qw(make_path);
 use File::Spec;
 use Fcntl qw(:flock);
@@ -459,12 +459,14 @@ sub find_executable {
     my @suffixes = $^O =~ /MSWin32/i ? ('', '.exe', '.bat', '.cmd')
       : $^O =~ /cygwin/i ? ('', '.exe')
       : ('');
-    my @dirs = (
-        $Bin,
-        File::Spec->catdir($Bin, File::Spec->updir()),
-        File::Spec->catdir($Bin, File::Spec->updir(), 'local', 'bin'),
-        File::Spec->path(),
-    );
+    my @dirs = ($Bin);
+    my $ancestor = $Bin;
+    for (1 .. 3) {
+        $ancestor = dirname($ancestor);
+        push @dirs, File::Spec->catdir($ancestor, 'local', 'bin');
+    }
+    push @dirs, '/usr/bin' if $^O =~ /cygwin/i;
+    push @dirs, File::Spec->path();
     my %seen;
     for my $dir (grep { defined($_) && length($_) && !$seen{$_}++ } @dirs) {
         for my $suffix (@suffixes) {

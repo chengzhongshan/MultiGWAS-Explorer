@@ -80,7 +80,7 @@ is(scalar @lines, 3, 'rows with missing cohort values retained');
 @row{@header} = @values;
 ok($row{META_P} !~ /\d/, 'missing meta P is not fabricated');
 SKIP: {
-    skip 'gnuplot or PDL is unavailable', 9
+    skip 'gnuplot or PDL is unavailable', 10
         unless system('gnuplot', '--version') == 0 && eval { require PDL; 1 };
     my $gnu_spec = "$dir/gunplot.spec.json";
     is(system($^X, "$Bin/../auto_prepare_and_run_diff_gwas_with_gunplot.pl",
@@ -126,6 +126,11 @@ SKIP: {
     $default_prefix =~ s/_SAS_/_GUNPLOT_/g;
     ok(-s "$relative_dir/$default_prefix.png",
         'default merged gnuplot writes a nonempty Manhattan image');
+    open my $default_manifest_fh, '<', "$relative_dir/$default_prefix.manifest.tsv" or die $!;
+    my %default_manifest = map { chomp; split /\t/, $_, 2 } <$default_manifest_fh>;
+    close $default_manifest_fh;
+    is($default_manifest{rows_scanned}, 2,
+        'genome-wide gnuplot scans only rows with a displayed P below 0.05');
 }
 ok(system($^X, $driver, '--input-merged', $input, '--spec', $spec_path,
     '--generate-spec-only') != 0, 'ambiguous input options rejected');

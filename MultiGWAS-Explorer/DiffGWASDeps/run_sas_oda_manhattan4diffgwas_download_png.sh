@@ -61,8 +61,31 @@ HTML_TITLE="${HTML_TITLE:-${PROJECT_TAG} SAS Manhattan Plot}"
 # Open the downloaded HTML by default. Set OPEN_RESULT=0 for non-interactive
 # validation runs when you only want to download and verify the files.
 OPEN_RESULT="${OPEN_RESULT:-1}"
+MANHATTAN_COMPACT_INPUT="${MANHATTAN_COMPACT_INPUT:-1}"
+MANHATTAN_SUBSET_THRESHOLD="${MANHATTAN_SUBSET_THRESHOLD:-0.05}"
 
 cd "${WORKDIR}"
+
+if [[ "${MANHATTAN_COMPACT_INPUT}" == "1" ]]; then
+  threshold_tag="${MANHATTAN_SUBSET_THRESHOLD//[^A-Za-z0-9]/_}"
+  compact_dir="${WORKDIR}/cache/sas_manhattan"
+  mkdir -p "${compact_dir}"
+  compact_basename="${OUTPUT_PREFIX}.p_lt_${threshold_tag}"
+  compact_data="${compact_dir}/${compact_basename}.tsv.gz"
+  compact_schema="${compact_dir}/${compact_basename}.schema.json"
+  compact_manifest="${compact_dir}/${compact_basename}.manifest.json"
+  perl "${DEPS_DIR}/prepare_sas_manhattan_plot_input.pl" \
+    --input "${DATA_GZ}" \
+    --schema-config "${SCHEMA_CONFIG_JSON}" \
+    --pvars "${MANHATTAN_P_VAR} ${MANHATTAN_OTHER_P_VARS}" \
+    --threshold "${MANHATTAN_SUBSET_THRESHOLD}" \
+    --output "${compact_data}" \
+    --schema-out "${compact_schema}" \
+    --manifest "${compact_manifest}"
+  DATA_GZ="${compact_data}"
+  SCHEMA_CONFIG_JSON="${compact_schema}"
+  REMOTE_DATA_BASENAME="$(basename "${DATA_GZ}")"
+fi
 
 open_html_result() {
   local target="${1:-}"
@@ -157,8 +180,9 @@ HTML_OUT="${WORKDIR}/${OUTPUT_PREFIX}_png.html"
 RUN_SAS_RENDERED="${WORKDIR}/run_sas_oda_manhattan4diffgwas.${stamp}.sas"
 LOCAL_DEBUG_SAS_RENDERED="${WORKDIR}/run_sas_local_debug_manhattan4diffgwas.${stamp}.sas"
 IMPORT_BLOCK_RENDERED="${WORKDIR}/auto_wide_import_manhattan.${stamp}.sas"
+SORT_BLOCK_RENDERED="${WORKDIR}/auto_manhattan_sort.${stamp}.sas"
 
-trap 'rm -f "${RUN_SAS_RENDERED}" "${IMPORT_BLOCK_RENDERED}"' EXIT
+trap 'rm -f "${RUN_SAS_RENDERED}" "${IMPORT_BLOCK_RENDERED}" "${SORT_BLOCK_RENDERED}"' EXIT
 
 oda_download_many() {
   local output_prefix="$1"
@@ -269,6 +293,12 @@ perl "${SCHEMA_INCLUDE_HELPER}" \
   --source-type gzip \
   --remote-basename "${REMOTE_DATA_BASENAME}" > "${IMPORT_BLOCK_RENDERED}"
 
+if [[ "${MANHATTAN_COMPACT_INPUT}" == "1" ]]; then
+  printf '/* Compact Manhattan input was sorted by numeric CHR and BP locally. */\n' > "${SORT_BLOCK_RENDERED}"
+else
+  printf 'proc sort data=scz_mh;\n  by CHR BP;\nrun;\n' > "${SORT_BLOCK_RENDERED}"
+fi
+
 perl "${RENDER_SAS_HELPER}" \
   --template "${RUN_SAS_TEMPLATE}" \
   --output "${RUN_SAS_RENDERED}" \
@@ -284,7 +314,8 @@ perl "${RENDER_SAS_HELPER}" \
   --replace "MANHATTAN_GWAS_LABEL_HALO_SIZE=${MANHATTAN_GWAS_LABEL_HALO_SIZE}" \
   --replace "OUTPUT_PREFIX=${OUTPUT_PREFIX}" \
   --replace "HTML_TITLE=${HTML_TITLE}" \
-  --replace-file "WIDE_IMPORT_BLOCK=${IMPORT_BLOCK_RENDERED}"
+  --replace-file "WIDE_IMPORT_BLOCK=${IMPORT_BLOCK_RENDERED}" \
+  --replace-file "MANHATTAN_SORT_BLOCK=${SORT_BLOCK_RENDERED}"
 
 if [[ "${EMIT_LOCAL_SAS_DEBUG}" == "1" || "${LOCAL_SAS_DEBUG_ONLY}" == "1" ]]; then
   perl "${LOCAL_SAS_DEBUG_EMITTER}" \

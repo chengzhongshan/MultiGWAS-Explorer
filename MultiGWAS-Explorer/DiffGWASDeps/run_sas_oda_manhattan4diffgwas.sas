@@ -16,9 +16,7 @@ ods listing;
 
 __WIDE_IMPORT_BLOCK__
 
-proc sort data=scz_mh;
-  by CHR BP;
-run;
+__MANHATTAN_SORT_BLOCK__
 
 /* Font controls for the Manhattan figure.
    Keep comments outside the macro call so SAS does not misparse the
