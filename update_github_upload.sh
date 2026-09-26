@@ -60,7 +60,7 @@ is_generated_file() {
   [[ "$path" == MultiGWAS-Explorer/benchmark/* ]] && return 1
   case "$path" in
     MultiGWAS-Explorer/cache/*|MultiGWAS-Explorer/local/*|\
-    MultiGWAS-Explorer/run_local_hits_*/*|MultiGWAS-Explorer/run_manhattan_*/*|\
+    MultiGWAS-Explorer/run_local*/*|MultiGWAS-Explorer/run_manhattan_*/*|\
     MultiGWAS-Explorer/run_single_snp_with_gtf_*/*|MultiGWAS-Explorer/upload_*/*|\
     MultiGWAS-Explorer/tmp*/*|MultiGWAS-Explorer/debug_single_local_gtf_*/*|\
     MultiGWAS-Explorer/configs/auto_*_diff_merged_*|\

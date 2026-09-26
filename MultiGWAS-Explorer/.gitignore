@@ -10,7 +10,7 @@ example-output*/
 public-gwas-test*/
 *.sif
 
-run_local_hits_*/
+run_local*/
 run_manhattan_*/
 run_local_hits_manhattan_*/
 tmp*/
