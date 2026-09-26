@@ -62,10 +62,12 @@ is_generated_file() {
     MultiGWAS-Explorer/cache/*|MultiGWAS-Explorer/local/*|\
     MultiGWAS-Explorer/run_local*/*|MultiGWAS-Explorer/run_manhattan_*/*|\
     MultiGWAS-Explorer/run_single_snp_with_gtf_*/*|MultiGWAS-Explorer/upload_*/*|\
+    MultiGWAS-Explorer/.autogen_*/*|\
     MultiGWAS-Explorer/tmp*/*|MultiGWAS-Explorer/debug_single_local_gtf_*/*|\
     MultiGWAS-Explorer/configs/auto_*_diff_merged_*|\
     MultiGWAS-Explorer/auto_gtf_import_single_snp.*.sas|\
     MultiGWAS-Explorer/auto_wide_import_single_snp.*.sas|\
+    MultiGWAS-Explorer/auto_wide_import_local_hits*.sas|\
     MultiGWAS-Explorer/run_sas_oda_single_snp_with_gtf.*.sas|\
     MultiGWAS-Explorer/run_sas_oda_local_top_hits_manhattan.*.sas|\
     MultiGWAS-Explorer/run_sas_local_debug_*.sas|\
