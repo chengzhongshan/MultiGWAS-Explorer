@@ -21,8 +21,10 @@ codex_*/
 cache/local_gtf_reuse/
 cache/local_manhattan_reuse/
 cache/sas_manhattan/
+cache/gnuplot_wide_index/
 cache/gtf/
 cache/plink2_1kg_phase3/
+cache/plink2_1kg_hg38/
 cache/plink2_bin/
 cache/plink2_ld/
 cache/plink2_tmp/

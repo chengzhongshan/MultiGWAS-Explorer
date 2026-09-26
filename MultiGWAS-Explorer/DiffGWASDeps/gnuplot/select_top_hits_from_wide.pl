@@ -76,6 +76,11 @@ die "--focus-pvar is required for non-targeted selection\n"
 my @target_snps = grep { length } map { trim($_) } split /,/, ($opt{target_snps} // '');
 my @thresholds = grep { defined && length } map { trim($_) } split /[,\s]+/, $opt{thresholds};
 @thresholds = ('1e-6') unless @thresholds;
+my %wanted_snp = map { uc($_) => 1 } @target_snps;
+my $loosest_threshold = 0;
+for my $threshold (@thresholds) {
+    $loosest_threshold = 0 + $threshold if 0 + $threshold > $loosest_threshold;
+}
 
 my $pop_map = parse_population_map($opt{gnomad_pop_map});
 my $gnomad_lookup = load_gnomad_lookup(file => $opt{gnomad_freq_file});
@@ -135,6 +140,15 @@ while (my $line = <$fh>) {
             next;
         }
     }
+    if (@target_snps) {
+        next unless $wanted_snp{uc($snp)};
+    }
+    else {
+        next unless defined($row->{focus_signal})
+            && $row->{focus_signal} > 0
+            && $row->{focus_signal} < $loosest_threshold;
+    }
+    delete $row->{raw};
     push @rows, $row;
 }
 close $fh;

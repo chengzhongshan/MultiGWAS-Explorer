@@ -15,6 +15,7 @@ my $min_r2 = 0;
 my $window_kb = 1000;
 my $phased = 1;
 my $quiet = 0;
+my $reference_build = 'GRCh37_hg19';
 
 GetOptions(
     'query-snp=s' => \$query,
@@ -30,15 +31,24 @@ GetOptions(
     'populations=s' => \$populations,
     'unphased' => sub { $phased = 0 },
     'quiet!' => \$quiet,
+    'reference-build=s' => \$reference_build,
     'output=s' => \$output,
 ) or die usage();
 
 die usage() unless defined($query) && (defined($pfile) xor defined($bfile));
 die "--min-r2 must be between 0 and 1\n" unless $min_r2 >= 0 && $min_r2 <= 1;
 die "--window-kb must be positive\n" unless $window_kb > 0;
+die "--reference-build must be GRCh37_hg19 or GRCh38_hg38\n"
+    unless $reference_build =~ /^(?:GRCh37_hg19|GRCh38_hg38)$/;
 $plink2 ||= $ENV{PLINK2} || 'plink2';
 
-my $tmp = tempdir('plink2_local_ld.XXXXXX', TMPDIR => 1, CLEANUP => 1);
+my $tmp_root = defined($output) && length($output)
+    ? dirname($output) : File::Spec->tmpdir();
+make_path($tmp_root) unless -d $tmp_root;
+# Cygwin's temporary directory can resolve inside an Anaconda installation
+# that native Windows PLINK2 cannot open. Keep intermediate files beside the
+# requested cache, where both programs already have access.
+my $tmp = tempdir('plink2_local_ld.XXXXXX', DIR => $tmp_root, CLEANUP => 1);
 my $prefix = "$tmp/ld";
 my $input_prefix = defined($pfile) ? $pfile : $bfile;
 my $pfile_arg = native_path($input_prefix);
@@ -166,10 +176,10 @@ sub parse_report {
     print "LD_ESTIMABILITY\t", (keys(%best) ? 'ESTIMABLE' : 'NOT_ESTIMABLE'), "\n";
     if ($out) {
         my $population_label = population_label($populations, $keep);
-        print {$out} join("\t", $ref, $ref, $population_label, 1, 'PLINK2_1KG_DIRECT', '1000_GENOMES_PHASE_3', 'GRCh37_hg19', ($phased ? 'PLINK2_R2_PHASED' : 'PLINK2_R2_UNPHASED')), "\n"
+        print {$out} join("\t", $ref, $ref, $population_label, 1, 'PLINK2_1KG_DIRECT', '1000_GENOMES_PHASE_3', $reference_build, ($phased ? 'PLINK2_R2_PHASED' : 'PLINK2_R2_UNPHASED')), "\n"
             if keys %best;
         for my $proxy (keys %best) {
-            print {$out} join("\t", $ref, $proxy, $population_label, $best{$proxy}, 'PLINK2_1KG_DIRECT', '1000_GENOMES_PHASE_3', 'GRCh37_hg19', ($phased ? 'PLINK2_R2_PHASED' : 'PLINK2_R2_UNPHASED')), "\n";
+            print {$out} join("\t", $ref, $proxy, $population_label, $best{$proxy}, 'PLINK2_1KG_DIRECT', '1000_GENOMES_PHASE_3', $reference_build, ($phased ? 'PLINK2_R2_PHASED' : 'PLINK2_R2_UNPHASED')), "\n";
         }
         close $out;
     }

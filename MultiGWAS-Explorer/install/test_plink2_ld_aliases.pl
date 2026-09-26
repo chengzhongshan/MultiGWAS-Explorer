@@ -46,4 +46,13 @@ like($text, qr/^rsQ\trsA\t/m, 'first semicolon-delimited alias is emitted');
 like($text, qr/^rsQ\trsB\t/m, 'second semicolon-delimited alias is emitted');
 unlike($text, qr/\t\.\t/, 'missing-ID sentinel is discarded');
 unlike($text, qr/rsA;rsB/, 'compound alias is not emitted as one unusable ID');
+my $hg38_output = "$dir/ld_hg38.tsv";
+my @hg38_cmd = (@cmd[0 .. $#cmd - 2], $hg38_output,
+    '--reference-build', 'GRCh38_hg38');
+is(system(@hg38_cmd), 0, 'PLINK2 LD normalizer accepts GRCh38 reference build');
+open $fh, '<', $hg38_output or die $!;
+my $hg38_text = join('', <$fh>);
+close $fh;
+like($hg38_text, qr/^rsQ\trsA\t[^\n]*\tGRCh38_hg38\t/m,
+    'LD cache records the GRCh38 build');
 done_testing;

@@ -1358,6 +1358,13 @@ Set `MANHATTAN_SUBSET_THRESHOLD` to change the threshold for both genome-wide
 backends. For SAS ODA only, `MANHATTAN_COMPACT_INPUT=0` restores the original
 full-input behavior.
 
+For local gnuplot Manhattan and GTF plots, a direct merged-wide meta-analysis
+input has no indexed long-format GWAS source. The runner builds and reuses a
+BGZF/tabix index of the merged-wide table under `cache/gnuplot_wide_index/`,
+then queries the selected SNP windows, retaining every row in each window
+regardless of P value. Indexed long-format GWAS inputs still use their existing
+tabix path. Gencode annotation intervals use tabix separately.
+
 Noninteractive first-run SAS ODA credential bootstrap:
 
 ```bash
@@ -2399,16 +2406,26 @@ configured phased 1000 Genomes reference is available, both plotters calculate
 local LD directly with PLINK2 and persist a compact normalized cache. HaploReg4
 is queried only as a backup when the local genotype reference is unavailable.
 
-For a LocusZoom-like LD view, request it explicitly with
-`--ld-display-mode heatmap` (or `both` to retain the selected marker overlay).
+The gnuplot `local_gtf` plot defaults to a signed-LD heatmap. For GRCh38/hg38
+GWAS it downloads the matching chromosome from the official
+[PLINK2 1000 Genomes Phase 3 resources](https://www.cog-genomics.org/plink/2.0/resources)
+on first use; GRCh37/hg19 GWAS use the configured hg19 panel. It calculates
+phased r2 against each plotted target SNP. Downloaded reference files and the
+PLINK2 binary are cached locally and excluded from Git. Use
+`--ld-display-mode none` to turn off the gnuplot GTF heatmap, or `both` to add
+LD markers. The gnuplot local Manhattan default remains unchanged. SAS ODA
+still uses its configured local-LD display mode.
+
+For an explicit LocusZoom-like LD view in SAS ODA, request
+`--local-ld-display-mode heatmap`.
 The pipeline carries phased PLINK2 r2 values into both SAS ODA and gnuplot
 local Manhattan/GTF renderers. Heatmap mode plots `r2 * sign(Z)` on a
 diverging scale from -1 through 0 to 1. Negative values mean a negative GWAS
 Z score, positive values mean a positive Z score, and the absolute value is
 the PLINK2 LD r2. Each locus is calculated against its own target SNP. A
 multi-locus SAS run builds one audited cache containing separate `query_snp`
-rows for every target. The reference panel and build are recorded as 1000
-Genomes Phase 3 and GRCh37/hg19. For example:
+rows for every target. The reference panel and build are recorded in the LD
+cache. For example:
 
 ```bash
 perl auto_prepare_and_run_diff_gwas.pl \
@@ -2848,13 +2865,15 @@ perl DiffGWASDeps/resolve_plink2_local_ld.pl \
   --output cache/plink2_ld/rs185665940_chr2.tsv
 ```
 
-The PLINK2 resource page provides phased 1000 Genomes Phase 3 `.pgen`, `.pvar`
-and `.psam` files, including chromosome-split downloads. The `.pgen.zst` file
-must be decompressed before use; `.pvar.zst` can be read with PLINK2's `vzs`
-modifier. Keep the reference build aligned with the plot (the phase-3 files
-are GRCh37/hg19), and prefer a chromosome-split fileset so a local query does
-not require a whole-genome scan. The helper does not download or commit these
-large reference files.
+The [PLINK2 resource page](https://www.cog-genomics.org/plink/2.0/resources)
+provides phased 1000 Genomes Phase 3 `.pgen`, `.pvar`, and `.psam` files in
+GRCh37/hg19 and GRCh38/hg38, including chromosome-split downloads. The
+`.pgen.zst` file must be decompressed before use; `.pvar.zst` can be read with
+PLINK2's `vzs` modifier. Keep the reference build aligned with the GWAS. The
+gnuplot GTF runner prepares the requested hg38 chromosome automatically;
+`DiffGWASDeps/prepare_plink2_1kg_hg38_chr.pl --chr 1 --output-dir cache/plink2_1kg_hg38`
+also prepares it independently. The downloaded genotype files are not
+committed.
 
 The public real-GWAS test accepts the same reference explicitly:
 

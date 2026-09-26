@@ -220,7 +220,7 @@ for my $need ('CHR', 'BP', 'SNP') {
     die "Required column missing from input: $need\n" unless exists $idx{$need};
 }
 
-my ($target_chr, $target_bp, @window_rows);
+my ($target_chr, $target_bp);
 my %requested_snp_position;
 while (my $line = <$fh>) {
     chomp $line;
@@ -238,7 +238,6 @@ while (my $line = <$fh>) {
     if ($is_label_snp{lc $snp} && !exists $requested_snp_position{lc $snp}) {
         $requested_snp_position{lc $snp} = { snp => $snp, chr => $chr, bp => $bp };
     }
-    push @window_rows, \@f;
 }
 close $fh;
 
@@ -248,16 +247,6 @@ my $start = $target_bp - $window_bp;
 $start = 1 if $start < 1;
 my $end = $target_bp + $window_bp;
 
-my @locus = grep {
-    normalize_chr($_->[ $idx{CHR} ]) eq $target_chr
-        &&
-    defined numeric($_->[ $idx{BP} ])
-        &&
-    numeric($_->[ $idx{BP} ]) >= $start
-        &&
-    numeric($_->[ $idx{BP} ]) <= $end
-} @window_rows;
-die "No rows found in locus window for $opt{snp}\n" unless @locus;
 my @target_markers;
 for my $requested (@label_snps) {
     my $marker = $requested_snp_position{lc $requested};
@@ -275,8 +264,20 @@ my %found_ld_snp;
 my $has_zcols = @resolved_zcols == @resolved_pcols ? 1 : 0;
 my $use_signed_r2 = ($has_gtf && $has_zcols && %ld_r2_for
     && $opt{ld_display_mode} =~ /^(?:heatmap|both)$/) ? 1 : 0;
-for my $row (@locus) {
+my $rows_in_window = 0;
+$fh = IO::Uncompress::Gunzip->new($opt{data})
+    or die "Cannot reread $opt{data}: $GunzipError\n";
+<$fh>;
+while (my $line = <$fh>) {
+    chomp $line;
+    $line =~ s/\r$//;
+    next unless length $line;
+    my @f = split /\t/, $line, -1;
+    next unless normalize_chr($f[ $idx{CHR} ]) eq $target_chr;
+    my $row = \@f;
     my $bp  = numeric($row->[ $idx{BP} ]);
+    next unless defined $bp && $bp >= $start && $bp <= $end;
+    $rows_in_window++;
     my $snp = $row->[ $idx{SNP} ] // '';
     for my $track_i (0 .. $#resolved_pcols) {
         my $p = numeric($row->[ $idx{ $resolved_pcols[$track_i] } ]);
@@ -307,7 +308,9 @@ for my $row (@locus) {
         $kept_points++;
     }
 }
+close $fh;
 close $pt or die "Cannot close $plot_tsv: $!\n";
+die "No rows found in locus window for $opt{snp}\n" unless $rows_in_window;
 
 my $gene_rows = 0;
 if ($has_gtf) {
@@ -462,7 +465,7 @@ print {$mf} join("\t", 'sig', $opt{sig}), "\n";
 print {$mf} join("\t", 'hide_y_axis', ($opt{hide_y_axis} ? 1 : 0)), "\n";
 print {$mf} join("\t", 'bottom_snp_label', ($opt{bottom_snp_label} // '')), "\n";
 print {$mf} join("\t", 'bottom_gene_label', ($opt{bottom_gene_label} // '')), "\n";
-print {$mf} join("\t", 'rows_in_window', scalar(@locus)), "\n";
+print {$mf} join("\t", 'rows_in_window', $rows_in_window), "\n";
 print {$mf} join("\t", 'points_plotted', $kept_points), "\n";
 print {$mf} join("\t", 'gene_rows', $gene_rows), "\n";
 close $mf or die "Cannot close $manifest: $!\n";

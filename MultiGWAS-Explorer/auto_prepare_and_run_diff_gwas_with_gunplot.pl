@@ -53,6 +53,7 @@ use GD;
 use Text::ParseWords qw(parse_line);
 use File::Spec;
 use File::Basename qw(basename dirname);
+use Digest::SHA qw(sha1_hex);
 use File::Copy qw(copy);
 use File::Path qw(make_path);
 use File::Temp qw(tempfile);
@@ -311,6 +312,10 @@ my %requested = normalize_requested_plots($plots, \@step_args);
 die "No gunplot plot steps were requested.\n" unless grep { $requested{$_} } qw(plot_manhattan plot_local_manhattan plot_local_gtf plot_forest);
 
 my $spec = load_json($spec_file);
+my $default_gtf_signed_ld = !defined($ld_display_mode)
+    && !exists($spec->{local_ld_display_mode})
+    && !$highlight_high_ld_snps
+    && !length(trim($ld_snps_override));
 $ld_r2_threshold_override = 0 + (
     defined($ld_r2_threshold_override)
       ? $ld_r2_threshold_override
@@ -324,6 +329,7 @@ die "--ld-display-mode must be none, markers, heatmap, or both\n"
 $ld_display_mode = 'markers'
     if $ld_display_mode eq 'none' && ($highlight_high_ld_snps || length(trim($ld_snps_override)));
 $highlight_high_ld_snps = 1 if $ld_display_mode ne 'none';
+my $gtf_ld_display_mode = $default_gtf_signed_ld ? 'heatmap' : $ld_display_mode;
 $ld_population_override = uc(
     $ld_population_override || $spec->{local_ld_population} || 'EUR'
 );
@@ -636,10 +642,11 @@ if ($requested{plot_local_gtf}) {
             ld_population=> $ld_population_override,
             ld_r2_threshold => $ld_r2_threshold_override,
             ld_web_fallback => $ld_web_fallback,
-            highlight_high_ld_snps => $highlight_high_ld_snps,
+            highlight_high_ld_snps => ($default_gtf_signed_ld ? 1 : $highlight_high_ld_snps),
             ld_marker_symbol => $ld_marker_symbol,
             ld_marker_color  => $ld_marker_color,
-            ld_display_mode  => $ld_display_mode,
+            ld_display_mode  => $gtf_ld_display_mode,
+            require_plink2   => $default_gtf_signed_ld,
             ld_r2_values     => $ld_r2_values_override,
             ld_heatmap_colors=> $ld_heatmap_colors,
             force       => $force,
@@ -1159,11 +1166,13 @@ sub resolve_plink2_ld_cache_for_plot {
     $tag =~ s/[^a-z0-9]+/_/g;
     my $threshold_tag = safe_name($args{min_r2});
     my $window_tag = safe_name($args{window_kb} // 1000);
+    my $build_tag = ($args{reference_build} || '') eq 'GRCh38_hg38' ? '_hg38' : '';
     my $cache = File::Spec->catfile(
         $args{output_dir},
-        'local_ld_' . safe_name($args{query_snp}) . "_${tag}_r2_${threshold_tag}_w${window_tag}.plink2_1kg_phase3.tsv",
+        'local_ld_' . safe_name($args{query_snp}) . "_${tag}_r2_${threshold_tag}_w${window_tag}${build_tag}.plink2_1kg_phase3.tsv",
     );
-    return ($cache, 1) if !$args{force} && -s $cache;
+    return ($cache, 1) if !$args{force} && -s $cache
+        && plink2_ld_cache_has_proxy($cache, $args{query_snp});
     my @cmd = (
         $^X, $helper,
         '--query-snp', $args{query_snp},
@@ -1171,6 +1180,7 @@ sub resolve_plink2_ld_cache_for_plot {
         '--populations', $population_list,
         '--min-r2', 0 + ($args{min_r2} // 0),
         '--window-kb', 0 + ($args{window_kb} // 1000),
+        '--reference-build', ($args{reference_build} || 'GRCh37_hg19'),
         '--output', $cache,
         '--quiet',
     );
@@ -1183,8 +1193,29 @@ sub resolve_plink2_ld_cache_for_plot {
     }
     print "[prep] Calculating local LD directly with PLINK2 using 1000 Genomes populations $population_list.\n";
     my $rc = system(@cmd);
-    return ('', 0) if $rc != 0 || !-s $cache;
+    return ('', 0) if $rc != 0 || !-s $cache
+        || !plink2_ld_cache_has_proxy($cache, $args{query_snp});
     return ($cache, 1);
+}
+
+sub plink2_ld_cache_has_proxy {
+    my ($path, $query_snp) = @_;
+    open my $fh, '<', $path or return 0;
+    my $header = <$fh> // '';
+    chomp $header;
+    my @cols = split /\t/, $header, -1;
+    my %idx = map { $cols[$_] => $_ } 0 .. $#cols;
+    return 0 unless exists($idx{query_snp}) && exists($idx{proxy_snp});
+    while (my $line = <$fh>) {
+        my @f = split /\t/, $line, -1;
+        next unless lc($f[$idx{query_snp}] // '') eq lc($query_snp || '');
+        if (lc($f[$idx{proxy_snp}] // '') ne lc($query_snp || '')) {
+            close $fh;
+            return 1;
+        }
+    }
+    close $fh;
+    return 0;
 }
 
 sub resolve_ld_snps_for_query {
@@ -1221,9 +1252,9 @@ sub resolve_ld_snps_for_query {
     my $population = uc($args{ld_population} || $runner->{LOCAL_LD_POPULATION} || 'EUR');
     my $min_r2 = 0 + (defined($args{ld_r2_threshold}) ? $args{ld_r2_threshold}
       : (defined($runner->{LOCAL_LD_R2_THRESHOLD}) ? $runner->{LOCAL_LD_R2_THRESHOLD} : 0));
-    my $audit_file = $args{audit_file} || '';
+    my $audit_file = $args{prefer_direct_cache} ? '' : ($args{audit_file} || '');
     $audit_file = localize_path($audit_file) if length $audit_file;
-    if (!length($audit_file) && length($runner->{TOP_HIT_LD_AUDIT_BASENAME} || '')) {
+    if (!$args{prefer_direct_cache} && !length($audit_file) && length($runner->{TOP_HIT_LD_AUDIT_BASENAME} || '')) {
         $audit_file = File::Spec->catfile($args{output_dir}, $runner->{TOP_HIT_LD_AUDIT_BASENAME});
     }
     if (length($audit_file) && -s $audit_file) {
@@ -1369,6 +1400,7 @@ sub plot_local_series {
         hits          => $args{hits},
         output_dir    => $args{output_dir},
         window_bp     => $args{window_bp},
+        wide_data     => $args{wide_data},
         source_long   => $args{source_long},
         preset_config => $args{preset_config},
         force         => $args{force},
@@ -1440,8 +1472,36 @@ sub plot_local_series {
             && !length(trim($args{ld_r2_values} // ''))
             && $ld_source eq 'PLINK2_1KG') {
             my $build = lc(trim($runner->{REFERENCE_BUILD} || 'hg19'));
-            die "1000 Genomes Phase 3 PLINK2 LD requires a GRCh37/hg19 GWAS reference build; got '$runner->{REFERENCE_BUILD}'.\n"
-                unless $build =~ /^(?:hg19|grch37)$/;
+            my $is_hg38 = $build =~ /^(?:hg38|grch38)$/ ? 1 : 0;
+            die "1000 Genomes Phase 3 PLINK2 LD requires an hg19/GRCh37 or hg38/GRCh38 GWAS reference build; got '$runner->{REFERENCE_BUILD}'.\n"
+                unless $is_hg38 || $build =~ /^(?:hg19|grch37)$/;
+            my $pfile = $runner->{TOP_HIT_LD_PFILE} || '';
+            my $bfile = $runner->{TOP_HIT_LD_BFILE} || '';
+            my $plink2 = $runner->{TOP_HIT_LD_PLINK2} || 'plink2';
+            if ($is_hg38) {
+                my $chrom = normalize_chr_label($hit->{CHR});
+                $chrom = 'X' if $chrom eq '23';
+                die "Cannot resolve chromosome for hg38 PLINK2 LD target $ld_reference_snp\n"
+                    unless $chrom =~ /^(?:[1-9]|1\d|2[0-2]|X)$/;
+                my $panel_dir = File::Spec->catdir($workdir_local, 'cache', 'plink2_1kg_hg38');
+                my $standard_pfile = File::Spec->catfile($panel_dir, "chr${chrom}_hg38");
+                $pfile = $standard_pfile
+                    unless $pfile =~ /hg38/i && -s localize_path("$pfile.pgen");
+                $bfile = '';
+                $plink2 = File::Spec->catfile($workdir_local, 'cache', 'plink2_bin',
+                    $^O =~ /cygwin|MSWin32/i ? 'plink2.exe' : 'plink2')
+                    unless $plink2 =~ m{[\\/]} && -f localize_path($plink2);
+                if ($args{require_plink2}) {
+                    run_cmd([
+                        $^X,
+                        File::Spec->catfile($Bin, 'DiffGWASDeps',
+                            'prepare_plink2_1kg_hg38_chr.pl'),
+                        '--chr', $chrom,
+                        '--output-dir', $panel_dir,
+                        '--plink2', $plink2,
+                    ], "prepare official PLINK2 1000 Genomes Phase 3 hg38 chr$chrom");
+                }
+            }
             my ($direct_cache, $direct_ok) = resolve_plink2_ld_cache_for_plot(
                 query_snp   => $ld_reference_snp,
                 chr         => $hit->{CHR},
@@ -1449,9 +1509,10 @@ sub plot_local_series {
                 populations => $args{ld_population},
                 min_r2      => $args{ld_r2_threshold},
                 window_kb   => ($runner->{TOP_HIT_LD_WINDOW_KB} || int(($args{window_bp} || 1) / 1000) || 1000),
-                pfile       => ($runner->{TOP_HIT_LD_PFILE} || ''),
-                bfile       => ($runner->{TOP_HIT_LD_BFILE} || ''),
-                plink2      => ($runner->{TOP_HIT_LD_PLINK2} || 'plink2'),
+                pfile       => $pfile,
+                bfile       => $bfile,
+                plink2      => $plink2,
+                reference_build => ($is_hg38 ? 'GRCh38_hg38' : 'GRCh37_hg19'),
                 output_dir  => $args{output_dir},
                 force       => $args{force_ld},
             );
@@ -1461,6 +1522,8 @@ sub plot_local_series {
                 print "[prep] Locus-specific PLINK2/1000 Genomes Phase 3 LD cache for $ld_reference_snp: $direct_cache\n";
             }
             else {
+                die "PLINK2/1000 Genomes Phase 3 LD could not be calculated for $ld_reference_snp; signed-LD GTF plot was not generated.\n"
+                    if $args{require_plink2};
                 warn "WARNING: PLINK2/1000 Genomes Phase 3 LD is unavailable for $ld_reference_snp.\n";
             }
         }
@@ -1469,6 +1532,7 @@ sub plot_local_series {
             explicit_r2=> $args{ld_r2_values},
             audit_file => $args{ld_audit_file},
             ld_cache   => $locus_ld_cache,
+            prefer_direct_cache => ($args{require_plink2} && length($locus_ld_cache || '')),
             ld_population => $args{ld_population},
             ld_r2_threshold => $args{ld_r2_threshold},
             ld_web_fallback => $locus_web_fallback,
@@ -1716,7 +1780,9 @@ sub plot_local_series {
             push @cmd, ('--ld-marker-color', ($args{ld_marker_color} || 'black'));
             push @cmd, ('--ld-display-mode', ($args{ld_display_mode} || 'markers'));
             push @cmd, ('--ld-population', ($args{ld_population} || 'EUR'));
-            push @cmd, ('--ld-reference-panel', '1000 Genomes Phase 3 / PLINK2');
+            my $panel_build = ($runner->{REFERENCE_BUILD} || '') =~ /^(?:hg38|grch38)$/i
+                ? 'GRCh38' : 'GRCh37';
+            push @cmd, ('--ld-reference-panel', "1000 Genomes Phase 3 / PLINK2 ($panel_build)");
             push @cmd, ('--ld-heatmap-colors', ($args{ld_heatmap_colors} || '#f7fbff,#6baed6,#54278f'));
         }
         if ($args{kind} eq 'local_manhattan') {
@@ -2475,6 +2541,103 @@ sub prepare_locus_wide_sources {
     my %sources;
     my $safe_window = safe_name($args{window_bp});
 
+    if ((!$args{source_long} || !-s $args{source_long})
+        && $args{wide_data} && -s $args{wide_data}) {
+        for my $hit (@{ $args{hits} || [] }) {
+            next if defined($hit->{CHR}) && defined($hit->{BP});
+            my $safe_snp = safe_name($hit->{SNP} || '');
+            for my $path (glob(File::Spec->catfile($args{output_dir},
+                '*' . $safe_snp . '*.manifest.tsv'))) {
+                my $metrics = read_manifest_tsv($path);
+                my $manifest_snp = $metrics->{target_snp} // $metrics->{snp} // '';
+                next unless lc($manifest_snp) eq lc($hit->{SNP} || '');
+                my $chr = $metrics->{target_chr} // $metrics->{chr};
+                my $bp = $metrics->{target_bp} // $metrics->{bp};
+                next unless defined($chr) && length($chr)
+                    && defined($bp) && $bp =~ /^\d+$/;
+                $hit->{CHR} = $chr;
+                $hit->{BP} = $bp;
+                last;
+            }
+        }
+        my %missing = map { uc($_->{SNP}) => $_ }
+            grep { defined($_->{SNP}) && length($_->{SNP})
+                && (!defined($_->{CHR}) || !defined($_->{BP})) }
+            @{ $args{hits} || [] };
+        if (%missing) {
+            print "[prep] Locating " . scalar(keys %missing)
+                . " target SNP coordinate(s) in merged-wide GWAS\n";
+            my $fh = IO::Uncompress::Gunzip->new($args{wide_data})
+                or die "Cannot read $args{wide_data}: $GunzipError\n";
+            my $header = <$fh>;
+            die "Empty merged-wide GWAS $args{wide_data}\n" unless defined $header;
+            chomp $header;
+            my @cols = split /\t/, $header, -1;
+            my %idx = map { $cols[$_] => $_ } 0 .. $#cols;
+            die "Merged-wide GWAS needs CHR, BP, and SNP columns\n"
+                unless exists($idx{CHR}) && exists($idx{BP}) && exists($idx{SNP});
+            while (%missing && (my $line = <$fh>)) {
+                chomp $line;
+                my @f = split /\t/, $line, -1;
+                my $hit = delete $missing{uc($f[$idx{SNP}] // '')};
+                next unless $hit;
+                $hit->{CHR} = $f[$idx{CHR}];
+                $hit->{BP} = $f[$idx{BP}];
+            }
+            close $fh;
+            die "Target SNP coordinate(s) not found: " . join(', ', sort keys %missing) . "\n"
+                if %missing;
+        }
+    }
+
+    if ((!$args{source_long} || !-s $args{source_long})
+        && $args{wide_data} && -s $args{wide_data}) {
+        my @batch_targets;
+        for my $hit (@{ $args{hits} || [] }) {
+            next unless defined($hit->{SNP}) && length($hit->{SNP})
+                && defined($hit->{CHR}) && defined($hit->{BP});
+            my $safe_snp = safe_name($hit->{SNP});
+            my $data = File::Spec->catfile($args{output_dir},
+                "gunplot_locus_${safe_snp}_window_${safe_window}.wide.tsv.gz");
+            my $manifest = File::Spec->catfile($args{output_dir},
+                "gunplot_locus_${safe_snp}_window_${safe_window}.wide.manifest.tsv");
+            my ($valid) = locus_wide_cache_matches(
+                data => $data, manifest => $manifest,
+                snp => $hit->{SNP}, window_bp => $args{window_bp}, exact_window => 1,
+                source => $args{wide_data},
+            );
+            push @batch_targets, $hit if $args{force} || !$valid;
+        }
+        if (@batch_targets) {
+            my $indexed_name = safe_name(basename($args{wide_data}))
+                . '.' . substr(sha1_hex($args{wide_data}), 0, 12) . '.bgz';
+            my $indexed_wide = File::Spec->catfile(
+                $workdir_local, 'cache', 'gnuplot_wide_index', $indexed_name);
+            run_cmd([
+                $^X,
+                File::Spec->catfile($Bin, 'DiffGWASDeps', 'gnuplot',
+                    'index_merged_wide_tabix.pl'),
+                '--input', $args{wide_data},
+                '--output', $indexed_wide,
+            ], 'build or reuse tabix index for merged-wide GWAS');
+            my @cmd = (
+                $^X,
+                File::Spec->catfile($Bin, 'DiffGWASDeps', 'gnuplot',
+                    'extract_merged_locus_wide_batch.pl'),
+                '--input', $args{wide_data},
+                '--indexed-input', $indexed_wide,
+                '--output-dir', $args{output_dir},
+                '--window-bp', $args{window_bp},
+            );
+            for my $hit (@batch_targets) {
+                push @cmd, ('--target', encode_json({
+                    snp => $hit->{SNP}, chr => $hit->{CHR}, bp => $hit->{BP},
+                }));
+            }
+            run_cmd(\@cmd, 'batch local wide extraction from merged GWAS');
+        }
+    }
+
     for my $hit (@{ $args{hits} || [] }) {
         my $snp = $hit->{SNP} || '';
         next unless length $snp;
@@ -2575,6 +2738,15 @@ sub locus_wide_cache_matches {
     my (%args) = @_;
     return (0, {}) unless $args{data} && -s $args{data} && $args{manifest} && -s $args{manifest};
     my $metrics = read_manifest_tsv($args{manifest});
+    if ($args{source}) {
+        my @source_stat = stat($args{source});
+        return (0, $metrics) unless @source_stat
+            && ($metrics->{source} // '') eq $args{source}
+            && defined($metrics->{source_size})
+            && defined($metrics->{source_mtime})
+            && $metrics->{source_size} == $source_stat[7]
+            && $metrics->{source_mtime} == $source_stat[9];
+    }
     my $manifest_snp = $metrics->{target_snp} // $metrics->{snp} // '';
     return (0, $metrics) unless lc($manifest_snp) eq lc($args{snp} || '');
     my $manifest_window = $metrics->{window_bp};
