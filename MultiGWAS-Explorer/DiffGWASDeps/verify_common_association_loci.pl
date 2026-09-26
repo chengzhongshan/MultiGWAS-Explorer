@@ -334,6 +334,9 @@ sub infer_input_file {
 
     my $stem = $spec->{artifact_stem} || return '';
     my $dir = $spec->{output_dir} || $spec->{input_dir} || return '';
+    if (($spec->{source_mode} || '') eq 'merged_gwas_table') {
+        return join_path($dir, $stem . '.merged_plotwide.tsv.gz');
+    }
     return join_path($dir, $stem . '.stdized.wide_beta_se_p_p_lt_0p05.final.tsv.gz');
 }
 

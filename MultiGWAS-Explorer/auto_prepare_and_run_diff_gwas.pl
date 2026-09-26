@@ -1190,10 +1190,15 @@ elsif ($runner_cfg->{TOP_HIT_MODE} && lc($runner_cfg->{TOP_HIT_MODE}) eq 'common
         my $out_base = safe_name($artifact_stem) . '.common_assoc_verify';
         my $out_tsv = File::Spec->catfile($output_dir, $out_base . '.tsv');
         my $cand_tsv = File::Spec->catfile($output_dir, $out_base . '.candidates.tsv');
-        my $thr_arg = defined $runner_cfg->{TOP_HIT_SIGNAL_THRSHDS} ? "--top-p-thresholds '$runner_cfg->{TOP_HIT_SIGNAL_THRSHDS}'" : '';
-        my $cmd = qq{perl '$verify' --spec '$spec_file' --output '$out_tsv' --candidates-out '$cand_tsv' $thr_arg};
-        print "[info] Running common-association verifier: $cmd\n";
-        system($cmd) == 0 or warn "verify_common_association_loci.pl failed: $?\n";
+        my @verify_cmd = ($^X, $verify, '--spec', $spec_file,
+            '--input', $generated->{wide_output}, '--output', $out_tsv,
+            '--candidates-out', $cand_tsv);
+        push @verify_cmd, ('--top-p-thresholds', $runner_cfg->{TOP_HIT_SIGNAL_THRSHDS})
+            if defined $runner_cfg->{TOP_HIT_SIGNAL_THRSHDS};
+        push @verify_cmd, ('--maf-threshold', $runner_cfg->{TOP_HIT_MAF_THRESHOLD})
+            if defined $runner_cfg->{TOP_HIT_MAF_THRESHOLD};
+        print "[info] Running common-association verifier on $generated->{wide_output}\n";
+        system(@verify_cmd) == 0 or die "verify_common_association_loci.pl failed: $?\n";
         $summary{common_association_verify} = $out_tsv if -s cygpath_to_win($out_tsv);
         if ($top_hit_selection_method eq 'ld' && $top_hit_ld_source eq 'PLINK2_1KG'
             && -s cygpath_to_win($cand_tsv)) {

@@ -87,6 +87,27 @@ cmp_ok(abs($row{META_Z} + 3.5), '<', 1e-12, 'supplied signed weighted Z retained
 cmp_ok(abs($row{META_BETA} + .234), '<', 1e-12, 'supplied meta beta retained');
 cmp_ok(abs($row{MP2PRT_DS_ALL_DIFF_BETA} - .3), '<', 1e-12, 'cohort differential calculation unchanged');
 is(scalar @lines, 3, 'rows with missing cohort values retained');
+my $verify_output = "$dir/common_assoc_verify.tsv";
+is(system($^X, "$Bin/../DiffGWASDeps/verify_common_association_loci.pl",
+    '--spec', $spec_path, '--output', $verify_output,
+    '--maf-threshold', '0'), 0,
+    'common-association verifier finds the converted merged wide table from the spec');
+ok(-s $verify_output, 'common-association verifier writes its result');
+my %wide_idx = map { $header[$_] => $_ } 0 .. $#header;
+my @common_row = split /\t/, $lines[0], -1;
+$common_row[$wide_idx{MP2PRT_DS_ALL_GROUP1_P}] = '1e-8';
+$common_row[$wide_idx{MP2PRT_DS_ALL_GROUP2_P}] = '0.01';
+my $common_input = "$dir/common_without_maf.tsv.gz";
+my $common_table = join("\t", @header) . "\n" . join("\t", @common_row) . "\n";
+gzip \$common_table => $common_input or die $GzipError;
+my $common_output = "$dir/common_without_maf.verify.tsv";
+is(system($^X, "$Bin/../DiffGWASDeps/verify_common_association_loci.pl",
+    '--spec', $spec_path, '--input', $common_input, '--output', $common_output,
+    '--maf-threshold', '0'), 0, 'verifier accepts the configured zero-MAF threshold');
+open my $common_fh, '<', $common_output or die $!;
+my @common_lines = <$common_fh>;
+close $common_fh;
+is(scalar @common_lines, 2, 'unknown-MAF common hit remains in the verifier output');
 @values = split /\t/, $lines[1], -1;
 @row{@header} = @values;
 ok($row{META_P} !~ /\d/, 'missing meta P is not fabricated');

@@ -1758,7 +1758,7 @@ if [[ "$(printf '%s' "${TOP_HIT_SELECTION_METHOD}" | tr '[:lower:]' '[:upper:]')
     "0"
 fi
 
-rm -f "${HTML_OUT}"
+rm -f "${HTML_OUT}" "${PNG_OUT}"
 mkdir -p "${GET_GTF_MACRO_UPLOAD_DIR}"
 
 if [[ -f "${GET_GTF_MACRO_SAS}" ]]; then
