@@ -39,12 +39,19 @@ cache/pgc_scz_sex_public/
 /auto_gtf_import_single_snp.*.sas
 /auto_wide_import_single_snp.*.sas
 /auto_wide_import_local_hits*.sas
+/auto_gtf_import_local_hits_with_gtf.*.sas
 /run_sas_oda_single_snp_with_gtf.*.sas
 /run_sas_oda_local_top_hits_manhattan.*.sas
+/run_sas_oda_local_top_hits_with_gtf.*.sas
 /single_snp_ld_augmented_*.tsv.gz
 /target_snp_augmented_*.tsv.gz
 /*_top_hits_*.csv
 /gnuplot_fallback_*.status.json
+/local_gtf_subset_local_hits_*.tsv
+/sas_action_runner_*.py
+/sas_action_args_*.json
+/sas_action_result_*.json
+/sas_submit_result_*
 
 # Reviewer-benchmark reruns and large downloadable HaploReg intermediates.
 benchmark/reproduction/

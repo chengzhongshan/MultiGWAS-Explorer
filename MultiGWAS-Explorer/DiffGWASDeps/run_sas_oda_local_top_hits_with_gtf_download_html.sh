@@ -1463,6 +1463,40 @@ if [[ -n "${TARGET_SNP_LIST}" ]]; then
   fi
 fi
 
+# Common/differential candidates are selected locally from the complete wide table.
+# Upload only their full (unfiltered) locus windows to SAS ODA, preserving
+# nonsignificant in-window SNPs needed by the local association/GTF panels.
+if [[ "${SOURCE_MODE:-}" == "merged_gwas_table" \
+    && -z "${TARGET_SNP_LIST}" \
+    && "${ODA_TRANSFER_MANIFEST_ONLY:-0}" != "1" ]] \
+    && [[ "${TOP_HIT_MODE:-}" == "common_association" \
+        || "${TOP_HIT_MODE:-}" == "common_and_differential" ]]; then
+  if ! generate_requested_top_hits_csv_locally || [[ ! -s "${CSV_OUT}" ]]; then
+    echo "ERROR: Could not select top-hit loci for a compact local-GTF upload." >&2
+    exit 1
+  fi
+  LOCAL_TOP_HITS_CSV_PREGENERATED=1
+  LOCAL_TOP_HITS_INPUT_CSV_BASENAME="${LOCAL_TOP_HITS_CSV_BASENAME}"
+  indexed_source="${DATA_GZ}"
+  if command -v cygpath >/dev/null 2>&1; then
+    indexed_source="$(cygpath -m "${DATA_GZ}")"
+  fi
+  indexed_hash="$(perl -MDigest::SHA=sha1_hex -e 'print substr(sha1_hex($ARGV[0]),0,12)' "${indexed_source}")"
+  indexed_wide="${WORKDIR}/cache/gnuplot_wide_index/$(basename "${DATA_GZ}").${indexed_hash}.bgz"
+  compact_dir="${WORKDIR}/cache/local_gtf_reuse"
+  mkdir -p "${compact_dir}"
+  compact_wide="${compact_dir}/${PROJECT_TAG}_common_local_gtf_${stamp}.tsv.gz"
+  perl "${DEPS_DIR}/gnuplot/index_merged_wide_tabix.pl" \
+    --input "${DATA_GZ}" --output "${indexed_wide}"
+  perl "${DEPS_DIR}/gnuplot/extract_merged_locus_wide_batch.pl" \
+    --input "${DATA_GZ}" --indexed-input "${indexed_wide}" \
+    --output-dir "${compact_dir}" --window-bp "${LOCAL_GTF_WINDOW_BP}" \
+    --targets-csv "${CSV_OUT}" --combined-output "${compact_wide}"
+  DATA_GZ="${compact_wide}"
+  REMOTE_DATA_BASENAME="$(basename "${compact_wide}")"
+  echo "[prep] SAS local-GTF GWAS upload contains only the selected locus windows: ${DATA_GZ}"
+fi
+
 schema_import_extra_args=()
 if [[ -s "${GTF_LD_R2_CACHE}" ]]; then
   schema_import_extra_args+=(--extra-numeric-cols LD_R2)
@@ -1565,7 +1599,7 @@ if [[ ${#gtf_region_args[@]} -gt 0 ]]; then
       if [[ "${gtf_region_args[$gtf_arg_i]}" == "--region" && $((gtf_arg_i + 1)) -lt ${#gtf_region_args[@]} ]]; then
         printf '%s\n' "${gtf_region_args[$((gtf_arg_i + 1))]}"
       fi
-    done | sort -u
+    done | /usr/bin/sort -u
   )"
   gtf_region_key="$(
     stable_hash_text \
@@ -1971,6 +2005,9 @@ fi
 
 if [[ "${SKIP_DATA_UPLOAD}" == "1" ]]; then
   echo "[manifest] GWAS subset is declared ready remotely: ${REMOTE_DATA_BASENAME}"
+elif [[ "${ODA_TRANSFER_MANIFEST_ONLY:-0}" != "1" && "${KEEP_REMOTE_PLOT_DATA}" == "1" ]] \
+    && remote_data_matches_local_size; then
+  echo "[manifest] Reusing size-verified remote GWAS subset: ${REMOTE_DATA_BASENAME}"
 else
   queue_bulk_oda_upload "${DATA_GZ}" "${REMOTE_DATA_BASENAME}" "GWAS plotting subset"
 fi

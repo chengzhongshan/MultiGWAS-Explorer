@@ -68,9 +68,16 @@ is_generated_file() {
     MultiGWAS-Explorer/auto_gtf_import_single_snp.*.sas|\
     MultiGWAS-Explorer/auto_wide_import_single_snp.*.sas|\
     MultiGWAS-Explorer/auto_wide_import_local_hits*.sas|\
+    MultiGWAS-Explorer/auto_gtf_import_local_hits_with_gtf.*.sas|\
     MultiGWAS-Explorer/run_sas_oda_single_snp_with_gtf.*.sas|\
     MultiGWAS-Explorer/run_sas_oda_local_top_hits_manhattan.*.sas|\
+    MultiGWAS-Explorer/run_sas_oda_local_top_hits_with_gtf.*.sas|\
     MultiGWAS-Explorer/run_sas_local_debug_*.sas|\
+    MultiGWAS-Explorer/local_gtf_subset_local_hits_*.tsv|\
+    MultiGWAS-Explorer/sas_action_runner_*.py|\
+    MultiGWAS-Explorer/sas_action_args_*.json|\
+    MultiGWAS-Explorer/sas_action_result_*.json|\
+    MultiGWAS-Explorer/sas_submit_result_*|\
     MultiGWAS-Explorer/*.local_debug.sas|\
     MultiGWAS-Explorer/*_top_hits_*.csv|\
     MultiGWAS-Explorer/gnuplot_fallback_*.status.json)

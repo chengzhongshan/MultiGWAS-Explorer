@@ -7,10 +7,11 @@ use File::Basename qw(dirname);
 use File::Path qw(make_path);
 use File::Spec;
 use JSON::PP qw(decode_json);
+use Text::CSV;
 use IO::Compress::Gzip qw($GzipError);
 use IO::Uncompress::Gunzip qw($GunzipError);
 
-my ($input, $indexed_input, $tabix_bin, $output_dir, $window_bp) = ('', '', '', '', '');
+my ($input, $indexed_input, $tabix_bin, $output_dir, $window_bp, $targets_csv, $combined_output) = ('') x 7;
 my @target_args;
 GetOptions(
     'input=s'      => \$input,
@@ -19,9 +20,12 @@ GetOptions(
     'output-dir=s' => \$output_dir,
     'window-bp=s'  => \$window_bp,
     'target=s@'    => \@target_args,
+    'targets-csv=s' => \$targets_csv,
+    'combined-output=s' => \$combined_output,
 ) or die "Invalid locus extraction options\n";
-die "--input, --output-dir, --window-bp, and at least one --target are required\n"
-    unless length($input) && length($output_dir) && length($window_bp) && @target_args;
+die "--input, --output-dir, --window-bp, and --target or --targets-csv are required\n"
+    unless length($input) && length($output_dir) && length($window_bp)
+        && (@target_args || length($targets_csv));
 die "Input not found: $input\n" unless -s $input;
 my @source_stat = stat($input);
 die "Indexed input or tabix index is missing: $indexed_input\n"
@@ -29,6 +33,24 @@ die "Indexed input or tabix index is missing: $indexed_input\n"
 die "--window-bp must be positive\n"
     unless $window_bp =~ /^(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i && $window_bp > 0;
 make_path($output_dir) unless -d $output_dir;
+
+if (length $targets_csv) {
+    open my $csv_fh, '<', $targets_csv or die "Cannot read $targets_csv: $!\n";
+    my $csv = Text::CSV->new({ binary => 1, auto_diag => 2 });
+    my $header = $csv->getline($csv_fh) or die "Empty target CSV: $targets_csv\n";
+    my %column = map { uc($header->[$_]) => $_ } 0 .. $#$header;
+    for my $needed (qw(SNP CHR BP)) {
+        die "Target CSV lacks $needed: $targets_csv\n" unless exists $column{$needed};
+    }
+    while (my $row = $csv->getline($csv_fh)) {
+        push @target_args, JSON::PP::encode_json({
+            snp => $row->[$column{SNP}],
+            chr => $row->[$column{CHR}],
+            bp  => $row->[$column{BP}],
+        });
+    }
+    close $csv_fh or die "Cannot close $targets_csv: $!\n";
+}
 
 my (%targets_by_chr, @targets, %seen);
 for my $arg (@target_args) {
@@ -67,6 +89,14 @@ my %idx = map { $cols[$_] => $_ } 0 .. $#cols;
 for my $required (qw(CHR BP SNP)) {
     die "Required column $required is missing from $input\n" unless exists $idx{$required};
 }
+my ($combined, $combined_tmp, %combined_seen, $combined_rows);
+if (length $combined_output) {
+    make_path(dirname($combined_output)) unless -d dirname($combined_output);
+    $combined_tmp = "$combined_output.tmp.$$";
+    $combined = IO::Compress::Gzip->new($combined_tmp)
+        or die "Cannot write $combined_tmp: $GzipError\n";
+    print {$combined} $header_text, "\n";
+}
 for my $target (@targets) {
     $target->{tmp_data} = "$target->{data}.tmp.$$";
     my $out = IO::Compress::Gzip->new($target->{tmp_data})
@@ -87,6 +117,11 @@ my $record = sub {
     $snp =~ s/[\r\n]+$//;
     for my $target (@$target_list) {
         next if $bp < $target->{start} || $bp > $target->{end};
+        if ($combined && !$combined_seen{$line}++) {
+            print {$combined} $line;
+            print {$combined} "\n" unless $line =~ /\n$/;
+            $combined_rows++;
+        }
         print { $target->{out} } $line;
         print { $target->{out} } "\n" unless $line =~ /\n$/;
         $target->{rows_written}++;
@@ -150,6 +185,11 @@ for my $target (@targets) {
     close $mf or die "Cannot close $tmp_manifest: $!\n";
     replace_file($tmp_manifest, $target->{manifest});
     print "[locus] $target->{snp}: $target->{rows_written} rows -> $target->{data}\n";
+}
+if ($combined) {
+    close $combined or die "Cannot finish $combined_tmp: $GzipError\n";
+    replace_file($combined_tmp, $combined_output);
+    print "[locus] Combined " . ($combined_rows || 0) . " unique rows -> $combined_output\n";
 }
 print $indexed_input
     ? "[locus] Queried " . scalar(@targets) . " indexed windows ($rows_read rows returned)\n"

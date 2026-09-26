@@ -62,6 +62,26 @@ my @streamed_rows = sort @streamed_lines[1, 2];
 is_deeply(\@indexed_rows, \@streamed_rows,
     'tabix extraction retains aliases and nonsignificant SNPs');
 
+my $target_csv = "$dir/common_top_hits.csv";
+open my $target_fh, '>', $target_csv or die $!;
+print {$target_fh} "SNP,CHR,BP\nrsA,1,100\nrsNearby,1,120\nrsB,2,200\n";
+close $target_fh or die $!;
+my $combined = "$dir/common_local_windows.tsv.gz";
+is(system($^X,
+    "$Bin/../DiffGWASDeps/gnuplot/extract_merged_locus_wide_batch.pl",
+    '--input', $input, '--indexed-input', $indexed,
+    '--output-dir', $dir, '--window-bp', '50',
+    '--targets-csv', $target_csv, '--combined-output', $combined), 0,
+    'common-hit CSV drives indexed local-window extraction');
+my $combined_text = '';
+gunzip $combined => \$combined_text or die $GunzipError;
+my @combined_rows = sort grep { length } (split /\n/, $combined_text)[1 .. 3];
+is_deeply(\@combined_rows, [sort(
+    "chr1\t100\trsA\t0.8\t0.1",
+    "1\t120\trsNearby\t0.9\t0.2",
+    "2\t200\trsB\t0.7\t0.4",
+)], 'combined upload keeps full locus rows and de-duplicates overlapping windows');
+
 my $sas_locus_dir = "$dir/sas locus";
 my $sas_cache_dir = "$dir/sas index";
 my @sas_locus_cmd = ($^X,
