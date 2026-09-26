@@ -29,6 +29,22 @@ It includes prerequisites, commands, container setup, SAS configuration, and
 troubleshooting links. Installation commands run from the inner pipeline
 directory shown above.
 
+## Update your GitHub repository
+
+From the outer clone directory (the one containing `.git`), preview and then
+upload source changes:
+
+```bash
+./update_github_upload.sh --dry-run
+./update_github_upload.sh "Describe the pipeline change"
+```
+
+The script stages tracked edits and new source or documentation files. It
+excludes SAS ODA and gnuplot run results, even if they were staged earlier;
+the local files remain available. The preview does not change the Git index
+or contact GitHub. If GitHub has newer commits, the upload stops before
+committing so you can integrate those changes first.
+
 ## Try a local example
 
 After installing:

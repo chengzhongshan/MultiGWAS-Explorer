@@ -68,6 +68,16 @@ benchmark/fixture_all_100k/gwama.out
 *.pptx
 *.log
 *.request.md5
+*.plot.tsv
+*.manifest.tsv
+*.status.json
+*.info.txt
+*.gp
+*.gz
+*.bgz
+*.tbi
+*.csi
+*.sas7bdat
 *.pid
 *.out
 *.err
