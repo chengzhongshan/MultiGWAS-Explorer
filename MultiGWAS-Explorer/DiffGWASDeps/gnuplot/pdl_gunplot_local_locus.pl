@@ -545,7 +545,7 @@ sub write_gnuplot {
     for my $i (0 .. $#{ $args{labels} }) {
         my $base = $i * $args{top_logp};
         my $panel_y = $base + $args{top_logp} - 0.95;
-        print {$gp} "set label " . (100 + $i) . " \"" . escape_gp($args{labels}[$i]) . "\" at $xmid,$panel_y center font ',18'\n";
+        print {$gp} "set label " . (100 + $i) . " \"" . escape_gp($args{labels}[$i]) . "\" at $xmid,$panel_y center font ',18' front\n";
     }
 
     if ($args{gene_tsv} && -s $args{gene_tsv}) {
