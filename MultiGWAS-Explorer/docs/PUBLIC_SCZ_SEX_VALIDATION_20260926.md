@@ -48,3 +48,28 @@ ancestor `local/bin` directory; explicit all-SNP mode now bypasses the earlier
 wide-table P filter as well as gnuplot point thinning; GTF downloads use a
 streamed curl transfer when available; and a transient Windows lock on a
 temporary SAS file no longer changes a successful preparation into a failure.
+
+## Meta-analysis and track-control rerun
+
+The same full public female/male input was reprocessed with default
+inverse-variance fixed-effect meta-analysis. The new wide cache contains
+1,440,033 rows; 1,425,467 pass the displayed-track P < 0.05 rule for the four
+genomewide tracks (differential, female, male, meta). The full gnuplot rerun
+completed in 1m 37s with a 4500 × 1875 PNG. The full SAS ODA rerun also
+completed and downloaded a 4500 × 1875 PNG (364,329 bytes). The wider format
+keeps the chromosome signals legible. These public `ALL` files contain only
+autosomes, so chromosome X inclusion was separately tested with a fixture
+containing both `X` and `23` spellings.
+
+The chr2 rs185665940 gnuplot local Manhattan and local GTF plots completed
+with independent multiple-track exclusions and custom orders. The local GTF
+retained the 1000 Genomes Phase 3 signed-LD heatmap. The local subset was
+queried through tabix, and its stale pre-meta cache was rebuilt when the
+requested meta P column was absent.
+The corresponding SAS ODA local Manhattan plot completed in 6m 22s with
+`ALL_FEMALE` and differential P panels (42,152-byte PNG). The SAS ODA local
+GTF plot completed in 3m 29s with `META` and `ALL_FEMALE` P panels, a gene
+track, and the signed-LD colorbar (217,773-byte PNG). Its first attempt
+revealed that the local SAS import template omitted the newly computed meta
+columns. The import now reads the actual local table header; the corrected
+rerun completed without that error.

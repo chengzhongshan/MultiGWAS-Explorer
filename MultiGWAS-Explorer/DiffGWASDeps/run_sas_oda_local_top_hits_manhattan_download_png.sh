@@ -101,7 +101,7 @@ SKIP_DATA_UPLOAD="${SKIP_DATA_UPLOAD:-0}"
 KEEP_REMOTE_PLOT_DATA="${KEEP_REMOTE_PLOT_DATA:-0}"
 EMIT_LOCAL_SAS_DEBUG="${EMIT_LOCAL_SAS_DEBUG:-0}"
 LOCAL_SAS_DEBUG_ONLY="${LOCAL_SAS_DEBUG_ONLY:-0}"
-MANHATTAN_GWAS_MODE="${MANHATTAN_GWAS_MODE:-multi}"
+MANHATTAN_GWAS_MODE="${LOCAL_MANHATTAN_GWAS_MODE:-${MANHATTAN_GWAS_MODE:-multi}}"
 DEFAULT_MULTI_P_VAR="ALL_STD_P"
 DEFAULT_MULTI_OTHER_P_VARS="ASN_STD_P EUR_STD_P ALL_DIFF_P ASN_DIFF_P EUR_DIFF_P"
 DEFAULT_MULTI_GWAS_LABEL_NAMES="All standardized P|Asian standardized P|European standardized P|All female-vs-male diff P|Asian female-vs-male diff P|European female-vs-male diff P"
@@ -119,7 +119,7 @@ else
   DEFAULT_MANHATTAN_GWAS_LABEL_NAMES="${DEFAULT_MULTI_GWAS_LABEL_NAMES}"
   DEFAULT_MANHATTAN_FIG_HEIGHT="1000"
 fi
-MANHATTAN_P_VAR="${MANHATTAN_P_VAR:-${DEFAULT_MANHATTAN_P_VAR}}"
+MANHATTAN_P_VAR="${LOCAL_MANHATTAN_P_VAR:-${MANHATTAN_P_VAR:-${DEFAULT_MANHATTAN_P_VAR}}}"
 GTF_LD_SNPS="${GTF_LD_SNPS:-}"
 GTF_LD_MARKER_SYMBOL="${GTF_LD_MARKER_SYMBOL:-star}"
 GTF_LD_MARKER_COLOR="${GTF_LD_MARKER_COLOR:-black}"
@@ -146,8 +146,8 @@ if [[ "${GTF_LD_MARKER_COLOR}" =~ ^#[0-9A-Fa-f]{6}$ ]]; then
 else
   GTF_LD_MARKER_SAS_COLOR="${GTF_LD_MARKER_COLOR}"
 fi
-MANHATTAN_OTHER_P_VARS="${MANHATTAN_OTHER_P_VARS:-${DEFAULT_MANHATTAN_OTHER_P_VARS}}"
-MANHATTAN_GWAS_LABEL_NAMES="${MANHATTAN_GWAS_LABEL_NAMES:-${DEFAULT_MANHATTAN_GWAS_LABEL_NAMES}}"
+MANHATTAN_OTHER_P_VARS="${LOCAL_MANHATTAN_OTHER_P_VARS-${MANHATTAN_OTHER_P_VARS:-${DEFAULT_MANHATTAN_OTHER_P_VARS}}}"
+MANHATTAN_GWAS_LABEL_NAMES="${LOCAL_MANHATTAN_GWAS_LABEL_NAMES:-${MANHATTAN_GWAS_LABEL_NAMES:-${DEFAULT_MANHATTAN_GWAS_LABEL_NAMES}}}"
 DEFAULT_MANHATTAN_FIG_WIDTH="${DEFAULT_MANHATTAN_FIG_WIDTH:-1800}"
 MANHATTAN_FIG_WIDTH="${LOCAL_MANHATTAN_FIG_WIDTH:-${MANHATTAN_FIG_WIDTH:-${DEFAULT_MANHATTAN_FIG_WIDTH}}}"
 MANHATTAN_FIG_HEIGHT="${LOCAL_MANHATTAN_FIG_HEIGHT:-${MANHATTAN_FIG_HEIGHT:-${DEFAULT_MANHATTAN_FIG_HEIGHT}}}"
@@ -627,14 +627,18 @@ augment_data_gz_with_target_snp_windows() {
   fi
 
   mkdir -p "${LOCAL_MH_REUSE_CACHE_DIR}"
-  local target_cache_key target_cache_base
+  local target_cache_key target_cache_base schema_checksum source_stamp
+  schema_checksum="$(perl -MDigest::MD5 -e 'open my $fh, q{<:raw}, $ARGV[0] or die $!; print Digest::MD5->new->addfile($fh)->hexdigest' "${SCHEMA_CONFIG_JSON}")"
+  source_stamp="$(perl -e 'my @s=stat($ARGV[0]); die $! unless @s; print "$s[7]:$s[9]"' "${SOURCE_LONG_GZ}")"
   target_cache_key="$(
     stable_hash_text \
       "${PROJECT_TAG}" \
       "${TARGET_SNP_LIST}" \
       "${LOCAL_WINDOW_BP}" \
       "${SOURCE_LONG_GZ}" \
-      "${SCHEMA_CONFIG_JSON}"
+      "${source_stamp}" \
+      "${SCHEMA_CONFIG_JSON}" \
+      "${schema_checksum}"
   )"
   target_cache_base="${LOCAL_MH_REUSE_CACHE_DIR}/target_snp_augmented_${SAFE_PROJECT_TAG}_${target_cache_key}"
   if [[ -s "${target_cache_base}.tsv.gz" ]]; then
@@ -734,6 +738,7 @@ augment_data_gz_with_target_snp_windows
 
 perl "${SCHEMA_INCLUDE_HELPER}" \
   --config "${SCHEMA_CONFIG_JSON}" \
+  --input-file "${DATA_GZ}" \
   --dataset scz_mh \
   --source-type gzip \
   --remote-basename "${REMOTE_DATA_BASENAME}" > "${IMPORT_BLOCK_RENDERED}"

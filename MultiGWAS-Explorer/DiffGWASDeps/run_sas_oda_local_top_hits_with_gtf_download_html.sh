@@ -377,7 +377,8 @@ PNG_OUT="${HTML_OUT%.html}.png"
 VERIFY_TOP_HITS_TSV=""
 if [[ "${TOP_HIT_MODE:-differential}" == "common_association" ]]; then
   data_base="$(basename "${DATA_GZ}")"
-  data_prefix="${data_base%.stdized.wide_beta_se_p_p_lt_0p05.final.tsv.gz}"
+  data_prefix="${data_base%.stdized.wide_beta_se_p_p_lt_0p05.meta_ivw.final.tsv.gz}"
+  [[ "${data_prefix}" != "${data_base}" ]] || data_prefix="${data_base%.stdized.wide_beta_se_p_p_lt_0p05.final.tsv.gz}"
   VERIFY_TOP_HITS_TSV="$(dirname "${DATA_GZ}")/${data_prefix}.common_assoc_verify.tsv"
 fi
 RUN_SAS_RENDERED="${WORKDIR}/run_sas_oda_local_top_hits_with_gtf.${stamp}.sas"
@@ -1469,6 +1470,7 @@ fi
 
 perl "${SCHEMA_INCLUDE_HELPER}" \
   --config "${SCHEMA_CONFIG_JSON}" \
+  --input-file "${DATA_GZ}" \
   --dataset scz_mh \
   --source-type gzip \
   --remote-basename "${REMOTE_DATA_BASENAME}" \

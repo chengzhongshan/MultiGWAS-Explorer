@@ -554,6 +554,26 @@ manifest_metric_value() {
   awk -F '\t' -v key="${metric}" '$1==key{print $2; exit}' "${manifest_path}"
 }
 
+wide_manifest_has_plot_columns() {
+  perl -MJSON::PP -e '
+    use strict; use warnings;
+    my ($manifest, $preset, $pvars) = @ARGV;
+    open my $mf, q{<}, $manifest or exit 1;
+    my $columns = q{};
+    while (<$mf>) { chomp; if (/^columns\t(.*)$/) { $columns=$1; last } }
+    my %available = map { $_ => 1 } split /,/, $columns;
+    my %alias;
+    if ($preset && -s $preset) {
+      open my $pf, q{<}, $preset or exit 1;
+      local $/; my $cfg = decode_json(<$pf>);
+      %alias = (%{ $cfg->{alias_map} || {} }, %{ $cfg->{post_alias_map} || {} });
+    }
+    for my $p (grep { length } split /\s+/, $pvars) {
+      exit 1 unless $available{$p} || $available{$alias{$p} || q{}};
+    }
+  ' "$1" "${SCHEMA_CONFIG_JSON:-}" "${GTF_ASSOC_PVARS}"
+}
+
 target_locus_from_csv() {
   local csv_path="$1"
   local target_snp="$2"
@@ -873,7 +893,9 @@ if [[ -z "${DATA_GZ}" && -n "${GENOME_WIDE_DATA_GZ_FOR_LOOKUP}" ]]; then
   if [[ -s "${shared_locus_data}" && -s "${shared_locus_manifest}" ]]; then
     shared_target_snp="$(manifest_metric_value target_snp "${shared_locus_manifest}" || true)"
     shared_window_bp="$(manifest_metric_value window_bp "${shared_locus_manifest}" || true)"
-    if [[ "${shared_target_snp}" == "${TARGET_SNP}" ]] && perl -e 'exit((0+$ARGV[0])==(0+$ARGV[1]) ? 0 : 1)' "${shared_window_bp:-0}" "${LOCAL_WINDOW_BP}"; then
+    if [[ "${shared_target_snp}" == "${TARGET_SNP}" ]] \
+        && wide_manifest_has_plot_columns "${shared_locus_manifest}" \
+        && perl -e 'exit((0+$ARGV[0])==(0+$ARGV[1]) ? 0 : 1)' "${shared_window_bp:-0}" "${LOCAL_WINDOW_BP}"; then
       DATA_GZ="${shared_locus_data}"
       LOCAL_WIDE_MANIFEST="${shared_locus_manifest}"
       TARGET_CHR="$(manifest_metric_value target_chr "${LOCAL_WIDE_MANIFEST}" || true)"
@@ -889,7 +911,9 @@ if [[ -z "${DATA_GZ}" ]]; then
   if [[ -s "${single_cache_base}.tsv.gz" && -s "${single_cache_base}.manifest.tsv" ]]; then
     cached_target_snp="$(manifest_metric_value target_snp "${single_cache_base}.manifest.tsv" || true)"
     cached_window_bp="$(manifest_metric_value window_bp "${single_cache_base}.manifest.tsv" || true)"
-    if [[ "${cached_target_snp}" == "${TARGET_SNP}" ]] && perl -e 'exit((0+$ARGV[0])==(0+$ARGV[1]) ? 0 : 1)' "${cached_window_bp:-0}" "${LOCAL_WINDOW_BP}"; then
+    if [[ "${cached_target_snp}" == "${TARGET_SNP}" ]] \
+        && wide_manifest_has_plot_columns "${single_cache_base}.manifest.tsv" \
+        && perl -e 'exit((0+$ARGV[0])==(0+$ARGV[1]) ? 0 : 1)' "${cached_window_bp:-0}" "${LOCAL_WINDOW_BP}"; then
       DATA_GZ="${single_cache_base}.tsv.gz"
       LOCAL_WIDE_MANIFEST="${single_cache_base}.manifest.tsv"
       TARGET_CHR="$(manifest_metric_value target_chr "${LOCAL_WIDE_MANIFEST}" || true)"
@@ -1178,6 +1202,7 @@ if [[ -n "${GTF_LD_R2_CACHE}" ]]; then
 fi
 perl "${SCHEMA_INCLUDE_HELPER}" \
   --config "${SCHEMA_CONFIG_JSON}" \
+  --input-file "${DATA_GZ}" \
   --dataset "${GWAS_DATASET}" \
   --source-type gzip \
   --remote-basename "${REMOTE_DATA_BASENAME}" \

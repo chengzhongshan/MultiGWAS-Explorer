@@ -93,8 +93,15 @@ my $local_manhattan_y_axis_value_size_override = '';
 my $target_snps_override = '';
 my $target_snp_genes_override = '';
 my $display_gwas_override = '';
+my $exclude_manhattan_tracks_override = '';
+my $manhattan_track_order_override = '';
+my $exclude_local_manhattan_tracks_override = '';
+my $local_manhattan_track_order_override = '';
+my $exclude_local_gtf_tracks_override = '';
+my $local_gtf_track_order_override = '';
 my $manhattan_differential_p_mode_override = '';
 my $manhattan_all_snps;
+my $include_x_chr;
 my $sas_oda_account_override = '';
 my $sas_oda_password_override = '';
 my $prompt_sas_oda_auth_override = 0;
@@ -160,6 +167,7 @@ GetOptions(
     'skip-plots!'         => \$skip_plots,
     'plots=s'             => \$plots,
     'manhattan-all-snps!' => \$manhattan_all_snps,
+    'include-x-chr!' => \$include_x_chr,
     'force!'              => \$force,
     'step=s@'             => \@step_args,
     'from-step=s'         => \$from_step,
@@ -210,6 +218,12 @@ GetOptions(
     'target-snps=s' => \$target_snps_override,
     'target-snp-genes=s' => \$target_snp_genes_override,
     'display-gwas|display-tracks=s' => \$display_gwas_override,
+    'exclude-manhattan-tracks|manhattan-exclude-tracks=s' => \$exclude_manhattan_tracks_override,
+    'manhattan-track-order=s' => \$manhattan_track_order_override,
+    'exclude-local-manhattan-tracks=s' => \$exclude_local_manhattan_tracks_override,
+    'local-manhattan-track-order=s' => \$local_manhattan_track_order_override,
+    'exclude-local-gtf-tracks|exclude-gtf-tracks=s' => \$exclude_local_gtf_tracks_override,
+    'local-gtf-track-order|gtf-track-order=s' => \$local_gtf_track_order_override,
     'manhattan-differential-p-mode=s' => \$manhattan_differential_p_mode_override,
     'sas-oda-account=s' => \$sas_oda_account_override,
     'sas-oda-password=s' => \$sas_oda_password_override,
@@ -356,6 +370,9 @@ my $spec = load_json($spec_file);
 $manhattan_all_snps = defined($manhattan_all_snps)
     ? ($manhattan_all_snps ? 1 : 0)
     : (cfg_or($spec, 'manhattan_all_snps', 0) ? 1 : 0);
+$include_x_chr = defined($include_x_chr)
+    ? ($include_x_chr ? 1 : 0)
+    : (cfg_or($spec, 'include_x_chr', 0) ? 1 : 0);
 $local_ld_r2_threshold_override = 0 + (
     defined($local_ld_r2_threshold_override)
       ? $local_ld_r2_threshold_override
@@ -467,6 +484,8 @@ my $project_tag = cfg_or($spec, 'project_tag', $artifact_stem);
 my $input_dir = normalize_unix_path(cfg_or($spec, 'input_dir', ''));
 my $output_dir = normalize_unix_path(cfg_or($spec, 'output_dir', $input_dir || $workdir));
 my $source_mode = cfg_or($spec, 'source_mode', 'raw_pgc_vcf_sumstats');
+my $compute_meta = $source_mode ne 'merged_gwas_table'
+    && cfg_or($spec, 'compute_meta', 1) ? 1 : 0;
 my $reference_build_profile = resolve_reference_build_profile_for_spec(
     spec               => $spec,
     reference_override => $reference_build_override,
@@ -576,6 +595,10 @@ my $generated = build_generated_paths(
 if ($manhattan_all_snps && $source_mode ne 'merged_gwas_table') {
     $generated->{wide_output} =~ s/p_lt_0p05\.final\.tsv\.gz$/all_snps.final.tsv.gz/;
     $generated->{wide_manifest} =~ s/p_lt_0p05\.final\.manifest\.tsv$/all_snps.final.manifest.tsv/;
+}
+if ($compute_meta) {
+    $generated->{wide_output} =~ s/\.final\.tsv\.gz$/.meta_ivw.final.tsv.gz/;
+    $generated->{wide_manifest} =~ s/\.final\.manifest\.tsv$/.meta_ivw.final.manifest.tsv/;
 }
 if ($source_mode eq 'precomputed_diff_stdized') {
     die "input_stdized is required for source_mode=precomputed_diff_stdized\n"
@@ -775,7 +798,14 @@ my $runner_cfg = build_runner_config(
     target_snps_override => $target_snps_override,
     target_snp_genes_override => $target_snp_genes_override,
     display_gwas_override => $display_gwas_override,
+    exclude_manhattan_tracks_override => $exclude_manhattan_tracks_override,
+    manhattan_track_order_override => $manhattan_track_order_override,
+    exclude_local_manhattan_tracks_override => $exclude_local_manhattan_tracks_override,
+    local_manhattan_track_order_override => $local_manhattan_track_order_override,
+    exclude_local_gtf_tracks_override => $exclude_local_gtf_tracks_override,
+    local_gtf_track_order_override => $local_gtf_track_order_override,
     manhattan_all_snps => $manhattan_all_snps,
+    include_x_chr => $include_x_chr,
     local_gtf_label_snps_override => $local_gtf_label_snps_override,
     local_ld_snps_override => $local_ld_snps_override,
     local_ld_reference_snp => $local_ld_reference_snp,
@@ -1104,6 +1134,17 @@ for my $step (@step_defs) {
     if ($step->{name} =~ /^plot_/) {
         print STDERR "[info] Validating generated files for plotting step '$step->{name}'...\n";
         validate_generated_files($generated, $pair_info);
+    }
+    if (!$local_sas_only && $step->{name} =~ /^plot_(?:manhattan|local_manhattan)$/) {
+        my $wide_path = cygpath_to_win($runner_cfg->{DATA_GZ} || '');
+        my @wide_stat = stat($wide_path);
+        my $plot_prefix = $step->{name} eq 'plot_manhattan'
+            ? ($runner_cfg->{OUTPUT_PREFIX} || "${project_tag}_SAS_manhattan")
+            : ($runner_cfg->{LOCAL_OUTPUT_PREFIX} || "${project_tag}_SAS_local_top_hits_manhattan");
+        $step->{cache_key} = md5_hex(join("\0",
+            $step->{name}, JSON::PP->new->canonical(1)->encode($runner_cfg),
+            @wide_stat ? ($wide_stat[7], $wide_stat[9]) : (0, 0)));
+        $step->{cache_file} = "$Bin/$plot_prefix.request.md5";
     }
     #Only skip the step when all output were found;
     foreach my $of (@{$step->{outputs}}) {
@@ -2601,6 +2642,29 @@ sub build_display_track_catalog {
         );
     }
 
+    if (cfg_or($spec || {}, 'source_mode', 'raw_pgc_vcf_sumstats') ne 'merged_gwas_table'
+        && cfg_or($spec || {}, 'compute_meta', 1)) {
+        for my $prefix (@prefixes) {
+            my $id = @prefixes == 1 ? 'META' : "${prefix}_META";
+            my $label = @prefixes == 1 ? 'Meta' : "$prefix meta";
+            my $entry = {
+                id => $id,
+                kind => 'meta',
+                prefix => $prefix,
+                pvar => "${id}_P",
+                manhattan_pvar => "${id}_P",
+                zvar => "${id}_Z",
+                betavar => "${id}_BETA",
+                sevar => "${id}_SE",
+                manhattan_label => "$label fixed-effect association P",
+                gtf_label => $id,
+            };
+            push @catalog, $entry;
+            add_display_track_aliases(\%lookup, $entry,
+                $id, "${id}_P", $label, "$label association");
+        }
+    }
+
     for my $track (@{ cfg_or($spec || {}, 'extra_tracks', []) || [] }) {
         next unless ref($track) eq 'HASH';
         my $id = $track->{id} || next;
@@ -2674,6 +2738,52 @@ sub resolve_display_track_selection {
         canonical => join(',', map { $_->{id} } @selected),
         available => [ map { $_->{id} } @{$catalog} ],
     };
+}
+
+sub resolve_plot_track_subset {
+    my ($selected, $catalog, $lookup, $exclude_raw, $order_raw, $plot_name) = @_;
+    my %excluded;
+    for my $token (parse_display_gwas_list($exclude_raw)) {
+        my $normalized = normalize_display_gwas_token($token);
+        if ($normalized =~ /^(?:DIFF|DIFFERENTIAL|DIFFERENTIAL_P)$/) {
+            $excluded{$_->{id}} = 1 for grep { $_->{kind} eq 'std' } @{$selected};
+            next;
+        }
+        my $entry = $lookup->{$normalized}
+            or die "Unknown $plot_name track '$token'. Available values: "
+                . join(', ', map { $_->{id} } @{$catalog}) . ", DIFFERENTIAL\n";
+        $excluded{$entry->{id}} = 1;
+    }
+    my @tracks = grep { !$excluded{$_->{id}} } @{$selected};
+    die "Track exclusions removed every $plot_name track\n" unless @tracks;
+    my @excluded_ids = map { $_->{id} } grep { $excluded{$_->{id}} } @{$selected};
+    my @priority;
+    if (length($order_raw // '')) {
+        my %available = map { $_->{id} => $_ } @tracks;
+        my %ordered;
+        for my $token (parse_display_gwas_list($order_raw)) {
+            my $normalized = normalize_display_gwas_token($token);
+            my @candidates = $normalized =~ /^(?:DIFF|DIFFERENTIAL|DIFFERENTIAL_P)$/
+                ? grep { $_->{kind} eq 'std' } @tracks
+                : do {
+                    my $entry = $lookup->{$normalized}
+                        or die "Unknown $plot_name order track '$token'. Available values: "
+                            . join(', ', map { $_->{id} } @tracks) . "\n";
+                    ($entry);
+                };
+            for my $entry (@candidates) {
+                die "$plot_name track '$token' is excluded or not displayed\n"
+                    unless $available{$entry->{id}};
+                next if $ordered{$entry->{id}}++;
+                push @priority, $entry->{id};
+            }
+        }
+        @tracks = (
+            (map { $available{$_} } @priority),
+            (grep { !$ordered{$_->{id}} } @tracks),
+        );
+    }
+    return (\@tracks, \@excluded_ids, \@priority);
 }
 
 sub display_selection_variant_tag {
@@ -2866,6 +2976,8 @@ sub build_preset_config {
         post_alias_map => build_post_alias_map($pair_info),
         pair_map       => $pair_info->{pair_map},
         prefix_order   => $pair_info->{prefix_order},
+        compute_meta   => cfg_or($spec, 'compute_meta', 1) ? 1 : 0,
+        meta_rho       => cfg_or($spec, 'rho', 0),
     };
 }
 
@@ -2990,6 +3102,24 @@ sub build_runner_config {
     my $target_snps_override = $args{target_snps_override} // '';
     my $target_snp_genes_override = $args{target_snp_genes_override} // '';
     my $display_gwas_override = $args{display_gwas_override} // '';
+    my $exclude_manhattan_tracks = length($args{exclude_manhattan_tracks_override} // '')
+        ? $args{exclude_manhattan_tracks_override}
+        : cfg_or($spec, 'exclude_manhattan_tracks', '');
+    my $manhattan_track_order = length($args{manhattan_track_order_override} // '')
+        ? $args{manhattan_track_order_override}
+        : cfg_or($spec, 'manhattan_track_order', '');
+    my $exclude_local_manhattan_tracks = length($args{exclude_local_manhattan_tracks_override} // '')
+        ? $args{exclude_local_manhattan_tracks_override}
+        : cfg_or($spec, 'exclude_local_manhattan_tracks', '');
+    my $local_manhattan_track_order = length($args{local_manhattan_track_order_override} // '')
+        ? $args{local_manhattan_track_order_override}
+        : cfg_or($spec, 'local_manhattan_track_order', '');
+    my $exclude_local_gtf_tracks = length($args{exclude_local_gtf_tracks_override} // '')
+        ? $args{exclude_local_gtf_tracks_override}
+        : cfg_or($spec, 'exclude_local_gtf_tracks', '');
+    my $local_gtf_track_order = length($args{local_gtf_track_order_override} // '')
+        ? $args{local_gtf_track_order_override}
+        : cfg_or($spec, 'local_gtf_track_order', '');
     my $local_gtf_label_snps_override = $args{local_gtf_label_snps_override} // '';
     my $local_ld_snps_override = $args{local_ld_snps_override} // '';
     my $local_ld_reference_snp = $args{local_ld_reference_snp} // '';
@@ -3018,6 +3148,19 @@ sub build_runner_config {
         display_gwas_override => $display_gwas_override,
     );
     my @selected_tracks = @{ $selection->{tracks} || [] };
+    my ($catalog, $track_lookup) = build_display_track_catalog($pair_info, $spec);
+    my ($manhattan_tracks, $excluded_manhattan_ids, $priority_order) =
+        resolve_plot_track_subset(\@selected_tracks, $catalog, $track_lookup,
+            $exclude_manhattan_tracks, $manhattan_track_order, 'genomewide Manhattan');
+    my @manhattan_tracks = @{$manhattan_tracks};
+    my @excluded_manhattan_ids = @{$excluded_manhattan_ids};
+    my @priority_order = @{$priority_order};
+    my ($local_manhattan_tracks, $excluded_local_manhattan_ids, $local_manhattan_priority) =
+        resolve_plot_track_subset(\@selected_tracks, $catalog, $track_lookup,
+            $exclude_local_manhattan_tracks, $local_manhattan_track_order, 'local Manhattan');
+    my ($local_gtf_tracks, $excluded_local_gtf_ids, $local_gtf_priority) =
+        resolve_plot_track_subset(\@selected_tracks, $catalog, $track_lookup,
+            $exclude_local_gtf_tracks, $local_gtf_track_order, 'local GTF');
     my @selected_std_tracks = grep { $_->{kind} eq 'std' } @selected_tracks;
     my @selected_group_tracks = grep { $_->{kind} eq 'group' } @selected_tracks;
     my @forest_tracks = @{ build_forest_group_tracks(
@@ -3027,7 +3170,7 @@ sub build_runner_config {
 
     my @prefixes = map { $_->{prefix} } @selected_std_tracks;
     my @labels = map { $_->{manhattan_label} } @selected_tracks;
-    my @gtf_labels = map { $_->{gtf_label} } @selected_tracks;
+    my @gtf_labels = map { $_->{gtf_label} } @{$local_gtf_tracks};
     my @std_pvars = map { $_->{pvar} } @selected_std_tracks;
     my @std_zvars = map { $_->{zvar} } @selected_std_tracks;
     my @group_pvars = map { $_->{pvar} } @selected_group_tracks;
@@ -3043,9 +3186,11 @@ sub build_runner_config {
     # than local Manhattan. Enforce one locus per batch/figure so each top hit
     # runs in isolation.
     my $local_gtf_max_hits_per_fig = 1;
-    my $manhattan_fig_height = cfg_or($spec, 'manhattan_fig_height', suggest_genomewide_fig_height($track_count));
-    my $manhattan_fig_width = cfg_or($spec, 'manhattan_fig_width', 1800);
-    my $local_manhattan_fig_height = cfg_or($spec, 'local_manhattan_fig_height', suggest_local_manhattan_fig_height($track_count, $local_max_hits_per_fig));
+    my $manhattan_fig_height = cfg_or($spec, 'manhattan_fig_height',
+        suggest_genomewide_fig_height(scalar @manhattan_tracks));
+    my $manhattan_fig_width = cfg_or($spec, 'manhattan_fig_width',
+        suggest_genomewide_fig_width($manhattan_fig_height));
+    my $local_manhattan_fig_height = cfg_or($spec, 'local_manhattan_fig_height', suggest_local_manhattan_fig_height(scalar @{$local_manhattan_tracks}, $local_max_hits_per_fig));
     my $local_manhattan_fig_width = cfg_or($spec, 'local_manhattan_fig_width', 1800);
     my $common_assoc_nominal_thrshd = cfg_or($spec, 'common_assoc_nominal_thrshd', '0.05');
     my $common_assoc_thrshds = cfg_or($spec, 'common_assoc_signal_thrshds', [ '5e-8', '1e-6', '1e-5' ]);
@@ -3057,12 +3202,12 @@ sub build_runner_config {
         @common_assoc_thrshds = grep { !$seen{$_}++ } ($common_assoc_top_hit_threshold_override, @common_assoc_thrshds);
     }
 
-    my @mh_labels = map { $_->{manhattan_label} } @selected_tracks;
+    my @mh_labels = map { $_->{manhattan_label} } @manhattan_tracks;
     my $default_gtf_colorbar_label = (
         $highlight_high_ld_snps
           && $local_ld_display_mode =~ /^(?:heatmap|both)$/i
     ) ? 'Signed LD r2 (r2 x sign(Z), 1000 Genomes Phase 3 / PLINK2)'
-      : infer_effect_metric_label_from_vars(map { $_->{zvar} } @selected_tracks);
+      : infer_effect_metric_label_from_vars(map { $_->{zvar} } @{$local_gtf_tracks});
 
     my @focus_tracks = @selected_std_tracks ? @selected_std_tracks
         : @selected_group_tracks ? @selected_group_tracks : @selected_tracks;
@@ -3159,6 +3304,30 @@ sub build_runner_config {
         $forest_output_html_basename = append_variant_to_filename($forest_output_html_basename, $display_variant);
         $forest_output_manifest_basename = append_variant_to_filename($forest_output_manifest_basename, $display_variant);
     }
+    if (@excluded_manhattan_ids) {
+        $output_prefix = append_variant_to_filename($output_prefix,
+            'without_' . join('_', @excluded_manhattan_ids));
+    }
+    if (@priority_order) {
+        $output_prefix = append_variant_to_filename($output_prefix,
+            'order_' . join('_', @priority_order));
+    }
+    if (@{$excluded_local_manhattan_ids}) {
+        $local_output_prefix = append_variant_to_filename($local_output_prefix,
+            'without_' . join('_', @{$excluded_local_manhattan_ids}));
+    }
+    if (@{$local_manhattan_priority}) {
+        $local_output_prefix = append_variant_to_filename($local_output_prefix,
+            'order_' . join('_', @{$local_manhattan_priority}));
+    }
+    if (@{$excluded_local_gtf_ids}) {
+        $output_html_basename = append_variant_to_filename($output_html_basename,
+            'without_' . join('_', @{$excluded_local_gtf_ids}));
+    }
+    if (@{$local_gtf_priority}) {
+        $output_html_basename = append_variant_to_filename($output_html_basename,
+            'order_' . join('_', @{$local_gtf_priority}));
+    }
 
     my $forest_default_hit_class = $top_hit_mode eq 'common_association'
         ? 'COMMON'
@@ -3179,14 +3348,18 @@ sub build_runner_config {
         DISPLAY_GWAS => $selection->{canonical},
         DISPLAY_GWAS_MODE => (scalar(@selected_tracks) == 1 ? 'single' : 'multi'),
         DISPLAY_GWAS_AVAILABLE => join('|', @{ $selection->{available} || [] }),
-        MANHATTAN_GWAS_MODE => (scalar(@selected_tracks) == 1 ? 'single' : 'multi'),
+        MANHATTAN_GWAS_MODE => (scalar(@manhattan_tracks) == 1 ? 'single' : 'multi'),
+        MANHATTAN_EXCLUDED_TRACKS => join(',', @excluded_manhattan_ids),
+        MANHATTAN_TRACK_ORDER => join(',', map { $_->{id} } @manhattan_tracks),
+        MANHATTAN_ORDER_PRIORITY => join(',', @priority_order),
         MANHATTAN_ALL_SNPS => ($args{manhattan_all_snps} ? 1 : 0),
+        MANHATTAN_INCLUDE_X_CHR => ($args{include_x_chr} ? 1 : 0),
         MANHATTAN_DIFFERENTIAL_P_MODE => uc(cfg_or(
             $spec, 'manhattan_differential_p_mode', 'raw'
         )),
-        MANHATTAN_P_VAR => ($selected_tracks[0]{manhattan_pvar} || $selected_tracks[0]{pvar}),
+        MANHATTAN_P_VAR => ($manhattan_tracks[0]{manhattan_pvar} || $manhattan_tracks[0]{pvar}),
         MANHATTAN_OTHER_P_VARS => [
-            map { $_->{manhattan_pvar} || $_->{pvar} } @selected_tracks[1 .. $#selected_tracks],
+            map { $_->{manhattan_pvar} || $_->{pvar} } @manhattan_tracks[1 .. $#manhattan_tracks],
         ],
         MANHATTAN_FIG_HEIGHT => $manhattan_fig_height,
         MANHATTAN_FIG_WIDTH => $manhattan_fig_width,
@@ -3253,6 +3426,15 @@ sub build_runner_config {
         ),
         LOCAL_MANHATTAN_FIG_HEIGHT => $local_manhattan_fig_height,
         LOCAL_MANHATTAN_FIG_WIDTH => $local_manhattan_fig_width,
+        LOCAL_MANHATTAN_GWAS_MODE => (@{$local_manhattan_tracks} == 1 ? 'single' : 'multi'),
+        LOCAL_MANHATTAN_EXCLUDED_TRACKS => join(',', @{$excluded_local_manhattan_ids}),
+        LOCAL_MANHATTAN_ORDER_PRIORITY => join(',', @{$local_manhattan_priority}),
+        LOCAL_MANHATTAN_TRACK_ORDER => join(',', map { $_->{id} } @{$local_manhattan_tracks}),
+        LOCAL_MANHATTAN_P_VAR => ($local_manhattan_tracks->[0]{manhattan_pvar} || $local_manhattan_tracks->[0]{pvar}),
+        LOCAL_MANHATTAN_OTHER_P_VARS => [
+            map { $_->{manhattan_pvar} || $_->{pvar} } @{$local_manhattan_tracks}[1 .. $#{$local_manhattan_tracks}],
+        ],
+        LOCAL_MANHATTAN_GWAS_LABEL_NAMES => join('|', map { $_->{manhattan_label} } @{$local_manhattan_tracks}),
         LOCAL_MAX_HITS_PER_FIG => $local_max_hits_per_fig,
         LOCAL_GTF_MAX_HITS_PER_FIG => $local_gtf_max_hits_per_fig,
         LOCAL_MANHATTAN_ANGLE4XAXIS_LABEL => (
@@ -3290,8 +3472,11 @@ sub build_runner_config {
               ? $local_manhattan_y_axis_value_size_override
               : cfg_or($spec, 'local_manhattan_y_axis_value_size', '')
         ),
-        GTF_ASSOC_PVARS => join(' ', map { $_->{pvar} } @selected_tracks),
-        GTF_ZSCORE_VARS => join(' ', map { $_->{zvar} } @selected_tracks),
+        GTF_EXCLUDED_TRACKS => join(',', @{$excluded_local_gtf_ids}),
+        GTF_ORDER_PRIORITY => join(',', @{$local_gtf_priority}),
+        GTF_TRACK_ORDER => join(',', map { $_->{id} } @{$local_gtf_tracks}),
+        GTF_ASSOC_PVARS => join(' ', map { $_->{pvar} } @{$local_gtf_tracks}),
+        GTF_ZSCORE_VARS => join(' ', map { $_->{zvar} } @{$local_gtf_tracks}),
         GTF_LABELS => join(' ', @gtf_labels),
         GTF_DIST2SNP => cfg_or($spec, 'gtf_dist2snp', 100000),
         GTF_YAXIS_LABEL => cfg_or($spec, 'gtf_yaxis_label', '-log10(P)'),
@@ -3389,6 +3574,12 @@ sub suggest_genomewide_fig_height {
     my $height = 260 + (110 * $track_count);
     $height = 420 if $height < 420;
     return int($height);
+}
+
+sub suggest_genomewide_fig_width {
+    my ($height) = @_;
+    my $width = int(($height || 0) * 2.4 + 0.5);
+    return $width > 1800 ? $width : 1800;
 }
 
 sub suggest_local_manhattan_fig_height {
@@ -4400,6 +4591,15 @@ Options:
   --plots LIST          Comma-separated plot set. Default: manhattan,local_manhattan,local_gtf
   --manhattan-all-snps  Include every coordinate-valid SNP in genome-wide Manhattan
                         instead of the default any-displayed-GWAS P < 0.05 filter.
+  --include-x-chr       Include chromosome X / 23 in genomewide Manhattan.
+                        Default: X / 23 excluded; --manhattan-all-snps does not change this.
+  --exclude-manhattan-tracks LIST  Remove comma-separated genomewide scatter tracks.
+  --manhattan-track-order LIST     Put listed genomewide tracks first, bottom to top.
+  --exclude-local-manhattan-tracks LIST  Remove local Manhattan scatter tracks.
+  --local-manhattan-track-order LIST     Put listed local Manhattan tracks first, bottom to top.
+  --exclude-local-gtf-tracks LIST        Remove local GTF scatter tracks.
+  --local-gtf-track-order LIST           Put listed local GTF tracks first, bottom to top.
+                       Use META, DIFFERENTIAL, or track IDs; remaining tracks retain order.
   --force               Rerun steps even if expected outputs already exist
   --list-steps          Print the available step names for the current spec and exit
   --step NAME           Run only one named step; repeat or comma-separate to run several

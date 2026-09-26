@@ -75,6 +75,8 @@ Options:
   --plots LIST                  Comma list: manhattan,local_manhattan,local_gtf,forest
   --manhattan-all-snps          Include every coordinate-valid SNP in genome-wide Manhattan.
                                 Default: any displayed GWAS has P < 0.05.
+  --include-x-chr               Include chromosome X / 23 in genomewide Manhattan.
+                                Default: autosomes only.
   --step NAME                   Plot step(s): plot_manhattan, plot_local_manhattan, plot_local_gtf, plot_forest
   --force                       Force plot regeneration while reusing valid upstream data.
   --force-upstream              Also rebuild the upstream wide GWAS subset.
@@ -82,11 +84,20 @@ Options:
                                 SAS ODA runner config. Use pair prefixes such as
                                 ALL,EUR,ASN for differential tracks and GWAS labels
                                 such as ALL_FEMALE or EUR_MALE for single-GWAS tracks.
+  --exclude-manhattan-tracks LIST
+                                Remove tracks from genomewide Manhattan only, e.g.
+                                META,DIFFERENTIAL or ALL_FEMALE.
+  --manhattan-track-order LIST  Put listed genomewide tracks first, bottom to top;
+                                unlisted tracks retain their current order.
+  --exclude-local-manhattan-tracks LIST  Remove local Manhattan scatter tracks.
+  --local-manhattan-track-order LIST     Order local Manhattan scatter tracks.
+  --exclude-local-gtf-tracks LIST        Remove local GTF scatter tracks.
+  --local-gtf-track-order LIST           Order local GTF scatter tracks.
   --manhattan-differential-p-mode MODE
                                 raw or standardized. Default: raw.
   --remove-X-chr / --no-remove-X-chr
-                                Remove chromosome X from final gunplot figures.
-                                Default: enabled.
+                                Legacy aliases controlling X in gunplot figures.
+                                --no-remove-X-chr includes X, like --include-x-chr.
   --target-snps A,B,C           Override target SNP list.
   --target-snp-genes MAP        Optional SNP:GENE overrides, comma-separated. Example: rs17425819:JAK2,rs2564978:CR1
   --ld-snps A,B,C               Optional LD-linked SNPs to overlay with asterisks.
@@ -154,6 +165,12 @@ my @step_args;
 my $force = 0;
 my $force_upstream = 0;
 my $display_gwas_override = '';
+my $exclude_manhattan_tracks_override = '';
+my $manhattan_track_order_override = '';
+my $exclude_local_manhattan_tracks_override = '';
+my $local_manhattan_track_order_override = '';
+my $exclude_local_gtf_tracks_override = '';
+my $local_gtf_track_order_override = '';
 my $manhattan_differential_p_mode_override = '';
 my $manhattan_all_snps;
 my $target_snps_override = '';
@@ -188,7 +205,8 @@ my $forest_fig_height_override = 0;
 my $local_max_hits_per_fig_override = 0;
 my $local_manhattan_columns_override = 0;
 my $local_manhattan_annotation_override = '';
-my $remove_x_chr = 1;
+my $remove_x_chr;
+my $include_x_chr;
 my $help = 0;
 
 GetOptions(
@@ -202,8 +220,15 @@ GetOptions(
     'force!'                  => \$force,
     'force-upstream!'         => \$force_upstream,
     'display-gwas|display-tracks=s' => \$display_gwas_override,
+    'exclude-manhattan-tracks|manhattan-exclude-tracks=s' => \$exclude_manhattan_tracks_override,
+    'manhattan-track-order=s' => \$manhattan_track_order_override,
+    'exclude-local-manhattan-tracks=s' => \$exclude_local_manhattan_tracks_override,
+    'local-manhattan-track-order=s' => \$local_manhattan_track_order_override,
+    'exclude-local-gtf-tracks|exclude-gtf-tracks=s' => \$exclude_local_gtf_tracks_override,
+    'local-gtf-track-order|gtf-track-order=s' => \$local_gtf_track_order_override,
     'manhattan-differential-p-mode=s' => \$manhattan_differential_p_mode_override,
     'remove-x-chr!'            => \$remove_x_chr,
+    'include-x-chr!'           => \$include_x_chr,
     'target-snps=s'           => \$target_snps_override,
     'target-snp-genes=s'      => \$target_snp_genes_override,
     'ld-snps=s'               => \$ld_snps_override,
@@ -316,6 +341,10 @@ my %requested = normalize_requested_plots($plots, \@step_args);
 die "No gunplot plot steps were requested.\n" unless grep { $requested{$_} } qw(plot_manhattan plot_local_manhattan plot_local_gtf plot_forest);
 
 my $spec = load_json($spec_file);
+$remove_x_chr = defined($include_x_chr)
+    ? ($include_x_chr ? 0 : 1)
+    : (defined($remove_x_chr) ? ($remove_x_chr ? 1 : 0)
+        : ($spec->{include_x_chr} ? 0 : 1));
 $manhattan_all_snps = defined($manhattan_all_snps)
     ? ($manhattan_all_snps ? 1 : 0)
     : ($spec->{manhattan_all_snps} ? 1 : 0);
@@ -366,6 +395,12 @@ my $reused_existing_runner = 0;
 my $has_runner_override = 0;
 for my $override_value (
     $display_gwas_override,
+    $exclude_manhattan_tracks_override,
+    $manhattan_track_order_override,
+    $exclude_local_manhattan_tracks_override,
+    $local_manhattan_track_order_override,
+    $exclude_local_gtf_tracks_override,
+    $local_gtf_track_order_override,
     $manhattan_differential_p_mode_override,
     $target_snps_override,
     $target_snp_genes_override,
@@ -385,6 +420,32 @@ if (!$manhattan_all_snps && ($spec->{source_mode} || '') ne 'merged_gwas_table'
     && -f $runner_config_local) {
     my $cached_runner = load_json($runner_config_local);
     $has_runner_override = 1 if $cached_runner->{MANHATTAN_ALL_SNPS};
+    my $want_meta = exists($spec->{compute_meta}) ? $spec->{compute_meta} : 1;
+    my $has_meta = ($cached_runner->{DATA_GZ} || '') =~ /\.meta_ivw\.final\.tsv\.gz$/;
+    $has_runner_override = 1 if !!$want_meta != !!$has_meta;
+}
+if (-f $runner_config_local) {
+    my $cached_runner = load_json($runner_config_local);
+    $has_runner_override = 1
+        if !!($cached_runner->{MANHATTAN_INCLUDE_X_CHR} || 0) != !!(!$remove_x_chr);
+    my $requested_exclusions = length($exclude_manhattan_tracks_override)
+        ? $exclude_manhattan_tracks_override : ($spec->{exclude_manhattan_tracks} || '');
+    my $requested_order = length($manhattan_track_order_override)
+        ? $manhattan_track_order_override : ($spec->{manhattan_track_order} || '');
+    my @local_plot_specs = (
+        [$exclude_local_manhattan_tracks_override, 'exclude_local_manhattan_tracks', 'LOCAL_MANHATTAN_EXCLUDED_TRACKS'],
+        [$local_manhattan_track_order_override, 'local_manhattan_track_order', 'LOCAL_MANHATTAN_ORDER_PRIORITY'],
+        [$exclude_local_gtf_tracks_override, 'exclude_local_gtf_tracks', 'GTF_EXCLUDED_TRACKS'],
+        [$local_gtf_track_order_override, 'local_gtf_track_order', 'GTF_ORDER_PRIORITY'],
+    );
+    $has_runner_override = 1
+        if $requested_exclusions || ($cached_runner->{MANHATTAN_EXCLUDED_TRACKS} || '')
+        || $requested_order || ($cached_runner->{MANHATTAN_ORDER_PRIORITY} || '');
+    for my $plot_spec (@local_plot_specs) {
+        $has_runner_override = 1
+            if $plot_spec->[0] || ($spec->{ $plot_spec->[1] } || '')
+            || ($cached_runner->{ $plot_spec->[2] } || '');
+    }
 }
 # A direct import creates a new spec, which may have different display tracks from
 # a cached runner with the same artifact name (for example, a prior Meta-only run).
@@ -410,7 +471,14 @@ if (!$reused_existing_runner) {
         spec_file                       => $spec_file,
         force                           => $force_upstream,
         manhattan_all_snps              => $manhattan_all_snps,
+        include_x_chr                   => !$remove_x_chr,
         display_gwas_override           => $display_gwas_override,
+        exclude_manhattan_tracks_override => $exclude_manhattan_tracks_override,
+        manhattan_track_order_override => $manhattan_track_order_override,
+        exclude_local_manhattan_tracks_override => $exclude_local_manhattan_tracks_override,
+        local_manhattan_track_order_override => $local_manhattan_track_order_override,
+        exclude_local_gtf_tracks_override => $exclude_local_gtf_tracks_override,
+        local_gtf_track_order_override => $local_gtf_track_order_override,
         manhattan_differential_p_mode_override => $manhattan_differential_p_mode_override,
         target_snps_override            => $target_snps_override,
         target_snp_genes_override       => $target_snp_genes_override,
@@ -436,13 +504,18 @@ if (($spec->{source_mode} || '') eq 'merged_gwas_table' && -f $preset_config_loc
         %{ $preset->{post_alias_map} || {} },
     );
     if (%alias) {
-        for my $key (qw(MANHATTAN_P_VAR TOP_HIT_FOCUS_PVAR)) {
+        for my $key (qw(MANHATTAN_P_VAR LOCAL_MANHATTAN_P_VAR TOP_HIT_FOCUS_PVAR)) {
             my $value = $runner->{$key} || '';
             $runner->{$key} = $alias{$value} if exists $alias{$value};
         }
         if (ref($runner->{MANHATTAN_OTHER_P_VARS}) eq 'ARRAY') {
             $runner->{MANHATTAN_OTHER_P_VARS} = [
                 map { $alias{$_} || $_ } @{ $runner->{MANHATTAN_OTHER_P_VARS} }
+            ];
+        }
+        if (ref($runner->{LOCAL_MANHATTAN_OTHER_P_VARS}) eq 'ARRAY') {
+            $runner->{LOCAL_MANHATTAN_OTHER_P_VARS} = [
+                map { $alias{$_} || $_ } @{ $runner->{LOCAL_MANHATTAN_OTHER_P_VARS} }
             ];
         }
         for my $key (qw(GTF_ASSOC_PVARS GTF_ZSCORE_VARS)) {
@@ -488,6 +561,17 @@ my @manhattan_pcols = (
 );
 
 my @manhattan_labels = split /\|/, ($runner->{MANHATTAN_GWAS_LABEL_NAMES} || join('|', @manhattan_pcols));
+my @local_manhattan_pcols = (
+    $runner->{LOCAL_MANHATTAN_P_VAR} || $runner->{MANHATTAN_P_VAR},
+    @{ ref($runner->{LOCAL_MANHATTAN_OTHER_P_VARS}) eq 'ARRAY'
+        ? $runner->{LOCAL_MANHATTAN_OTHER_P_VARS}
+        : (ref($runner->{MANHATTAN_OTHER_P_VARS}) eq 'ARRAY'
+            ? $runner->{MANHATTAN_OTHER_P_VARS} : []) },
+);
+my @local_manhattan_labels = split /\|/,
+    ($runner->{LOCAL_MANHATTAN_GWAS_LABEL_NAMES}
+        || $runner->{MANHATTAN_GWAS_LABEL_NAMES}
+        || join('|', @local_manhattan_pcols));
 
 my @gtf_pcols = grep { length } split /\s+/, ($runner->{GTF_ASSOC_PVARS} || '');
 my @gtf_zcols = grep { length } split /\s+/, ($runner->{GTF_ZSCORE_VARS} || '');
@@ -575,8 +659,8 @@ if ($requested{plot_local_manhattan}) {
             wide_data    => $wide_data_local,
             gnuplot      => $gnuplot,
             hits         => \@hits,
-            pcols        => \@manhattan_pcols,
-            labels       => \@manhattan_labels,
+            pcols        => \@local_manhattan_pcols,
+            labels       => \@local_manhattan_labels,
             window_bp    => ($runner->{LOCAL_WINDOW_BP} || '1e7'),
             batch_size   => ($local_max_hits_per_fig_override || ($runner->{LOCAL_MAX_HITS_PER_FIG} || 15)),
             panel_columns=> ($local_manhattan_columns_override || $runner->{LOCAL_MANHATTAN_COLUMNS} || $spec->{local_manhattan_columns} || 0),
@@ -709,8 +793,24 @@ sub run_upstream_preprocessing {
     );
     push @cmd, '--force' if $args{force};
     push @cmd, '--manhattan-all-snps' if $args{manhattan_all_snps};
+    push @cmd, '--include-x-chr' if $args{include_x_chr};
     if ($args{display_gwas_override}) {
         push @cmd, '--display-gwas', $args{display_gwas_override};
+    }
+    if ($args{exclude_manhattan_tracks_override}) {
+        push @cmd, '--exclude-manhattan-tracks', $args{exclude_manhattan_tracks_override};
+    }
+    if ($args{manhattan_track_order_override}) {
+        push @cmd, '--manhattan-track-order', $args{manhattan_track_order_override};
+    }
+    for my $option (
+        ['exclude-local-manhattan-tracks', 'exclude_local_manhattan_tracks_override'],
+        ['local-manhattan-track-order', 'local_manhattan_track_order_override'],
+        ['exclude-local-gtf-tracks', 'exclude_local_gtf_tracks_override'],
+        ['local-gtf-track-order', 'local_gtf_track_order_override'],
+    ) {
+        push @cmd, '--' . $option->[0], $args{ $option->[1] }
+            if $args{ $option->[1] };
     }
     if ($args{manhattan_differential_p_mode_override}) {
         push @cmd, '--manhattan-differential-p-mode',
@@ -765,6 +865,7 @@ sub plot_manhattan {
         '--manifest', File::Spec->catfile($args{cache_dir}, "$compact_stem.manifest.json"),
     );
     push @compact_cmd, '--all-snps' if $args{all_snps};
+    push @compact_cmd, '--include-x-chr' unless $args{remove_x_chr};
     run_cmd(\@compact_cmd, 'compact genomewide Manhattan input');
     my $output_prefix = gunplotize_name($args{runner}{OUTPUT_PREFIX} || 'gunplot_manhattan');
     my $out_prefix_path = File::Spec->catfile($args{output_dir}, $output_prefix);
@@ -805,7 +906,7 @@ sub plot_manhattan {
             '--thin-mod', $thin_mod,
             '--gnuplot', $args{gnuplot},
         );
-        push @cmd, '--remove-x-chr' if $args{remove_x_chr};
+        push @cmd, ($args{remove_x_chr} ? '--remove-x-chr' : '--no-remove-x-chr');
         run_cmd(\@cmd, 'gunplot genomewide Manhattan');
     }
     else {
@@ -1416,6 +1517,15 @@ sub plot_local_series {
     # Resolve each target from the indexed GWAS source before grouping.  On a
     # cold run the caller normally supplies only SNP names, so grouping before
     # this step silently treated nearby targets as unrelated loci.
+    my @locus_required_pcols = @{ $args{pcols} || [] };
+    if ($args{preset_config} && -s $args{preset_config}) {
+        my $preset = load_json($args{preset_config});
+        my %aliases = (
+            %{ $preset->{alias_map} || {} },
+            %{ $preset->{post_alias_map} || {} },
+        );
+        @locus_required_pcols = map { $aliases{$_} || $_ } @locus_required_pcols;
+    }
     my $locus_sources = prepare_locus_wide_sources(
         hits          => $args{hits},
         output_dir    => $args{output_dir},
@@ -1423,6 +1533,7 @@ sub plot_local_series {
         wide_data     => $args{wide_data},
         source_long   => $args{source_long},
         preset_config => $args{preset_config},
+        required_cols => \@locus_required_pcols,
         force         => $args{force},
     );
 
@@ -2625,6 +2736,7 @@ sub prepare_locus_wide_sources {
                 data => $data, manifest => $manifest,
                 snp => $hit->{SNP}, window_bp => $args{window_bp}, exact_window => 1,
                 source => $args{wide_data},
+                required_cols => $args{required_cols},
             );
             push @batch_targets, $hit if $args{force} || !$valid;
         }
@@ -2690,6 +2802,7 @@ sub prepare_locus_wide_sources {
             snp        => $snp,
             window_bp  => $args{window_bp},
             exact_window => 1,
+            required_cols => $args{required_cols},
         );
 
         if (($args{force} || !$valid)
@@ -2715,6 +2828,7 @@ sub prepare_locus_wide_sources {
                 snp        => $snp,
                 window_bp  => $args{window_bp},
                 exact_window => 1,
+                required_cols => $args{required_cols},
             );
             die "Target-locus extraction did not produce a valid cache for $snp\n" unless $valid;
         }
@@ -2729,6 +2843,7 @@ sub prepare_locus_wide_sources {
                     snp        => $snp,
                     window_bp  => $args{window_bp},
                     exact_window => 0,
+                    required_cols => $args{required_cols},
                 );
                 next unless $candidate_valid;
                 push @compatible, [$candidate, $candidate_manifest, $candidate_metrics];
@@ -2758,6 +2873,10 @@ sub locus_wide_cache_matches {
     my (%args) = @_;
     return (0, {}) unless $args{data} && -s $args{data} && $args{manifest} && -s $args{manifest};
     my $metrics = read_manifest_tsv($args{manifest});
+    if (@{ $args{required_cols} || [] }) {
+        my %columns = map { $_ => 1 } split /,/, ($metrics->{columns} || '');
+        return (0, $metrics) if grep { !$columns{$_} } @{ $args{required_cols} };
+    }
     if ($args{source}) {
         my @source_stat = stat($args{source});
         return (0, $metrics) unless @source_stat

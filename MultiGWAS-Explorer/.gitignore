@@ -54,6 +54,7 @@ benchmark/fixture_all_100k/gwama.out
 *.png
 *.pptx
 *.log
+*.request.md5
 *.pid
 *.out
 *.err

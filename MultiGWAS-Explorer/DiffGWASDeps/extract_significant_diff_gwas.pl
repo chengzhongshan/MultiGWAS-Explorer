@@ -6,6 +6,7 @@ use Getopt::Long qw(GetOptions);
 use IO::Compress::Gzip qw($GzipError);
 use IO::Uncompress::Gunzip qw($GunzipError);
 use lib $Bin;
+use FixedEffectMeta qw(fixed_effect_meta);
 use DiffGWASConfig qw(
   load_config_file
   normalize_pair_map
@@ -28,6 +29,8 @@ my $value_fields = join(',', default_value_fields());
 my $pair_map = 'SCZ_W3_ALL_SEX=ALL,SCZ_W3_ASN_SEX=ASN,SCZ_W3_EUR_SEX=EUR';
 my $prefix_order = 'ALL,ASN,EUR';
 my $base_cols = join(',', default_base_cols());
+my $compute_meta = 0;
+my $meta_rho = 0;
 
 GetOptions(
     'config=s'        => \$config_file,
@@ -42,6 +45,8 @@ GetOptions(
     'filter-fields=s' => \$filter_fields,
     'pair-map=s'      => \$pair_map,
     'prefix-order=s'  => \$prefix_order,
+    'compute-meta!'   => \$compute_meta,
+    'meta-rho=f'      => \$meta_rho,
 ) or die usage();
 
 my $cfg = load_config_file($config_file);
@@ -56,6 +61,8 @@ $value_fields = cfg_or($cfg, 'value_fields', $value_fields);
 $filter_fields = cfg_or($cfg, 'filter_fields', $filter_fields);
 $pair_map = $cfg->{pair_map} if exists $cfg->{pair_map};
 $prefix_order = cfg_or($cfg, 'prefix_order', $prefix_order);
+$compute_meta = cfg_or($cfg, 'compute_meta', $compute_meta);
+$meta_rho = cfg_or($cfg, 'meta_rho', $meta_rho);
 
 die "Input file not found: $input\n" unless -s $input;
 die "threshold must be positive\n" unless $threshold > 0;
@@ -95,10 +102,28 @@ for my $field (@filter_fields) {
 
 my @pair_order = ordered_prefixes(\%pair_to_prefix, \@prefix_order);
 die "No pair tags found in --pair-map\n" unless @pair_order;
+my @meta_beta_se_fields;
+if ($compute_meta) {
+    for my $names ([qw(GROUP1_BETA GROUP1_SE GROUP2_BETA GROUP2_SE)],
+                   [qw(FEMALE_BETA FEMALE_SE MALE_BETA MALE_SE)]) {
+        if (!grep { !exists $idx{$_} } @{$names}) {
+            @meta_beta_se_fields = @{$names};
+            last;
+        }
+    }
+    die "Computed meta-analysis requires both cohorts' BETA and SE columns\n"
+        unless @meta_beta_se_fields;
+}
 
 my @out_cols = @base_cols;
 for my $prefix (@pair_order) {
     push @out_cols, map { "${prefix}_$_" } @value_fields;
+}
+if ($compute_meta) {
+    push @out_cols, map {
+        my $id = @pair_order == 1 ? 'META' : "${_}_META";
+        map { "${id}_$_" } qw(BETA SE Z P)
+    } @pair_order;
 }
 
 my %stats = (
@@ -222,6 +247,19 @@ sub process_bucket {
             my $value = $vals->[ $idx->{$field} ] // '';
             my $numeric = numeric($value);
             $row{$out_col} = defined $numeric ? fmt($numeric) : $value;
+        }
+
+        if ($compute_meta) {
+            my ($beta, $se, $z, $p) = fixed_effect_meta(
+                (map { $vals->[ $idx->{$_} ] } @meta_beta_se_fields), $meta_rho);
+            if (defined $p) {
+                my $id = @{$pair_order} == 1 ? 'META' : "${prefix}_META";
+                $row{"${id}_BETA"} = fmt($beta);
+                $row{"${id}_SE"} = fmt($se);
+                $row{"${id}_Z"} = fmt($z);
+                $row{"${id}_P"} = fmt($p);
+                $keep = 1 if $p < $threshold;
+            }
         }
 
         for my $field (@{$filter_fields}) {

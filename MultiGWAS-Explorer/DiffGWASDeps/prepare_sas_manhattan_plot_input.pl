@@ -13,6 +13,7 @@ use File::Temp qw(tempdir);
 my ($input, $schema_config, $pvars, $output, $schema_out, $manifest) = ('') x 6;
 my $threshold = 0.05;
 my $all_snps = 0;
+my $include_x_chr = 0;
 GetOptions(
     'input=s'         => \$input,
     'schema-config=s' => \$schema_config,
@@ -22,6 +23,7 @@ GetOptions(
     'manifest=s'      => \$manifest,
     'threshold=f'     => \$threshold,
     'all-snps!'       => \$all_snps,
+    'include-x-chr!'  => \$include_x_chr,
 ) or die "Invalid Manhattan subset options\n";
 die "--input, --pvars, --output, --schema-out, and --manifest are required\n"
     unless length($input) && length($pvars) && length($output)
@@ -56,6 +58,7 @@ my $cache_key = JSON::PP->new->canonical->encode({
     alias => \%alias,
     threshold => $threshold,
     all_snps => $all_snps ? 1 : 0,
+    include_x_chr => $include_x_chr ? 1 : 0,
 });
 if (-s $output && -s $schema_out && -s $manifest) {
     my $old = eval {
@@ -98,7 +101,7 @@ my $unsorted = File::Spec->catfile($tmpdir, 'unsorted.tsv');
 my $sorted = File::Spec->catfile($tmpdir, 'sorted.tsv');
 my $tmp_gz = File::Spec->catfile($tmpdir, 'subset.tsv.gz');
 open my $raw, '>', $unsorted or die "Cannot write $unsorted: $!\n";
-my ($rows_read, $rows_written, $bad_coord) = (0, 0, 0);
+my ($rows_read, $rows_written, $bad_coord, $x_removed) = (0, 0, 0, 0);
 while (my $line = <$in>) {
     $rows_read++;
     $line =~ s/[\r\n]+$//;
@@ -111,6 +114,10 @@ while (my $line = <$in>) {
     unless ($chr =~ /^\d+$/ && $chr >= 1 && $chr <= 24
         && $bp =~ /^\d+$/ && $bp > 0) {
         $bad_coord++;
+        next;
+    }
+    if (!$include_x_chr && $chr == 23) {
+        $x_removed++;
         next;
     }
     my @p = map { $values[$index{$_}] // '' } @physical_pvars;
@@ -150,12 +157,14 @@ my $report = {
     output => $output,
     threshold => $threshold,
     all_snps => $all_snps ? 1 : 0,
+    include_x_chr => $include_x_chr ? 1 : 0,
     displayed_pvars => \@pvars,
     physical_pvars => \@physical_pvars,
     rows_read => $rows_read,
     rows_written => $rows_written,
     rows_removed => $rows_read - $rows_written,
     rows_bad_coordinate => $bad_coord,
+    rows_x_removed => $x_removed,
 };
 write_json($schema_out, $schema);
 replace_file($tmp_gz, $output);

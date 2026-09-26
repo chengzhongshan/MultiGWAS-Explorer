@@ -1,0 +1,94 @@
+{
+   "artifact_stem" : "AOA_GWAS_Data_diff_merged",
+   "auto_detect_summary" : {
+      "cohort_tracks" : [
+         "MP2PRT",
+         "DS_ALL"
+      ],
+      "extra_tracks" : [
+         "meta"
+      ],
+      "generated_from_dir" : "/cygdrive/c/Users/zcheng/Downloads/AI4Coding/perlMCP4AOA_GWAS/AOA_GWAS_Data",
+      "selected_file" : "DS_ALL_and_MP2PRT_plus_meta.gz",
+      "selected_mode" : "merged_gwas_table"
+   },
+   "clean_oda_input" : 1,
+   "cygwin_bash" : "/bin/bash",
+   "extra_tracks" : [
+      {
+         "betavar" : "META_BETA",
+         "id" : "META",
+         "kind" : "extra",
+         "label" : "Meta",
+         "pvar" : "META_P",
+         "sevar" : "",
+         "zvar" : "META_Z"
+      }
+   ],
+   "include_non_protein_coding_genes_in_local_gtf" : 0,
+   "input_dir" : "/cygdrive/c/Users/zcheng/Downloads/AI4Coding/perlMCP4AOA_GWAS/AOA_GWAS_Data",
+   "input_merged" : "/mnt/c/Users/zcheng/Downloads/AI4Coding/perlMCP4AOA_GWAS/AOA_GWAS_Data/DS_ALL_and_MP2PRT_plus_meta.gz",
+   "keep_remote_plot_data" : 1,
+   "local_gtf_window_bp" : "1e7",
+   "local_window_bp" : "1e7",
+   "merged_base_cols" : {
+      "a1" : "A1",
+      "a2" : "A2",
+      "bp" : "BP",
+      "chr" : "CHR",
+      "snp" : "SNP"
+   },
+   "merged_extra_tracks" : [
+      {
+         "beta_col" : "BETAR_meta",
+         "id" : "META",
+         "label" : "meta",
+         "p_col" : "PR_meta",
+         "se_col" : null,
+         "z_col" : "WEIGHTED_Z_meta"
+      }
+   ],
+   "merged_group_tracks" : [
+      {
+         "beta_col" : "BETA_MP2PRT",
+         "id" : "MP2PRT",
+         "label" : "MP2PRT",
+         "p_col" : "P_MP2PRT",
+         "se_col" : "SE_MP2PRT"
+      },
+      {
+         "beta_col" : "BETA_DS_ALL",
+         "id" : "DS_ALL",
+         "label" : "DS_ALL",
+         "p_col" : "P_DS_ALL",
+         "se_col" : "SE_DS_ALL"
+      }
+   ],
+   "open_result" : 0,
+   "output_dir" : "/cygdrive/c/Users/zcheng/Downloads/AI4Coding/perlMCP4AOA_GWAS/AOA_GWAS_Data",
+   "pairs" : [
+      {
+         "group1" : "GWAS_MP2PRT",
+         "group1_label" : "MP2PRT",
+         "group2" : "GWAS_DS_ALL",
+         "group2_label" : "DS_ALL",
+         "label" : "MP2PRT vs DS_ALL",
+         "pair_tag" : "GWAS_MP2PRT_vs_GWAS_DS_ALL",
+         "prefix" : "MP2PRT_DS_ALL",
+         "source_group1" : "MP2PRT",
+         "source_group2" : "DS_ALL"
+      }
+   ],
+   "project_tag" : "AOA_GWAS_Data_diff",
+   "reference_build" : "hg38",
+   "source_mode" : "merged_gwas_table",
+   "threshold" : 0.05,
+   "top_hit_dist_bp" : "1e6",
+   "top_hit_focus_prefix" : "MP2PRT_DS_ALL",
+   "top_hit_ld_population_rule" : "ANY",
+   "top_hit_ld_r2_threshold" : "0.1",
+   "top_hit_selection_method" : "ld",
+   "top_hit_signal_thrshd" : "1e-6",
+   "workdir" : "/cygdrive/c/Users/zcheng/Downloads/AI4Coding/perlMCP4AOA_GWAS/MultiGWAS-Explorer/MultiGWAS-Explorer"
+}
+

@@ -90,8 +90,18 @@ is(scalar @lines, 3, 'rows with missing cohort values retained');
 @values = split /\t/, $lines[1], -1;
 @row{@header} = @values;
 ok($row{META_P} !~ /\d/, 'missing meta P is not fabricated');
+open my $sas_import_pipe, '-|', $^X,
+    "$Bin/../DiffGWASDeps/generate_sas_wide_import_include.pl",
+    '--config', $preset_path, '--input-file', $preset->{output},
+    '--remote-basename', 'merged.tsv.gz' or die $!;
+my $sas_import = do { local $/; <$sas_import_pipe> };
+ok(close($sas_import_pipe), 'merged SAS import reads the real wide header');
+like($sas_import, qr/^\s+META_Z\s*$/m,
+    'merged SAS import includes the supplied signed meta Z');
+unlike($sas_import, qr/\bMETA_Z\s*=/,
+    'merged SAS import does not overwrite the supplied signed meta Z');
 SKIP: {
-    skip 'gnuplot or PDL is unavailable', 10
+    skip 'gnuplot or PDL is unavailable', 14
         unless system('gnuplot', '--version') == 0 && eval { require PDL; 1 };
     my $gnu_spec = "$dir/gunplot.spec.json";
     is(system($^X, "$Bin/../auto_prepare_and_run_diff_gwas_with_gunplot.pl",
@@ -154,6 +164,31 @@ SKIP: {
     close $default_manifest_fh;
     is($default_manifest{rows_scanned}, 3,
         'explicit all-SNP mode bypasses the nominal P filter');
+    my $custom_spec = "$dir/custom_gunplot.spec.json";
+    is(system($^X, "$Bin/../auto_prepare_and_run_diff_gwas_with_gunplot.pl",
+        '--input-merged', $input, '--spec-out', $custom_spec, '--plots', 'manhattan',
+        '--exclude-manhattan-tracks', 'MP2PRT_DS_ALL,MP2PRT',
+        '--manhattan-track-order', 'META,DS_ALL',
+        '--exclude-local-manhattan-tracks', 'META,MP2PRT',
+        '--local-manhattan-track-order', 'DS_ALL,MP2PRT_DS_ALL',
+        '--exclude-local-gtf-tracks', 'MP2PRT,MP2PRT_DS_ALL',
+        '--local-gtf-track-order', 'META,DS_ALL',
+        '--include-x-chr'), 0,
+        'gnuplot wrapper forwards independent track exclusions and orders');
+    my $custom_artifact = read_json($custom_spec)->{artifact_stem};
+    my $custom_runner = read_json("$dir/auto_${custom_artifact}_runner.json");
+    is($custom_runner->{MANHATTAN_TRACK_ORDER}, 'META,DS_ALL',
+        'gnuplot genomewide panels follow the requested order');
+    is($custom_runner->{LOCAL_MANHATTAN_TRACK_ORDER}, 'DS_ALL,MP2PRT_DS_ALL',
+        'gnuplot local Manhattan panels retain their independent order');
+    is($custom_runner->{GTF_TRACK_ORDER}, 'META,DS_ALL',
+        'gnuplot local GTF scatter panels retain their independent order');
+    is($custom_runner->{MANHATTAN_INCLUDE_X_CHR}, 1,
+        'gnuplot X override is recorded in the shared runner');
+    my $compact_manifest = "$Bin/../cache/sas_manhattan/"
+        . $custom_runner->{OUTPUT_PREFIX} . '.p_lt_0_05.manifest.json';
+    is(read_json($compact_manifest)->{include_x_chr}, 1,
+        'gnuplot X override reaches compact genomewide input');
     is($default_manifest{rows_thinned}, 0,
         'explicit all-SNP gnuplot mode disables background point thinning');
 }

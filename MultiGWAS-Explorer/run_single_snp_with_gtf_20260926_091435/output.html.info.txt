@@ -1,0 +1,667 @@
+
+=== Submitted SAS Codes or file ===
+./run_sas_oda_single_snp_with_gtf.20260926_091435.sas
+
+
+=== Output Directory ===
+run_single_snp_with_gtf_20260926_091435
+
+=== Dependency Logs ===
+Using colocated importallmacros_ue bootstrap only for unresolved macros: SNP_Local_Manhattan_With_GTF
+No additional macro files were uploaded because importallmacros_ue.sas is treated as self-contained.
+Checked/reused/uploaded macro bootstrap helper: /home/cheng.zhong.shan/importallmacros_ue.sas
+
+=== Macro Bootstrap Diagnostics ===
+Bootstrap Start: 2026-09-26 09:17:34
+Bootstrap End: 2026-09-26 09:17:39
+Bootstrap Elapsed Seconds: 4.68
+Bootstrap OK: 1
+Bootstrap Warning: 0
+Bootstrap-only SAS log: /cygdrive/c/Users/zcheng/Downloads/AI4Coding/perlMCP4AOA_GWAS/MultiGWAS-Explorer/MultiGWAS-Explorer/run_single_snp_with_gtf_20260926_091435/output.macro_bootstrap.log.txt
+
+=== Submission Preflight ===
+Target: ./run_sas_oda_single_snp_with_gtf.20260926_091435.sas
+Total lines: 384
+No obvious unmatched comments, unterminated quoted strings, or open-code macro-control statements were detected.
+
+=== Include Preflight ===
+Target: ~/adj_grpnum4close_gene_bed_regs.sas
+Total lines: 525
+No obvious unmatched block comments or unterminated quoted strings were detected.
+Skipped remote include refresh due to INCLUDE_PREFLIGHT_REFRESH_REMOTE=0
+
+=== Include Preflight ===
+Target: ~/Multgscatter_with_gene_exons.sas
+Total lines: 753
+No obvious unmatched block comments or unterminated quoted strings were detected.
+Skipped remote include refresh due to INCLUDE_PREFLIGHT_REFRESH_REMOTE=0
+
+=== Include Preflight ===
+Target: ~/map_grp_assoc2gene4covidsexgwas.sas
+Total lines: 520
+No obvious unmatched block comments or unterminated quoted strings were detected.
+Skipped remote include refresh due to INCLUDE_PREFLIGHT_REFRESH_REMOTE=0
+
+=== Include Preflight ===
+Target: ~/SNP_Local_Manhattan_With_GTF.sas
+Total lines: 654
+No obvious unmatched block comments or unterminated quoted strings were detected.
+Skipped remote include refresh due to INCLUDE_PREFLIGHT_REFRESH_REMOTE=0
+
+=== Include Preflight ===
+Target: ~/Lattice_gscatter_over_bed_track.sas
+Total lines: 2768
+No obvious unmatched block comments or unterminated quoted strings were detected.
+Skipped remote include refresh due to INCLUDE_PREFLIGHT_REFRESH_REMOTE=0
+
+=== Status Snapshot ===
+state: running
+phase: submit_returned
+message: SAS submit returned to the wrapper
+bootstrap_started_at: 2026-09-26 09:17:34
+bootstrap_finished_at: 2026-09-26 09:17:39
+bootstrap_elapsed_seconds: 4.68
+bootstrap_ok: 1
+bootstrap_warning: 0
+bootstrap_log_path: /cygdrive/c/Users/zcheng/Downloads/AI4Coding/perlMCP4AOA_GWAS/MultiGWAS-Explorer/MultiGWAS-Explorer/run_single_snp_with_gtf_20260926_091435/output.macro_bootstrap.log.txt
+last_update: 2026-09-26 09:17:40
+
+=== Error ===
+SAS log contains fatal errors: ERROR: Function LOG10 requires a numeric expression as argument 1.
+
+=== SAS Log ===
+19                                                         The SAS System                   Saturday, September 26, 2026 02:17:00 PM
+
+102246     ods listing close;ods html5 (id=saspy_internal) file=_tomods1 options(bitmap_mode='inline') device=svg style=HTMLBlue;
+102246   ! ods graphics on / outputfmt=png;
+102247     
+102248     /*
+102249     Run this in SAS ODA after uploading:
+102250       1) a wide differential GWAS subset .tsv.gz with the expected beta / SE / P columns
+102251     
+102252     This script draws a local Manhattan plot with gene tracks for a single target SNP by:
+102253       - reading the uploaded wide GWAS subset
+102254       - computing Z-scores from beta / SE columns
+102255       - locating the requested target SNP
+102256       - subsetting a configurable +/- local window around that SNP
+102257       - ensuring the requested GTF dataset exists in SAS ODA
+102258       - calling SNP_Local_Manhattan_With_GTF with configurable track settings
+102259     */
+102260     
+102261     *options mprint mlogic symbolgen;
+102262     
+102263     %let target_snp=rs185665940;
+102264     %let local_window_bp=500000;
+102265     %let gtf_label_snps=rs185665940;
+102266     %let gtf_ld_snps=;
+102267     %let gtf_ld_display_mode=heatmap;
+102268     %let gtf_ld_r2_values=;
+102269     %let gtf_ld_heatmap_colors=CXF7FBFF CX6BAED6 CX54278F;
+102270     %let gtf_ld_heatmap_legend_title=Signed LD r2 to rs185665940 (EUR, 1000G Phase 3 / PLINK2);
+102271     %let html_outfile=PUBLIC_SCZ_CHR2_LOCUS_SAS_local_top_hits_with_gtf_without_ALL_ALL_MALE_order_META_ALL_FEMALE.html;
+102272     %let
+102272   ! done_outfile=PUBLIC_SCZ_CHR2_LOCUS_SAS_local_top_hits_with_gtf_without_ALL_ALL_MALE_order_META_ALL_FEMALE.html.complete.t
+102272   ! sv;
+102273     %let gwas_dsd=SCZMH_20260926091435;
+102274     %let target_hit_dsd=THIT_20260926091435;
+102275     %let target_local_dsd=TLOC_20260926091435;
+102276     
+102277     %let gtf_dsd=FM.GTF_HG19;
+102278     %let fm_libpath=/home/cheng.zhong.shan/my_shared_file_links/cheng.zhong.shan/F_vs_M_Covid19_Hosp;
+102279     %let gtf_local_dsd=gtf_hg19;
+102280     %let
+102280   ! gtf_gz_url=https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_49/GRCh37_mapping/gencode.v49lift37.annotati
+102280   ! on.gtf.gz;
+102281     %let gtf_assoc_pvars=META_P ALL_FEMALE_P;
+102282     %let gtf_zscore_vars=META_Z ALL_FEMALE_Z;
+102283     %let gtf_labels=META ALL_FEMALE;
+102284     %let gtf_dist2snp=100000;
+102285     %let gtf_design_width=1500;
+102286     %let gtf_design_height=1395;
+102287     %let gtf_dist2sep_genes=100000;
+102288     %let gtf_shift_text_yval=0.2;
+102289     %let gtf_pct4neg_y=1.4;
+102290     %let gtf_adjval4header=-0.6;
+102291     %let gtf_yaxis_label=-log10(P);
+102292     %let gtf_colorbar_label=Signed LD r2 (r2 x sign(Z), 1000 Genomes Phase 3 / PLINK2);
+102293     %let gtf_yoffset4textlabels=1.5;
+102294     %let gtf_include_non_protein_coding=0;
+102295     
+102296     ods _all_ close;
+102297     ods html5 file="~/&html_outfile"
+102298       options(bitmap_mode='inline')
+102299       style=HTMLBlue;
+102300     ods graphics on / outputfmt=png;
+102301     
+102302     %if %length(&fm_libpath) > 0 %then %do;
+102303       libname FM "&fm_libpath";
+102304     %end;
+102305     
+102306     %include "~/adj_grpnum4close_gene_bed_regs.sas";
+102831     %include "~/Multgscatter_with_gene_exons.sas";
+103584     %include "~/map_grp_assoc2gene4covidsexgwas.sas";
+104104     %include "~/SNP_Local_Manhattan_With_GTF.sas";
+104758     %include "~/Lattice_gscatter_over_bed_track.sas";
+107526     
+107527     filename gtfdata zip "~/single_snp_gtf_hg19_srcef4f3a809971_rs185665940_chr2_71769028_72769028_npc0.tsv.gz" gzip;
+107528     
+107529     data gtf_hg19;
+107530       infile gtfdata dlm='09'x dsd firstobs=2 truncover lrecl=1048576;
+107531       length chr_text chr_raw seqname source $64 feature type $32 score $32 strand $4 frame $8 ensembl $64;
+107532       length gene gene_name gene_id transcript_name transcript_id gene_type transcript_type exon_id exon_number genesymbol
+107532   ! $128;
+107533       input
+107534         chr
+107535         chr_text :$64.
+107536         chr_raw :$64.
+107537         seqname :$64.
+107538         source :$64.
+107539         feature :$32.
+107540         type :$32.
+107541         start
+107542         end
+107543         st
+107544         en
+107545         bp1
+107546         bp2
+107547         txStart
+107548         txEnd
+107549         score :$32.
+107550         strand :$4.
+107551         frame :$8.
+107552         gene :$128.
+107553         gene_name :$128.
+107554         gene_id :$128.
+107555         transcript_name :$128.
+107556         transcript_id :$128.
+107557         gene_type :$128.
+107558         transcript_type :$128.
+107559         exon_id :$128.
+107560         exon_number :$128.
+107561         ensembl :$64.
+107562         genesymbol :$128.
+107563         protein_coding
+107564         original_protein_coding
+107565       ;
+107566     run;
+107567     
+107568     
+107569     %macro _ensure_effective_gtf_dsd(target_chr=,target_bp=,flank_bp=);
+107570       %global effective_gtf_dsd effective_gtf_dist2snp effective_gtf_pct4neg_y effective_gtf_dist2sep_genes
+107570   ! effective_gtf_grp_font_size;
+107571       %local _n_genes_for_plot _n_exons_for_plot _n_non_protein_for_plot _n_tx_for_plot _compact_gtf_dsd;
+107572       %let effective_gtf_dsd=&gtf_local_dsd;
+107573       %let effective_gtf_dist2snp=&gtf_dist2snp;
+107574       %let effective_gtf_pct4neg_y=&gtf_pct4neg_y;
+107575       %let effective_gtf_dist2sep_genes=&gtf_dist2sep_genes;
+107576       %let effective_gtf_grp_font_size=8;
+107577       %if %sysevalf(&local_window_bp > &effective_gtf_dist2snp) %then %do;
+107578         %put NOTE: Expanding local GTF half-window from &effective_gtf_dist2snp bp to the requested SNP-centered local window
+107578   !  (&local_window_bp bp).;
+107579         %let effective_gtf_dist2snp=&local_window_bp;
+107580       %end;
+107581     
+107582       %let _compact_gtf_dsd=&effective_gtf_dsd._compact;
+107583     
+107584       proc sql;
+107585         create table _gtf_transcript_rank as
+107586         select coalescec(genesymbol,gene) as gene_key length=256,
+107587                coalescec(transcript_id,transcript_name) as tx_key length=256,
+107588                sum(type='exon') as exon_count,
+107589                (max(en)-min(st)+1) as tx_span
+107590         from &effective_gtf_dsd
+107591         where type in ('transcript','exon')
+107592           and not missing(coalescec(genesymbol,gene))
+107593           and not missing(coalescec(transcript_id,transcript_name))
+107594         group by calculated gene_key, calculated tx_key
+107595         ;
+107596       quit;
+107597     
+107598       proc sort data=_gtf_transcript_rank;
+107599         by gene_key descending exon_count descending tx_span tx_key;
+107600       run;
+107601     
+107602       data _gtf_transcript_best;
+107603         set _gtf_transcript_rank;
+107604         by gene_key;
+107605         if first.gene_key;
+107606       run;
+107607     
+107608       proc sql;
+107609         create table &_compact_gtf_dsd as
+107610         select a.*
+107611         from &effective_gtf_dsd as a
+107612         left join _gtf_transcript_best as b
+107613           on coalescec(a.genesymbol,a.gene)=b.gene_key
+107614         where a.type='gene'
+107615            or (
+107616                 a.type in ('transcript','exon')
+107617             and not missing(coalescec(a.transcript_id,a.transcript_name))
+107618             and coalescec(a.transcript_id,a.transcript_name)=b.tx_key
+107619            )
+107620         ;
+107621       quit;
+107622     
+107623       %if %sysfunc(exist(&_compact_gtf_dsd)) %then %let effective_gtf_dsd=&_compact_gtf_dsd;
+107624     
+107625       proc sql noprint;
+107626         select count(distinct genesymbol),
+107627                sum(type='exon'),
+107628                sum(original_protein_coding=0),
+107629                count(distinct coalescec(transcript_id,transcript_name))
+107630           into :_n_genes_for_plot trimmed,
+107631                :_n_exons_for_plot trimmed,
+107632                :_n_non_protein_for_plot trimmed,
+107633                :_n_tx_for_plot trimmed
+107634         from &effective_gtf_dsd
+107635         ;
+107636       quit;
+107637     
+107638       %put NOTE: Using local GTF dataset &effective_gtf_dsd for single-SNP plotting.;
+107639       %put NOTE: Local GTF stats: genes=&_n_genes_for_plot representative_transcripts=&_n_tx_for_plot
+107639   ! exons=&_n_exons_for_plot non_protein_coding_features=&_n_non_protein_for_plot
+107639   ! include_non_protein_coding=&gtf_include_non_protein_coding.;
+107640     %mend;
+107641     
+107642     %macro _auto_tune_gene_track_ratio(target_chr=,target_bp=,gtf_dsd=);
+107643       %global effective_gtf_pct4neg_y effective_gtf_dist2sep_genes effective_gtf_grp_font_size;
+107644       %local _nearby_gene_count _recommended_pct4neg_y _recommended_dist2sep_genes _recommended_grp_font_size
+107644   ! _display_window_bp _normalized_base_dist2sep_genes;
+107645       %let _nearby_gene_count=0;
+107646       %let _recommended_pct4neg_y=&gtf_pct4neg_y;
+107647       %let _normalized_base_dist2sep_genes=&gtf_dist2sep_genes;
+107648       %let _recommended_dist2sep_genes=&gtf_dist2sep_genes;
+107649       %let _recommended_grp_font_size=&effective_gtf_grp_font_size;
+107650       %let _display_window_bp=%sysevalf(2*&effective_gtf_dist2snp);
+107651       %if %sysevalf(&_normalized_base_dist2sep_genes >= %sysevalf(&_display_window_bp*0.25)) %then %do;
+107652         %let _normalized_base_dist2sep_genes=%sysfunc(max(50000,%sysfunc(int(%sysevalf(&_display_window_bp*0.005)))));
+107653       %end;
+107654       %let _recommended_dist2sep_genes=&_normalized_base_dist2sep_genes;
+107655     
+107656       proc sql noprint;
+107657         select count(distinct coalescec(genesymbol,gene))
+107658           into :_nearby_gene_count trimmed
+107659         from &gtf_dsd
+107660         where not missing(strip(cats(gene)))
+107661           and type='gene'
+107662           and chr=&target_chr
+107663           and st <= (&target_bp + &effective_gtf_dist2snp)
+107664           and en >= (&target_bp - &effective_gtf_dist2snp)
+107665         ;
+107666       quit;
+107667     
+107668       %if %sysevalf(%superq(_nearby_gene_count)=,boolean) %then %let _nearby_gene_count=0;
+107669     
+107670       %if %sysevalf(&_nearby_gene_count > 120) %then %do;
+107671         %let _recommended_pct4neg_y=%sysfunc(max(&gtf_pct4neg_y,3.00));
+107672         %let
+107672   ! _recommended_dist2sep_genes=%sysfunc(min(&_normalized_base_dist2sep_genes,%sysfunc(max(50000,%sysfunc(int(%sysevalf(&_dis
+107672   ! play_window_bp*0.002)))))));
+107673         %let _recommended_grp_font_size=5;
+107674       %end;
+107675       %else %if %sysevalf(&_nearby_gene_count > 80) %then %do;
+107676         %let _recommended_pct4neg_y=%sysfunc(max(&gtf_pct4neg_y,2.40));
+107677         %let
+107677   ! _recommended_dist2sep_genes=%sysfunc(min(&_normalized_base_dist2sep_genes,%sysfunc(max(75000,%sysfunc(int(%sysevalf(&_dis
+107677   ! play_window_bp*0.003)))))));
+107678         %let _recommended_grp_font_size=5;
+107679       %end;
+107680       %else %if %sysevalf(&_nearby_gene_count > 50) %then %do;
+107681         %let _recommended_pct4neg_y=%sysfunc(max(&gtf_pct4neg_y,1.90));
+107682         %let
+107682   ! _recommended_dist2sep_genes=%sysfunc(min(&_normalized_base_dist2sep_genes,%sysfunc(max(100000,%sysfunc(int(%sysevalf(&_di
+107682   ! splay_window_bp*0.004)))))));
+107683         %let _recommended_grp_font_size=6;
+107684       %end;
+107685       %else %if %sysevalf(&_nearby_gene_count > 30) %then %do;
+107686         %let _recommended_pct4neg_y=%sysfunc(max(&gtf_pct4neg_y,1.50));
+107687         %let
+107687   ! _recommended_dist2sep_genes=%sysfunc(min(&_normalized_base_dist2sep_genes,%sysfunc(max(125000,%sysfunc(int(%sysevalf(&_di
+107687   ! splay_window_bp*0.006)))))));
+107688         %let _recommended_grp_font_size=6;
+107689       %end;
+107690       %else %if %sysevalf(&_nearby_gene_count > 15) %then %do;
+107691         %let _recommended_pct4neg_y=%sysfunc(max(&gtf_pct4neg_y,1.20));
+107692         %let
+107692   ! _recommended_dist2sep_genes=%sysfunc(min(&_normalized_base_dist2sep_genes,%sysfunc(max(150000,%sysfunc(int(%sysevalf(&_di
+107692   ! splay_window_bp*0.008)))))));
+107693         %let _recommended_grp_font_size=7;
+107694       %end;
+107695     
+107696       %let effective_gtf_pct4neg_y=&_recommended_pct4neg_y;
+107697       %let effective_gtf_dist2sep_genes=&_recommended_dist2sep_genes;
+107698       %let effective_gtf_grp_font_size=&_recommended_grp_font_size;
+107699       %put NOTE: Auto-tuned single-SNP gene-track ratio using nearby_gene_count=&_nearby_gene_count
+107699   ! pct4neg_y=&effective_gtf_pct4neg_y (base=&gtf_pct4neg_y) dist2sep_genes=&effective_gtf_dist2sep_genes
+107699   ! (base=&gtf_dist2sep_genes) grp_font_size=&effective_gtf_grp_font_size.;
+107700     %mend;
+107701     
+107702     %macro _maybe_expand_gtf_dist2snp(target_chr=,target_bp=,gtf_dsd=);
+107703       %local _nearby_gene_count;
+107704       %let _nearby_gene_count=0;
+107705       proc sql noprint;
+107706         select count(*) into: _nearby_gene_count trimmed
+107707         from &gtf_dsd
+107708         where not missing(strip(cats(gene)))
+107709           and type='gene'
+107710           and chr=&target_chr
+107711           and (&target_bp between (st-&gtf_dist2snp) and (en+&gtf_dist2snp))
+107712         ;
+107713       quit;
+107714     
+107715       %if %sysevalf(&_nearby_gene_count=0) %then %do;
+107716         %let effective_gtf_dist2snp=&local_window_bp;
+107717         %put NOTE: No genes were found within the default GTF distance of &gtf_dist2snp bp. Expanding gene-track search to
+107717   ! the local window size (&effective_gtf_dist2snp bp).;
+107718       %end;
+107719     %mend;
+107720     
+107721     filename mhdata zip "~/single_snp_ld_augmented_rs185665940_20260926_091435.tsv.gz" gzip;
+107722     
+107723     data SCZMH_20260926091435;
+107724       infile mhdata dlm='09'x dsd firstobs=2 truncover lrecl=32767;
+107725       length A1 $8 A2 $8 SNP $40;
+107726       input
+107727         CHR
+107728         BP
+107729         A1 :$8.
+107730         A2 :$8.
+107731         SNP :$40.
+107732         ALL_GROUP1_BETA
+107733         ALL_GROUP2_BETA
+107734         ALL_DIFF_BETA
+107735         ALL_GROUP1_SE
+107736         ALL_GROUP2_SE
+107737         ALL_DIFF_SE
+107738         ALL_GROUP1_P
+107739         ALL_GROUP2_P
+107740         ALL_DIFF_P
+107741         ALL_STD_DIFF_Z
+107742         ALL_STD_DIFF_P
+107743         ALL_GROUP1_FRQ_A
+107744         ALL_GROUP1_FRQ_U
+107745         ALL_GROUP2_FRQ_A
+107746         ALL_GROUP2_FRQ_U
+107747         ALL_GROUP1_INFO
+107748         ALL_GROUP2_INFO
+107749         LD_R2
+107750       ;
+107751       ALL_FEMALE_P = ALL_GROUP1_P;
+107752       ALL_MALE_P = ALL_GROUP2_P;
+107753       ALL_STD_P = ALL_STD_DIFF_P;
+107754       if ALL_GROUP1_SE>0 then ALL_GROUP1_Z = ALL_GROUP1_BETA / ALL_GROUP1_SE;
+107755       if ALL_GROUP2_SE>0 then ALL_GROUP2_Z = ALL_GROUP2_BETA / ALL_GROUP2_SE;
+107756       if ALL_DIFF_SE>0 then ALL_DIFF_Z = ALL_DIFF_BETA / ALL_DIFF_SE;
+107757       ALL_FEMALE_Z = ALL_GROUP1_Z;
+107758       ALL_MALE_Z = ALL_GROUP2_Z;
+107759       ALL_STD_Z = ALL_STD_DIFF_Z;
+107760     run;
+107761     
+107762     
+107763     proc sort data=&gwas_dsd;
+107764       by CHR BP;
+107765     run;
+107766     
+107767     proc sql;
+107768       create table &target_hit_dsd as
+107769       select *
+107770       from &gwas_dsd
+107771       where strip(SNP)=strip("&target_snp");
+107772     quit;
+107773     
+107774     proc sql outobs=1 noprint;
+107775       select CHR, BP into :target_chr trimmed, :target_bp trimmed
+107776       from &target_hit_dsd;
+107777     quit;
+107778     
+107779     %if %superq(target_chr)= or %superq(target_bp)= %then %do;
+107780       %put ERROR: Target SNP &target_snp was not found in the uploaded GWAS subset.;
+107781       %abort 255;
+107782     %end;
+107783     
+107784     %_ensure_effective_gtf_dsd(target_chr=&target_chr,target_bp=&target_bp,flank_bp=&local_window_bp);
+107785     %_maybe_expand_gtf_dist2snp(target_chr=&target_chr,target_bp=&target_bp,gtf_dsd=&effective_gtf_dsd);
+107786     %_auto_tune_gene_track_ratio(target_chr=&target_chr,target_bp=&target_bp,gtf_dsd=&effective_gtf_dsd);
+107787     
+107788     proc sql;
+107789       create table &target_local_dsd as
+107790       select *
+107791       from &gwas_dsd
+107792       where CHR=&target_chr
+107793         and BP between (&target_bp-&local_window_bp) and (&target_bp+&local_window_bp)
+107794       order by CHR, BP;
+107795     quit;
+107796     
+107797     %SNP_Local_Manhattan_With_GTF(
+107798       gwas_dsd=&target_local_dsd,
+107799       chr_var=CHR,
+107800       AssocPVars=&gtf_assoc_pvars,
+107801       SNP_IDs=&target_snp,
+107802       dist2snp=&effective_gtf_dist2snp,
+107803       SNP_Var=SNP,
+107804       Pos_Var=BP,
+107805       gtf_dsd=&effective_gtf_dsd,
+107806       ZscoreVars=&gtf_zscore_vars,
+107807       gwas_labels_in_order=&gtf_labels,
+107808       design_width=&gtf_design_width,
+107809       design_height=&gtf_design_height,
+107810       barthickness=10,
+107811       dotsize=5,
+107812       grp_font_size=&effective_gtf_grp_font_size,
+107813       dist2sep_genes=&effective_gtf_dist2sep_genes,
+107814       where_cndtn_for_gwasdsd=%str(),
+107815       shift_text_yval=&gtf_shift_text_yval,
+107816       fig_fmt=png,
+107817       pct4neg_y=&effective_gtf_pct4neg_y,
+107818       adjval4header=&gtf_adjval4header,
+107819       scatter_yaxis_label=&gtf_yaxis_label,
+107820       heatmap_legend_title=&gtf_colorbar_label,
+107821       makedotheatmap=1,
+107822       makeheatmapdotintooneline=0,
+107823       SNPs2label_scatterplot_dots=&gtf_label_snps,
+107824       LD_SNPs2mark_scatterplot_dots=&gtf_ld_snps,
+107825       LD_display_mode=&gtf_ld_display_mode,
+107826       LD_r2_values=&gtf_ld_r2_values,
+107827       LD_heatmap_colormodel=&gtf_ld_heatmap_colors,
+107828       LD_heatmap_legend_title=&gtf_ld_heatmap_legend_title,
+107829       Yoffset4textlabels=&gtf_yoffset4textlabels,
+107830       verbose=0
+107831     );
+To prevent too many notes printed in the SAS log, we will enable options nonotes
+Your input three parameters for the SNP rs185665940 are: chr=       2 minst=71769028 maxend=72769028
+rename your svg output filename as:
+Local_SNP_Manhattanplot_1
+rename your svg output filename as:
+Local_SNP_Manhattanplot_2
+rename your svg output filename as:
+Local_SNP_Manhattanplot_3
+rename your svg output filename as:
+Local_SNP_Manhattanplot_4
+rename your svg output filename as:
+Local_SNP_Manhattanplot_5
+rename your svg output filename as:
+Local_SNP_Manhattanplot_6
+rename your svg output filename as:
+Local_SNP_Manhattanplot_7
+rename your svg output filename as:
+Local_SNP_Manhattanplot_8
+rename your svg output filename as:
+Local_SNP_Manhattanplot_9
+rename your svg output filename as:
+Local_SNP_Manhattanplot_10
+rename your svg output filename as:
+Local_SNP_Manhattanplot_11
+rename your svg output filename as:
+Local_SNP_Manhattanplot_12
+rename your svg output filename as:
+Local_SNP_Manhattanplot_13
+rename your svg output filename as:
+Local_SNP_Manhattanplot_14
+rename your svg output filename as:
+Local_SNP_Manhattanplot_15
+rename your svg output filename as:
+Local_SNP_Manhattanplot_16
+rename your svg output filename as:
+Local_SNP_Manhattanplot_17
+rename your svg output filename as:
+Local_SNP_Manhattanplot_18
+rename your svg output filename as:
+Local_SNP_Manhattanplot_19
+rename your svg output filename as:
+Local_SNP_Manhattanplot_20
+rename your svg output filename as:
+Local_SNP_Manhattanplot_21
+rename your svg output filename as:
+Local_SNP_Manhattanplot_22
+rename your svg output filename as:
+Local_SNP_Manhattanplot_23
+rename your svg output filename as:
+Local_SNP_Manhattanplot_24
+rename your svg output filename as:
+Local_SNP_Manhattanplot_25
+rename your svg output filename as:
+Local_SNP_Manhattanplot_26
+rename your svg output filename as:
+Local_SNP_Manhattanplot_27
+rename your svg output filename as:
+Local_SNP_Manhattanplot_28
+rename your svg output filename as:
+Local_SNP_Manhattanplot_29
+rename your svg output filename as:
+Local_SNP_Manhattanplot_30
+rename your svg output filename as:
+Local_SNP_Manhattanplot_31
+rename your svg output filename as:
+Local_SNP_Manhattanplot_32
+rename your svg output filename as:
+Local_SNP_Manhattanplot_33
+rename your svg output filename as:
+Local_SNP_Manhattanplot_34
+rename your svg output filename as:
+Local_SNP_Manhattanplot_35
+rename your svg output filename as:
+Local_SNP_Manhattanplot_36
+rename your svg output filename as:
+Local_SNP_Manhattanplot_37
+rename your svg output filename as:
+Local_SNP_Manhattanplot_38
+rename your svg output filename as:
+Local_SNP_Manhattanplot_39
+rename your svg output filename as:
+Local_SNP_Manhattanplot_40
+rename your svg output filename as:
+Local_SNP_Manhattanplot_41
+rename your svg output filename as:
+Local_SNP_Manhattanplot_42
+rename your svg output filename as:
+Local_SNP_Manhattanplot_43
+rename your svg output filename as:
+Local_SNP_Manhattanplot_44
+rename your svg output filename as:
+Local_SNP_Manhattanplot_45
+rename your svg output filename as:
+Local_SNP_Manhattanplot_46
+rename your svg output filename as:
+Local_SNP_Manhattanplot_47
+rename your svg output filename as:
+Local_SNP_Manhattanplot_48
+rename your svg output filename as:
+Local_SNP_Manhattanplot_49
+rename your svg output filename as:
+Local_SNP_Manhattanplot_50
+rename your svg output filename as:
+Local_SNP_Manhattanplot_51
+rename your svg output filename as:
+Local_SNP_Manhattanplot_52
+rename your svg output filename as:
+Local_SNP_Manhattanplot_53
+rename your svg output filename as:
+Local_SNP_Manhattanplot_54
+rename your svg output filename as:
+Local_SNP_Manhattanplot_55
+rename your svg output filename as:
+Local_SNP_Manhattanplot_56
+rename your svg output filename as:
+Local_SNP_Manhattanplot_57
+rename your svg output filename as:
+Local_SNP_Manhattanplot_58
+rename your svg output filename as:
+Local_SNP_Manhattanplot_59
+Extend to the st and end position to cover gene bodies and exons
+There are       61 unique exons!
+The final chromosomal range for your query region is from 21768028 to 122770028
+However, we will restrict the x-axis to the original min and max genomic position in the final figure
+ERROR: Function LOG10 requires a numeric expression as argument 1.
+ERROR: Expression using negation (-) requires numeric types.
+ERROR: The following columns were not found in the contributing tables: META_P.
+ERROR: File WORK.SIGNAL_DSD.DATA does not exist.
+WARNING: The data set WORK.SIGNAL_DSD may be incomplete.  When this step was stopped there were 0 observations and 7 variables.
+WARNING: Apparent symbolic reference CHRS not resolved.
+These chromosomes are included in the bed dsd signal_dsd: &chrs
+WARNING: Apparent symbolic reference CHRS not resolved.
+WARNING: Apparent symbolic reference CHRS not resolved.
+running analysis for chromosome chrs
+ERROR: Expression using subtraction (-) requires numeric types.
+ERROR: Expression using addition (+) requires numeric types.
+ERROR: The following columns were not found in the contributing tables: end, st.
+ERROR: File WORK.EXONCHRS.DATA does not exist.
+WARNING: The data set WORK.EXONCHRS may be incomplete.  When this step was stopped there were 0 observations and 0 variables.
+WARNING: The data set WORK.EXONDUPCHRS may be incomplete.  When this step was stopped there were 0 observations and 0 variables.
+ERROR: Table WORK.EXONCHRS doesn't have any columns. PROC SQL requires each of its tables to have at least 1 column.
+WARNING: Apparent symbolic reference OBS_NUM not resolved.
+ERROR: A character operand was found in the %EVAL function or %IF condition where a numeric operand is required. The condition was: 
+       (&obs_num=0) 
+ERROR: The macro DELETE_EMPTY_DSD will stop executing.
+ERROR: Table WORK.EXONCHRS doesn't have any columns. PROC SQL requires each of its tables to have at least 1 column.
+ERROR: The following columns were not found in the contributing tables: grp.
+ERROR: Variable GRP not found.
+Your input dsd name is the same as the output dsd name
+we will temporarily change the exonchrs as: exonchrs_
+ERROR: The following columns were not found in the contributing tables: grp.
+ERROR: The following columns were not found in the contributing tables: grp.
+WARNING: Apparent symbolic reference NGENES not resolved.
+ERROR: A character operand was found in the %EVAL function or %IF condition where a numeric operand is required. The condition was: 
+       &ngenes 
+ERROR: The %TO value of the %DO NI loop is invalid.
+ERROR: The macro ADJ_GRPNUM4CLOSE_GENE_BED_REGS will stop executing.
+WARNING: The data set WORK.EXONCHRS_ may be incomplete.  When this step was stopped there were 0 observations and 5 variables.
+WARNING: Data set WORK.EXONCHRS_ was not replaced because this step was stopped.
+ERROR: Table WORK.EXONCHRS doesn't have any columns. PROC SQL requires each of its tables to have at least 1 column.
+ERROR: The following columns were not found in the contributing tables: _numgrp_.
+Your input sas dsd is _x1_
+Going to run proc contents to obtain variable list!
+Your rgx () matchs the following vars:
+AssocGrp AssocGrp1 AssocGrp2 Variant_Length_Var chr end pi st var4log10P var4log10P1 var4log10P2
+A global macro var HasVar is created to have the varnames
+Your input sas dsd is _x1_
+Going to run proc contents to obtain variable list!
+Your rgx (_Target_SNP_) matchs the following vars:
+
+A global macro var HasVar1 is created to have the varnames
+No varnames matching with your Rgx (_Target_SNP_)
+ERROR: Execution terminated by an %ABORT statement.
+107832     
+107833     ods html5 close;
+107834     
+107835     /* The HTML file is created when ODS opens, so its existence alone does not
+107836        prove that the plot finished. Write this marker only after ODS closes. */
+107837     /* SAS filerefs are limited to eight characters. */
+107838     filename _pdone "~/&done_outfile" encoding="utf-8";
+107839     data _null_;
+107840       file _pdone;
+107841       put "status=complete";
+107842       put "target_snp=&target_snp";
+107843       put "html=&html_outfile";
+107844     run;
+107845     filename _pdone clear;
+107846     
+107847     
+107848     
+107849     ods html5 (id=saspy_internal) close;ods listing;
+107850     
+20                                                         The SAS System                   Saturday, September 26, 2026 02:17:00 PM
+
+107851     
+
+=== Output ===
+

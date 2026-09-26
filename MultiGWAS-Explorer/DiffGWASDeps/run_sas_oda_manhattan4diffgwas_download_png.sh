@@ -48,9 +48,13 @@ fi
 MANHATTAN_P_VAR="${MANHATTAN_P_VAR:-${DEFAULT_MANHATTAN_P_VAR}}"
 MANHATTAN_OTHER_P_VARS="${MANHATTAN_OTHER_P_VARS:-${DEFAULT_MANHATTAN_OTHER_P_VARS}}"
 MANHATTAN_GWAS_LABEL_NAMES="${MANHATTAN_GWAS_LABEL_NAMES:-${DEFAULT_MANHATTAN_GWAS_LABEL_NAMES}}"
-DEFAULT_MANHATTAN_FIG_WIDTH="${DEFAULT_MANHATTAN_FIG_WIDTH:-1800}"
-MANHATTAN_FIG_WIDTH="${MANHATTAN_FIG_WIDTH:-${DEFAULT_MANHATTAN_FIG_WIDTH}}"
 MANHATTAN_FIG_HEIGHT="${MANHATTAN_FIG_HEIGHT:-${DEFAULT_MANHATTAN_FIG_HEIGHT}}"
+DEFAULT_MANHATTAN_FIG_WIDTH="${DEFAULT_MANHATTAN_FIG_WIDTH:-1800}"
+if [[ "${MANHATTAN_FIG_HEIGHT}" =~ ^[0-9]+$ ]]; then
+  suggested_width=$(( (MANHATTAN_FIG_HEIGHT * 12 + 2) / 5 ))
+  (( suggested_width <= DEFAULT_MANHATTAN_FIG_WIDTH )) || DEFAULT_MANHATTAN_FIG_WIDTH="${suggested_width}"
+fi
+MANHATTAN_FIG_WIDTH="${MANHATTAN_FIG_WIDTH:-${DEFAULT_MANHATTAN_FIG_WIDTH}}"
 MANHATTAN_FONTSIZE="${MANHATTAN_FONTSIZE:-2.4}"
 MANHATTAN_Y_AXIS_LABEL_SIZE="${MANHATTAN_Y_AXIS_LABEL_SIZE:-2.4}"
 MANHATTAN_Y_AXIS_VALUE_SIZE="${MANHATTAN_Y_AXIS_VALUE_SIZE:-2.2}"
@@ -64,6 +68,7 @@ OPEN_RESULT="${OPEN_RESULT:-1}"
 MANHATTAN_COMPACT_INPUT="${MANHATTAN_COMPACT_INPUT:-1}"
 MANHATTAN_SUBSET_THRESHOLD="${MANHATTAN_SUBSET_THRESHOLD:-0.05}"
 MANHATTAN_ALL_SNPS="${MANHATTAN_ALL_SNPS:-0}"
+MANHATTAN_INCLUDE_X_CHR="${MANHATTAN_INCLUDE_X_CHR:-0}"
 
 cd "${WORKDIR}"
 
@@ -74,6 +79,9 @@ if [[ "${MANHATTAN_COMPACT_INPUT}" == "1" ]]; then
   if [[ "${MANHATTAN_ALL_SNPS}" == "1" ]]; then
     subset_tag="all_snps"
     subset_args+=(--all-snps)
+  fi
+  if [[ "${MANHATTAN_INCLUDE_X_CHR}" == "1" ]]; then
+    subset_args+=(--include-x-chr)
   fi
   compact_dir="${WORKDIR}/cache/sas_manhattan"
   mkdir -p "${compact_dir}"
@@ -304,7 +312,12 @@ perl "${SCHEMA_INCLUDE_HELPER}" \
 if [[ "${MANHATTAN_COMPACT_INPUT}" == "1" ]]; then
   printf '/* Compact Manhattan input was sorted by numeric CHR and BP locally. */\n' > "${SORT_BLOCK_RENDERED}"
 else
-  printf 'proc sort data=scz_mh;\n  by CHR BP;\nrun;\n' > "${SORT_BLOCK_RENDERED}"
+  if [[ "${MANHATTAN_INCLUDE_X_CHR}" != "1" ]]; then
+    printf "data scz_mh;\n  set scz_mh;\n  if upcase(strip(vvalue(CHR))) in ('X','23','CHRX','CHR23') then delete;\nrun;\n" > "${SORT_BLOCK_RENDERED}"
+  else
+    : > "${SORT_BLOCK_RENDERED}"
+  fi
+  printf 'proc sort data=scz_mh;\n  by CHR BP;\nrun;\n' >> "${SORT_BLOCK_RENDERED}"
 fi
 
 perl "${RENDER_SAS_HELPER}" \

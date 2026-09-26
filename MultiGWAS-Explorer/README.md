@@ -90,6 +90,18 @@ beside that spec. `--display-gwas Meta` selects the supplied meta-analysis
 track for plotting. Relative GWAS directories are resolved before generating
 plot paths, and concatenated gzip streams are read in full.
 
+When two separate cohort GWAS files provide allele-aligned BETA and positive
+SE values, the pipeline now adds a `META` track by default. Its BETA, SE, Z,
+and two-sided P use inverse-variance fixed-effect meta-analysis for independent
+cohorts, as described by [GWAMA](https://pmc.ncbi.nlm.nih.gov/articles/PMC2893603/).
+When the spec sets a nonzero `rho` for correlated cohorts, the calculation
+uses the corresponding two-study covariance matrix.
+The combined P can retain a SNP even when neither cohort P is below 0.05.
+Missing BETA or SE leaves that SNP's computed meta values blank. The merged
+AOA workflow continues to use supplied meta-analysis values without
+recalculation. Set `"compute_meta": 0` in a separate-cohort spec to disable
+the calculation.
+
 This is the combined-table format used by the old local AOA workflow: a
 tab-separated file (plain or gzip compressed) with `CHR`, `BP`, `SNP`, and at
 least two cohort `BETA_<cohort>`, `SE_<cohort>`, `P_<cohort>` blocks. Optional
@@ -1359,12 +1371,44 @@ Pass `--manhattan-all-snps` to either automation entry point to plot every
 coordinate-valid SNP in the genome-wide Manhattan plot. The all-SNP mode uses
 a separate cache and disables gnuplot's background point thinning; omitting
 the option restores the default P filter.
+Genomewide Manhattan plots exclude chromosome X / 23 by default, including in
+all-SNP mode. Pass `--include-x-chr` to either automation entry point, or set
+`"include_x_chr": true` in the spec, to include chromosome X / 23. The source
+GWAS table is unchanged, and explicit local target windows remain available
+either way.
 For raw or precomputed differential GWAS input, all-SNP mode also builds a
 separate unfiltered wide table from the standardized results; it can take
 substantially more time and disk space. The default filtered wide table is
 reused on ordinary runs.
 The [public PGC schizophrenia female/male validation](docs/PUBLIC_SCZ_SEX_VALIDATION_20260926.md)
 records a full default Manhattan rerun and a targeted signed-LD GTF rerun.
+The SAS genomewide Manhattan width defaults to at least 2.4 times its height,
+with a minimum width of 1800 pixels. An explicit `manhattan_fig_width` or
+`--manhattan-fig-width` controls the width directly.
+
+Each plot can independently remove several tracks and put selected tracks
+first. Lists are comma-separated; omitted tracks retain their original order.
+The listed order runs from the bottom panel upward in both renderers.
+`DIFFERENTIAL` names all differential-P tracks, while `META` names the
+computed or supplied meta track. Track IDs are listed in the generated runner
+config's `DISPLAY_GWAS_AVAILABLE` field. These options work with both the SAS
+and gnuplot automation entry points:
+
+```bash
+perl auto_prepare_and_run_diff_gwas.pl --spec my_gwas.json \
+  --exclude-manhattan-tracks DIFFERENTIAL,ALL_MALE \
+  --manhattan-track-order META,ALL_FEMALE \
+  --exclude-local-manhattan-tracks META,DIFFERENTIAL \
+  --local-manhattan-track-order ALL_MALE,ALL_FEMALE \
+  --exclude-local-gtf-tracks DIFFERENTIAL,ALL_MALE \
+  --local-gtf-track-order META,ALL_FEMALE
+```
+
+The equivalent spec keys are `exclude_manhattan_tracks`,
+`manhattan_track_order`, `exclude_local_manhattan_tracks`,
+`local_manhattan_track_order`, `exclude_local_gtf_tracks`, and
+`local_gtf_track_order`. These change displayed scatter tracks only; top-hit
+selection and local LD calculation still use their configured inputs.
 Set `MANHATTAN_SUBSET_THRESHOLD` to change the threshold for both genome-wide
 backends. For SAS ODA only, `MANHATTAN_COMPACT_INPUT=0` restores the original
 full-input behavior.

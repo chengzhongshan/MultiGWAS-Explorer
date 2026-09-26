@@ -25,7 +25,8 @@ Options:
   --min-logp FLOAT          Drop points below this. Default: 0.5
   --keep-all-logp FLOAT     Keep all points above this. Default: 3
   --thin-mod N              Background thinning factor. Default: 40
-  --remove-x-chr            Exclude chromosome X / 23 from the rendered figure.
+  --remove-x-chr            Exclude chromosome X / 23 (default).
+  --no-remove-x-chr         Include chromosome X / 23.
   --gnuplot PATH            gnuplot executable. Default: gnuplot
 USAGE
 }
@@ -38,7 +39,7 @@ my %opt = (
     min_logp      => 0.5,
     keep_all_logp => 3,
     thin_mod      => 40,
-    remove_x_chr  => 0,
+    remove_x_chr  => 1,
     gnuplot       => 'gnuplot',
     title         => '',
 );

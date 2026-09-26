@@ -3,6 +3,7 @@ use strict;
 use warnings;
 use FindBin qw($Bin);
 use Getopt::Long qw(GetOptions);
+use IO::Uncompress::Gunzip qw($GunzipError);
 use lib $Bin;
 use DiffGWASConfig qw(
   load_config_file
@@ -22,6 +23,7 @@ my $value_fields = join(',', default_value_fields());
 my $pair_map = 'SCZ_W3_ALL_SEX=ALL,SCZ_W3_ASN_SEX=ASN,SCZ_W3_EUR_SEX=EUR';
 my $prefix_order = 'ALL,ASN,EUR';
 my $extra_numeric_cols = '';
+my $input_file = '';
 
 GetOptions(
     'config=s'          => \$config_file,
@@ -34,6 +36,7 @@ GetOptions(
     'pair-map=s'        => \$pair_map,
     'prefix-order=s'    => \$prefix_order,
     'extra-numeric-cols=s' => \$extra_numeric_cols,
+    'input-file=s'       => \$input_file,
 ) or die usage();
 
 die "--remote-basename is required\n" unless length $remote_basename;
@@ -46,6 +49,21 @@ $value_fields = cfg_or($cfg, 'value_fields', $value_fields);
 $pair_map = $cfg->{pair_map} if exists $cfg->{pair_map};
 $prefix_order = cfg_or($cfg, 'prefix_order', $prefix_order);
 my $wide_columns = cfg_list($cfg, 'wide_columns');
+if (length $input_file) {
+    my $source = $source_type eq 'gzip'
+        ? IO::Uncompress::Gunzip->new($input_file, MultiStream => 1)
+        : do { open my $fh, '<', $input_file or die "Cannot read $input_file: $!\n"; $fh };
+    die "Cannot read $input_file: $GunzipError\n" unless $source;
+    my $header = <$source>;
+    die "Missing header in $input_file\n" unless defined $header;
+    $header =~ s/[\r\n]+$//;
+    $header =~ s/^#//;
+    my @columns = split /\t/, $header, -1;
+    die "Invalid column name in $input_file header\n"
+        if grep { !/^[A-Za-z_][A-Za-z0-9_]*$/ } @columns;
+    $wide_columns = \@columns;
+    close $source or die "Cannot close $input_file: $!\n";
+}
 my $char_lengths = cfg_hash($cfg, 'char_lengths');
 my $alias_map = cfg_hash($cfg, 'alias_map');
 my $post_alias_map = cfg_hash($cfg, 'post_alias_map');
@@ -105,6 +123,7 @@ for my $col (@out_cols) {
     (my $se_col = $col) =~ s/_BETA$/_SE/;
     next unless $out_col_exists{$se_col};
     (my $z_col = $col) =~ s/_BETA$/_Z/;
+    next if $out_col_exists{$z_col};
     $derived_z_exists{$z_col} = 1;
     push @z_lines, "  if $se_col>0 then $z_col = $col / $se_col;";
 }
@@ -178,6 +197,7 @@ Options:
   --prefix-order LIST     Optional override for output prefix ordering
   --extra-numeric-cols LIST
                           Comma-separated numeric columns appended to the input table.
+  --input-file FILE        Read the actual local table header for ordered input columns.
 
 Config extras:
   wide_columns            Explicit ordered list of already-wide columns to read.

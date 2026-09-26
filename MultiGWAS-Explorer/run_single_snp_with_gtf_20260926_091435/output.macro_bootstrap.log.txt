@@ -1,0 +1,72 @@
+Bootstrap Start: 2026-09-26 09:17:34
+Bootstrap End: 2026-09-26 09:17:39
+Elapsed Seconds: 4.68
+Bootstrap OK: 1
+Debug Macro Exists: 0
+Bootstrap Skipped: 0
+Warning: 0
+
+=== SAS Macro Bootstrap Log ===
+5                                                          The SAS System                   Saturday, September 26, 2026 02:17:00 PM
+
+24         ods listing close;ods html5 (id=saspy_internal) file=_tomods1 options(bitmap_mode='inline') device=svg style=HTMLBlue;
+24       ! ods graphics on / outputfmt=png;
+25         
+26         
+27         %macro _pipeline_bootstrap_macros;
+28         %global _pipeline_macro_bootstrap_ok _pipeline_macro_boot_skipped _pipeline_debug_macro_exists;
+29         %let _pipeline_macro_bootstrap_ok=0;
+30         %let _pipeline_macro_boot_skipped=0;
+31         %let _pipeline_debug_macro_exists=%sysmacexist(debug_macro);
+32         %let _home=%sysfunc(pathname(HOME));
+33         %let _macro_home=&_home/Macros;
+34         %let _pipeline_opt_mprint=%sysfunc(getoption(mprint,keyword));
+35         %let _pipeline_opt_mlogic=%sysfunc(getoption(mlogic,keyword));
+36         %let _pipeline_opt_symbolgen=%sysfunc(getoption(symbolgen,keyword));
+37         %let _pipeline_opt_notes=%sysfunc(getoption(notes,keyword));
+38         %let _pipeline_opt_source=%sysfunc(getoption(source,keyword));
+39         %let _pipeline_opt_source2=%sysfunc(getoption(source2,keyword));
+40         options nomprint nomlogic nosymbolgen nonotes nosource nosource2;
+41         %if &_pipeline_debug_macro_exists %then %do;
+42             %let _pipeline_macro_bootstrap_ok=1;
+43             %let _pipeline_macro_boot_skipped=1;
+44         %end;
+45         %else %do;
+46             %if %sysfunc(fileexist("&_home/importallmacros_ue.sas")) %then %do;
+47                 %include "&_home/importallmacros_ue.sas";
+48             %end;
+49             %else %if %sysfunc(fileexist("&_macro_home/importallmacros_ue.sas")) %then %do;
+50                 %include "&_macro_home/importallmacros_ue.sas";
+51             %end;
+52             %else %do;
+53                 filename M url
+53       ! "https://raw.githubusercontent.com/chengzhongshan/COVID19_GWAS_Analyzer/main/Macros/importallmacros_ue.sas";
+54                 %include M;
+55                 filename M clear;
+56             %end;
+57             %if %sysmacexist(importallmacros_ue) %then %do;
+58                 %importallmacros_ue(MacroDir=&_macro_home,fileRgx=.,verbose=0);
+59                 %let _pipeline_macro_bootstrap_ok=1;
+60             %end;
+61         %end;
+62         options &_pipeline_opt_mprint &_pipeline_opt_mlogic &_pipeline_opt_symbolgen &_pipeline_opt_notes &_pipeline_opt_source
+62       ! &_pipeline_opt_source2;
+63         %put NOTE: PIPELINE_DEBUG_MACRO_EXISTS=&_pipeline_debug_macro_exists;
+64         %put NOTE: PIPELINE_MACRO_BOOTSTRAP_SKIPPED=&_pipeline_macro_boot_skipped;
+65         %put NOTE: PIPELINE_MACRO_BOOTSTRAP_OK=&_pipeline_macro_bootstrap_ok;
+66         %mend;
+67         %_pipeline_bootstrap_macros;
+The required SAS macros exist in the macro dir /home/cheng.zhong.shan/Macros
+We will not download these macros from github
+Macro Dir is /home/cheng.zhong.shan/Macros
+Your system is LIN X64
+rc=0
+;
+102184     
+102185     
+102186     
+102187     ods html5 (id=saspy_internal) close;ods listing;
+102188     
+6                                                          The SAS System                   Saturday, September 26, 2026 02:17:00 PM
+
+102189     
