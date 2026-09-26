@@ -25,14 +25,14 @@ my $status = system($^X,
     '--target', encode_json({snp => 'rsB', chr => '2', bp => 200}));
 is($status, 0, 'multiple merged-wide loci are extracted in one pass');
 my $a = '';
-gunzip "$dir/gunplot_locus_rsA_window_50.wide.tsv.gz" => \$a or die $GunzipError;
+gunzip "$dir/gnuplot_locus_rsA_window_50.wide.tsv.gz" => \$a or die $GunzipError;
 is($a, "CHR\tBP\tSNP\tP\tBETA\nchr1\t100\trsA\t0.8\t0.1\n1\t120\trsNearby\t0.9\t0.2\n",
     'local window keeps all rows and columns regardless of P');
 my $b = '';
-gunzip "$dir/gunplot_locus_rsB_window_50.wide.tsv.gz" => \$b or die $GunzipError;
+gunzip "$dir/gnuplot_locus_rsB_window_50.wide.tsv.gz" => \$b or die $GunzipError;
 is($b, "CHR\tBP\tSNP\tP\tBETA\n2\t200\trsB\t0.7\t0.4\n",
     'other chromosome receives only its own locus');
-open my $mf, '<', "$dir/gunplot_locus_rsA_window_50.wide.manifest.tsv" or die $!;
+open my $mf, '<', "$dir/gnuplot_locus_rsA_window_50.wide.manifest.tsv" or die $!;
 my %manifest = map { chomp; split /\t/, $_, 2 } <$mf>;
 close $mf;
 is($manifest{target_snp}, 'rsA', 'manifest identifies the target SNP');
@@ -54,7 +54,7 @@ is(system($^X,
     '--target', encode_json({snp => 'rsB', chr => '2', bp => 200})), 0,
     'local windows are fetched through tabix');
 my $indexed_a = '';
-gunzip "$dir/gunplot_locus_rsA_window_50.wide.tsv.gz" => \$indexed_a or die $GunzipError;
+gunzip "$dir/gnuplot_locus_rsA_window_50.wide.tsv.gz" => \$indexed_a or die $GunzipError;
 my @indexed_lines = split /\n/, $indexed_a;
 my @streamed_lines = split /\n/, $a;
 my @indexed_rows = sort @indexed_lines[1, 2];
@@ -71,13 +71,13 @@ my @sas_locus_cmd = ($^X,
 is(system(@sas_locus_cmd), 0,
     'SAS GTF preparation builds a sorted tabix index and extracts the target window');
 my $sas_locus = '';
-gunzip "$sas_locus_dir/gunplot_locus_rsA_window_50.wide.tsv.gz" => \$sas_locus
+gunzip "$sas_locus_dir/gnuplot_locus_rsA_window_50.wide.tsv.gz" => \$sas_locus
     or die $GunzipError;
 my @sas_locus_lines = split /\n/, $sas_locus;
 my @sas_locus_rows = sort @sas_locus_lines[1, 2];
 is_deeply(\@sas_locus_rows, \@streamed_rows,
     'SAS GTF tabix locus retains nonsignificant SNPs');
-open my $smf, '<', "$sas_locus_dir/gunplot_locus_rsA_window_50.wide.manifest.tsv" or die $!;
+open my $smf, '<', "$sas_locus_dir/gnuplot_locus_rsA_window_50.wide.manifest.tsv" or die $!;
 my %sas_manifest = map { chomp; split /\t/, $_, 2 } <$smf>;
 close $smf;
 is($sas_manifest{access_mode}, 'TABIX', 'SAS GTF locus records indexed access');
@@ -88,7 +88,7 @@ SKIP: {
     my $prefix = "$dir/local_rsA";
     my $plot_status = system($^X,
         "$Bin/../DiffGWASDeps/gnuplot/pdl_gunplot_local_locus.pl",
-        '--data', "$dir/gunplot_locus_rsA_window_50.wide.tsv.gz",
+        '--data', "$dir/gnuplot_locus_rsA_window_50.wide.tsv.gz",
         '--snp', 'rsA', '--out-prefix', $prefix,
         '--window-bp', '50', '--pcols', 'P',
         '--width', '600', '--height', '400');

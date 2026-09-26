@@ -1794,8 +1794,8 @@ sub plot_local_series {
         }
 
         my $locus_input = $args{wide_data};
-        my $cached_locus_input = File::Spec->catfile($args{output_dir}, "gunplot_locus_${safe_snp}_window_${safe_window}.wide.tsv.gz");
-        my $cached_locus_manifest = File::Spec->catfile($args{output_dir}, "gunplot_locus_${safe_snp}_window_${safe_window}.wide.manifest.tsv");
+        my $cached_locus_input = File::Spec->catfile($args{output_dir}, "gnuplot_locus_${safe_snp}_window_${safe_window}.wide.tsv.gz");
+        my $cached_locus_manifest = File::Spec->catfile($args{output_dir}, "gnuplot_locus_${safe_snp}_window_${safe_window}.wide.manifest.tsv");
         my $legacy_locus_input = File::Spec->catfile($args{output_dir}, $base_name . '_' . $safe_snp . '.wide.tsv.gz');
         my $legacy_locus_manifest = File::Spec->catfile($args{output_dir}, $base_name . '_' . $safe_snp . '.wide.manifest.tsv');
         if (!(-s $cached_locus_input && -s $cached_locus_manifest) && -s $legacy_locus_input && -s $legacy_locus_manifest) {
@@ -1859,7 +1859,7 @@ sub plot_local_series {
             my $npc_flag = $runner->{LOCAL_GTF_INCLUDE_NON_PROTEIN_CODING_GENES} ? 1 : 0;
             $gtf_file = File::Spec->catfile(
                 $args{output_dir},
-                "gunplot_locus_${safe_snp}_window_${safe_window}_npc${npc_flag}.gtf.tsv"
+                "gnuplot_locus_${safe_snp}_window_${safe_window}_npc${npc_flag}.gtf.tsv"
             );
             my $region_start = $hit->{BP} - (0 + $args{window_bp});
             $region_start = 1 if $region_start < 1;
@@ -2729,9 +2729,9 @@ sub prepare_locus_wide_sources {
                 && defined($hit->{CHR}) && defined($hit->{BP});
             my $safe_snp = safe_name($hit->{SNP});
             my $data = File::Spec->catfile($args{output_dir},
-                "gunplot_locus_${safe_snp}_window_${safe_window}.wide.tsv.gz");
+                "gnuplot_locus_${safe_snp}_window_${safe_window}.wide.tsv.gz");
             my $manifest = File::Spec->catfile($args{output_dir},
-                "gunplot_locus_${safe_snp}_window_${safe_window}.wide.manifest.tsv");
+                "gnuplot_locus_${safe_snp}_window_${safe_window}.wide.manifest.tsv");
             my ($valid) = locus_wide_cache_matches(
                 data => $data, manifest => $manifest,
                 snp => $hit->{SNP}, window_bp => $args{window_bp}, exact_window => 1,
@@ -2790,11 +2790,11 @@ sub prepare_locus_wide_sources {
         }
         my $data = File::Spec->catfile(
             $args{output_dir},
-            "gunplot_locus_${safe_snp}_window_${safe_window}.wide.tsv.gz",
+            "gnuplot_locus_${safe_snp}_window_${safe_window}.wide.tsv.gz",
         );
         my $manifest = File::Spec->catfile(
             $args{output_dir},
-            "gunplot_locus_${safe_snp}_window_${safe_window}.wide.manifest.tsv",
+            "gnuplot_locus_${safe_snp}_window_${safe_window}.wide.manifest.tsv",
         );
         my ($valid, $metrics) = locus_wide_cache_matches(
             data       => $data,
@@ -3888,10 +3888,10 @@ sub infer_cached_locus_gtf_path {
     my $npc_flag = ($args{runner} && $args{runner}{LOCAL_GTF_INCLUDE_NON_PROTEIN_CODING_GENES}) ? 1 : 0;
     my $gtf_path = File::Spec->catfile(
         $args{output_dir},
-        "gunplot_locus_${safe_snp}_window_${safe_window}_npc${npc_flag}.gtf.tsv",
+        "gnuplot_locus_${safe_snp}_window_${safe_window}_npc${npc_flag}.gtf.tsv",
     );
     return $gtf_path if -f $gtf_path;
-    my ($fallback) = glob(File::Spec->catfile($args{output_dir}, "gunplot_locus_${safe_snp}_window_*_npc${npc_flag}.gtf.tsv"));
+    my ($fallback) = glob(File::Spec->catfile($args{output_dir}, "gnuplot_locus_${safe_snp}_window_*_npc${npc_flag}.gtf.tsv"));
     return ($fallback && -f $fallback) ? $fallback : '';
 }
 

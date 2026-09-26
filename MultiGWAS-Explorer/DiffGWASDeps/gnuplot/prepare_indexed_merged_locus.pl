@@ -35,9 +35,9 @@ make_path($cache_dir) unless -d $cache_dir;
 my $safe_snp = safe_name($target_snp);
 my $safe_window = safe_name($window_bp);
 my $data = File::Spec->catfile($output_dir,
-    "gunplot_locus_${safe_snp}_window_${safe_window}.wide.tsv.gz");
+    "gnuplot_locus_${safe_snp}_window_${safe_window}.wide.tsv.gz");
 my $manifest = File::Spec->catfile($output_dir,
-    "gunplot_locus_${safe_snp}_window_${safe_window}.wide.manifest.tsv");
+    "gnuplot_locus_${safe_snp}_window_${safe_window}.wide.manifest.tsv");
 my @source_stat = stat($input);
 my %old = -s $manifest ? read_manifest($manifest) : ();
 my $source_matches = defined($old{source})

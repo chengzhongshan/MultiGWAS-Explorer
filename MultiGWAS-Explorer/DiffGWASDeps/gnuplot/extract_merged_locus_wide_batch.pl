@@ -41,7 +41,7 @@ for my $arg (@target_args) {
     $chr = normalize_chr($chr);
     die "Invalid target coordinate: $arg\n" unless length($chr) && $bp > 0;
     next if $seen{uc($snp)}++;
-    my $stem = 'gunplot_locus_' . safe_name($snp)
+    my $stem = 'gnuplot_locus_' . safe_name($snp)
         . '_window_' . safe_name($window_bp) . '.wide';
     my $target = {
         snp => $snp, chr => $chr, bp => 0 + $bp,

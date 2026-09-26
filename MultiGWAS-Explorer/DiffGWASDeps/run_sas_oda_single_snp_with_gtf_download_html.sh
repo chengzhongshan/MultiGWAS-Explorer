@@ -888,8 +888,8 @@ if [[ -z "${DATA_GZ}" && "${SOURCE_MODE:-}" == "merged_gwas_table" ]]; then
 fi
 if [[ -z "${DATA_GZ}" && -n "${GENOME_WIDE_DATA_GZ_FOR_LOOKUP}" ]]; then
   shared_locus_dir="$(dirname "${GENOME_WIDE_DATA_GZ_FOR_LOOKUP}")"
-  shared_locus_data="${shared_locus_dir}/gunplot_locus_${SAFE_TARGET_SNP}_window_${SAFE_LOCAL_WINDOW_BP}.wide.tsv.gz"
-  shared_locus_manifest="${shared_locus_dir}/gunplot_locus_${SAFE_TARGET_SNP}_window_${SAFE_LOCAL_WINDOW_BP}.wide.manifest.tsv"
+  shared_locus_data="${shared_locus_dir}/gnuplot_locus_${SAFE_TARGET_SNP}_window_${SAFE_LOCAL_WINDOW_BP}.wide.tsv.gz"
+  shared_locus_manifest="${shared_locus_dir}/gnuplot_locus_${SAFE_TARGET_SNP}_window_${SAFE_LOCAL_WINDOW_BP}.wide.manifest.tsv"
   if [[ -s "${shared_locus_data}" && -s "${shared_locus_manifest}" ]]; then
     shared_target_snp="$(manifest_metric_value target_snp "${shared_locus_manifest}" || true)"
     shared_window_bp="$(manifest_metric_value window_bp "${shared_locus_manifest}" || true)"
@@ -1165,7 +1165,7 @@ if [[ -s "${single_gtf_cache_base}.tsv.gz" ]]; then
   LOCAL_GTF_SUBSET_CACHE_MANAGED=1
   echo "[prep] Reusing cached local GTF subset for ${TARGET_SNP}: ${LOCAL_GTF_SUBSET_GZ}"
 else
-  shared_gtf_path="$(dirname "${DATA_GZ}")/gunplot_locus_${SAFE_TARGET_SNP}_window_${SAFE_LOCAL_WINDOW_BP}_npc${LOCAL_GTF_INCLUDE_NON_PROTEIN_CODING_GENES}.gtf.tsv"
+  shared_gtf_path="$(dirname "${DATA_GZ}")/gnuplot_locus_${SAFE_TARGET_SNP}_window_${SAFE_LOCAL_WINDOW_BP}_npc${LOCAL_GTF_INCLUDE_NON_PROTEIN_CODING_GENES}.gtf.tsv"
   if [[ -s "${shared_gtf_path}" ]]; then
     echo "[prep] Reusing the gnuplot target/window GTF subset for SAS ODA: ${shared_gtf_path}"
     gzip -c "${shared_gtf_path}" > "${single_gtf_cache_base}.tsv.gz"
