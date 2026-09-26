@@ -73,3 +73,7 @@ track, and the signed-LD colorbar (217,773-byte PNG). Its first attempt
 revealed that the local SAS import template omitted the newly computed meta
 columns. The import now reads the actual local table header; the corrected
 rerun completed without that error.
+An additional SAS local Manhattan rerun selected `META` and `ALL_FEMALE`,
+removed the differential and male tracks, and downloaded a 42,112-byte PNG.
+Visual inspection confirmed the requested bottom-to-top order and plotted
+meta association points.

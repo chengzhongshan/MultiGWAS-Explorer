@@ -29,6 +29,19 @@ cache/plink2_bin/
 cache/plink2_ld/
 cache/plink2_tmp/
 cache/pgc_scz_sex_public/
+/cache/
+/run_single_snp_with_gtf_*/
+/upload_*/
+/configs/auto_*_diff_merged_*
+/*.local_debug.sas
+/run_sas_local_debug_*.sas
+/auto_gtf_import_single_snp.*.sas
+/auto_wide_import_single_snp.*.sas
+/run_sas_oda_single_snp_with_gtf.*.sas
+/single_snp_ld_augmented_*.tsv.gz
+/target_snp_augmented_*.tsv.gz
+/*_top_hits_*.csv
+/gnuplot_fallback_*.status.json
 
 # Reviewer-benchmark reruns and large downloadable HaploReg intermediates.
 benchmark/reproduction/
