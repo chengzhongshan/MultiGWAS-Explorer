@@ -421,11 +421,10 @@ sub resolve_hts_tool {
     my ($dir, $tool) = @_;
     my @names = ($tool);
     push @names, "$tool.exe" if $^O =~ /^(?:cygwin|MSWin32)$/i;
-    my @candidates = (
-        (defined $dir && length $dir ? map { "$dir/$_" } @names : ()),
-        (map { "$Bin/$_" } @names),
-        @names,
+    my @dirs = grep { defined $_ && length $_ } (
+        $dir, $Bin, map { "$Bin/" . ('../' x $_) . 'local/bin' } 1 .. 3
     );
+    my @candidates = ((map { my $base = $_; map { "$base/$_" } @names } @dirs), @names);
     for my $candidate (@candidates) {
         next unless defined $candidate && length $candidate;
         return $candidate if -x $candidate || command_exists($candidate);

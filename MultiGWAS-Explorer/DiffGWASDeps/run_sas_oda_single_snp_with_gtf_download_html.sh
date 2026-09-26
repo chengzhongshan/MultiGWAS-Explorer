@@ -105,7 +105,11 @@ GTF_LD_SNPS="${GTF_LD_SNPS:-}"
 GTF_LD_SNPS="${GTF_LD_SNPS//,/ }"
 GTF_LD_DISPLAY_MODE="${GTF_LD_DISPLAY_MODE:-none}"
 GTF_LD_R2_VALUES="${GTF_LD_R2_VALUES:-}"
-GTF_LD_R2_CACHE="${GTF_LD_R2_CACHE:-${LOCAL_LD_CACHE_TSV:-}}"
+if [[ "${CALLER_GTF_LD_R2_CACHE}" == "" ]]; then
+  GTF_LD_R2_CACHE=""
+else
+  GTF_LD_R2_CACHE="${GTF_LD_R2_CACHE:-${LOCAL_LD_CACHE_TSV:-}}"
+fi
 GTF_LD_REFERENCE_SNP="${GTF_LD_REFERENCE_SNP:-${LOCAL_LD_REFERENCE_SNP:-${TARGET_SNP}}}"
 GTF_LD_HEATMAP_COLORS="${GTF_LD_HEATMAP_COLORS:-CXF7FBFF CX6BAED6 CX54278F}"
 GTF_LD_HEATMAP_LEGEND_TITLE="${GTF_LD_HEATMAP_LEGEND_TITLE:-LD r2 (EUR)}"
@@ -114,11 +118,11 @@ case "$(printf '%s' "${GTF_LD_DISPLAY_MODE}" | tr '[:upper:]' '[:lower:]')" in
   *) echo "ERROR: Unsupported GTF_LD_DISPLAY_MODE=${GTF_LD_DISPLAY_MODE}" >&2; exit 2 ;;
 esac
 
-# A single-SNP context run should not silently reuse the generic genome-wide
-# wide subset or generic local-top-hits HTML basename from the multi-hit runner
-# config. Fall back to SNP-specific helper output instead.
-if [[ -n "${DATA_GZ}" && "$(basename "${DATA_GZ}")" == *.stdized.wide_beta_se_p_p_lt_0p05.final.tsv.gz ]]; then
-  echo "[prep] Ignoring generic DATA_GZ from runner config for single-SNP mode: ${DATA_GZ}"
+# The runner config's DATA_GZ is a genome-wide input. Keep its path for
+# locating a reusable indexed locus, but never upload or LD-augment the whole
+# table for a single-SNP plot. An explicit caller DATA_GZ is already local.
+if [[ "${CALLER_DATA_GZ}" == "__UNSET__" && -n "${DATA_GZ}" ]]; then
+  echo "[prep] Extracting a target window from runner DATA_GZ: ${DATA_GZ}"
   DATA_GZ=""
   REMOTE_DATA_BASENAME=""
 fi
@@ -400,17 +404,18 @@ RUN_LOG_DIR="${WORKDIR}/${RUN_PREFIX}"
 RUN_LOG_FILE="${RUN_LOG_DIR}/output.html.info.txt"
 
 cleanup_local_artifacts() {
-  rm -f "${RUN_SAS_RENDERED}" "${IMPORT_BLOCK_RENDERED}" "${GTF_IMPORT_BLOCK_RENDERED}"
+  rm -f "${RUN_SAS_RENDERED}" "${IMPORT_BLOCK_RENDERED}" "${GTF_IMPORT_BLOCK_RENDERED}" || true
   if [[ "${CLEAN_LOCAL_AUTOGEN}" == "1" && -n "${LOCAL_LD_AUGMENTED_GZ}" ]]; then
-    rm -f "${LOCAL_LD_AUGMENTED_GZ}"
+    rm -f "${LOCAL_LD_AUGMENTED_GZ}" || true
   fi
   if [[ "${CLEAN_LOCAL_AUTOGEN}" == "1" && "${LOCAL_GTF_SUBSET_CACHE_MANAGED}" != "1" ]]; then
-    rm -f "${LOCAL_GTF_SUBSET}" "${LOCAL_GTF_SUBSET_GZ}"
+    rm -f "${LOCAL_GTF_SUBSET}" "${LOCAL_GTF_SUBSET_GZ}" || true
   fi
   if [[ "${LOCAL_WIDE_AUTOGEN}" == "1" && "${LOCAL_WIDE_CACHE_MANAGED}" != "1" && "${CLEAN_LOCAL_AUTOGEN}" == "1" ]]; then
-    [[ -n "${DATA_GZ}" ]] && rm -f "${DATA_GZ}"
-    [[ -n "${LOCAL_WIDE_MANIFEST}" ]] && rm -f "${LOCAL_WIDE_MANIFEST}"
+    [[ -z "${DATA_GZ}" ]] || rm -f "${DATA_GZ}" || true
+    [[ -z "${LOCAL_WIDE_MANIFEST}" ]] || rm -f "${LOCAL_WIDE_MANIFEST}" || true
   fi
+  return 0
 }
 
 trap cleanup_local_artifacts EXIT
@@ -841,6 +846,26 @@ TARGET_BP=""
 mkdir -p "${GTF_CACHE_DIR}" "${LOCAL_GTF_REUSE_CACHE_DIR}"
 echo "[prep] Shared full-GTF BGZF/tabix cache: ${GTF_CACHE_DIR}"
 SAFE_LOCAL_WINDOW_BP="$(printf '%s' "${LOCAL_WINDOW_BP}" | tr -c 'A-Za-z0-9._-' '_')"
+if [[ -z "${DATA_GZ}" && "${SOURCE_MODE:-}" == "merged_gwas_table" ]]; then
+  [[ -s "${GENOME_WIDE_DATA_GZ_FOR_LOOKUP}" ]] \
+    || { echo "ERROR: Merged-wide GWAS source is unavailable: ${GENOME_WIDE_DATA_GZ_FOR_LOOKUP}" >&2; exit 2; }
+  echo "[prep] Preparing a sorted tabix-indexed merged-wide GWAS locus for ${TARGET_SNP}."
+  indexed_locus_out="$(perl "${DEPS_DIR}/gnuplot/prepare_indexed_merged_locus.pl" \
+    --input "${GENOME_WIDE_DATA_GZ_FOR_LOOKUP}" \
+    --target-snp "${TARGET_SNP}" --window-bp "${LOCAL_WINDOW_BP}" \
+    --output-dir "$(dirname "${GENOME_WIDE_DATA_GZ_FOR_LOOKUP}")" \
+    --cache-dir "${WORKDIR}/cache/gnuplot_wide_index")"
+  DATA_GZ="$(printf '%s\n' "${indexed_locus_out}" | awk -F '\t' '$1=="OUTPUT"{print $2}')"
+  LOCAL_WIDE_MANIFEST="$(printf '%s\n' "${indexed_locus_out}" | awk -F '\t' '$1=="MANIFEST"{print $2}')"
+  TARGET_CHR="$(printf '%s\n' "${indexed_locus_out}" | awk -F '\t' '$1=="TARGET_CHR"{print $2}')"
+  TARGET_BP="$(printf '%s\n' "${indexed_locus_out}" | awk -F '\t' '$1=="TARGET_BP"{print $2}')"
+  [[ -s "${DATA_GZ}" && -s "${LOCAL_WIDE_MANIFEST}" ]] \
+    || { echo "ERROR: Indexed merged-wide target extraction failed." >&2; printf '%s\n' "${indexed_locus_out}" >&2; exit 2; }
+  LOCAL_WIDE_AUTOGEN=1
+  LOCAL_WIDE_CACHE_MANAGED=1
+  printf '%s\n' "${indexed_locus_out}" | grep -E '^\[locus\]|^\[tabix\]' || true
+  echo "[prep] Using tabix-extracted target locus: ${DATA_GZ}"
+fi
 if [[ -z "${DATA_GZ}" && -n "${GENOME_WIDE_DATA_GZ_FOR_LOOKUP}" ]]; then
   shared_locus_dir="$(dirname "${GENOME_WIDE_DATA_GZ_FOR_LOOKUP}")"
   shared_locus_data="${shared_locus_dir}/gunplot_locus_${SAFE_TARGET_SNP}_window_${SAFE_LOCAL_WINDOW_BP}.wide.tsv.gz"
@@ -940,6 +965,51 @@ if [[ -z "${local_target_row}" ]]; then
 fi
 echo "[prep] Verified that the local single-SNP wide subset contains ${TARGET_SNP}."
 log_local_subset_target_summary_if_available
+
+if [[ "${GTF_LD_DISPLAY_MODE,,}" == "heatmap" || "${GTF_LD_DISPLAY_MODE,,}" == "both" ]] \
+    && [[ -z "${GTF_LD_R2_CACHE}" ]]; then
+  case "${REFERENCE_BUILD}" in
+    hg38)
+      ld_chr="${TARGET_CHR#chr}"
+      ld_panel_dir="${WORKDIR}/cache/plink2_1kg_hg38"
+      ld_plink2="${TOP_HIT_LD_PLINK2:-${WORKDIR}/cache/plink2_bin/plink2.exe}"
+      ld_window_kb="${TOP_HIT_LD_WINDOW_KB:-1000}"
+      ld_population="${LOCAL_LD_POPULATION:-EUR}"
+      ld_min_r2="${LOCAL_LD_R2_THRESHOLD:-0}"
+      [[ "${ld_window_kb}" =~ ^[0-9]+$ ]] || { echo "ERROR: TOP_HIT_LD_WINDOW_KB must be an integer." >&2; exit 2; }
+      [[ "${TARGET_BP}" =~ ^[0-9]+$ ]] || { echo "ERROR: Target BP is required for PLINK2 LD." >&2; exit 2; }
+      ld_from=$(( TARGET_BP - ld_window_kb * 1000 ))
+      (( ld_from > 0 )) || ld_from=1
+      ld_to=$(( TARGET_BP + ld_window_kb * 1000 ))
+      ld_population_tag="$(printf '%s' "${ld_population}" | tr -c 'A-Za-z0-9' '_')"
+      ld_r2_tag="$(printf '%s' "${ld_min_r2}" | tr -c 'A-Za-z0-9' '_')"
+      ld_cache_dir="${WORKDIR}/cache/plink2_ld"
+      mkdir -p "${ld_cache_dir}"
+      ld_cache="${ld_cache_dir}/sas_gtf_${SAFE_TARGET_SNP}_chr${ld_chr}_${ld_population_tag}_r2_${ld_r2_tag}_w${ld_window_kb}_hg38.tsv"
+      perl "${DEPS_DIR}/prepare_plink2_1kg_hg38_chr.pl" \
+        --chr "${ld_chr}" --output-dir "${ld_panel_dir}" --plink2 "${ld_plink2}"
+      if [[ ! -s "${ld_cache}" ]]; then
+        echo "[prep] Calculating phased 1000 Genomes Phase 3 LD for ${TARGET_SNP} with PLINK2."
+        perl "${DEPS_DIR}/resolve_plink2_local_ld.pl" \
+          --query-snp "${TARGET_SNP}" \
+          --pfile "${ld_panel_dir}/chr${ld_chr}_hg38" \
+          --plink2 "${ld_plink2}" \
+          --chr "${ld_chr}" --from-bp "${ld_from}" --to-bp "${ld_to}" \
+          --window-kb "${ld_window_kb}" --min-r2 "${ld_min_r2}" \
+          --populations "${ld_population}" --reference-build GRCh38_hg38 \
+          --output "${ld_cache}" --quiet
+      fi
+      awk -F '\t' -v query="${TARGET_SNP}" 'NR>1 && $1==query && $2!=query {found=1; exit} END {exit !found}' "${ld_cache}" \
+        || { echo "ERROR: No PLINK2 LD proxies were estimated for ${TARGET_SNP}." >&2; exit 2; }
+      GTF_LD_R2_CACHE="${ld_cache}"
+      echo "[prep] Using build-matched PLINK2 LD cache: ${GTF_LD_R2_CACHE}"
+      ;;
+    *)
+      echo "ERROR: ${REFERENCE_BUILD} signed-LD GTF heatmap needs a PLINK2 LD cache; pass GTF_LD_R2_CACHE." >&2
+      exit 2
+      ;;
+  esac
+fi
 
 if [[ -n "${GTF_LD_R2_CACHE}" ]]; then
   if [[ ! -s "${GTF_LD_R2_CACHE}" ]]; then

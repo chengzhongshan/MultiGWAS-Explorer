@@ -1347,13 +1347,24 @@ perl auto_prepare_and_run_diff_gwas.pl \
   --step plot_local_gtf
 ```
 
-The SAS ODA and gunplot genome-wide Manhattan runners now prepare a cached,
-sorted input locally. It keeps only `CHR`, `BP`, and the displayed P columns,
-and retains a SNP only when at least one displayed P is `< 0.05`. This avoids
+The SAS ODA and gunplot genome-wide Manhattan runners prepare a cached,
+sorted input locally. By default it keeps only `CHR`, `BP`, and the displayed
+P columns, and retains a SNP only when at least one displayed P is `< 0.05`.
+This avoids
 loading and sorting the full GWAS-wide table in SAS `WORK` and speeds up the
 genome-wide gunplot scan. Local Manhattan, local GTF, top-hit, and forest inputs
 are unchanged. The compact file, its import schema, and a row-count manifest
 are in `cache/sas_manhattan/`.
+Pass `--manhattan-all-snps` to either automation entry point to plot every
+coordinate-valid SNP in the genome-wide Manhattan plot. The all-SNP mode uses
+a separate cache and disables gnuplot's background point thinning; omitting
+the option restores the default P filter.
+For raw or precomputed differential GWAS input, all-SNP mode also builds a
+separate unfiltered wide table from the standardized results; it can take
+substantially more time and disk space. The default filtered wide table is
+reused on ordinary runs.
+The [public PGC schizophrenia female/male validation](docs/PUBLIC_SCZ_SEX_VALIDATION_20260926.md)
+records a full default Manhattan rerun and a targeted signed-LD GTF rerun.
 Set `MANHATTAN_SUBSET_THRESHOLD` to change the threshold for both genome-wide
 backends. For SAS ODA only, `MANHATTAN_COMPACT_INPUT=0` restores the original
 full-input behavior.
@@ -2413,8 +2424,25 @@ on first use; GRCh37/hg19 GWAS use the configured hg19 panel. It calculates
 phased r2 against each plotted target SNP. Downloaded reference files and the
 PLINK2 binary are cached locally and excluded from Git. Use
 `--ld-display-mode none` to turn off the gnuplot GTF heatmap, or `both` to add
-LD markers. The gnuplot local Manhattan default remains unchanged. SAS ODA
-still uses its configured local-LD display mode.
+LD markers. The gnuplot local Manhattan default remains unchanged. A
+SAS ODA `plot_local_gtf` run with explicit target SNPs also defaults to the
+signed-LD heatmap when no LD display mode is set. For a merged-wide GWAS, it sorts and
+tabix-indexes the wide table once, reuses that index on later runs, and
+extracts the full local SNP window before applying 1KG Phase 3 PLINK2 LD.
+The local window retains nonsignificant SNPs. On hg38, the build-matched
+chromosome reference and LD cache are prepared automatically. For example:
+
+```bash
+perl auto_prepare_and_run_diff_gwas.pl \
+  --gwas-dir AOA_GWAS_Data \
+  --step plot_local_gtf \
+  --target-snps rs75761054 \
+  --local-gtf-window-bp 500000
+```
+
+Set `--local-ld-display-mode none` to disable the SAS heatmap explicitly.
+With multiple target SNPs, SAS creates a separate indexed local window, LD
+reference, and signed colorbar for each target.
 
 For an explicit LocusZoom-like LD view in SAS ODA, request
 `--local-ld-display-mode heatmap`.

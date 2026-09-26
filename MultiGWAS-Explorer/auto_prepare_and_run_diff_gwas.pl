@@ -94,6 +94,7 @@ my $target_snps_override = '';
 my $target_snp_genes_override = '';
 my $display_gwas_override = '';
 my $manhattan_differential_p_mode_override = '';
+my $manhattan_all_snps;
 my $sas_oda_account_override = '';
 my $sas_oda_password_override = '';
 my $prompt_sas_oda_auth_override = 0;
@@ -158,6 +159,7 @@ GetOptions(
     'mode=s'              => \$mode,
     'skip-plots!'         => \$skip_plots,
     'plots=s'             => \$plots,
+    'manhattan-all-snps!' => \$manhattan_all_snps,
     'force!'              => \$force,
     'step=s@'             => \@step_args,
     'from-step=s'         => \$from_step,
@@ -351,6 +353,9 @@ if (!length $spec_file && (length $gwas_dir || length $input_merged)) {
 
 die "--spec is required (or provide --gwas-dir or --input-merged to generate one)\n" unless length $spec_file;
 my $spec = load_json($spec_file);
+$manhattan_all_snps = defined($manhattan_all_snps)
+    ? ($manhattan_all_snps ? 1 : 0)
+    : (cfg_or($spec, 'manhattan_all_snps', 0) ? 1 : 0);
 $local_ld_r2_threshold_override = 0 + (
     defined($local_ld_r2_threshold_override)
       ? $local_ld_r2_threshold_override
@@ -568,6 +573,10 @@ my $generated = build_generated_paths(
     output_dir    => $output_dir,
     artifact_stem => $artifact_stem,
 );
+if ($manhattan_all_snps && $source_mode ne 'merged_gwas_table') {
+    $generated->{wide_output} =~ s/p_lt_0p05\.final\.tsv\.gz$/all_snps.final.tsv.gz/;
+    $generated->{wide_manifest} =~ s/p_lt_0p05\.final\.manifest\.tsv$/all_snps.final.manifest.tsv/;
+}
 if ($source_mode eq 'precomputed_diff_stdized') {
     die "input_stdized is required for source_mode=precomputed_diff_stdized\n"
       unless length cfg_or($spec, 'input_stdized', '');
@@ -592,9 +601,21 @@ my $local_plot_requested =
     || $step_flag{plot_local_gtf}
     || scalar(grep { /^(?:plot_)?local_(?:manhattan|gtf)$/ } @step_args)
     || (!$skip_plots && ($plots || '') =~ /(?:^|,)local_(?:manhattan|gtf)(?:,|$)/);
+my $target_gtf_requested = @configured_target_snps > 0
+    && ($step_flag{plot_local_gtf}
+        || scalar(grep { /^(?:plot_)?local_gtf$/ } @step_args)
+        || (!@step_args && !$step_flag{plot_local_manhattan} && !$skip_plots
+            && ($plots || '') =~ /(?:^|,)local_gtf(?:,|$)/));
+my $default_gtf_signed_ld = $target_gtf_requested
+    && !defined($local_ld_display_mode)
+    && !exists($spec->{local_ld_display_mode})
+    && !$highlight_high_ld_snps
+    && !length($local_ld_snps_override)
+    && !length(cfg_or($spec, 'local_ld_snps', ''));
 $highlight_high_ld_snps = 1
     if length($local_ld_snps_override) || length(cfg_or($spec, 'local_ld_snps', ''));
-$local_ld_display_mode = lc(trim($local_ld_display_mode // $spec->{local_ld_display_mode} // 'none'));
+$local_ld_display_mode = lc(trim($local_ld_display_mode // $spec->{local_ld_display_mode}
+    // ($default_gtf_signed_ld ? 'heatmap' : 'none')));
 die "--local-ld-display-mode must be none, markers, heatmap, or both\n"
     unless $local_ld_display_mode =~ /^(?:none|markers|heatmap|both)$/;
 $local_ld_display_mode = 'markers'
@@ -617,33 +638,41 @@ if ($highlight_high_ld_snps
         && !length($local_ld_r2_values_override)
         && $top_hit_ld_source eq 'PLINK2_1KG') {
         my $ld_build = lc(trim($reference_build_profile->{build} || ''));
-        die "1000 Genomes Phase 3 PLINK2 LD requires a GRCh37/hg19 GWAS reference build; got '$reference_build_profile->{build}'.\n"
-            unless $ld_build =~ /^(?:hg19|grch37)$/;
-        my ($direct_cache, $direct_ok) = resolve_plink2_ld_cache_for_plot(
-            query_snp   => $local_ld_reference_snp,
-            populations => $local_ld_population_override,
-            min_r2     => $local_ld_r2_threshold_override,
-            window_kb  => cfg_or($spec, 'local_ld_window_kb', cfg_or($spec, 'top_hit_ld_window_kb', 1000)),
-            pfile      => $top_hit_ld_pfile,
-            bfile      => $top_hit_ld_bfile,
-            plink2     => $top_hit_ld_plink2,
-            output_dir => $output_dir,
-            force      => $force,
-        );
-        if ($direct_ok) {
-            $local_ld_cache = $direct_cache;
-            $local_ld_cache_override = $direct_cache;
-            $local_ld_web_fallback = 0;
-            print "[prep] Direct PLINK2/1000 Genomes local-LD cache: $direct_cache\n";
+        if ($ld_build =~ /^(?:hg38|grch38)$/
+            && $target_gtf_requested
+            && $local_ld_display_mode eq 'heatmap') {
+            print "[prep] GRCh38 PLINK2 LD will be calculated after each SAS single-SNP runner resolves its target locus.\n";
         }
         else {
-            warn "[warn] Direct 1000 Genomes local LD is unavailable; HaploReg4 will be used only as a backup when web fallback is enabled.\n";
+            die "1000 Genomes Phase 3 PLINK2 LD requires a GRCh37/hg19 GWAS reference build, or a GRCh38/hg38 GTF heatmap with explicit targets; got '$reference_build_profile->{build}'.\n"
+                unless $ld_build =~ /^(?:hg19|grch37)$/;
+            my ($direct_cache, $direct_ok) = resolve_plink2_ld_cache_for_plot(
+                query_snp   => $local_ld_reference_snp,
+                populations => $local_ld_population_override,
+                min_r2     => $local_ld_r2_threshold_override,
+                window_kb  => cfg_or($spec, 'local_ld_window_kb', cfg_or($spec, 'top_hit_ld_window_kb', 1000)),
+                pfile      => $top_hit_ld_pfile,
+                bfile      => $top_hit_ld_bfile,
+                plink2     => $top_hit_ld_plink2,
+                output_dir => $output_dir,
+                force      => $force,
+            );
+            if ($direct_ok) {
+                $local_ld_cache = $direct_cache;
+                $local_ld_cache_override = $direct_cache;
+                $local_ld_web_fallback = 0;
+                print "[prep] Direct PLINK2/1000 Genomes local-LD cache: $direct_cache\n";
+            }
+            else {
+                warn "[warn] Direct 1000 Genomes local LD is unavailable; HaploReg4 will be used only as a backup when web fallback is enabled.\n";
+            }
         }
     }
     $local_ld_cache_by_snp{lc $local_ld_reference_snp} = $local_ld_cache
         if length($local_ld_reference_snp) && length($local_ld_cache);
     if ($local_ld_display_mode eq 'heatmap'
         && $top_hit_ld_source eq 'PLINK2_1KG'
+        && lc(trim($reference_build_profile->{build} || '')) !~ /^(?:hg38|grch38)$/
         && @configured_target_snps > 1) {
         for my $query_snp (@configured_target_snps) {
             next if length($local_ld_cache_by_snp{lc $query_snp} // '');
@@ -688,7 +717,9 @@ die "top_hit_focus_prefix $focus_prefix is not one of: " . join(', ', @prefixes)
 
 my $merge_cfg = build_merge_config($spec, $generated) if $source_mode eq 'raw_pgc_vcf_sumstats';
 my $diff_cfg = build_diff_config($spec, $generated) if $source_mode eq 'raw_pgc_vcf_sumstats';
-my $preset_cfg = build_preset_config($spec, $generated, $pair_info, $threshold, $window_bp);
+my $wide_threshold = $manhattan_all_snps && $source_mode ne 'merged_gwas_table'
+    ? 2 : $threshold;
+my $preset_cfg = build_preset_config($spec, $generated, $pair_info, $wide_threshold, $window_bp);
 my %common_ld_artifacts;
 if ($effective_get_common_associations
     && !length($configured_target_snps)
@@ -744,6 +775,7 @@ my $runner_cfg = build_runner_config(
     target_snps_override => $target_snps_override,
     target_snp_genes_override => $target_snp_genes_override,
     display_gwas_override => $display_gwas_override,
+    manhattan_all_snps => $manhattan_all_snps,
     local_gtf_label_snps_override => $local_gtf_label_snps_override,
     local_ld_snps_override => $local_ld_snps_override,
     local_ld_reference_snp => $local_ld_reference_snp,
@@ -861,7 +893,8 @@ if (length($single_target_gtf_snp) && !$local_sas_only) {
 elsif ($target_gtf_snp_count > 1
     && $local_ld_display_mode eq 'heatmap'
     && !$local_sas_only
-    && !grep { !length($local_ld_cache_by_snp{lc $_} // '') } @target_gtf_snps) {
+    && (lc(trim($reference_build_profile->{build} || '')) =~ /^(?:hg38|grch38)$/
+        || !grep { !length($local_ld_cache_by_snp{lc $_} // '') } @target_gtf_snps)) {
     my $output_base = $runner_cfg->{OUTPUT_HTML_BASENAME}
       || "${project_tag}_SAS_local_top_hits_with_gtf.html";
     $output_base =~ s/\.html$//i;
@@ -876,7 +909,7 @@ elsif ($target_gtf_snp_count > 1
         $safe_target =~ s/[^A-Za-z0-9._-]/_/g;
         my $target_html = "${output_base}_${safe_target}.html";
         my $target_csv = "${output_base}_${safe_target}_top_hit.csv";
-        my $target_cache = $local_ld_cache_by_snp{lc $target_snp};
+        my $target_cache = $local_ld_cache_by_snp{lc $target_snp} // '';
         my $legend_population = uc(trim($local_ld_population_override || 'EUR'));
         my $legend = "Signed LD r2 to $target_snp ($legend_population, 1000G Phase 3 / PLINK2)";
         push @target_commands,
@@ -3140,12 +3173,14 @@ sub build_runner_config {
         REFERENCE_BUILD_EVIDENCE => ($reference_build_profile->{evidence} || ''),
         GTF_CACHE_DIR => normalize_unix_path(cfg_or($spec, 'gtf_cache_dir', "$workdir/cache/gtf")),
         DATA_GZ => $generated->{wide_output},
+        SOURCE_MODE => $source_mode,
         SOURCE_LONG_GZ => ($source_mode eq 'merged_gwas_table' ? '' : $generated->{stdized_output}),
         EXTRACTOR_CONFIG_JSON => $generated->{preset_config},
         DISPLAY_GWAS => $selection->{canonical},
         DISPLAY_GWAS_MODE => (scalar(@selected_tracks) == 1 ? 'single' : 'multi'),
         DISPLAY_GWAS_AVAILABLE => join('|', @{ $selection->{available} || [] }),
         MANHATTAN_GWAS_MODE => (scalar(@selected_tracks) == 1 ? 'single' : 'multi'),
+        MANHATTAN_ALL_SNPS => ($args{manhattan_all_snps} ? 1 : 0),
         MANHATTAN_DIFFERENTIAL_P_MODE => uc(cfg_or(
             $spec, 'manhattan_differential_p_mode', 'raw'
         )),
@@ -4363,6 +4398,8 @@ Options:
   --mode MODE           full|configs . Default: full
   --skip-plots          Generate/prepare data but do not call SAS ODA runners
   --plots LIST          Comma-separated plot set. Default: manhattan,local_manhattan,local_gtf
+  --manhattan-all-snps  Include every coordinate-valid SNP in genome-wide Manhattan
+                        instead of the default any-displayed-GWAS P < 0.05 filter.
   --force               Rerun steps even if expected outputs already exist
   --list-steps          Print the available step names for the current spec and exit
   --step NAME           Run only one named step; repeat or comma-separate to run several

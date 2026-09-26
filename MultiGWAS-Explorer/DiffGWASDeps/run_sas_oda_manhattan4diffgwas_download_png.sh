@@ -63,14 +63,21 @@ HTML_TITLE="${HTML_TITLE:-${PROJECT_TAG} SAS Manhattan Plot}"
 OPEN_RESULT="${OPEN_RESULT:-1}"
 MANHATTAN_COMPACT_INPUT="${MANHATTAN_COMPACT_INPUT:-1}"
 MANHATTAN_SUBSET_THRESHOLD="${MANHATTAN_SUBSET_THRESHOLD:-0.05}"
+MANHATTAN_ALL_SNPS="${MANHATTAN_ALL_SNPS:-0}"
 
 cd "${WORKDIR}"
 
 if [[ "${MANHATTAN_COMPACT_INPUT}" == "1" ]]; then
   threshold_tag="${MANHATTAN_SUBSET_THRESHOLD//[^A-Za-z0-9]/_}"
+  subset_tag="p_lt_${threshold_tag}"
+  subset_args=()
+  if [[ "${MANHATTAN_ALL_SNPS}" == "1" ]]; then
+    subset_tag="all_snps"
+    subset_args+=(--all-snps)
+  fi
   compact_dir="${WORKDIR}/cache/sas_manhattan"
   mkdir -p "${compact_dir}"
-  compact_basename="${OUTPUT_PREFIX}.p_lt_${threshold_tag}"
+  compact_basename="${OUTPUT_PREFIX}.${subset_tag}"
   compact_data="${compact_dir}/${compact_basename}.tsv.gz"
   compact_schema="${compact_dir}/${compact_basename}.schema.json"
   compact_manifest="${compact_dir}/${compact_basename}.manifest.json"
@@ -79,6 +86,7 @@ if [[ "${MANHATTAN_COMPACT_INPUT}" == "1" ]]; then
     --schema-config "${SCHEMA_CONFIG_JSON}" \
     --pvars "${MANHATTAN_P_VAR} ${MANHATTAN_OTHER_P_VARS}" \
     --threshold "${MANHATTAN_SUBSET_THRESHOLD}" \
+    "${subset_args[@]}" \
     --output "${compact_data}" \
     --schema-out "${compact_schema}" \
     --manifest "${compact_manifest}"

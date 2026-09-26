@@ -14,9 +14,16 @@ fi
 
 mkdir -p "${TMPDIR_SORT}"
 
-if [[ -n "${HTSBIN}" && -x "${HTSBIN}/bgzip" && -x "${HTSBIN}/tabix" ]]; then
-  export PATH="${HTSBIN}:$PATH"
-fi
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+for candidate in "${HTSBIN}" "${SCRIPT_DIR}/../local/bin" \
+                 "${SCRIPT_DIR}/../../local/bin" "${SCRIPT_DIR}/../../../local/bin"; do
+  [[ -n "${candidate}" ]] || continue
+  if { [[ -x "${candidate}/bgzip" ]] || [[ -x "${candidate}/bgzip.exe" ]]; } \
+      && { [[ -x "${candidate}/tabix" ]] || [[ -x "${candidate}/tabix.exe" ]]; }; then
+    export PATH="${candidate}:$PATH"
+    break
+  fi
+done
 
 HAS_BGZIP=0
 HAS_TABIX=0

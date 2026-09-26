@@ -143,6 +143,7 @@ for my $target (@targets) {
         ['source', $input],
         ['source_size', $source_stat[7]],
         ['source_mtime', $source_stat[9]],
+        ['access_mode', ($indexed_input ? 'TABIX' : 'STREAM')],
     ) {
         print {$mf} join("\t", @$entry), "\n";
     }

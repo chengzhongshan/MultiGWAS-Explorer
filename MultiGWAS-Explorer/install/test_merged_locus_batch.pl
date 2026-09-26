@@ -62,6 +62,27 @@ my @streamed_rows = sort @streamed_lines[1, 2];
 is_deeply(\@indexed_rows, \@streamed_rows,
     'tabix extraction retains aliases and nonsignificant SNPs');
 
+my $sas_locus_dir = "$dir/sas locus";
+my $sas_cache_dir = "$dir/sas index";
+my @sas_locus_cmd = ($^X,
+    "$Bin/../DiffGWASDeps/gnuplot/prepare_indexed_merged_locus.pl",
+    '--input', $input, '--target-snp', 'rsA', '--window-bp', '50',
+    '--output-dir', $sas_locus_dir, '--cache-dir', $sas_cache_dir);
+is(system(@sas_locus_cmd), 0,
+    'SAS GTF preparation builds a sorted tabix index and extracts the target window');
+my $sas_locus = '';
+gunzip "$sas_locus_dir/gunplot_locus_rsA_window_50.wide.tsv.gz" => \$sas_locus
+    or die $GunzipError;
+my @sas_locus_lines = split /\n/, $sas_locus;
+my @sas_locus_rows = sort @sas_locus_lines[1, 2];
+is_deeply(\@sas_locus_rows, \@streamed_rows,
+    'SAS GTF tabix locus retains nonsignificant SNPs');
+open my $smf, '<', "$sas_locus_dir/gunplot_locus_rsA_window_50.wide.manifest.tsv" or die $!;
+my %sas_manifest = map { chomp; split /\t/, $_, 2 } <$smf>;
+close $smf;
+is($sas_manifest{access_mode}, 'TABIX', 'SAS GTF locus records indexed access');
+is(system(@sas_locus_cmd), 0, 'SAS GTF indexed locus is reusable');
+
 SKIP: {
     skip 'gnuplot is unavailable', 3 if system('gnuplot', '--version') != 0;
     my $prefix = "$dir/local_rsA";

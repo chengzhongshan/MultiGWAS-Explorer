@@ -28,6 +28,7 @@ cache/plink2_1kg_hg38/
 cache/plink2_bin/
 cache/plink2_ld/
 cache/plink2_tmp/
+cache/pgc_scz_sex_public/
 
 # Reviewer-benchmark reruns and large downloadable HaploReg intermediates.
 benchmark/reproduction/

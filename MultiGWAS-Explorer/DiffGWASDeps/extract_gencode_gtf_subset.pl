@@ -513,6 +513,27 @@ sub sanitize {
 sub download_if_missing {
     my ($url, $path) = @_;
     return if -s $path;
+    my $curl = find_executable('', 'curl');
+    if ($curl) {
+        my $tmp = "$path.download.$$";
+        my $curl_output = $tmp;
+        if ($^O =~ /cygwin/i) {
+            open my $pipe, '-|', 'cygpath', '-m', $tmp
+                or die "Cannot convert GTF download path $tmp: $!\n";
+            $curl_output = <$pipe> // '';
+            close $pipe or die "Cannot convert GTF download path $tmp\n";
+            $curl_output =~ s/[\r\n]+$//;
+        }
+        my $ok = system($curl, '--fail', '--location', '--retry', '3',
+            '--connect-timeout', '20', '--max-time', '600',
+            '--silent', '--show-error', '--output', $curl_output, $url) == 0;
+        if (!$ok || !-s $tmp) {
+            unlink $tmp if -e $tmp;
+            die "Failed to download $url with curl\n";
+        }
+        rename $tmp, $path or die "Cannot save downloaded GTF $path: $!\n";
+        return;
+    }
     my $http = HTTP::Tiny->new(
         timeout => 600,
         verify_SSL => 1,

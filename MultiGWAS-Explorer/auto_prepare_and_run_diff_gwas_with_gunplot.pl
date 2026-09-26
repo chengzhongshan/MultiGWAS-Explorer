@@ -73,6 +73,8 @@ Options:
   --input-merged FILE           Import a combined cohort/meta GWAS table directly.
   --spec-out FILE.json          Save the generated spec at this path for reuse.
   --plots LIST                  Comma list: manhattan,local_manhattan,local_gtf,forest
+  --manhattan-all-snps          Include every coordinate-valid SNP in genome-wide Manhattan.
+                                Default: any displayed GWAS has P < 0.05.
   --step NAME                   Plot step(s): plot_manhattan, plot_local_manhattan, plot_local_gtf, plot_forest
   --force                       Force plot regeneration while reusing valid upstream data.
   --force-upstream              Also rebuild the upstream wide GWAS subset.
@@ -153,6 +155,7 @@ my $force = 0;
 my $force_upstream = 0;
 my $display_gwas_override = '';
 my $manhattan_differential_p_mode_override = '';
+my $manhattan_all_snps;
 my $target_snps_override = '';
 my $target_snp_genes_override = '';
 my $ld_snps_override = '';
@@ -194,6 +197,7 @@ GetOptions(
     'input-merged=s'          => \$input_merged,
     'spec-out=s'              => \$spec_out,
     'plots=s'                 => \$plots,
+    'manhattan-all-snps!'     => \$manhattan_all_snps,
     'step=s@'                 => \@step_args,
     'force!'                  => \$force,
     'force-upstream!'         => \$force_upstream,
@@ -312,6 +316,9 @@ my %requested = normalize_requested_plots($plots, \@step_args);
 die "No gunplot plot steps were requested.\n" unless grep { $requested{$_} } qw(plot_manhattan plot_local_manhattan plot_local_gtf plot_forest);
 
 my $spec = load_json($spec_file);
+$manhattan_all_snps = defined($manhattan_all_snps)
+    ? ($manhattan_all_snps ? 1 : 0)
+    : ($spec->{manhattan_all_snps} ? 1 : 0);
 my $default_gtf_signed_ld = !defined($ld_display_mode)
     && !exists($spec->{local_ld_display_mode})
     && !$highlight_high_ld_snps
@@ -373,6 +380,12 @@ for my $override_value (
     }
 }
 $has_runner_override = 1 if $local_max_hits_per_fig_override;
+$has_runner_override = 1 if $manhattan_all_snps && ($spec->{source_mode} || '') ne 'merged_gwas_table';
+if (!$manhattan_all_snps && ($spec->{source_mode} || '') ne 'merged_gwas_table'
+    && -f $runner_config_local) {
+    my $cached_runner = load_json($runner_config_local);
+    $has_runner_override = 1 if $cached_runner->{MANHATTAN_ALL_SNPS};
+}
 # A direct import creates a new spec, which may have different display tracks from
 # a cached runner with the same artifact name (for example, a prior Meta-only run).
 $has_runner_override = 1 if length($input_merged) || length($gwas_dir);
@@ -396,6 +409,7 @@ if (!$reused_existing_runner) {
     run_upstream_preprocessing(
         spec_file                       => $spec_file,
         force                           => $force_upstream,
+        manhattan_all_snps              => $manhattan_all_snps,
         display_gwas_override           => $display_gwas_override,
         manhattan_differential_p_mode_override => $manhattan_differential_p_mode_override,
         target_snps_override            => $target_snps_override,
@@ -508,6 +522,7 @@ if ($requested{plot_manhattan}) {
             pcols      => \@manhattan_source_pcols,
             labels     => \@new_manhattan_labels,
             remove_x_chr => $remove_x_chr,
+            all_snps   => $manhattan_all_snps,
             force      => $force,
         ),
     );
@@ -693,6 +708,7 @@ sub run_upstream_preprocessing {
         '--local-ld-display-mode', 'none',
     );
     push @cmd, '--force' if $args{force};
+    push @cmd, '--manhattan-all-snps' if $args{manhattan_all_snps};
     if ($args{display_gwas_override}) {
         push @cmd, '--display-gwas', $args{display_gwas_override};
     }
@@ -735,9 +751,9 @@ sub plot_manhattan {
     (my $threshold_tag = $threshold) =~ s/[^A-Za-z0-9]/_/g;
     make_path($args{cache_dir}) unless -d $args{cache_dir};
     my $compact_stem = safe_name($args{runner}{OUTPUT_PREFIX} || 'gunplot_manhattan')
-        . ".p_lt_${threshold_tag}";
+        . ($args{all_snps} ? '.all_snps' : ".p_lt_${threshold_tag}");
     my $compact_data = File::Spec->catfile($args{cache_dir}, "$compact_stem.tsv.gz");
-    run_cmd([
+    my @compact_cmd = (
         $^X,
         File::Spec->catfile($Bin, 'DiffGWASDeps', 'prepare_sas_manhattan_plot_input.pl'),
         '--input', $args{source_wide_data},
@@ -747,7 +763,9 @@ sub plot_manhattan {
         '--output', $compact_data,
         '--schema-out', File::Spec->catfile($args{cache_dir}, "$compact_stem.schema.json"),
         '--manifest', File::Spec->catfile($args{cache_dir}, "$compact_stem.manifest.json"),
-    ], 'compact genomewide Manhattan input');
+    );
+    push @compact_cmd, '--all-snps' if $args{all_snps};
+    run_cmd(\@compact_cmd, 'compact genomewide Manhattan input');
     my $output_prefix = gunplotize_name($args{runner}{OUTPUT_PREFIX} || 'gunplot_manhattan');
     my $out_prefix_path = File::Spec->catfile($args{output_dir}, $output_prefix);
     my $png_path = $out_prefix_path . '.png';
@@ -761,6 +779,8 @@ sub plot_manhattan {
     my $thin_mod = defined $args{runner}{GUNPLOT_MANHATTAN_THIN_MOD}
         ? $args{runner}{GUNPLOT_MANHATTAN_THIN_MOD}
         : 10;
+    $min_logp = 0 if $args{all_snps};
+    $thin_mod = 1 if $args{all_snps};
     my $plot_manifest = $out_prefix_path . '.manifest.tsv';
     my $prior = -s $plot_manifest ? read_manifest_tsv($plot_manifest) : {};
     my $plot_reusable = !$args{force}

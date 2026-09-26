@@ -12,6 +12,7 @@ use File::Temp qw(tempdir);
 
 my ($input, $schema_config, $pvars, $output, $schema_out, $manifest) = ('') x 6;
 my $threshold = 0.05;
+my $all_snps = 0;
 GetOptions(
     'input=s'         => \$input,
     'schema-config=s' => \$schema_config,
@@ -20,6 +21,7 @@ GetOptions(
     'schema-out=s'    => \$schema_out,
     'manifest=s'      => \$manifest,
     'threshold=f'     => \$threshold,
+    'all-snps!'       => \$all_snps,
 ) or die "Invalid Manhattan subset options\n";
 die "--input, --pvars, --output, --schema-out, and --manifest are required\n"
     unless length($input) && length($pvars) && length($output)
@@ -53,6 +55,7 @@ my $cache_key = JSON::PP->new->canonical->encode({
     pvars => \@pvars,
     alias => \%alias,
     threshold => $threshold,
+    all_snps => $all_snps ? 1 : 0,
 });
 if (-s $output && -s $schema_out && -s $manifest) {
     my $old = eval {
@@ -111,10 +114,12 @@ while (my $line = <$in>) {
         next;
     }
     my @p = map { $values[$index{$_}] // '' } @physical_pvars;
-    my $keep = 0;
-    for my $value (@p) {
-        next unless $value =~ /^(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/;
-        if ($value < $threshold) { $keep = 1; last; }
+    my $keep = $all_snps ? 1 : 0;
+    if (!$all_snps) {
+        for my $value (@p) {
+            next unless $value =~ /^(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/;
+            if ($value < $threshold) { $keep = 1; last; }
+        }
     }
     next unless $keep;
     print {$raw} join("\t", 0 + $chr, 0 + $bp, @p), "\n";
@@ -122,7 +127,9 @@ while (my $line = <$in>) {
 }
 close $in or die "Cannot finish reading $input: $GunzipError\n";
 close $raw or die "Cannot finish writing $unsorted: $!\n";
-die "No rows pass P < $threshold for the displayed tracks\n" unless $rows_written;
+die $all_snps ? "No coordinate-valid rows in $input\n"
+    : "No rows pass P < $threshold for the displayed tracks\n"
+    unless $rows_written;
 
 local $ENV{LC_ALL} = 'C';
 my $sort_bin = $^O eq 'cygwin' ? '/usr/bin/sort' : 'sort';
@@ -142,6 +149,7 @@ my $report = {
     source => $input,
     output => $output,
     threshold => $threshold,
+    all_snps => $all_snps ? 1 : 0,
     displayed_pvars => \@pvars,
     physical_pvars => \@physical_pvars,
     rows_read => $rows_read,
@@ -153,7 +161,9 @@ write_json($schema_out, $schema);
 replace_file($tmp_gz, $output);
 write_json($manifest, $report);
 print "Compact SAS Manhattan input: $output\n";
-print "Rows read: $rows_read; kept at P < $threshold: $rows_written; bad coordinates: $bad_coord\n";
+print $all_snps
+    ? "Rows read: $rows_read; kept all coordinate-valid SNPs: $rows_written; bad coordinates: $bad_coord\n"
+    : "Rows read: $rows_read; kept at P < $threshold: $rows_written; bad coordinates: $bad_coord\n";
 print "Columns: CHR BP ", join(' ', @pvars), "\n";
 
 sub write_json {

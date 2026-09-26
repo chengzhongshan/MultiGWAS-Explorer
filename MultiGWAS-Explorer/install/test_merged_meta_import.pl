@@ -61,6 +61,17 @@ $spec->{top_hit_ld_source} = 'HAPLOREG4';
 write_json($spec_path, $spec);
 is(system($^X, $driver, '--spec', $spec_path, '--skip-plots', '--list-steps'), 0,
     'existing pipeline generates configs for direct import');
+my $runner_path = "$dir/configs/auto_meta_test_runner.json";
+is(system($^X, $driver, '--spec', $spec_path, '--step', 'plot_local_gtf',
+    '--target-snps', 'rsTest,rsOther', '--list-steps'), 0,
+    'multi-target SAS GTF configuration is generated');
+is(read_json($runner_path)->{GTF_LD_DISPLAY_MODE}, 'heatmap',
+    'explicit target GTF plots default to the signed-LD heatmap');
+is(system($^X, $driver, '--spec', $spec_path, '--step', 'plot_manhattan',
+    '--manhattan-all-snps', '--list-steps'), 0,
+    'SAS Manhattan accepts the explicit all-SNP option');
+is(read_json($runner_path)->{MANHATTAN_ALL_SNPS}, 1,
+    'all-SNP override reaches the SAS runner');
 my $preset_path = "$dir/configs/auto_meta_test_preset.json";
 my $preset = read_json($preset_path);
 is(system($^X, "$Bin/../DiffGWASDeps/convert_merged_gwas_to_plotwide.pl",
@@ -131,6 +142,20 @@ SKIP: {
     close $default_manifest_fh;
     is($default_manifest{rows_scanned}, 2,
         'genome-wide gnuplot scans only rows with a displayed P below 0.05');
+    chdir dirname($relative_dir) or die $!;
+    my $all_gnu_status = system($^X,
+        "$Bin/../auto_prepare_and_run_diff_gwas_with_gunplot.pl",
+        '--gwas-dir', basename($relative_dir), '--spec-out', $default_gnu_spec,
+        '--plots', 'manhattan', '--manhattan-all-snps');
+    chdir $previous_cwd or die $!;
+    is($all_gnu_status, 0, 'gnuplot accepts the explicit all-SNP Manhattan option');
+    open $default_manifest_fh, '<', "$relative_dir/$default_prefix.manifest.tsv" or die $!;
+    %default_manifest = map { chomp; split /\t/, $_, 2 } <$default_manifest_fh>;
+    close $default_manifest_fh;
+    is($default_manifest{rows_scanned}, 3,
+        'explicit all-SNP mode bypasses the nominal P filter');
+    is($default_manifest{rows_thinned}, 0,
+        'explicit all-SNP gnuplot mode disables background point thinning');
 }
 ok(system($^X, $driver, '--input-merged', $input, '--spec', $spec_path,
     '--generate-spec-only') != 0, 'ambiguous input options rejected');

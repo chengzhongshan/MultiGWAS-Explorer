@@ -52,6 +52,17 @@ is_deeply(read_json($compact_schema)->{wide_columns},
     [qw(CHR BP DIFF_P DS_ALL_P MP2PRT_P META_P)],
     'SAS import schema matches the compact table');
 is(system(@cmd), 0, 'identical compact input is reusable');
+is(system(@cmd, '--all-snps'), 0, 'explicit all-SNP Manhattan input is prepared');
+my $all_plain = '';
+gunzip $output => \$all_plain or die $GunzipError;
+my @all_rows = split /\n/, $all_plain;
+shift @all_rows;
+is(scalar(@all_rows), 4, 'all coordinate-valid SNPs are retained without the P filter');
+like($all_plain, qr/^2\t100\t0\.05\t/m,
+    'the exact P = 0.05 boundary is retained only in all-SNP mode');
+is(read_json($manifest)->{all_snps}, 1, 'all-SNP mode is recorded in the cache manifest');
+is(system(@cmd), 0, 'switching back to default rebuilds the nominally filtered input');
+is(read_json($manifest)->{rows_written}, 3, 'default P < 0.05 filtering is restored');
 done_testing();
 
 sub read_json {
