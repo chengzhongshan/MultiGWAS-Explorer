@@ -63,6 +63,15 @@ is(system($^X, $driver, '--spec', $spec_path, '--skip-plots', '--list-steps'), 0
     'existing pipeline generates configs for direct import');
 my $runner_path = "$dir/configs/auto_meta_test_runner.json";
 is(system($^X, $driver, '--spec', $spec_path, '--step', 'plot_local_gtf',
+    '--list-steps'), 0, 'automatic-hit local GTF configuration is generated');
+is(read_json($runner_path)->{GTF_LD_DISPLAY_MODE}, 'heatmap',
+    'automatically selected GTF loci default to signed-LD heatmaps');
+is(system($^X, $driver, '--spec', $spec_path, '--step', 'plot_local_gtf',
+    '--local-ld-display-mode', 'none', '--list-steps'), 0,
+    'user can explicitly request the non-LD color scale');
+is(read_json($runner_path)->{GTF_LD_DISPLAY_MODE}, 'none',
+    'explicit non-LD display mode overrides the default');
+is(system($^X, $driver, '--spec', $spec_path, '--step', 'plot_local_gtf',
     '--target-snps', 'rsTest,rsOther', '--list-steps'), 0,
     'multi-target SAS GTF configuration is generated');
 is(read_json($runner_path)->{GTF_LD_DISPLAY_MODE}, 'heatmap',

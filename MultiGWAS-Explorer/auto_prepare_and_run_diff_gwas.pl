@@ -624,12 +624,12 @@ my $local_plot_requested =
     || $step_flag{plot_local_gtf}
     || scalar(grep { /^(?:plot_)?local_(?:manhattan|gtf)$/ } @step_args)
     || (!$skip_plots && ($plots || '') =~ /(?:^|,)local_(?:manhattan|gtf)(?:,|$)/);
-my $target_gtf_requested = @configured_target_snps > 0
-    && ($step_flag{plot_local_gtf}
-        || scalar(grep { /^(?:plot_)?local_gtf$/ } @step_args)
-        || (!@step_args && !$step_flag{plot_local_manhattan} && !$skip_plots
-            && ($plots || '') =~ /(?:^|,)local_gtf(?:,|$)/));
-my $default_gtf_signed_ld = $target_gtf_requested
+my $local_gtf_requested = $step_flag{plot_local_gtf}
+    || scalar(grep { /^(?:plot_)?local_gtf$/ } @step_args)
+    || (!@step_args && !$step_flag{plot_local_manhattan} && !$skip_plots
+        && ($plots || '') =~ /(?:^|,)local_gtf(?:,|$)/);
+my $target_gtf_requested = @configured_target_snps > 0 && $local_gtf_requested;
+my $default_gtf_signed_ld = $local_gtf_requested
     && !defined($local_ld_display_mode)
     && !exists($spec->{local_ld_display_mode})
     && !$highlight_high_ld_snps
@@ -4757,9 +4757,9 @@ Options:
   --ld-marker-color COLOR
                        Named or #RRGGBB LD marker color. Default: black.
   --local-ld-display-mode MODE
-                       none|markers|heatmap|both. Default: none. The heatmap
-                       mode maps sign(Z)*r2 to one continuous diverging
-                       colormap in the original Z-score legend position.
+                       none|markers|heatmap|both. Local GTF plots default to
+                       heatmap (signed LD r2 x sign(Z)); other plots default
+                       to none. Use none to keep Z-score coloring.
   --local-ld-r2-values MAP
                        Optional comma-separated SNP:r2 values for explicit
                        --local-ld-snps.

@@ -1758,6 +1758,35 @@ if [[ "$(printf '%s' "${TOP_HIT_SELECTION_METHOD}" | tr '[:lower:]' '[:upper:]')
     "0"
 fi
 
+dispatch_selected_signed_ld_gtf() {
+  [[ -z "${TARGET_SNP_LIST}" ]] || return 1
+  [[ "${GTF_LD_DISPLAY_MODE_NORMALIZED}" == "heatmap" || "${GTF_LD_DISPLAY_MODE_NORMALIZED}" == "both" ]] || return 1
+  [[ "${LOCAL_SAS_DEBUG_ONLY}" != "1" && "${ODA_TRANSFER_MANIFEST_ONLY:-0}" != "1" ]] || return 1
+  [[ -s "${CSV_OUT}" ]] || {
+    echo "ERROR: Signed-LD local GTF plots require a selected-hit CSV: ${CSV_OUT}" >&2
+    exit 1
+  }
+  perl "${DEPS_DIR}/run_selected_signed_ld_gtf.pl" \
+    --targets-csv "${CSV_OUT}" \
+    --runner-config "${RUNNER_CONFIG_JSON}" \
+    --output-html "${HTML_OUT}" \
+    --single-runner "${DEPS_DIR}/run_sas_oda_single_snp_with_gtf_download_html.sh" \
+    --window-bp "${LOCAL_GTF_WINDOW_BP}" \
+    --population "${LOCAL_LD_POPULATION:-EUR}" \
+    --mode "${GTF_LD_DISPLAY_MODE}"
+}
+
+GTF_LD_DISPLAY_MODE_NORMALIZED="$(printf '%s' "${GTF_LD_DISPLAY_MODE}" | tr '[:upper:]' '[:lower:]')"
+if [[ "$(printf '%s' "${TOP_HIT_SELECTION_METHOD}" | tr '[:lower:]' '[:upper:]')" != "LD" \
+    && -z "${TARGET_SNP_LIST}" \
+    && ( "${GTF_LD_DISPLAY_MODE_NORMALIZED}" == "heatmap" || "${GTF_LD_DISPLAY_MODE_NORMALIZED}" == "both" ) \
+    && "${LOCAL_SAS_DEBUG_ONLY}" != "1" \
+    && "${ODA_TRANSFER_MANIFEST_ONLY:-0}" != "1" \
+    && -s "${CSV_OUT}" ]]; then
+  dispatch_selected_signed_ld_gtf
+  exit 0
+fi
+
 rm -f "${HTML_OUT}" "${PNG_OUT}"
 mkdir -p "${GET_GTF_MACRO_UPLOAD_DIR}"
 
@@ -2196,9 +2225,26 @@ GTF_SUBMIT_RETRY_SLEEP_SECONDS="${GTF_SUBMIT_RETRY_SLEEP_SECONDS:-10}"
 BATCH_SIZE="${LOCAL_MAX_HITS_PER_FIG:-4}"
 if [[ "$(printf '%s' "${TOP_HIT_SELECTION_METHOD}" | tr '[:lower:]' '[:upper:]')" == "LD" && -z "${TARGET_SNP_LIST}" ]]; then
   echo "[prep] Running LD clumping before local-GTF batching."
-  generate_top_hits_csv_for_batching || true
+  if [[ ( "${GTF_LD_DISPLAY_MODE_NORMALIZED}" == "heatmap" || "${GTF_LD_DISPLAY_MODE_NORMALIZED}" == "both" ) \
+      && "${LOCAL_SAS_DEBUG_ONLY}" != "1" \
+      && "${ODA_TRANSFER_MANIFEST_ONLY:-0}" != "1" ]]; then
+    # The earlier CSV contains candidates. Require the prep pass to replace it
+    # with LD-pruned leads before spawning one signed-LD plot per locus.
+    rm -f "${CSV_OUT}"
+    generate_top_hits_csv_for_batching
+    [[ -s "${CSV_OUT}" ]] || { echo "ERROR: SAS LD clumping produced no selected-hit CSV." >&2; exit 1; }
+  else
+    generate_top_hits_csv_for_batching || true
+  fi
 elif [[ ! -s "${CSV_OUT}" ]]; then
   generate_top_hits_csv_for_batching || true
+fi
+if [[ -z "${TARGET_SNP_LIST}" \
+    && ( "${GTF_LD_DISPLAY_MODE_NORMALIZED}" == "heatmap" || "${GTF_LD_DISPLAY_MODE_NORMALIZED}" == "both" ) \
+    && "${LOCAL_SAS_DEBUG_ONLY}" != "1" \
+    && "${ODA_TRANSFER_MANIFEST_ONLY:-0}" != "1" ]]; then
+  dispatch_selected_signed_ld_gtf
+  exit 0
 fi
 if [[ -f "${CSV_OUT}" && -s "${CSV_OUT}" ]]; then
   total_hits="$(($(wc -l < "${CSV_OUT}") - 1))"

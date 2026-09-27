@@ -990,7 +990,8 @@ fi
 echo "[prep] Verified that the local single-SNP wide subset contains ${TARGET_SNP}."
 log_local_subset_target_summary_if_available
 
-if [[ "${GTF_LD_DISPLAY_MODE,,}" == "heatmap" || "${GTF_LD_DISPLAY_MODE,,}" == "both" ]] \
+ld_display_mode_normalized="$(printf '%s' "${GTF_LD_DISPLAY_MODE}" | tr '[:upper:]' '[:lower:]')"
+if [[ "${ld_display_mode_normalized}" == "heatmap" || "${ld_display_mode_normalized}" == "both" ]] \
     && [[ -z "${GTF_LD_R2_CACHE}" ]]; then
   case "${REFERENCE_BUILD}" in
     hg38)
@@ -1022,6 +1023,41 @@ if [[ "${GTF_LD_DISPLAY_MODE,,}" == "heatmap" || "${GTF_LD_DISPLAY_MODE,,}" == "
           --window-kb "${ld_window_kb}" --min-r2 "${ld_min_r2}" \
           --populations "${ld_population}" --reference-build GRCh38_hg38 \
           --output "${ld_cache}" --quiet
+      fi
+      awk -F '\t' -v query="${TARGET_SNP}" 'NR>1 && $1==query && $2!=query {found=1; exit} END {exit !found}' "${ld_cache}" \
+        || { echo "ERROR: No PLINK2 LD proxies were estimated for ${TARGET_SNP}." >&2; exit 2; }
+      GTF_LD_R2_CACHE="${ld_cache}"
+      echo "[prep] Using build-matched PLINK2 LD cache: ${GTF_LD_R2_CACHE}"
+      ;;
+    hg19)
+      ld_pfile="${TOP_HIT_LD_PFILE:-}"
+      ld_bfile="${TOP_HIT_LD_BFILE:-}"
+      ld_plink2="${TOP_HIT_LD_PLINK2:-${WORKDIR}/cache/plink2_bin/plink2.exe}"
+      ld_window_kb="${TOP_HIT_LD_WINDOW_KB:-1000}"
+      ld_population="${LOCAL_LD_POPULATION:-EUR}"
+      ld_min_r2="${LOCAL_LD_R2_THRESHOLD:-0}"
+      ld_population_tag="$(printf '%s' "${ld_population}" | tr -c 'A-Za-z0-9' '_')"
+      ld_r2_tag="$(printf '%s' "${ld_min_r2}" | tr -c 'A-Za-z0-9' '_')"
+      ld_cache_dir="${WORKDIR}/cache/plink2_ld"
+      mkdir -p "${ld_cache_dir}"
+      ld_cache="${ld_cache_dir}/sas_gtf_${SAFE_TARGET_SNP}_${ld_population_tag}_r2_${ld_r2_tag}_w${ld_window_kb}_hg19.tsv"
+      ld_reference_args=()
+      if [[ -s "${ld_pfile}.pgen" && -s "${ld_pfile}.psam" ]] \
+          && [[ -s "${ld_pfile}.pvar" || -s "${ld_pfile}.pvar.zst" ]]; then
+        ld_reference_args=(--pfile "${ld_pfile}")
+      elif [[ -s "${ld_bfile}.bed" && -s "${ld_bfile}.bim" && -s "${ld_bfile}.fam" ]]; then
+        ld_reference_args=(--bfile "${ld_bfile}")
+      else
+        echo "ERROR: hg19 signed-LD GTF plot needs the 1000 Genomes Phase 3 PLINK2 reference at TOP_HIT_LD_PFILE or TOP_HIT_LD_BFILE." >&2
+        exit 2
+      fi
+      if [[ ! -s "${ld_cache}" ]]; then
+        echo "[prep] Calculating phased 1000 Genomes Phase 3 hg19 LD for ${TARGET_SNP} with PLINK2."
+        perl "${DEPS_DIR}/resolve_plink2_local_ld.pl" \
+          --query-snp "${TARGET_SNP}" "${ld_reference_args[@]}" \
+          --plink2 "${ld_plink2}" --window-kb "${ld_window_kb}" \
+          --min-r2 "${ld_min_r2}" --populations "${ld_population}" \
+          --reference-build GRCh37_hg19 --output "${ld_cache}" --quiet
       fi
       awk -F '\t' -v query="${TARGET_SNP}" 'NR>1 && $1==query && $2!=query {found=1; exit} END {exit !found}' "${ld_cache}" \
         || { echo "ERROR: No PLINK2 LD proxies were estimated for ${TARGET_SNP}." >&2; exit 2; }

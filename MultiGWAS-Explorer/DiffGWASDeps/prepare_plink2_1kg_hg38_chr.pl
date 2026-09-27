@@ -102,9 +102,13 @@ sub download {
     my ($curl_bin, $url, $dest) = @_;
     return if -s $dest;
     my $part = "$dest.part";
+    # A native Windows curl cannot open Cygwin's /cygdrive/... output path.
+    my $curl_part = $^O eq 'cygwin' && $curl_bin =~ /\.exe$/i
+        ? Cygwin::posix_to_win_path($part, 1)
+        : $part;
     print "[download] " . basename($dest) . " from official PLINK2 resource\n";
     system($curl_bin, '-L', '--fail', '--retry', '3', '--retry-delay', '3',
-        '--continue-at', '-', '-o', $part, $url) == 0
+        '--continue-at', '-', '-o', $curl_part, $url) == 0
         or die "Download failed for $dest\n";
     die "Downloaded file is empty: $dest\n" unless -s $part;
     rename $part, $dest or die "Cannot install $dest: $!\n";
