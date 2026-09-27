@@ -859,7 +859,12 @@ sub run_upstream_preprocessing {
     if ($args{local_max_hits_per_fig_override}) {
         push @cmd, '--local-max-hits-per-fig', $args{local_max_hits_per_fig_override};
     }
-    run_cmd(\@cmd, 'upstream preprocessing');
+    run_cmd(
+        \@cmd,
+        $args{config_only_for_explicit_local_targets}
+            ? 'upstream configuration for explicit local targets'
+            : 'upstream preprocessing',
+    );
 }
 
 sub plot_manhattan {
