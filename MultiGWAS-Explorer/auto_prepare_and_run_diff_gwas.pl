@@ -896,7 +896,22 @@ if ($mode eq 'configs') {
 
 my %wanted = map { $_ => 1 } grep { length } split /\s*,\s*/, $plots;
 my @plot_sequence = grep { $wanted{$_} } qw(manhattan local_manhattan local_gtf forest);
-my $share_remote_data = (!$skip_plots && @plot_sequence > 1) ? 1 : 0;
+my @explicit_step_names = grep { length } map { canonical_step_name($_) }
+    map { split /\s*,\s*/, ($_ // '') } @step_args;
+push @explicit_step_names, grep { $step_flag{$_} } sort keys %step_flag;
+my $has_step_range = length(canonical_step_name($from_step // ''))
+    || length(canonical_step_name($to_step // ''));
+my $explicit_local_plot_only = @explicit_step_names
+    && !grep { $_ !~ /^plot_local_(?:manhattan|gtf)$/ } @explicit_step_names;
+my $plot_option_local_only = !@explicit_step_names && !$has_step_range
+    && @plot_sequence
+    && !grep { $_ !~ /^local_(?:manhattan|gtf)$/ } @plot_sequence;
+my $explicit_target_local_plot_fast_path = !$skip_plots
+    && @configured_target_snps
+    && $source_mode ne 'merged_gwas_table'
+    && ($explicit_local_plot_only || $plot_option_local_only);
+my $share_remote_data = (!$explicit_target_local_plot_fast_path
+    && !$skip_plots && @plot_sequence > 1) ? 1 : 0;
 my $shared_remote_basename = basename($runner_cfg->{DATA_GZ} // $generated->{wide_output});
 my $plot_clean_oda_input = $share_remote_data ? 0 : $clean_oda_input;
 my $plot_skip_upload = 0;
@@ -1116,6 +1131,29 @@ my $step_selection = resolve_step_selection(
     step_defs     => \@step_defs,
 );
 
+if ($explicit_target_local_plot_fast_path) {
+    delete $step_selection->{selected}{extract_wide_subset};
+    $step_selection->{selected_order} = [
+        grep { $_ ne 'extract_wide_subset' } @{ $step_selection->{selected_order} }
+    ];
+
+    my $source_long = $runner_cfg->{SOURCE_LONG_GZ} || $generated->{stdized_output} || '';
+    my $source_long_ready = length($source_long) && -s cygpath_to_win($source_long);
+    if ($source_long_ready && $step_selection->{selection_mode} eq 'full_pipeline') {
+        my %not_needed = map { $_ => 1 } qw(merge_raw sort_long diff_pairs standardize_diff);
+        delete @{$step_selection->{selected}}{keys %not_needed};
+        $step_selection->{selected_order} = [
+            grep { !$not_needed{$_} } @{ $step_selection->{selected_order} }
+        ];
+    }
+
+    print "[skip] Explicit local SAS ODA targets do not require the full plotting-wide table; "
+        . ($source_long_ready
+            ? "using the long GWAS source and its Tabix cache instead.\n"
+            : "retaining prerequisite long-GWAS stages and skipping only extract_wide_subset.\n");
+    $summary{explicit_local_target_data_path} = 'compact_tabix_locus';
+}
+
 if ($list_steps) {
     print_step_catalog(\@step_defs, $step_selection);
     exit 0;
@@ -1133,18 +1171,31 @@ for my $step (@step_defs) {
     }
     if ($step->{name} =~ /^plot_/) {
         print STDERR "[info] Validating generated files for plotting step '$step->{name}'...\n";
-        validate_generated_files($generated, $pair_info);
+        if ($explicit_target_local_plot_fast_path
+            && $step->{name} =~ /^plot_local_(?:manhattan|gtf)$/) {
+            validate_local_target_plot_files($generated, $pair_info, $step->{name});
+        }
+        else {
+            validate_generated_files($generated, $pair_info);
+        }
     }
-    if (!$local_sas_only && $step->{name} =~ /^plot_(?:manhattan|local_manhattan)$/) {
-        my $wide_path = cygpath_to_win($runner_cfg->{DATA_GZ} || '');
-        my @wide_stat = stat($wide_path);
+    if (!$local_sas_only && $step->{name} =~ /^plot_(?:manhattan|local_manhattan|local_gtf)$/) {
+        my $cache_input = ($explicit_target_local_plot_fast_path
+                && $step->{name} =~ /^plot_local_(?:manhattan|gtf)$/)
+            ? ($runner_cfg->{SOURCE_LONG_GZ} || $generated->{stdized_output} || '')
+            : ($runner_cfg->{DATA_GZ} || '');
+        my @input_stat = stat(cygpath_to_win($cache_input));
         my $plot_prefix = $step->{name} eq 'plot_manhattan'
             ? ($runner_cfg->{OUTPUT_PREFIX} || "${project_tag}_SAS_manhattan")
-            : ($runner_cfg->{LOCAL_OUTPUT_PREFIX} || "${project_tag}_SAS_local_top_hits_manhattan");
+            : ($step->{name} eq 'plot_local_manhattan'
+                ? ($runner_cfg->{LOCAL_OUTPUT_PREFIX} || "${project_tag}_SAS_local_top_hits_manhattan")
+                : ($runner_cfg->{OUTPUT_HTML_BASENAME} || "${project_tag}_SAS_local_top_hits_with_gtf.html"));
         $step->{cache_key} = md5_hex(join("\0",
             $step->{name}, JSON::PP->new->canonical(1)->encode($runner_cfg),
-            @wide_stat ? ($wide_stat[7], $wide_stat[9]) : (0, 0)));
-        $step->{cache_file} = "$Bin/$plot_prefix.request.md5";
+            @input_stat ? ($input_stat[7], $input_stat[9]) : (0, 0)));
+        $step->{cache_file} = $step->{name} eq 'plot_local_gtf'
+            ? $local_gtf_request_cache_file
+            : "$Bin/$plot_prefix.request.md5";
     }
     #Only skip the step when all output were found;
     foreach my $of (@{$step->{outputs}}) {
@@ -3695,6 +3746,32 @@ sub validate_generated_files {
     assert_wide_output_matches_pairs($generated->{wide_output}, $pair_info);
     assert_not_single_snp_manifest($generated->{wide_manifest});
     assert_wide_manifest_matches_pairs($generated->{wide_manifest}, $pair_info);
+}
+
+sub validate_local_target_plot_files {
+    my ($generated, $pair_info, $step_name) = @_;
+    for my $path ($generated->{runner_config}, $generated->{preset_config}) {
+        die "Expected generated configuration missing or empty: $path\n"
+            unless defined $path && -s cygpath_to_win($path);
+    }
+
+    my $source_long = $generated->{stdized_output} || '';
+    if (length($source_long) && -s cygpath_to_win($source_long)) {
+        print STDERR "[info] $step_name will build and upload a compact target-locus table from SOURCE_LONG_GZ; full wide-table validation skipped.\n";
+        return;
+    }
+
+    my $wide = $generated->{wide_output} || '';
+    my $manifest = $generated->{wide_manifest} || '';
+    if (length($wide) && length($manifest)
+        && -s cygpath_to_win($wide) && -s cygpath_to_win($manifest)) {
+        validate_generated_files($generated, $pair_info);
+        return;
+    }
+
+    die "Cannot run $step_name for explicit target SNPs: neither SOURCE_LONG_GZ "
+      . "($source_long) nor the full plotting-wide table is available. Run the prerequisite "
+      . "long-GWAS stages first, or invoke the local-only plot selection so they can be prepared.\n";
 }
 
 sub assert_not_single_snp_manifest {

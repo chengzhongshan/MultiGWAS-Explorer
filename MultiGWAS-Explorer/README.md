@@ -2530,12 +2530,25 @@ perl auto_prepare_and_run_diff_gwas_with_gunplot.pl \
 ```
 
 When `--target-snps` is supplied and only `local_manhattan` and/or `local_gtf`
-is requested, the gnuplot wrapper does not build the genome-wide plotting-wide
-table. It generates the runner configuration, reuses or creates the sorted
-BGZF/Tabix long-GWAS cache, and queries only the requested intervals. Successful
-extraction reports `REGION_QUERY_MODE tabix`. The full plotting-wide table is
-still required for genome-wide Manhattan plots, forest plots, and automatic
-top-hit selection because those operations must inspect genome-wide results.
+is requested, both the SAS ODA driver and the gnuplot wrapper skip the
+genome-wide plotting-wide table. They generate the runner configuration, reuse
+or create the sorted BGZF/Tabix long-GWAS cache, and query only the requested
+intervals. The SAS ODA runners upload the resulting compact locus table instead
+of the genome-wide table. Successful extraction reports `REGION_QUERY_MODE
+tabix`; GTF extraction reports `GTF_ACCESS_MODE TABIX`. The full plotting-wide
+table is still required for genome-wide Manhattan plots, forest plots, and
+automatic top-hit selection because those operations must inspect genome-wide
+results.
+
+Cached GTF indexes are validated with the active `tabix` executable before
+reuse. If an index is corrupt or incompatible, the local plot runner repairs it
+automatically and then continues with the indexed interval query.
+On Cygwin, paths passed to native Windows `tabix` binaries are converted to
+Windows form before long-GWAS and GTF index checks or region queries.
+For explicit local Manhattan targets, previously generated locus manifests are
+also reused as SNP coordinate hints. This avoids rescanning the long GWAS merely
+to translate an rsID into a chromosome and base-pair position before the Tabix
+interval query.
 
 `MAJOR4` expands to `EUR,AFR,AMR,EAS`. The default r2 threshold is zero for
 local LD, so every estimable query-to-variant pair in the PLINK2 window is

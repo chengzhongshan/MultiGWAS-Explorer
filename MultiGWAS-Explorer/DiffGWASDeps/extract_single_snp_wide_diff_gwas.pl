@@ -417,7 +417,7 @@ sub open_window_reader {
         my @regions = $stats->{target_lookup_mode} && $stats->{target_lookup_mode} eq 'hint'
           ? candidate_regions($raw_chr, $start, $end)
           : ("$raw_chr:$start-$end");
-        my $cmd = join(' ', shell_quote($tabix), shell_quote($path), map { shell_quote($_) } @regions);
+        my $cmd = join(' ', shell_quote($tabix), shell_quote(external_tool_path($path)), map { shell_quote($_) } @regions);
         open my $fh, '-|', $cmd or die "Cannot tabix-query $path: $!\n";
         $stats->{region_query_mode} = 'tabix';
         return $fh;
@@ -484,6 +484,18 @@ sub has_tabix_index {
         return 1 if -e "$stem.tbi" || -e "$stem.csi";
     }
     return 0;
+}
+
+sub external_tool_path {
+    my ($path) = @_;
+    return $path unless defined($path) && length($path) && $^O =~ /cygwin/i;
+    my $converted = '';
+    if (open my $fh, '-|', 'cygpath', '-m', $path) {
+        $converted = <$fh> // '';
+        chomp $converted;
+        close $fh;
+    }
+    return length($converted) ? $converted : $path;
 }
 
 sub candidate_regions {

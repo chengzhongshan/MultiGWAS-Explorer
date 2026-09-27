@@ -93,6 +93,45 @@ RENDER_SAS_HELPER="${RENDER_SAS_HELPER:-${DEPS_DIR}/render_sas_template.pl}"
 LOCAL_SAS_DEBUG_EMITTER="${LOCAL_SAS_DEBUG_EMITTER:-${DEPS_DIR}/emit_local_sas_debug_script.pl}"
 LOCAL_TOP_HITS_CSV_HELPER="${LOCAL_TOP_HITS_CSV_HELPER:-${DEPS_DIR}/generate_requested_top_hits_csv.pl}"
 SINGLE_SNP_WIDE_HELPER="${SINGLE_SNP_WIDE_HELPER:-${DEPS_DIR}/extract_single_snp_wide_diff_gwas.pl}"
+
+fresh_tabix_index_exists() {
+  local data_path="$1"
+  local index_path
+  [[ -s "${data_path}" ]] || return 1
+  for index_path in "${data_path}.tbi" "${data_path}.csi"; do
+    [[ -s "${index_path}" ]] || continue
+    [[ ! "${data_path}" -nt "${index_path}" ]] && return 0
+  done
+  return 1
+}
+
+resolve_existing_tabix_source() {
+  local source_path="$1"
+  local stem candidate
+  fresh_tabix_index_exists "${source_path}" && { printf '%s' "${source_path}"; return 0; }
+  stem="${source_path%.gz}"
+  for candidate in \
+    "${stem%.tsv}.tabix_ready.tsv.gz" \
+    "${stem}.tabix_ready.tsv.gz"; do
+    fresh_tabix_index_exists "${candidate}" || continue
+    printf '%s' "${candidate}"
+    return 0
+  done
+  printf '%s' "${source_path}"
+}
+
+manifest_metric_value() {
+  local key="$1"
+  local manifest="$2"
+  awk -F '\t' -v wanted="${key}" '$1==wanted { print $2; exit }' "${manifest}"
+}
+
+if [[ -n "${SOURCE_LONG_GZ:-}" ]]; then
+  SOURCE_LONG_GZ="$(resolve_existing_tabix_source "${SOURCE_LONG_GZ}")"
+  if fresh_tabix_index_exists "${SOURCE_LONG_GZ}"; then
+    echo "[prep] Using indexed long GWAS source for local Manhattan extraction: ${SOURCE_LONG_GZ}"
+  fi
+fi
 SESSION_ID="${SESSION_ID:-mysession}"
 USE_PERSISTENT_SESSION="${USE_PERSISTENT_SESSION:-0}"
 CLEAN_ODA_INPUT="${CLEAN_ODA_INPUT:-1}"
@@ -652,8 +691,10 @@ augment_data_gz_with_target_snp_windows() {
 
   mkdir -p "${TARGET_SNP_AUG_DIR}"
   local snp safe_snp single_out single_manifest
+  local coordinate_manifest coordinate_snp coordinate_chr coordinate_bp
   local -a target_snp_array=()
   local -a extra_args=()
+  local -a hint_args=()
   echo "[prep] Building a compact local Manhattan subset directly from SOURCE_LONG_GZ for the requested target SNP(s)..."
   IFS=',' read -r -a target_snp_array <<< "${TARGET_SNP_LIST}"
   for snp in "${target_snp_array[@]}"; do
@@ -662,13 +703,27 @@ augment_data_gz_with_target_snp_windows() {
     safe_snp="$(printf '%s' "${snp}" | tr -c 'A-Za-z0-9._-' '_')"
     single_out="${TARGET_SNP_AUG_DIR}/${safe_snp}.wide.tsv.gz"
     single_manifest="${TARGET_SNP_AUG_DIR}/${safe_snp}.manifest.tsv"
+    hint_args=()
+    for coordinate_manifest in "$(dirname "${SOURCE_LONG_GZ}")"/*"${safe_snp}"*.manifest.tsv; do
+      [[ -s "${coordinate_manifest}" ]] || continue
+      coordinate_snp="$(manifest_metric_value target_snp "${coordinate_manifest}" || true)"
+      [[ "$(printf '%s' "${coordinate_snp}" | tr '[:upper:]' '[:lower:]')" == "$(printf '%s' "${snp}" | tr '[:upper:]' '[:lower:]')" ]] || continue
+      coordinate_chr="$(manifest_metric_value target_chr "${coordinate_manifest}" || true)"
+      coordinate_bp="$(manifest_metric_value target_bp "${coordinate_manifest}" || true)"
+      if [[ -n "${coordinate_chr}" && "${coordinate_bp}" =~ ^[0-9]+$ ]]; then
+        hint_args=(--target-chr "${coordinate_chr}" --target-bp "${coordinate_bp}")
+        echo "[prep] Reusing cached target coordinate ${coordinate_chr}:${coordinate_bp} for ${snp}; the locus will be queried with Tabix."
+        break
+      fi
+    done
     perl "${SINGLE_SNP_WIDE_HELPER}" \
       --config "${SCHEMA_CONFIG_JSON}" \
       --input "${SOURCE_LONG_GZ}" \
       --target-snp "${snp}" \
       --window-bp "${LOCAL_WINDOW_BP}" \
       --output "${single_out}" \
-      --manifest "${single_manifest}"
+      --manifest "${single_manifest}" \
+      "${hint_args[@]}"
     if [[ -s "${single_out}" ]]; then
       extra_args+=("${single_out}")
     else

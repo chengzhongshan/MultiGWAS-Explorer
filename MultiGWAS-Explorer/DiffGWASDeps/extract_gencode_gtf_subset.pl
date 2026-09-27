@@ -274,7 +274,8 @@ sub open_gtf_input {
     );
     return unless $indexed && -s $indexed && -s "$indexed.tbi";
 
-    open my $list_fh, '-|', $tabix, '-l', $indexed
+    my $indexed_arg = external_tool_path($indexed);
+    open my $list_fh, '-|', $tabix, '-l', $indexed_arg
       or do {
           die "[tabix] Could not list indexed GTF contigs from $indexed.\n";
       };
@@ -304,7 +305,7 @@ sub open_gtf_input {
     }
     return unless @queries;
 
-    open my $query_fh, '-|', $tabix, $indexed, @queries
+    open my $query_fh, '-|', $tabix, $indexed_arg, @queries
       or do {
           die "[tabix] Could not start indexed GTF query for $indexed.\n";
       };
@@ -343,10 +344,13 @@ sub prepare_bgzf_gtf {
     if (-s "$source.tbi") {
         my $source_mtime = (stat($source))[9] // 0;
         my $source_index_mtime = (stat("$source.tbi"))[9] // 0;
-        if ($source_index_mtime >= $source_mtime) {
+        if ($source_index_mtime >= $source_mtime
+            && tabix_index_readable($args{tabix}, $source)) {
             print STDERR "[tabix] Reusing indexed source GTF: $source\n";
             return $source;
         }
+        warn "[tabix] Source GTF index exists but cannot be read by the active tabix; preparing a compatible cache.\n"
+            if $source_index_mtime >= $source_mtime;
     }
 
     my $indexed = $source;
@@ -363,9 +367,21 @@ sub prepare_bgzf_gtf {
     my $index_mtime = -s "$indexed.tbi" ? ((stat("$indexed.tbi"))[9] // 0) : 0;
     if (-s $indexed && -s "$indexed.tbi"
         && $indexed_mtime >= $source_mtime && $index_mtime >= $indexed_mtime) {
-        print STDERR "[tabix] Reusing BGZF GTF cache and index: $indexed\n";
-        close $lock;
-        return $indexed;
+        if (tabix_index_readable($args{tabix}, $indexed)) {
+            print STDERR "[tabix] Reusing BGZF GTF cache and index: $indexed\n";
+            close $lock;
+            return $indexed;
+        }
+
+        warn "[tabix] Cached GTF index is unreadable; rebuilding the index with the active tabix: $indexed\n";
+        system { $args{tabix} } $args{tabix}, '-f', '-p', 'gff', external_tool_path($indexed);
+        if ($? == 0 && -s "$indexed.tbi"
+            && tabix_index_readable($args{tabix}, $indexed)) {
+            print STDERR "[tabix] Repaired cached GTF index: $indexed.tbi\n";
+            close $lock;
+            return $indexed;
+        }
+        warn "[tabix] Index-only repair failed; rebuilding the BGZF GTF cache and index.\n";
     }
 
     my $tmp_bgz = "$indexed.tmp.$$";
@@ -435,7 +451,7 @@ sub prepare_bgzf_gtf {
     unlink $tmp_sorted;
     die "bgzip failed while creating $tmp_bgz\n" unless $? == 0 && -s $tmp_bgz;
 
-    system { $args{tabix} } $args{tabix}, '-f', '-p', 'gff', $tmp_bgz;
+    system { $args{tabix} } $args{tabix}, '-f', '-p', 'gff', external_tool_path($tmp_bgz);
     die "tabix failed while indexing $tmp_bgz\n" unless $? == 0 && -s $tmp_tbi;
     unlink $indexed if -e $indexed;
     unlink "$indexed.tbi" if -e "$indexed.tbi";
@@ -443,6 +459,39 @@ sub prepare_bgzf_gtf {
     rename $tmp_tbi, "$indexed.tbi" or die "Cannot install tabix index $indexed.tbi: $!\n";
     close $lock;
     return $indexed;
+}
+
+sub tabix_index_readable {
+    my ($tabix, $indexed) = @_;
+    return 0 unless defined($tabix) && length($tabix)
+        && defined($indexed) && -s $indexed && -s "$indexed.tbi";
+
+    my $pid = open my $fh, '-|';
+    return 0 unless defined $pid;
+    if ($pid == 0) {
+        open STDERR, '>', File::Spec->devnull();
+        exec { $tabix } $tabix, '-l', external_tool_path($indexed);
+        exit 127;
+    }
+
+    my $has_contig = 0;
+    while (my $line = <$fh>) {
+        $has_contig = 1 if $line =~ /\S/;
+    }
+    my $closed = close $fh;
+    return $closed && $has_contig ? 1 : 0;
+}
+
+sub external_tool_path {
+    my ($path) = @_;
+    return $path unless defined($path) && length($path) && $^O =~ /cygwin/i;
+    my $converted = '';
+    if (open my $fh, '-|', 'cygpath', '-m', $path) {
+        $converted = <$fh> // '';
+        chomp $converted;
+        close $fh;
+    }
+    return defined($converted) && length($converted) ? $converted : $path;
 }
 
 sub find_executable {
