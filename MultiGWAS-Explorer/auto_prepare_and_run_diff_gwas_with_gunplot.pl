@@ -99,6 +99,9 @@ Options:
                                 Legacy aliases controlling X in gunplot figures.
                                 --no-remove-X-chr includes X, like --include-x-chr.
   --target-snps A,B,C           Override target SNP list.
+                                With local plots only, explicit targets use the
+                                indexed long GWAS directly and skip rebuilding
+                                the genome-wide plotting-wide table.
   --target-snp-genes MAP        Optional SNP:GENE overrides, comma-separated. Example: rs17425819:JAK2,rs2564978:CR1
   --ld-snps A,B,C               Optional LD-linked SNPs to overlay with asterisks.
   --[no-]highlight-high-ld-snps Resolve and draw high-LD markers. Default: off.
@@ -341,6 +344,12 @@ my %requested = normalize_requested_plots($plots, \@step_args);
 die "No gunplot plot steps were requested.\n" unless grep { $requested{$_} } qw(plot_manhattan plot_local_manhattan plot_local_gtf plot_forest);
 
 my $spec = load_json($spec_file);
+my $explicit_target_local_only = length(trim(
+    $target_snps_override || $spec->{target_snps} || ''
+))
+    && ($requested{plot_local_manhattan} || $requested{plot_local_gtf})
+    && !$requested{plot_manhattan}
+    && !$requested{plot_forest};
 $remove_x_chr = defined($include_x_chr)
     ? ($include_x_chr ? 0 : 1)
     : (defined($remove_x_chr) ? ($remove_x_chr ? 1 : 0)
@@ -487,6 +496,7 @@ if (!$reused_existing_runner) {
         reference_build_override        => $reference_build_override,
         local_gtf_window_bp_override    => $local_gtf_window_bp_override,
         local_max_hits_per_fig_override => $local_max_hits_per_fig_override,
+        config_only_for_explicit_local_targets => $explicit_target_local_only,
     );
 }
 
@@ -553,7 +563,13 @@ my $gnuplot = find_gnuplot_exe();
 print "Using gnuplot executable: $gnuplot\n";
 
 my $wide_data_local = localize_path($runner->{DATA_GZ});
-die "Wide input file not found: $wide_data_local\n" unless -s $wide_data_local;
+if (!-s $wide_data_local) {
+    die "Wide input file not found: $wide_data_local\n"
+        unless $explicit_target_local_only
+            && -s localize_path($runner->{SOURCE_LONG_GZ} || '');
+    print "[skip] explicit local targets do not require the full plotting-wide table; "
+        . "using the indexed long GWAS source instead\n";
+}
 
 my @manhattan_pcols = (
     $runner->{MANHATTAN_P_VAR},
@@ -792,6 +808,7 @@ sub run_upstream_preprocessing {
         '--local-ld-display-mode', 'none',
     );
     push @cmd, '--force' if $args{force};
+    push @cmd, '--list-steps' if $args{config_only_for_explicit_local_targets};
     push @cmd, '--manhattan-all-snps' if $args{manhattan_all_snps};
     push @cmd, '--include-x-chr' if $args{include_x_chr};
     if ($args{display_gwas_override}) {

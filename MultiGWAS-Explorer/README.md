@@ -2529,6 +2529,14 @@ perl auto_prepare_and_run_diff_gwas_with_gunplot.pl \
   --ld-r2-threshold 0
 ```
 
+When `--target-snps` is supplied and only `local_manhattan` and/or `local_gtf`
+is requested, the gnuplot wrapper does not build the genome-wide plotting-wide
+table. It generates the runner configuration, reuses or creates the sorted
+BGZF/Tabix long-GWAS cache, and queries only the requested intervals. Successful
+extraction reports `REGION_QUERY_MODE tabix`. The full plotting-wide table is
+still required for genome-wide Manhattan plots, forest plots, and automatic
+top-hit selection because those operations must inspect genome-wide results.
+
 `MAJOR4` expands to `EUR,AFR,AMR,EAS`. The default r2 threshold is zero for
 local LD, so every estimable query-to-variant pair in the PLINK2 window is
 available to the colormap.
