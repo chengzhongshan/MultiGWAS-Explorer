@@ -119,7 +119,7 @@ be in the pipeline directory; their paths are recorded in that report. Recheck
 existing images with `--phase images --backend both`.
 
 The test also creates `results.html` and copies validated images from both
-backends into `figures/gunplot/` and `figures/sas/` inside the output directory.
+backends into `figures/gnuplot/` and `figures/sas/` inside the output directory.
 Open `results.html` to browse both sets together. Rebuild this gallery with
 `perl install/build_public_gwas_gallery.pl --output-dir /path/to/results`.
 `results_gallery_manifest.json` records each source image and SHA-256 checksum;

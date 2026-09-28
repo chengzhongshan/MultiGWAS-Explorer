@@ -14,7 +14,7 @@ CHR	BP	SNP	EUR_P	EUR_Z
 1	120	rs200	1e-5	2
 1	140	rs300	1e-4	4
 EOF
-perl "${PIPELINE_ROOT}/DiffGWASDeps/gnuplot/pdl_gunplot_local_locus.pl" \
+perl "${PIPELINE_ROOT}/DiffGWASDeps/gnuplot/pdl_gnuplot_local_locus.pl" \
   --data "${output_dir}/example.tsv" \
   --snp rs200 --window-bp 100 \
   --pcols EUR_P --zcols EUR_Z --labels 'Synthetic GWAS' \

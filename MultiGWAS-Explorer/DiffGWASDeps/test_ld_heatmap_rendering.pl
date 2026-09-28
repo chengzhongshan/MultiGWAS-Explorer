@@ -50,7 +50,7 @@ close $resolver_fh or die "LD resolver fixture failed\n";
 die "LD resolver did not preserve numeric r2 pairs\n"
     unless $resolver_output =~ /^LD_R2_PAIRS\tRS300:0\.91$/m;
 
-my $renderer = File::Spec->catfile($Bin, 'gnuplot', 'pdl_gunplot_local_locus.pl');
+my $renderer = File::Spec->catfile($Bin, 'gnuplot', 'pdl_gnuplot_local_locus.pl');
 my @cmd = (
     $^X, $renderer,
     '--data', $gz,

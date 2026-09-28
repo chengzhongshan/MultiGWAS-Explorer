@@ -9,7 +9,7 @@ my $dir=tempdir('forest-text-XXXXX',TMPDIR=>1,CLEANUP=>1);
 open my $csv,'>',"$dir/hits.csv" or die $!;
 print {$csv} "SNP,hit_class,BETA,SE,P\nrs_123*,DIFFERENTIAL,0.1,0.05,0.04\n";
 close $csv;
-my $rc=system($^X,"$Bin/../DiffGWASDeps/gnuplot/pdl_gunplot_forest.pl",
+my $rc=system($^X,"$Bin/../DiffGWASDeps/gnuplot/pdl_gnuplot_forest.pl",
  '--csv',"$dir/hits.csv",'--out-prefix',"$dir/forest",'--track-ids','TEST',
  '--track-labels','Test_cohort','--track-beta-vars','BETA','--track-se-vars','SE',
  '--track-p-vars','P','--width',900,'--height',420);
@@ -25,7 +25,7 @@ print {$csv} "SNP,gene,hit_class,BETA,SE,P\n",
  "rs2,ZSCAN12,DIFFERENTIAL,0.2,0.05,0.01\n",
  "rs3,TENM1,DIFFERENTIAL,-0.1,0.05,0.04\n";
 close $csv;
-$rc=system($^X,"$Bin/../DiffGWASDeps/gnuplot/pdl_gunplot_forest.pl",
+$rc=system($^X,"$Bin/../DiffGWASDeps/gnuplot/pdl_gnuplot_forest.pl",
  '--csv',"$dir/multi.csv",'--out-prefix',"$dir/multi",'--track-ids','TEST',
  '--track-labels','Test_cohort','--track-beta-vars','BETA','--track-se-vars','SE',
  '--track-p-vars','P','--width',900,'--height',420);

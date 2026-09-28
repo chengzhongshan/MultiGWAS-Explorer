@@ -106,9 +106,9 @@ perl -I DiffGWASDeps -c auto_prepare_and_run_diff_gwas.pl >/dev/null
 perl -c auto_prepare_and_run_diff_gwas_with_gnuplot.pl >/dev/null
 perl -I DiffGWASDeps -c server.pl >/dev/null
 perl -I DiffGWASDeps -c run_sas_codes_or_script_in_ODA.pl >/dev/null
-perl -c DiffGWASDeps/gnuplot/pdl_gunplot_manhattan.pl >/dev/null
-perl -c DiffGWASDeps/gnuplot/pdl_gunplot_forest.pl >/dev/null
-perl -c DiffGWASDeps/gnuplot/pdl_gunplot_local_locus.pl >/dev/null
+perl -c DiffGWASDeps/gnuplot/pdl_gnuplot_manhattan.pl >/dev/null
+perl -c DiffGWASDeps/gnuplot/pdl_gnuplot_forest.pl >/dev/null
+perl -c DiffGWASDeps/gnuplot/pdl_gnuplot_local_locus.pl >/dev/null
 perl DiffGWASDeps/test_gnuplot_directory_layout.pl >/dev/null
 perl DiffGWASDeps/test_ld_heatmap_rendering.pl >/dev/null
 perl DiffGWASDeps/test_ld_heatmap_contract.pl >/dev/null

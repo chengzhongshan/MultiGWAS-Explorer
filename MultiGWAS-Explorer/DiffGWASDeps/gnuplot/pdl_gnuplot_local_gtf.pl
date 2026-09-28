@@ -8,7 +8,7 @@ use File::Basename;
 
 sub usage {
     print <<'USAGE';
-Usage: pdl_gunplot_local_gtf.pl --data file.tsv.gz --snp rsID --outdir out [--window 1000000] [--gtf path.gtf]
+Usage: pdl_gnuplot_local_gtf.pl --data file.tsv.gz --snp rsID --outdir out [--window 1000000] [--gtf path.gtf]
 
 Generates a local locus plot with gene-track using gnuplot. If --gtf is omitted
 gene track will be skipped unless gene columns are present.

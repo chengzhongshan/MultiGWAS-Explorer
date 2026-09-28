@@ -1670,7 +1670,7 @@ sub discover_raw_gwas_candidate_files {
         next if $entry eq '.' || $entry eq '..';
         my $full = "$win_dir\\$entry";
         next unless -f $full;
-        next if $entry =~ /(?:merged_long|diff_effects|\.stdized\b|wide_beta_se_p|excluded_noncoord|sorted\.coord|manifest|merged_plotwide|gunplot|SAS_top_hits_forest|single_snp\.data|\.gp$|\.html$|\.png$)/i;
+        next if $entry =~ /(?:merged_long|diff_effects|\.stdized\b|wide_beta_se_p|excluded_noncoord|sorted\.coord|manifest|merged_plotwide|gnuplot|SAS_top_hits_forest|single_snp\.data|\.gp$|\.html$|\.png$)/i;
         next unless $entry =~ /\.(?:tsv|txt|sumstats|assoc|vcf)(?:\.(?:gz|bgz|bgzip))?$/i
                  || $entry =~ /\.gz$/i
                  || $entry =~ /\.vcf\.tsv\.gz$/i;
@@ -1693,7 +1693,7 @@ sub discover_precomputed_candidate_files {
         next unless -f $full;
         next if $entry =~ /\.vcf\.tsv\.gz$/i;
         next unless $entry =~ /\.(?:tsv|txt)(?:\.(?:gz|bgz|bgzip))?$/i;
-        next if $entry =~ /(?:manifest|excluded_noncoord|sorted\.coord\.tsv\.gz\.tbi|merged_plotwide|gunplot|SAS_top_hits_forest|single_snp\.data|\.gp$|\.html$|\.png$)/i;
+        next if $entry =~ /(?:manifest|excluded_noncoord|sorted\.coord\.tsv\.gz\.tbi|merged_plotwide|gnuplot|SAS_top_hits_forest|single_snp\.data|\.gp$|\.html$|\.png$)/i;
         push @files, win_to_cygpath($full);
     }
     closedir $dh;
@@ -1717,7 +1717,7 @@ sub discover_merged_candidate_files {
         next unless $entry =~ /(?:merged|plus_meta|meta|combined|wide)/i;
         next unless $entry =~ /\.(?:tsv|txt)(?:\.(?:gz|bgz|bgzip))?$/i
                  || $entry =~ /\.gz$/i;
-        next if $entry =~ /(?:manifest|merged_plotwide|gunplot|SAS_top_hits_forest|single_snp\.data|\.gp$|\.html$|\.png$)/i;
+        next if $entry =~ /(?:manifest|merged_plotwide|gnuplot|SAS_top_hits_forest|single_snp\.data|\.gp$|\.html$|\.png$)/i;
         push @files, win_to_cygpath($full);
     }
     closedir $dh;
@@ -4795,7 +4795,7 @@ Options:
                        automatic top-hit picking.
   --display-gwas LIST
                        Optional comma-separated GWAS track selection shared by
-                       both SAS ODA and gunplot pipelines. Use pair prefixes
+                       both SAS ODA and gnuplot pipelines. Use pair prefixes
                        such as ALL,EUR,ASN for differential tracks and GWAS
                        labels such as ALL_FEMALE or EUR_MALE for single-GWAS
                        tracks. When only one GWAS track is selected, the

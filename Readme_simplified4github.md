@@ -2,7 +2,7 @@
 
 MultiGWAS-Explorer is a cross-platform GWAS plotting pipeline for differential
 and common-association analyses. It combines local preprocessing scripts,
-SAS OnDemand for Academics plotting wrappers, and an alternative gunplot / PDL
+SAS OnDemand for Academics plotting wrappers, and an alternative gnuplot / PDL
 backend for genome-wide Manhattan plots, local Manhattan plots, local GTF
 gene-track plots, and forest plots.
 <img width="2400" height="2510" alt="Figure1_pipeline_overview_Zhongshan" src="https://github.com/user-attachments/assets/a56b8675-2a48-41c9-ba2c-1d1e793603ee" />
@@ -15,7 +15,7 @@ The [main README](README.md) is the canonical installation guide.
 - `auto_prepare_and_run_diff_gwas.pl`
   Main automation entry point for the SAS ODA workflow.
 - `auto_prepare_and_run_diff_gwas_with_gnuplot.pl`
-  Main automation entry point for the non-SAS gunplot workflow.
+  Main automation entry point for the non-SAS gnuplot workflow.
 - `run_sas_codes_or_script_in_ODA.pl`
   Low-level helper for SAS ODA submit, upload, download, delete, and session
   reuse.
@@ -118,7 +118,7 @@ Useful before running any SAS-based plotting step:
 perl ./run_sas_codes_or_script_in_ODA.pl --check-sas-oda-login-only
 ```
 
-### 2. Quick gunplot validation
+### 2. Quick gnuplot validation
 
 For a self-contained test without SAS ODA credentials or external GWAS data:
 
@@ -161,7 +161,7 @@ perl ./auto_prepare_and_run_diff_gwas.pl \
 
 ### 4. Forest plot examples
 
-Gunplot:
+Gnuplot:
 
 ```bash
 perl ./auto_prepare_and_run_diff_gwas_with_gnuplot.pl \
@@ -188,7 +188,7 @@ perl ./auto_prepare_and_run_diff_gwas.pl \
 
 ## Notes
 
-- Use the gunplot workflow first if you want a fast end-to-end validation.
+- Use the gnuplot workflow first if you want a fast end-to-end validation.
 - Use the SAS ODA workflow when you want the SAS-rendered plot outputs.
 - On container runs, keep `PIPELINE_WORKDIR=/opt/MultiGWAS-Explorer` so the
   wrappers use the Linux-installed environment inside the image.

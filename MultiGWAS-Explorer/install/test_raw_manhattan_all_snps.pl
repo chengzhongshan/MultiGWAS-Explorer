@@ -162,7 +162,7 @@ $x_manifest = decode_json(read_file("$dir/x_manifest.json"));
 is($x_manifest->{rows_written}, 3, 'explicit request includes X and chromosome 23');
 SKIP: {
     skip 'gnuplot is unavailable', 4 unless system('gnuplot', '--version') == 0;
-    my $plotter = "$Bin/../DiffGWASDeps/gnuplot/pdl_gunplot_manhattan.pl";
+    my $plotter = "$Bin/../DiffGWASDeps/gnuplot/pdl_gnuplot_manhattan.pl";
     my @plot_args = ($^X, $plotter, '--data', "$dir/x_compact.tsv.gz",
         '--pcols', 'P', '--labels', 'Test', '--width', 500, '--height', 300,
         '--min-logp', 0, '--thin-mod', 1);

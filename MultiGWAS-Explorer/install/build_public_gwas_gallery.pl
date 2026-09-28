@@ -12,7 +12,7 @@ GetOptions('output-dir=s'=>\$dir) && $dir or die "Usage: perl $0 --output-dir DI
 my (@sections,@manifest);
 my %titles=(manhattan=>'Genome-wide Manhattan',local_manhattan=>'Local Manhattan',local_gtf=>'Local gene tracks',forest=>'Forest plot');
 my %order=(manhattan=>0,local_manhattan=>1,local_gtf=>2,forest=>3);
-for my $backend (qw(gunplot sas)) {
+for my $backend (qw(gnuplot sas)) {
     my $report="$dir/image_validation_$backend.json";
     next unless -f $report;
     open my $fh,'<',$report or die "$report: $!";
@@ -38,7 +38,7 @@ die "No image validation reports found in $dir\n" unless @sections;
 open my $out,'>',"$dir/results.html" or die $!;
 print {$out} '<!doctype html><html lang="en"><meta charset="utf-8"><title>Public GWAS test results</title>'
  .'<style>body{font-family:sans-serif;margin:2rem}img{max-width:100%;height:auto}figure{margin:2rem 0}figcaption{overflow-wrap:anywhere}</style>'
- .'<h1>Public GWAS test results</h1><nav><a href="#sas">SAS ODA figures</a> | <a href="#gunplot">gnuplot figures</a></nav><p>Click a figure to open it at full size. Copied files are verified against their source with SHA-256.</p>'
+ .'<h1>Public GWAS test results</h1><nav><a href="#sas">SAS ODA figures</a> | <a href="#gnuplot">gnuplot figures</a></nav><p>Click a figure to open it at full size. Copied files are verified against their source with SHA-256.</p>'
  .join("\n",@sections).'</html>';
 close $out or die $!;
 open my $mf,'>',"$dir/results_gallery_manifest.json" or die $!;

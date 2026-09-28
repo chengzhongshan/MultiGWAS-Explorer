@@ -93,7 +93,7 @@ if ($phase eq 'all' || $phase eq 'plots') {
   run('gnuplot_inquiry',$^X,'auto_prepare_and_run_diff_gwas_with_gnuplot.pl',
    '--spec',$spec,'--plots','manhattan,local_manhattan,local_gtf,forest',
    '--target-snps',$targets,'--no-remove-X-chr','--ld-display-mode','heatmap');
-  verify_images('GUNPLOT');
+  verify_images('GNUPLOT');
   verify_gnuplot_signed_ld($targets);
  }
  if ($backend eq 'sas' || $backend eq 'both') {
@@ -154,11 +154,11 @@ sub verify_gnuplot_signed_ld {
  my ($targets)=@_;
  my @wanted=split /,/,$targets;
  opendir my $dh,$out or die "Cannot inspect $out: $!\n";
- my @files=grep {/GUNPLOT_local_top_hits_(?:manhattan|with_gtf)_.*\.manifest\.tsv\z/} readdir $dh;
+ my @files=grep {/GNUPLOT_local_top_hits_(?:manhattan|with_gtf)_.*\.manifest\.tsv\z/} readdir $dh;
  closedir $dh;
  for my $snp (@wanted) {
   for my $family (qw(local_top_hits_manhattan local_top_hits_with_gtf)) {
-  my ($file)=grep { /GUNPLOT_\Q$family\E_.*\Q$snp\E\.manifest\.tsv\z/ } @files;
+  my ($file)=grep { /GNUPLOT_\Q$family\E_.*\Q$snp\E\.manifest\.tsv\z/ } @files;
   die "Missing gnuplot $family manifest for $snp\n" unless $file;
   open my $fh,'<',"$out/$file" or die $!;
   my %metric;
@@ -205,7 +205,7 @@ sub verify_gnuplot_signed_ld {
     && ($first[$idx{ld_method}]//'') eq 'PLINK2_R2_PHASED';
   }
  }
- my @combined_gp=glob("$out/*GUNPLOT_local_top_hits_manhattan.combined_gtf.gp");
+ my @combined_gp=glob("$out/*GNUPLOT_local_top_hits_manhattan.combined_gtf.gp");
  die "Missing combined gnuplot local Manhattan script\n" unless @combined_gp==1 && -s $combined_gp[0];
  open my $cg,'<',$combined_gp[0] or die $!;
  my $combined_text=do {local $/;<$cg>}; close $cg;
@@ -236,7 +236,7 @@ sub verify_sas_target_gtf {
 }
 if ($phase eq 'images') {
  if ($backend eq 'gnuplot' || $backend eq 'both') {
-  verify_images('GUNPLOT');
+  verify_images('GNUPLOT');
   open my $tf,'<',"$out/targets.txt" or die "Run --phase validate first: $!\n";
   my $targets=<$tf>; close $tf; chomp $targets;
   verify_gnuplot_signed_ld($targets);

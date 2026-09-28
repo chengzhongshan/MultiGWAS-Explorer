@@ -70,7 +70,7 @@ Options:
   --manhattan-differential-p-mode MODE
                                 raw or standardized. Default: raw.
   --remove-X-chr / --no-remove-X-chr
-                                Legacy aliases controlling X in gunplot figures.
+                                Legacy aliases controlling X in gnuplot figures.
                                 --no-remove-X-chr includes X, like --include-x-chr.
   --target-snps A,B,C           Override target SNP list.
                                 With local plots only, explicit targets use the
@@ -124,14 +124,14 @@ Options:
                                 Forest-plot dimensions in pixels. Plot-specific
                                 values override --figure-width/--figure-height.
   --local-max-hits-per-fig N    Override local Manhattan batch size.
-  --local-manhattan-columns N   Override the number of loci columns per combined gunplot local-Manhattan figure.
+  --local-manhattan-columns N   Override the number of loci columns per combined gnuplot local-Manhattan figure.
   --local-manhattan-annotation MODE  Under-column annotation for combined local Manhattan: labels, gtf, auto, none
                                      Default: gtf
 
 Recommended interactive pattern:
   open this repository in VS Code, use the integrated shell for the current
   platform, and keep Codex in the same workspace if you are driving the local
-  gunplot pipeline through the MCP server.
+  gnuplot pipeline through the MCP server.
 USAGE
 }
 
@@ -258,7 +258,7 @@ if (length($input_merged) || length($gwas_dir)) {
     }
     else {
         my $fh;
-        ($fh, $spec_file) = tempfile('gunplot_merged_XXXX', SUFFIX => '.spec.json', TMPDIR => 1, UNLINK => 0);
+        ($fh, $spec_file) = tempfile('gnuplot_merged_XXXX', SUFFIX => '.spec.json', TMPDIR => 1, UNLINK => 0);
         close $fh or die "Cannot close generated spec $spec_file: $!\n";
     }
     run_cmd([
@@ -317,7 +317,7 @@ for my $dimension (
 die "Spec file not found: $spec_file\n" unless -f $spec_file;
 
 my %requested = normalize_requested_plots($plots, \@step_args);
-die "No gunplot plot steps were requested.\n" unless grep { $requested{$_} } qw(plot_manhattan plot_local_manhattan plot_local_gtf plot_forest);
+die "No gnuplot plot steps were requested.\n" unless grep { $requested{$_} } qw(plot_manhattan plot_local_manhattan plot_local_gtf plot_forest);
 
 my $spec = load_json($spec_file);
 my $explicit_target_local_only = length(trim(
@@ -443,7 +443,7 @@ if (!$force_upstream && !$has_runner_override && -f $runner_config_local) {
         my ($ok, $why_not) = runner_wide_cache_is_reusable($existing_runner);
         if ($ok) {
         $reused_existing_runner = 1;
-        print "[skip] reusing existing runner config and wide subset for gunplot pipeline\n";
+        print "[skip] reusing existing runner config and wide subset for gnuplot pipeline\n";
         }
         else {
             print "[info] refreshing upstream preprocessing because the cached wide subset is not reusable: $why_not\n";
@@ -513,7 +513,7 @@ if (($spec->{source_mode} || '') eq 'merged_gwas_table' && -f $preset_config_loc
                 exists $alias{$1} ? $alias{$1} : $1/ge;
         }
         $plot_runner_config_local = File::Spec->catfile(
-            $configs_dir_local, "auto_${artifact_stem}_gunplot_runner.json");
+            $configs_dir_local, "auto_${artifact_stem}_gnuplot_runner.json");
         open my $plot_fh, '>', $plot_runner_config_local
             or die "Cannot write $plot_runner_config_local: $!\n";
         print {$plot_fh} encode_json($runner), "\n";
@@ -668,15 +668,15 @@ if ($requested{plot_local_manhattan}) {
                 || $runner->{LOCAL_MANHATTAN_COLUMN_ANNOTATION}
                 || $spec->{local_manhattan_annotation}
                 || 'gtf'),
-            output_base  => gunplotize_name($runner->{LOCAL_OUTPUT_PREFIX} || 'local_top_hits_manhattan'),
-            html_title   => gunplot_title($runner->{LOCAL_HTML_TITLE} || 'Local top hits Manhattan Plot'),
+            output_base  => gnuplotize_name($runner->{LOCAL_OUTPUT_PREFIX} || 'local_top_hits_manhattan'),
+            html_title   => gnuplot_title($runner->{LOCAL_HTML_TITLE} || 'Local top hits Manhattan Plot'),
             width        => ($runner->{LOCAL_MANHATTAN_FIG_WIDTH} || 1800),
             height       => ($runner->{LOCAL_MANHATTAN_FIG_HEIGHT} || 1200),
             with_gtf     => 0,
             source_long  => ($indexed_source_long_local || localize_path($runner->{SOURCE_LONG_GZ} || '')),
             preset_config=> $preset_config_local,
             gtf_cache_dir => $shared_gtf_cache_local,
-            top_csv_name => gunplotize_name($runner->{LOCAL_TOP_HITS_CSV_BASENAME} || 'gunplot_top_hits.csv'),
+            top_csv_name => gnuplotize_name($runner->{LOCAL_TOP_HITS_CSV_BASENAME} || 'gnuplot_top_hits.csv'),
             ld_snps      => $ld_snps_override,
             ld_audit_file=> $ld_audit_file_override,
             ld_cache     => $ld_cache_override,
@@ -725,15 +725,15 @@ if ($requested{plot_local_gtf}) {
             labels       => \@gtf_labels,
             window_bp    => $gtf_window,
             batch_size   => ($runner->{LOCAL_GTF_MAX_HITS_PER_FIG} || 1),
-            output_base  => gunplotize_name($runner->{OUTPUT_HTML_BASENAME} || 'local_top_hits_with_gtf.html'),
-            html_title   => gunplot_title($runner->{LOCAL_HTML_TITLE} || 'Local top hits Manhattan and GTF Plot'),
+            output_base  => gnuplotize_name($runner->{OUTPUT_HTML_BASENAME} || 'local_top_hits_with_gtf.html'),
+            html_title   => gnuplot_title($runner->{LOCAL_HTML_TITLE} || 'Local top hits Manhattan and GTF Plot'),
             width        => ($runner->{GTF_DESIGN_WIDTH} || 1500),
             height       => ($runner->{GTF_DESIGN_HEIGHT} || compute_gtf_height(scalar(@gtf_pcols))),
             with_gtf     => 1,
             source_long  => ($indexed_source_long_local || localize_path($runner->{SOURCE_LONG_GZ} || '')),
             preset_config=> $preset_config_local,
             gtf_cache_dir => $shared_gtf_cache_local,
-            top_csv_name => gunplotize_name($runner->{LOCAL_TOP_HITS_CSV_BASENAME} || 'gunplot_top_hits.csv'),
+            top_csv_name => gnuplotize_name($runner->{LOCAL_TOP_HITS_CSV_BASENAME} || 'gnuplot_top_hits.csv'),
             ld_snps      => $ld_snps_override,
             ld_audit_file=> $ld_audit_file_override,
             ld_cache     => $ld_cache_override,
@@ -775,7 +775,7 @@ if ($requested{plot_forest}) {
     print "[done] plot_forest finished in " . format_elapsed_seconds(time() - $step_started) . "\n";
 }
 
-print "\nGenerated gunplot outputs:\n";
+print "\nGenerated gnuplot outputs:\n";
 for my $key (sort keys %outputs) {
     print "$key\t$outputs{$key}\n";
 }
@@ -856,7 +856,7 @@ sub plot_manhattan {
     my $threshold = $ENV{MANHATTAN_SUBSET_THRESHOLD} || '0.05';
     (my $threshold_tag = $threshold) =~ s/[^A-Za-z0-9]/_/g;
     make_path($args{cache_dir}) unless -d $args{cache_dir};
-    my $compact_stem = safe_name($args{runner}{OUTPUT_PREFIX} || 'gunplot_manhattan')
+    my $compact_stem = safe_name($args{runner}{OUTPUT_PREFIX} || 'gnuplot_manhattan')
         . ($args{all_snps} ? '.all_snps' : ".p_lt_${threshold_tag}");
     my $compact_data = File::Spec->catfile($args{cache_dir}, "$compact_stem.tsv.gz");
     my @compact_cmd = (
@@ -873,18 +873,18 @@ sub plot_manhattan {
     push @compact_cmd, '--all-snps' if $args{all_snps};
     push @compact_cmd, '--include-x-chr' unless $args{remove_x_chr};
     run_cmd(\@compact_cmd, 'compact genomewide Manhattan input');
-    my $output_prefix = gunplotize_name($args{runner}{OUTPUT_PREFIX} || 'gunplot_manhattan');
+    my $output_prefix = gnuplotize_name($args{runner}{OUTPUT_PREFIX} || 'gnuplot_manhattan');
     my $out_prefix_path = File::Spec->catfile($args{output_dir}, $output_prefix);
     my $png_path = $out_prefix_path . '.png';
     my $html = File::Spec->catfile($args{output_dir}, $output_prefix . '.html');
-    my $min_logp = defined $args{runner}{GUNPLOT_MANHATTAN_MIN_LOGP}
-        ? $args{runner}{GUNPLOT_MANHATTAN_MIN_LOGP}
+    my $min_logp = defined $args{runner}{GNUPLOT_MANHATTAN_MIN_LOGP}
+        ? $args{runner}{GNUPLOT_MANHATTAN_MIN_LOGP}
         : 0.5;
-    my $keep_all_logp = defined $args{runner}{GUNPLOT_MANHATTAN_KEEP_ALL_LOGP}
-        ? $args{runner}{GUNPLOT_MANHATTAN_KEEP_ALL_LOGP}
+    my $keep_all_logp = defined $args{runner}{GNUPLOT_MANHATTAN_KEEP_ALL_LOGP}
+        ? $args{runner}{GNUPLOT_MANHATTAN_KEEP_ALL_LOGP}
         : 2;
-    my $thin_mod = defined $args{runner}{GUNPLOT_MANHATTAN_THIN_MOD}
-        ? $args{runner}{GUNPLOT_MANHATTAN_THIN_MOD}
+    my $thin_mod = defined $args{runner}{GNUPLOT_MANHATTAN_THIN_MOD}
+        ? $args{runner}{GNUPLOT_MANHATTAN_THIN_MOD}
         : 10;
     $min_logp = 0 if $args{all_snps};
     $thin_mod = 1 if $args{all_snps};
@@ -895,11 +895,11 @@ sub plot_manhattan {
         && ($prior->{pcols} || '') eq join(',', @{ $args{pcols} || [] })
         && ($prior->{labels} || '') eq join('|', @{ $args{labels} || [] })
         && target_is_newer_than_inputs($png_path, $compact_data,
-            File::Spec->catfile($Bin, 'DiffGWASDeps', 'gnuplot', 'pdl_gunplot_manhattan.pl'));
+            File::Spec->catfile($Bin, 'DiffGWASDeps', 'gnuplot', 'pdl_gnuplot_manhattan.pl'));
     if (!$plot_reusable) {
         my @cmd = (
             $^X,
-            File::Spec->catfile($Bin, 'DiffGWASDeps', 'gnuplot', 'pdl_gunplot_manhattan.pl'),
+            File::Spec->catfile($Bin, 'DiffGWASDeps', 'gnuplot', 'pdl_gnuplot_manhattan.pl'),
             '--data', $compact_data,
             '--out-prefix', $out_prefix_path,
             '--pcols', join(',', @{ $args{pcols} || [] }),
@@ -913,38 +913,38 @@ sub plot_manhattan {
             '--gnuplot', $args{gnuplot},
         );
         push @cmd, ($args{remove_x_chr} ? '--remove-x-chr' : '--no-remove-x-chr');
-        run_cmd(\@cmd, 'gunplot genomewide Manhattan');
+        run_cmd(\@cmd, 'gnuplot genomewide Manhattan');
     }
     else {
-        print "[skip] reusing existing gunplot genomewide Manhattan PNG $png_path\n";
+        print "[skip] reusing existing gnuplot genomewide Manhattan PNG $png_path\n";
     }
 
     write_single_image_html(
         path      => $html,
-        title     => gunplot_title($args{runner}{HTML_TITLE} || 'Gunplot Manhattan Plot'),
+        title     => gnuplot_title($args{runner}{HTML_TITLE} || 'Gnuplot Manhattan Plot'),
         image_rel => basename($png_path),
     );
     return (
-        gunplot_manhattan_png  => $png_path,
-        gunplot_manhattan_html => $html,
+        gnuplot_manhattan_png  => $png_path,
+        gnuplot_manhattan_html => $html,
     );
 }
 
 sub plot_forest {
     my (%args) = @_;
     my $runner = $args{runner} || {};
-    my $forest_output_prefix = gunplotize_name($runner->{FOREST_OUTPUT_PREFIX} || 'gunplot_top_hits_forest');
+    my $forest_output_prefix = gnuplotize_name($runner->{FOREST_OUTPUT_PREFIX} || 'gnuplot_top_hits_forest');
     $forest_output_prefix =~ s/\.html$//i;
     my $out_prefix_path = File::Spec->catfile($args{output_dir}, $forest_output_prefix);
-    my $html_name = gunplotize_name($runner->{FOREST_OUTPUT_HTML_BASENAME} || ($forest_output_prefix . '.html'));
+    my $html_name = gnuplotize_name($runner->{FOREST_OUTPUT_HTML_BASENAME} || ($forest_output_prefix . '.html'));
     my $html_path = File::Spec->catfile($args{output_dir}, $html_name);
-    my $manifest_name = gunplotize_name($runner->{FOREST_OUTPUT_MANIFEST_BASENAME} || ($forest_output_prefix . '.manifest.tsv'));
+    my $manifest_name = gnuplotize_name($runner->{FOREST_OUTPUT_MANIFEST_BASENAME} || ($forest_output_prefix . '.manifest.tsv'));
     my $manifest_path = File::Spec->catfile($args{output_dir}, $manifest_name);
     my $top_hits_csv_name = forest_csv_basename_for_targets(
         base_name    => ($runner->{FOREST_TOP_HITS_CSV_BASENAME} || ($forest_output_prefix . '_top_hits.csv')),
         target_snps  => $args{target_snps},
     );
-    $top_hits_csv_name = gunplotize_name($top_hits_csv_name);
+    $top_hits_csv_name = gnuplotize_name($top_hits_csv_name);
     my $top_hits_csv_path = File::Spec->catfile($args{output_dir}, $top_hits_csv_name);
 
     my $reuse_forest_csv = ($ENV{REUSE_FOREST_TOP_HITS_CSV} // '0') eq '1';
@@ -972,10 +972,10 @@ sub plot_forest {
         push @cmd, ('--gnomad-pop-map', $runner->{TOP_HIT_GNOMAD_POP_MAP})
             if defined $runner->{TOP_HIT_GNOMAD_POP_MAP} && length $runner->{TOP_HIT_GNOMAD_POP_MAP};
         push @cmd, '--remove-x-chr' if $args{remove_x_chr};
-        run_cmd(\@cmd, 'gunplot forest top-hit CSV generation');
+        run_cmd(\@cmd, 'gnuplot forest top-hit CSV generation');
     }
     else {
-        print "[skip] reusing existing gunplot forest top-hit CSV $top_hits_csv_path\n";
+        print "[skip] reusing existing gnuplot forest top-hit CSV $top_hits_csv_path\n";
     }
 
     my $need_render = $regenerate_csv || !-s $manifest_path;
@@ -983,7 +983,7 @@ sub plot_forest {
         my @panels = read_forest_manifest_rows($manifest_path);
         my @expected_pngs = map { File::Spec->catfile($args{output_dir}, $_->{png_file}) }
             grep { defined $_->{png_file} && length $_->{png_file} } @panels;
-        my $renderer = File::Spec->catfile($Bin, 'DiffGWASDeps', 'gnuplot', 'pdl_gunplot_forest.pl');
+        my $renderer = File::Spec->catfile($Bin, 'DiffGWASDeps', 'gnuplot', 'pdl_gnuplot_forest.pl');
         $need_render = !@expected_pngs || grep {
             !target_is_newer_than_inputs($_, $top_hits_csv_path, $renderer)
         } @expected_pngs;
@@ -992,7 +992,7 @@ sub plot_forest {
     if ($need_render) {
         my @cmd = (
             $^X,
-            File::Spec->catfile($Bin, 'DiffGWASDeps', 'gnuplot', 'pdl_gunplot_forest.pl'),
+            File::Spec->catfile($Bin, 'DiffGWASDeps', 'gnuplot', 'pdl_gnuplot_forest.pl'),
             '--csv', $top_hits_csv_path,
             '--out-prefix', $out_prefix_path,
             '--track-ids', ($runner->{FOREST_TRACK_IDS} || ''),
@@ -1000,7 +1000,7 @@ sub plot_forest {
             '--track-beta-vars', ($runner->{FOREST_TRACK_BETA_VARS} || ''),
             '--track-se-vars', ($runner->{FOREST_TRACK_SE_VARS} || ''),
             '--track-p-vars', ($runner->{FOREST_TRACK_P_VARS} || ''),
-            '--title', gunplot_title($runner->{FOREST_HTML_TITLE} || 'Top-hit forest plots'),
+            '--title', gnuplot_title($runner->{FOREST_HTML_TITLE} || 'Top-hit forest plots'),
             '--width', ($runner->{FOREST_FIG_WIDTH} || 1100),
             '--dotsize', ($runner->{FOREST_DOTSIZE} || 8),
             '--y-font-size', ($runner->{FOREST_Y_FONT_SIZE} || 12),
@@ -1012,21 +1012,21 @@ sub plot_forest {
         );
         push @cmd, ('--height', $runner->{FOREST_FIG_HEIGHT})
             if defined $runner->{FOREST_FIG_HEIGHT} && length $runner->{FOREST_FIG_HEIGHT};
-        run_cmd(\@cmd, 'gunplot forest plot rendering');
+        run_cmd(\@cmd, 'gnuplot forest plot rendering');
     }
     else {
-        print "[skip] reusing existing gunplot forest plot artifacts rooted at $out_prefix_path\n";
+        print "[skip] reusing existing gnuplot forest plot artifacts rooted at $out_prefix_path\n";
     }
 
     my @manifest_rows = read_forest_manifest_rows($manifest_path);
-    die "Gunplot forest manifest has no panel rows: $manifest_path\n" unless @manifest_rows;
+    die "Gnuplot forest manifest has no panel rows: $manifest_path\n" unless @manifest_rows;
     my @images = map {
         +{
             snp   => ($_->{track_label} || $_->{track_id} || 'forest'),
             image => File::Spec->catfile($args{output_dir}, $_->{png_file}),
         }
     } grep { defined $_->{png_file} && length $_->{png_file} && -s File::Spec->catfile($args{output_dir}, $_->{png_file}) } @manifest_rows;
-    die "Gunplot forest manifest did not resolve any downloaded PNG panels under $args{output_dir}\n" unless @images;
+    die "Gnuplot forest manifest did not resolve any downloaded PNG panels under $args{output_dir}\n" unless @images;
 
     my $combined_png = '';
     if (@images > 1) {
@@ -1043,40 +1043,40 @@ sub plot_forest {
     if (@images == 1) {
         write_single_image_html(
             path      => $html_path,
-            title     => gunplot_title($runner->{FOREST_HTML_TITLE} || 'Top-hit forest plot'),
+            title     => gnuplot_title($runner->{FOREST_HTML_TITLE} || 'Top-hit forest plot'),
             image_rel => basename($images[0]{image}),
         );
     }
     elsif ($combined_png && -s $combined_png) {
         write_single_image_html(
             path      => $html_path,
-            title     => gunplot_title($runner->{FOREST_HTML_TITLE} || 'Top-hit forest plots'),
+            title     => gnuplot_title($runner->{FOREST_HTML_TITLE} || 'Top-hit forest plots'),
             image_rel => basename($combined_png),
         );
     }
     else {
         write_gallery_html(
             path   => $html_path,
-            title  => gunplot_title($runner->{FOREST_HTML_TITLE} || 'Top-hit forest plots'),
+            title  => gnuplot_title($runner->{FOREST_HTML_TITLE} || 'Top-hit forest plots'),
             images => \@images,
             top_csv=> basename($top_hits_csv_path),
         );
     }
 
     my %out = (
-        gunplot_forest_html => $html_path,
-        gunplot_forest_manifest => $manifest_path,
-        gunplot_forest_top_hits_csv => $top_hits_csv_path,
+        gnuplot_forest_html => $html_path,
+        gnuplot_forest_manifest => $manifest_path,
+        gnuplot_forest_top_hits_csv => $top_hits_csv_path,
     );
     if (@images == 1) {
-        $out{gunplot_forest_png} = $images[0]{image};
+        $out{gnuplot_forest_png} = $images[0]{image};
     }
     elsif ($combined_png && -s $combined_png) {
-        $out{gunplot_forest_png} = $combined_png;
-        $out{gunplot_forest_panels} = scalar(@images);
+        $out{gnuplot_forest_png} = $combined_png;
+        $out{gnuplot_forest_panels} = scalar(@images);
     }
     else {
-        $out{gunplot_forest_panels} = scalar(@images);
+        $out{gnuplot_forest_panels} = scalar(@images);
     }
     return %out;
 }
@@ -1088,11 +1088,11 @@ sub collect_top_hits {
     my $differential_thresholds = resolve_runner_differential_threshold_ladder($runner);
     my $out_tsv = File::Spec->catfile(
         $args{output_dir},
-        gunplotize_name(($runner->{PROJECT_TAG} || 'diff_gwas') . '.gunplot_top_hits.tsv')
+        gnuplotize_name(($runner->{PROJECT_TAG} || 'diff_gwas') . '.gnuplot_top_hits.tsv')
     );
 
     if (!$args{force} && -s $out_tsv && !$target_snps) {
-        print "[skip] reusing existing gunplot top-hit table $out_tsv\n";
+        print "[skip] reusing existing gnuplot top-hit table $out_tsv\n";
         return read_hits_tsv($out_tsv);
     }
 
@@ -1142,7 +1142,7 @@ sub collect_top_hits {
             wide_data => $args{wide_data},
             remove_x_chr => $args{remove_x_chr},
         );
-        return merge_hit_lists_for_gunplot(
+        return merge_hit_lists_for_gnuplot(
             max_hits => 15,
             lists => [ \@diff, \@common ],
         );
@@ -1174,7 +1174,7 @@ sub collect_top_hits_for_mode {
     my $runner = $args{runner} || {};
     my $mode = $args{mode} || 'differential';
     my $out_tsv = $args{output_tsv}
-        || File::Spec->catfile($args{output_dir}, "gunplot_top_hits_${mode}.tsv");
+        || File::Spec->catfile($args{output_dir}, "gnuplot_top_hits_${mode}.tsv");
     if ($mode =~ /^common_association$/i) {
         my @cmd = (
             $^X,
@@ -1219,7 +1219,7 @@ sub collect_top_hits_for_mode {
     return read_hits_tsv($out_tsv);
 }
 
-sub merge_hit_lists_for_gunplot {
+sub merge_hit_lists_for_gnuplot {
     my (%args) = @_;
     my %seen;
     my @hits;
@@ -1531,17 +1531,6 @@ sub plot_local_series {
     my $panel_columns = $args{panel_columns} || 0;
     my $cache_dir = $args{gtf_cache_dir}
         || File::Spec->catfile($args{output_dir}, '.gnuplot_gtf_cache');
-    if (!$args{gtf_cache_dir} && !-e $cache_dir) {
-        my $legacy_cache_dir = File::Spec->catfile($args{output_dir}, '.gunplot_gtf_cache');
-        if (-d $legacy_cache_dir) {
-            if (rename($legacy_cache_dir, $cache_dir)) {
-                print "[migrate] Renamed legacy GTF cache directory $legacy_cache_dir to $cache_dir\n";
-            }
-            else {
-                warn "WARNING: Could not rename legacy GTF cache directory $legacy_cache_dir to $cache_dir: $!. A new canonical cache will be created.\n";
-            }
-        }
-    }
     make_path($cache_dir) unless -d $cache_dir;
     # Resolve each target from the indexed GWAS source before grouping.  On a
     # cold run the caller normally supplies only SNP names, so grouping before
@@ -1772,7 +1761,7 @@ sub plot_local_series {
             required          => \@required_locus_outputs,
             manifest          => $existing_locus_manifest,
             png               => $locus_prefix . '.png',
-            renderer          => File::Spec->catfile($Bin, 'DiffGWASDeps', 'gnuplot', 'pdl_gunplot_local_locus.pl'),
+            renderer          => File::Spec->catfile($Bin, 'DiffGWASDeps', 'gnuplot', 'pdl_gnuplot_local_locus.pl'),
             snp               => $hit->{SNP},
             window_bp         => $args{window_bp},
             pcols             => join(',', @{ $args{pcols} }),
@@ -1800,7 +1789,7 @@ sub plot_local_series {
         );
         my $need_locus_render = $args{force} || !$cache_reusable;
         if ($need_locus_render && !$args{force} && all_nonempty_files(@required_locus_outputs)) {
-            print "[cache] regenerating gunplot $args{kind} locus artifacts for $hit->{SNP}: $cache_reason\n";
+            print "[cache] regenerating gnuplot $args{kind} locus artifacts for $hit->{SNP}: $cache_reason\n";
         }
 
         if (!$need_locus_render) {
@@ -1813,7 +1802,7 @@ sub plot_local_series {
                 gtf_file  => $expected_gtf_file,
                 gene_tsv  => $locus_prefix . '.genes.tsv',
             ) if $expected_gtf_file;
-            print "[skip] reusing existing gunplot $args{kind} locus artifacts for $hit->{SNP}\n";
+            print "[skip] reusing existing gnuplot $args{kind} locus artifacts for $hit->{SNP}\n";
             push @images, {
                 slot_index=> $batch_pos,
                 snp      => $locus_title_snps,
@@ -1901,7 +1890,7 @@ sub plot_local_series {
             $region_start = 1 if $region_start < 1;
             my $region_end = $hit->{BP} + (0 + $args{window_bp});
             if (!$args{force} && -s $gtf_file) {
-                print "[skip] reusing cached gunplot GTF subset $gtf_file\n";
+                print "[skip] reusing cached gnuplot GTF subset $gtf_file\n";
             }
             else {
                 my @gtf_cmd = (
@@ -1924,7 +1913,7 @@ sub plot_local_series {
 
         my @cmd = (
             $^X,
-            File::Spec->catfile($Bin, 'DiffGWASDeps', 'gnuplot', 'pdl_gunplot_local_locus.pl'),
+            File::Spec->catfile($Bin, 'DiffGWASDeps', 'gnuplot', 'pdl_gnuplot_local_locus.pl'),
             '--data', $locus_input,
             '--snp', $hit->{SNP},
             '--label-snps', $label_snps_csv,
@@ -2008,7 +1997,7 @@ sub plot_local_series {
             my $batch_cols = compute_panel_columns(scalar(@{ $batches[$i] }), $panel_columns);
             my $batch_annotation_mode = normalize_local_manhattan_annotation_mode($args{annotation_mode}, scalar(@{ $batches[$i] }));
             # A group of adjacent query SNPs is already rendered as one
-            # coordinate-aware locus by pdl_gunplot_local_locus.pl.  Rebuilding
+            # coordinate-aware locus by pdl_gnuplot_local_locus.pl.  Rebuilding
             # that single locus through the multi-locus compositor discarded
             # its query-SNP labels and made old two-panel output easy to reuse.
             # Publish the authoritative locus image directly under the stable
@@ -2034,7 +2023,7 @@ sub plot_local_series {
             }
             if ($batch_annotation_mode eq 'gtf') {
                 if (!$args{force} && -s $batch_png && target_is_newer_than_inputs($batch_png, batch_dependency_files($batches[$i], 1))) {
-                    print "[skip] reusing existing combined gunplot local Manhattan GTF batch $batch_png\n";
+                    print "[skip] reusing existing combined gnuplot local Manhattan GTF batch $batch_png\n";
                 }
                 else {
                     render_combined_local_manhattan_gtf_batch(
@@ -2052,7 +2041,7 @@ sub plot_local_series {
                 }
             } else {
                 if (!$args{force} && -s $batch_png && target_is_newer_than_inputs($batch_png, batch_dependency_files($batches[$i], 0))) {
-                    print "[skip] reusing existing combined gunplot local Manhattan batch $batch_png\n";
+                    print "[skip] reusing existing combined gnuplot local Manhattan batch $batch_png\n";
                 }
                 else {
                     render_combined_local_manhattan_batch(
@@ -2094,8 +2083,8 @@ sub plot_local_series {
                 path      => $main_html,
                 title     => $args{html_title},
                 parts     => \@parts,
-                top_csv   => gunplotize_name($runner->{LOCAL_TOP_HITS_CSV_BASENAME} || 'gunplot_top_hits.csv'),
-                batch_msg => sprintf('Top hits were split into %d combined gunplot batch figures.', scalar(@parts)),
+                top_csv   => gnuplotize_name($runner->{LOCAL_TOP_HITS_CSV_BASENAME} || 'gnuplot_top_hits.csv'),
+                batch_msg => sprintf('Top hits were split into %d combined gnuplot batch figures.', scalar(@parts)),
             );
         }
     }
@@ -2105,7 +2094,7 @@ sub plot_local_series {
                 path    => $main_html,
                 title   => $args{html_title},
                 images  => $batches[0],
-                top_csv => gunplotize_name($runner->{LOCAL_TOP_HITS_CSV_BASENAME} || 'gunplot_top_hits.csv'),
+                top_csv => gnuplotize_name($runner->{LOCAL_TOP_HITS_CSV_BASENAME} || 'gnuplot_top_hits.csv'),
             );
         }
         else {
@@ -2115,7 +2104,7 @@ sub plot_local_series {
                     path    => $part_html,
                     title   => sprintf('%s (Part %d)', $args{html_title}, $i + 1),
                     images  => $batches[$i],
-                    top_csv => gunplotize_name($runner->{LOCAL_TOP_HITS_CSV_BASENAME} || 'gunplot_top_hits.csv'),
+                    top_csv => gnuplotize_name($runner->{LOCAL_TOP_HITS_CSV_BASENAME} || 'gnuplot_top_hits.csv'),
                 );
                 push @parts, $part_html;
             }
@@ -2123,8 +2112,8 @@ sub plot_local_series {
                 path      => $main_html,
                 title     => $args{html_title},
                 parts     => \@parts,
-                top_csv   => gunplotize_name($runner->{LOCAL_TOP_HITS_CSV_BASENAME} || 'gunplot_top_hits.csv'),
-                batch_msg => sprintf('Top hits were split into %d gunplot batch pages.', scalar(@parts)),
+                top_csv   => gnuplotize_name($runner->{LOCAL_TOP_HITS_CSV_BASENAME} || 'gnuplot_top_hits.csv'),
+                batch_msg => sprintf('Top hits were split into %d gnuplot batch pages.', scalar(@parts)),
             );
         }
     }
@@ -3196,7 +3185,7 @@ sub read_forest_manifest_rows {
 
 sub forest_csv_basename_for_targets {
     my (%args) = @_;
-    my $name = $args{base_name} || 'gunplot_forest_top_hits.csv';
+    my $name = $args{base_name} || 'gnuplot_forest_top_hits.csv';
     my $targets = $args{target_snps} || '';
     return $name unless length $targets;
     my @items = grep { length } map { trim($_) } split /,/, $targets;
@@ -3705,18 +3694,18 @@ sub command_exists {
     return system('sh', '-lc', "command -v '$cmd' >/dev/null 2>&1") == 0 ? 1 : 0;
 }
 
-sub gunplotize_name {
+sub gnuplotize_name {
     my ($name) = @_;
-    $name ||= 'gunplot_output';
-    $name =~ s/_SAS_/_GUNPLOT_/g;
-    if ($name !~ /_GUNPLOT_/ && $name !~ /GUNPLOT/i) {
+    $name ||= 'gnuplot_output';
+    $name =~ s/_SAS_/_GNUPLOT_/g;
+    if ($name !~ /_GNUPLOT_/ && $name !~ /GNUPLOT/i) {
         my ($stem, $ext) = $name =~ /^(.*?)(\.[^.]+)?$/;
-        $name = $stem . '_GUNPLOT' . ($ext || '');
+        $name = $stem . '_GNUPLOT' . ($ext || '');
     }
     return $name;
 }
 
-sub gunplot_title {
+sub gnuplot_title {
     my ($title) = @_;
     $title ||= 'Plot output';
     return $title;

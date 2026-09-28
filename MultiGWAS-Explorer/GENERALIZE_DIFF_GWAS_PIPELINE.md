@@ -82,7 +82,7 @@ The repository also keeps a parallel non-SAS plotting entry point:
 
 - [auto_prepare_and_run_diff_gwas_with_gnuplot.pl](/G:/NGS_lib/Linux_codes_SAM/Conda_and_Docker_Related_Scripts/perlMCP4Gemini_Paper/auto_prepare_and_run_diff_gwas_with_gnuplot.pl)
 
-Keep that gunplot pipeline separate from the SAS ODA workflow. It is intended
+Keep that gnuplot pipeline separate from the SAS ODA workflow. It is intended
 for independent rendering and layout experimentation, not as an automatic
 fallback inside the SAS ODA pipeline.
 
@@ -90,7 +90,7 @@ Forest plotting is now part of both entry points:
 
 - SAS ODA path:
   - `--step plot_forest`
-- gunplot path:
+- gnuplot path:
   - `--plots forest`
 
 Shared forest-plot behavior:
@@ -163,7 +163,7 @@ Legacy recovery helpers:
 ## Top-Hit MAF Safeguard
 
 Local top-hit selection now applies the same MAF safeguard before either the
-gunplot or SAS ODA local-panel renderers consume the selected loci:
+gnuplot or SAS ODA local-panel renderers consume the selected loci:
 
 - prefer GWAS-derived MAF when the wide plotting subset carries
   `*_GROUP1_FRQ_A`, `*_GROUP1_FRQ_U`, `*_GROUP2_FRQ_A`, and `*_GROUP2_FRQ_U`
@@ -303,9 +303,9 @@ you also want the slower genome-wide gnuplot Manhattan panel in the same run.
 After the 2026-06-08 layout refresh, that Docker smoke-test path also verified
 that:
 
-- genome-wide gunplot Manhattan now places the GWAS sublabels at the top of
+- genome-wide gnuplot Manhattan now places the GWAS sublabels at the top of
   each subplot, which is closer to the SAS ODA genome-wide layout
-- combined gunplot local Manhattan now defaults to a bottom gene-track view
+- combined gnuplot local Manhattan now defaults to a bottom gene-track view
   instead of the older vertical SNP/gene text labels
 - users who still prefer the older compact label mode can restore it with:
   - `--local-manhattan-annotation labels`
@@ -315,7 +315,7 @@ Measured Ubuntu Docker timing on 2026-06-08 for this repository:
 - first uncached `docker build` completed in about 4.2 minutes
 - post-build `bash install/check_pipeline_install.sh` inside the image
   completed in about 10 seconds
-- a one-SNP gunplot validation of
+- a one-SNP gnuplot validation of
   `manhattan,local_manhattan,local_gtf` completed successfully in about
   9 minutes 43 seconds total, with `plot_manhattan` alone taking about
   9 minutes 10 seconds
@@ -323,7 +323,7 @@ Measured Ubuntu Docker timing on 2026-06-08 for this repository:
   tests completed in about:
   - 13 seconds for `--plots local_manhattan`
   - 9 minutes 6 seconds for `--plots manhattan`
-- in that run, the genome-wide gunplot Manhattan stage scanned 2,417,954 wide
+- in that run, the genome-wide gnuplot Manhattan stage scanned 2,417,954 wide
   rows and wrote an intermediate `.plot.tsv` of about 110 MB, which explains
   why Docker validation can feel slow even when the container is healthy
 - after the 2026-06-11 Manhattan style refresh, another rebuilt Ubuntu Docker
@@ -385,7 +385,7 @@ Ubuntu Docker fallback validation:
 - that Docker fallback confirmed:
   - `bash install/install_ubuntu.sh`
   - `bash install/check_pipeline_install.sh`
-  - the top-level gunplot wrapper for `manhattan`, `local_manhattan`, and
+  - the top-level gnuplot wrapper for `manhattan`, `local_manhattan`, and
     `local_gtf`
 - in the same 2026-06-08 Docker validation cycle, the containerized SAS ODA
   login probe did not complete successfully:
@@ -397,13 +397,13 @@ Ubuntu Docker fallback validation:
   - on Ubuntu/Docker, SAS ODA housekeeping calls can outlast conservative
     host-side automation timeouts, so final local-GTF artifacts should be
     checked before concluding that the scientific plot itself failed
-  - for the gunplot path, prefer a quick one-SNP `local_manhattan,local_gtf`
+  - for the gnuplot path, prefer a quick one-SNP `local_manhattan,local_gtf`
     validation before adding `manhattan`, because the genome-wide stage is the
     dominant runtime cost in Docker
 
 Portable Cygwin wrapper validation:
 
-- the top-level gunplot wrapper was validated from an isolated portable Cygwin
+- the top-level gnuplot wrapper was validated from an isolated portable Cygwin
   repo copy under `H:\TMP4SAS\...`
 - during that validation, the real Windows/Cygwin GD problem turned out to be
   mixed-platform repo-local Perl libraries rather than only missing native
@@ -421,7 +421,7 @@ perl ./auto_prepare_and_run_diff_gwas_with_gnuplot.pl \
   --plots manhattan,local_manhattan,local_gtf
 ```
 
-Quick Ubuntu Docker gunplot validation:
+Quick Ubuntu Docker gnuplot validation:
 
 ```bash
 perl ./auto_prepare_and_run_diff_gwas_with_gnuplot.pl \
@@ -430,7 +430,7 @@ perl ./auto_prepare_and_run_diff_gwas_with_gnuplot.pl \
   --target-snps rs185665940
 ```
 
-Quick gunplot forest validation:
+Quick gnuplot forest validation:
 
 ```bash
 perl ./auto_prepare_and_run_diff_gwas_with_gnuplot.pl \
@@ -439,17 +439,17 @@ perl ./auto_prepare_and_run_diff_gwas_with_gnuplot.pl \
   --target-snps rs185665940
 ```
 
-Genome-wide gunplot cache-safety note:
+Genome-wide gnuplot cache-safety note:
 
 - during validation, an interrupted rerun left a corrupted cached
-  genome-wide wide subset that made the gunplot Manhattan figure diverge
+  genome-wide wide subset that made the gnuplot Manhattan figure diverge
   sharply from the SAS ODA figure
-- the gunplot wrapper now validates the cached wide subset against its
+- the gnuplot wrapper now validates the cached wide subset against its
   manifest before reuse instead of trusting file existence alone
 - `DiffGWASDeps/extract_significant_diff_gwas.pl` now writes the wide subset
   and manifest atomically, which reduces the chance of leaving a partially
   overwritten genome-wide input behind
-- if a future gunplot genome-wide Manhattan plot looks structurally truncated
+- if a future gnuplot genome-wide Manhattan plot looks structurally truncated
   or obviously wrong, rebuild the plotting subset with:
 
 ```bash
@@ -473,10 +473,10 @@ Reference-build validation note:
 
 Genome-wide visual-parity note:
 
-- the gunplot genome-wide Manhattan renderer now colors points by chromosome
+- the gnuplot genome-wide Manhattan renderer now colors points by chromosome
   palette index rather than track index, which restores the same repeating
   chromosome-color logic used by the SAS ODA figure
-- the gunplot PNG also now omits the extra default top title so the figure
+- the gnuplot PNG also now omits the extra default top title so the figure
   frame is closer to the manuscript SAS layout
 - the main residual differences after the 2026-06-11 refresh were backend
   rasterization details such as point packing and antialiasing, not different
@@ -529,13 +529,13 @@ bash install/install_cygwin.sh
 During development, the Windows bootstrap was repeatedly exercised in isolated
 `H:\TMP4SAS\...` directories so package refresh, repo-local Python setup, and
 portable path handling could be checked without relying on the user's global
-Cygwin tree. The gunplot wrapper now also prefers `gnuplot` from the active
+Cygwin tree. The gnuplot wrapper now also prefers `gnuplot` from the active
 portable shell `PATH`, which prevents the installed workflow from silently
 borrowing a host-specific Windows `gnuplot.exe`. It also validates cached
 genome-wide wide subsets against their manifest row counts before reuse, so a
 stale interrupted rerun is less likely to poison later Manhattan plots.
 
-The gunplot path now mirrors the same displayed-GWAS flexibility as the SAS ODA
+The gnuplot path now mirrors the same displayed-GWAS flexibility as the SAS ODA
 path:
 
 - `--display-gwas ALL` for one differential track
@@ -555,7 +555,7 @@ The same inquiry-SNP flexibility now also applies to forest plots:
   - styling intentionally aligned to the SAS ODA
     `beta2OR_forest_plot.sas` output
 
-Example combined local-Manhattan gunplot rerun:
+Example combined local-Manhattan gnuplot rerun:
 
 ```bash
 perl auto_prepare_and_run_diff_gwas_with_gnuplot.pl \
@@ -566,7 +566,7 @@ perl auto_prepare_and_run_diff_gwas_with_gnuplot.pl \
   --local-manhattan-annotation gtf
 ```
 
-Example single-GWAS plot set in the gunplot path:
+Example single-GWAS plot set in the gnuplot path:
 
 ```bash
 perl auto_prepare_and_run_diff_gwas_with_gnuplot.pl \
@@ -575,7 +575,7 @@ perl auto_prepare_and_run_diff_gwas_with_gnuplot.pl \
   --plots manhattan,local_manhattan,local_gtf
 ```
 
-Example gunplot forest rerun for one target SNP:
+Example gnuplot forest rerun for one target SNP:
 
 ```bash
 perl auto_prepare_and_run_diff_gwas_with_gnuplot.pl \
@@ -584,7 +584,7 @@ perl auto_prepare_and_run_diff_gwas_with_gnuplot.pl \
   --target-snps rs185665940
 ```
 
-Example gunplot forest rerun for multiple target SNPs:
+Example gnuplot forest rerun for multiple target SNPs:
 
 ```bash
 perl auto_prepare_and_run_diff_gwas_with_gnuplot.pl \
@@ -623,7 +623,7 @@ codex mcp list
 ```
 
 6. start a fresh Codex session in that same workspace; and
-7. ask Codex to run either the SAS ODA or gunplot entry script.
+7. ask Codex to run either the SAS ODA or gnuplot entry script.
 
 Platform-specific terminal notes:
 
@@ -652,7 +652,7 @@ perl auto_prepare_and_run_diff_gwas.pl \
   --sas-oda-password 'your_password'
 ```
 
-Important gunplot note:
+Important gnuplot note:
 
 - the default combined local-Manhattan annotation mode is now `gtf`, so the
   final combined figure prefers a bottom gene track instead of the older
@@ -666,9 +666,9 @@ Important gunplot note:
 - the key debug artifact for that mode is:
   - `*.combined_scaled.tsv`
 - that unified table is now the preferred source of truth for the combined
-  gunplot local-Manhattan GTF path
+  gnuplot local-Manhattan GTF path
 
-Both the SAS ODA and gunplot workflows now also support optional
+Both the SAS ODA and gnuplot workflows now also support optional
 user-designated adjacent-gene labels for explicit target SNPs.
 
 Example:
@@ -740,11 +740,11 @@ Recommended recovery sequence when that pattern appears:
    - `*_diff_effects.tsv.gz`
    - `*.stdized.tsv.gz`
    - `*.wide_beta_se_p_p_lt_0p05*.tsv.gz`
-5. then rerun SAS ODA or gunplot figures
+5. then rerun SAS ODA or gnuplot figures
 
 Plotting reminder:
 
-- the gunplot workflow now removes chrX from final figures by default unless
+- the gnuplot workflow now removes chrX from final figures by default unless
   `--no-remove-X-chr` is set
 - that behavior does not mean chrX was absent upstream
 
@@ -1022,7 +1022,7 @@ perl auto_prepare_and_run_diff_gwas.pl \
 Merged-wide implementation notes:
 
 - the directory scan now ignores generated artifacts such as
-  `*.merged_plotwide.tsv.gz`, `gunplot`, `png`, `html`, and manifest files so
+  `*.merged_plotwide.tsv.gz`, `gnuplot`, `png`, `html`, and manifest files so
   reruns continue to target the original merged input
 - the normalization path uses:
   - `DiffGWASDeps/convert_merged_gwas_to_plotwide.pl`

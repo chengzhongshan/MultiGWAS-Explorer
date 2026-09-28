@@ -30,7 +30,7 @@ Before running a workflow, identify:
   check.
 - Desired final products: long merged table, tabix-indexed coordinate table,
   differential effects, Manhattan subset, local GTF plot, forest plot, and
-  SAS ODA or gunplot PNG/HTML outputs.
+  SAS ODA or gnuplot PNG/HTML outputs.
 - Cygwin path equivalents for Windows drives, usually `/mnt/e/...` and `/mnt/g/...`.
 - Whether the user wants a fast install/render validation or a full
   genome-wide rerun. In Ubuntu Docker, those are very different time costs.
@@ -77,9 +77,9 @@ Before running a workflow, identify:
      - `--plots local_manhattan,local_gtf`
      - `--target-snps rs185665940`
    - only add `manhattan` after the local plots succeed, because the
-     genome-wide gunplot stage is the main runtime hotspot
+     genome-wide gnuplot stage is the main runtime hotspot
    - in the 2026-06-08 validation of this repository, the Ubuntu Docker
-     genome-wide gunplot step scanned 2,417,954 wide rows and wrote an
+     genome-wide gnuplot step scanned 2,417,954 wide rows and wrote an
      intermediate `.plot.tsv` of about 110 MB; that single stage took about
      9 minutes, whereas the one-locus local Manhattan and local GTF panels each
      finished in about 10-12 seconds
@@ -308,8 +308,8 @@ Before running a workflow, identify:
    - SAS ODA forest plots are driven by:
      - `DiffGWASDeps/beta2OR_forest_plot.sas`
      - `DiffGWASDeps/run_sas_oda_top_hits_forest_plot.sas`
-   - gunplot forest plots are driven by:
-     - `DiffGWASDeps/gnuplot/pdl_gunplot_forest.pl`
+   - gnuplot forest plots are driven by:
+     - `DiffGWASDeps/gnuplot/pdl_gnuplot_forest.pl`
      - `auto_prepare_and_run_diff_gwas_with_gnuplot.pl --plots forest`
    Prefer these conventions:
    - single-SNP forest plot:
@@ -321,7 +321,7 @@ Before running a workflow, identify:
      - nearby gene labels on the right y-axis
      - horizontal dashed divider between differential and common hits
      - significance star for `P < 5e-8`
-   The gunplot renderer is intentionally styled to stay close to the SAS ODA
+   The gnuplot renderer is intentionally styled to stay close to the SAS ODA
    forest output, so small remaining differences should mostly be backend
    rasterization details rather than different ordering, labels, or grouping.
 
@@ -398,7 +398,7 @@ For a new project, copy/adapt the script templates in this skill's `scripts/` fo
 - Report row counts at each major stage.
 - Validate headers and column mappings before a full run.
 - For merged-wide auto-detection, verify that `--gwas-dir` selected the
-  original merged table instead of a generated `merged_plotwide`, `gunplot`,
+  original merged table instead of a generated `merged_plotwide`, `gnuplot`,
   `png`, or `html` artifact.
 - For merged-wide spec generation, verify that the inferred `wide_columns`
   blocks match the cohort names you expect to display and compare.

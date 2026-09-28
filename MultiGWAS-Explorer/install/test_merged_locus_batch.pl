@@ -107,7 +107,7 @@ SKIP: {
     skip 'gnuplot is unavailable', 3 if system('gnuplot', '--version') != 0;
     my $prefix = "$dir/local_rsA";
     my $plot_status = system($^X,
-        "$Bin/../DiffGWASDeps/gnuplot/pdl_gunplot_local_locus.pl",
+        "$Bin/../DiffGWASDeps/gnuplot/pdl_gnuplot_local_locus.pl",
         '--data', "$dir/gnuplot_locus_rsA_window_50.wide.tsv.gz",
         '--snp', 'rsA', '--out-prefix', $prefix,
         '--window-bp', '50', '--pcols', 'P',

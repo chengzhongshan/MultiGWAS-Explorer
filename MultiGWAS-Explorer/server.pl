@@ -1179,7 +1179,7 @@ $server->tool(
             },
             display_gwas => {
                 type => 'string',
-                description => 'Optional comma-separated GWAS track selection shared by the SAS ODA and gunplot pipelines. Use pair prefixes such as ALL,EUR,ASN for differential tracks and GWAS labels such as ALL_FEMALE or EUR_MALE for single-GWAS tracks.'
+                description => 'Optional comma-separated GWAS track selection shared by the SAS ODA and gnuplot pipelines. Use pair prefixes such as ALL,EUR,ASN for differential tracks and GWAS labels such as ALL_FEMALE or EUR_MALE for single-GWAS tracks.'
             },
             target_snps => {
                 type => 'string',
@@ -1699,11 +1699,11 @@ $server->tool(
 
 
 # # -------------------------
-# # Run the gunplot wrapper (PDL + gnuplot) as an asynchronous MCP job
+# # Run the gnuplot wrapper (PDL + gnuplot) as an asynchronous MCP job
 # # -------------------------
 $server->tool(
-    name        => 'run_gunplot_wrapper',
-    description => 'Run the auto_prepare_and_run_diff_gwas_with_gnuplot.pl wrapper to produce genomewide Manhattan, local Manhattan, and local GTF plots with the alternative gunplot renderer. This backend now mirrors the SAS ODA path for displayed-GWAS selection, single-GWAS rendering mode, inquiry SNP local plots, optional SNP:GENE label overrides, and merged-wide GWAS compatibility once a spec has been generated. For merged-wide study tables such as the AOA DS_ALL + MP2PRT + meta input, first generate the inferred spec through auto_prepare_and_run_diff_gwas.pl with gwas_dir/preview_spec/spec_out, then pass that spec here. The genomewide Manhattan renderer now uses the same repeated chromosome palette family and top-of-panel GWAS labels as the SAS ODA multi-track figure style, while still retaining small renderer-specific differences such as gnuplot rasterization. It also shares the build-aware local GTF logic, so explicit reference_build overrides or detected hg19/hg38/T2T tokens select the matching built-in GTF profile automatically. The wrapper now prefers a real gnuplot command from the active PATH, keeps portable Cygwin installs self-contained instead of borrowing a host-specific Windows gnuplot.exe, validates cached genome-wide wide subsets against their manifest before reuse, has been exercised successfully from an isolated Ubuntu Docker runtime as well as portable Cygwin, and can also be packaged through the bundled Dockerfile or Singularity/Apptainer definition. In Ubuntu Docker, the first image build can take several minutes, and the genomewide Manhattan stage is usually the dominant runtime cost; for quick Linux-container validation, prefer one inquiry SNP with local_manhattan and local_gtf before adding manhattan.',
+    name        => 'run_gnuplot_wrapper',
+    description => 'Run the auto_prepare_and_run_diff_gwas_with_gnuplot.pl wrapper to produce genomewide Manhattan, local Manhattan, and local GTF plots with the alternative gnuplot renderer. This backend now mirrors the SAS ODA path for displayed-GWAS selection, single-GWAS rendering mode, inquiry SNP local plots, optional SNP:GENE label overrides, and merged-wide GWAS compatibility once a spec has been generated. For merged-wide study tables such as the AOA DS_ALL + MP2PRT + meta input, first generate the inferred spec through auto_prepare_and_run_diff_gwas.pl with gwas_dir/preview_spec/spec_out, then pass that spec here. The genomewide Manhattan renderer now uses the same repeated chromosome palette family and top-of-panel GWAS labels as the SAS ODA multi-track figure style, while still retaining small renderer-specific differences such as gnuplot rasterization. It also shares the build-aware local GTF logic, so explicit reference_build overrides or detected hg19/hg38/T2T tokens select the matching built-in GTF profile automatically. The wrapper now prefers a real gnuplot command from the active PATH, keeps portable Cygwin installs self-contained instead of borrowing a host-specific Windows gnuplot.exe, validates cached genome-wide wide subsets against their manifest before reuse, has been exercised successfully from an isolated Ubuntu Docker runtime as well as portable Cygwin, and can also be packaged through the bundled Dockerfile or Singularity/Apptainer definition. In Ubuntu Docker, the first image build can take several minutes, and the genomewide Manhattan stage is usually the dominant runtime cost; for quick Linux-container validation, prefer one inquiry SNP with local_manhattan and local_gtf before adding manhattan.',
     input_schema => {
         type => 'object',
         properties => {
@@ -1711,7 +1711,7 @@ $server->tool(
             plots => { type => 'string', description => 'Optional comma-separated plot list, for example: manhattan,local_manhattan,local_gtf' },
             step => { type => 'string', description => 'Optional plot step name or comma-separated step names, for example: plot_manhattan or plot_local_gtf' },
             force => { type => 'string', description => 'Optional truthy flag to refresh cached preprocessing and rerender outputs.' },
-            remove_x_chr => { type => 'string', description => 'Optional truthy flag to remove chrX from final gunplot figures. Default: true.' },
+            remove_x_chr => { type => 'string', description => 'Optional truthy flag to remove chrX from final gnuplot figures. Default: true.' },
             display_gwas => { type => 'string', description => 'Optional comma-separated displayed GWAS tracks. Use pair prefixes such as ALL,EUR,ASN for differential tracks and GWAS labels such as ALL_FEMALE or EUR_MALE for single-GWAS tracks.' },
             target_snps => { type => 'string', description => 'Optional comma-separated inquiry SNP list for local Manhattan / local GTF plots. This is also the preferred fast-validation path for Ubuntu Docker runs.' },
             target_snp_genes => { type => 'string', description => 'Optional comma-separated SNP:GENE overrides, for example: rs17425819:JAK2,rs185665940:FANCL' },
@@ -1732,7 +1732,7 @@ $server->tool(
             local_manhattan_columns => { type => 'integer', description => 'Optional override for combined local-Manhattan figure columns.' },
             local_manhattan_annotation => { type => 'string', description => 'Optional under-column annotation mode for combined local Manhattan: labels, gtf, auto, none.' },
             output_file => { type => 'string', description => 'Optional path to write wrapper stdout/stderr.' },
-            pid       => { type => 'integer', description => 'Optional PID to check status of a previous gunplot wrapper query.' }
+            pid       => { type => 'integer', description => 'Optional PID to check status of a previous gnuplot wrapper query.' }
         },
         required => []
     },
@@ -1768,7 +1768,7 @@ $server->tool(
         my $pid_file;
 
         if (defined $pid_arg) {
-            $pid_file = "tmp*/gunplot_wrapper.pid";
+            $pid_file = "tmp*/gnuplot_wrapper.pid";
             my @pid_files = glob($pid_file);
             foreach my $pf (@pid_files) {
                 next unless -f $pf;
@@ -1798,7 +1798,7 @@ $server->tool(
                 return {
                     content => [{
                         type => 'text',
-                        text => "STATUS: COMPLETE (PID $pid_arg)\n\nGunplot log saved to: $out_file\n\n" . $content
+                        text => "STATUS: COMPLETE (PID $pid_arg)\n\nGnuplot log saved to: $out_file\n\n" . $content
                     }]
                 };
             }
@@ -1814,8 +1814,8 @@ $server->tool(
 
         my $tmpdir = "tmp" . time();
         mkdir $tmpdir or die "Failed to create tmp dir: $!" unless -d $tmpdir;
-        $pid_file = "$tmpdir/gunplot_wrapper.pid";
-        $out_file = $output_file // "$tmpdir/output.gunplot.txt";
+        $pid_file = "$tmpdir/gnuplot_wrapper.pid";
+        $out_file = $output_file // "$tmpdir/output.gnuplot.txt";
 
         my $script = File::Spec->catfile($MCP_SERVER_DIR, 'auto_prepare_and_run_diff_gwas_with_gnuplot.pl');
         my @cmd = ('perl', $script, '--spec', $spec);
@@ -1884,7 +1884,7 @@ $server->tool(
         return {
             content => [{
                 type => 'text',
-                text => "QUERYING: gunplot wrapper started\nPID: $child_pid\nOutput file: $out_file\nAsk the AI agent to check status with: {\"spec_file\": \"$spec\", \"pid\": $child_pid}\nHints: use display_gwas=\"ALL_FEMALE\" for a single-GWAS plot set, display_gwas=\"EUR,EUR_FEMALE,EUR_MALE\" for mixed track display, and target_snps=\"rs123\" for inquiry-SNP local plots. In Ubuntu Docker, prefer local_manhattan/local_gtf first for a fast validation and add manhattan only when you want the slower genomewide render."
+                text => "QUERYING: gnuplot wrapper started\nPID: $child_pid\nOutput file: $out_file\nAsk the AI agent to check status with: {\"spec_file\": \"$spec\", \"pid\": $child_pid}\nHints: use display_gwas=\"ALL_FEMALE\" for a single-GWAS plot set, display_gwas=\"EUR,EUR_FEMALE,EUR_MALE\" for mixed track display, and target_snps=\"rs123\" for inquiry-SNP local plots. In Ubuntu Docker, prefer local_manhattan/local_gtf first for a fast validation and add manhattan only when you want the slower genomewide render."
             }]
         };
     }

@@ -10,7 +10,7 @@ use File::Path qw(make_path);
 sub usage {
     return <<"USAGE";
 Usage:
-  perl pdl_gunplot_manhattan.pl --data wide.tsv.gz --out-prefix prefix [options]
+  perl pdl_gnuplot_manhattan.pl --data wide.tsv.gz --out-prefix prefix [options]
 
 Options:
   --data FILE.tsv.gz        Input wide GWAS TSV.gz.

@@ -96,7 +96,7 @@ my %reference_contract = (
         "set cbrange [-1:1]",
         "push \@cmd, '--require-complete' if \$include_all_r2",
     ],
-    File::Spec->catfile('DiffGWASDeps', 'gnuplot', 'pdl_gunplot_local_locus.pl') => [
+    File::Spec->catfile('DiffGWASDeps', 'gnuplot', 'pdl_gnuplot_local_locus.pl') => [
         'exists($header_idx{is_marker})',
         'my $has_ld_r2 = exists($ld_r2_for{lc $snp})',
         'my $is_ld = exists($is_ld_snp{lc $snp})',

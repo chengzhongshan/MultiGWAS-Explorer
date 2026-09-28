@@ -10,7 +10,7 @@ use File::Basename qw(dirname basename);
 sub usage {
     return <<"USAGE";
 Usage:
-  perl pdl_gunplot_local_locus.pl --data wide.tsv.gz --snp rsID --out-prefix prefix [options]
+  perl pdl_gnuplot_local_locus.pl --data wide.tsv.gz --snp rsID --out-prefix prefix [options]
 
 Options:
   --window-bp N            Required.

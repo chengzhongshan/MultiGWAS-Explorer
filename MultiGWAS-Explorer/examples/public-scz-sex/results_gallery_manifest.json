@@ -2,80 +2,80 @@
     "images":  [
                    {
                        "backend":  "gnuplot",
-                       "copy":  "figures/gunplot/PUBLIC_SCZ_EUR_SEX_GUNPLOT_manhattan.png",
+                       "copy":  "figures/gnuplot/PUBLIC_SCZ_EUR_SEX_GNUPLOT_manhattan.png",
                        "family":  "manhattan",
                        "sha256":  "3dfa94beeae6fb3c124a07c2c606f955c70e9ccaf6a8c702438190d527b9a72b",
-                       "source":  "original-run/PUBLIC_SCZ_EUR_SEX_GUNPLOT_manhattan.png"
+                       "source":  "original-run/PUBLIC_SCZ_EUR_SEX_GNUPLOT_manhattan.png"
                    },
                    {
                        "backend":  "gnuplot",
-                       "copy":  "figures/gunplot/PUBLIC_SCZ_EUR_SEX_GUNPLOT_local_top_hits_manhattan.png",
+                       "copy":  "figures/gnuplot/PUBLIC_SCZ_EUR_SEX_GNUPLOT_local_top_hits_manhattan.png",
                        "family":  "local_manhattan",
                        "sha256":  "746ff975b1a1545d1fa32acef34ec0c1e9530da4800e19c35aac80fbcabd17aa",
-                       "source":  "original-run/PUBLIC_SCZ_EUR_SEX_GUNPLOT_local_top_hits_manhattan.png"
+                       "source":  "original-run/PUBLIC_SCZ_EUR_SEX_GNUPLOT_local_top_hits_manhattan.png"
                    },
                    {
                        "backend":  "gnuplot",
-                       "copy":  "figures/gunplot/PUBLIC_SCZ_EUR_SEX_GUNPLOT_local_top_hits_manhattan_rs185665940.png",
+                       "copy":  "figures/gnuplot/PUBLIC_SCZ_EUR_SEX_GNUPLOT_local_top_hits_manhattan_rs185665940.png",
                        "family":  "local_manhattan",
                        "sha256":  "c27d84ed06395c8ce8b896e4e5bb5ea5f1183255ba70f70f363080079078c79d",
-                       "source":  "original-run/PUBLIC_SCZ_EUR_SEX_GUNPLOT_local_top_hits_manhattan_rs185665940.png"
+                       "source":  "original-run/PUBLIC_SCZ_EUR_SEX_GNUPLOT_local_top_hits_manhattan_rs185665940.png"
                    },
                    {
                        "backend":  "gnuplot",
-                       "copy":  "figures/gunplot/PUBLIC_SCZ_EUR_SEX_GUNPLOT_local_top_hits_manhattan_rs2232429.png",
+                       "copy":  "figures/gnuplot/PUBLIC_SCZ_EUR_SEX_GNUPLOT_local_top_hits_manhattan_rs2232429.png",
                        "family":  "local_manhattan",
                        "sha256":  "5e28223b2619a9197e2e676951b3120f6259922c036872fc2ea61520f0e620b3",
-                       "source":  "original-run/PUBLIC_SCZ_EUR_SEX_GUNPLOT_local_top_hits_manhattan_rs2232429.png"
+                       "source":  "original-run/PUBLIC_SCZ_EUR_SEX_GNUPLOT_local_top_hits_manhattan_rs2232429.png"
                    },
                    {
                        "backend":  "gnuplot",
-                       "copy":  "figures/gunplot/PUBLIC_SCZ_EUR_SEX_GUNPLOT_local_top_hits_manhattan_rs62604261.png",
+                       "copy":  "figures/gnuplot/PUBLIC_SCZ_EUR_SEX_GNUPLOT_local_top_hits_manhattan_rs62604261.png",
                        "family":  "local_manhattan",
                        "sha256":  "d8a1f7ff50a4fa98195d4b5af1d5b6a94bc0193ff3e3de831c8afa255dee47a8",
-                       "source":  "original-run/PUBLIC_SCZ_EUR_SEX_GUNPLOT_local_top_hits_manhattan_rs62604261.png"
+                       "source":  "original-run/PUBLIC_SCZ_EUR_SEX_GNUPLOT_local_top_hits_manhattan_rs62604261.png"
                    },
                    {
                        "backend":  "gnuplot",
-                       "copy":  "figures/gunplot/PUBLIC_SCZ_EUR_SEX_GUNPLOT_local_top_hits_with_gtf_rs185665940.png",
+                       "copy":  "figures/gnuplot/PUBLIC_SCZ_EUR_SEX_GNUPLOT_local_top_hits_with_gtf_rs185665940.png",
                        "family":  "local_gtf",
                        "sha256":  "91736c3fde485686399c64ec8b29390f6033e6337199a3651e5064ccd5c12268",
-                       "source":  "original-run/PUBLIC_SCZ_EUR_SEX_GUNPLOT_local_top_hits_with_gtf_rs185665940.png"
+                       "source":  "original-run/PUBLIC_SCZ_EUR_SEX_GNUPLOT_local_top_hits_with_gtf_rs185665940.png"
                    },
                    {
                        "backend":  "gnuplot",
-                       "copy":  "figures/gunplot/PUBLIC_SCZ_EUR_SEX_GUNPLOT_local_top_hits_with_gtf_rs2232429.png",
+                       "copy":  "figures/gnuplot/PUBLIC_SCZ_EUR_SEX_GNUPLOT_local_top_hits_with_gtf_rs2232429.png",
                        "family":  "local_gtf",
                        "sha256":  "ef35f68bb0b7c907166e46f16abf493945bdafd86a5618aaf55d927dd53e99f9",
-                       "source":  "original-run/PUBLIC_SCZ_EUR_SEX_GUNPLOT_local_top_hits_with_gtf_rs2232429.png"
+                       "source":  "original-run/PUBLIC_SCZ_EUR_SEX_GNUPLOT_local_top_hits_with_gtf_rs2232429.png"
                    },
                    {
                        "backend":  "gnuplot",
-                       "copy":  "figures/gunplot/PUBLIC_SCZ_EUR_SEX_GUNPLOT_local_top_hits_with_gtf_rs62604261.png",
+                       "copy":  "figures/gnuplot/PUBLIC_SCZ_EUR_SEX_GNUPLOT_local_top_hits_with_gtf_rs62604261.png",
                        "family":  "local_gtf",
                        "sha256":  "bd540ee4d494adf97a823ec7f821ebf34ba26cca911bdb7fdd0c495f0430e241",
-                       "source":  "original-run/PUBLIC_SCZ_EUR_SEX_GUNPLOT_local_top_hits_with_gtf_rs62604261.png"
+                       "source":  "original-run/PUBLIC_SCZ_EUR_SEX_GNUPLOT_local_top_hits_with_gtf_rs62604261.png"
                    },
                    {
                        "backend":  "gnuplot",
-                       "copy":  "figures/gunplot/PUBLIC_SCZ_EUR_SEX_GUNPLOT_top_hits_forest_EUR_FEMALE.png",
+                       "copy":  "figures/gnuplot/PUBLIC_SCZ_EUR_SEX_GNUPLOT_top_hits_forest_EUR_FEMALE.png",
                        "family":  "forest",
                        "sha256":  "28dc2a946cdb1563edfeaabb08cb66c282417c0776f91ce9fa6de368be0907a0",
-                       "source":  "original-run/PUBLIC_SCZ_EUR_SEX_GUNPLOT_top_hits_forest_EUR_FEMALE.png"
+                       "source":  "original-run/PUBLIC_SCZ_EUR_SEX_GNUPLOT_top_hits_forest_EUR_FEMALE.png"
                    },
                    {
                        "backend":  "gnuplot",
-                       "copy":  "figures/gunplot/PUBLIC_SCZ_EUR_SEX_GUNPLOT_top_hits_forest_EUR_MALE.png",
+                       "copy":  "figures/gnuplot/PUBLIC_SCZ_EUR_SEX_GNUPLOT_top_hits_forest_EUR_MALE.png",
                        "family":  "forest",
                        "sha256":  "bf0df0e6cf4ad6317c2bcd0c0ac35ff5f2845f464089c63b03125b37a87b9d85",
-                       "source":  "original-run/PUBLIC_SCZ_EUR_SEX_GUNPLOT_top_hits_forest_EUR_MALE.png"
+                       "source":  "original-run/PUBLIC_SCZ_EUR_SEX_GNUPLOT_top_hits_forest_EUR_MALE.png"
                    },
                    {
                        "backend":  "gnuplot",
-                       "copy":  "figures/gunplot/PUBLIC_SCZ_EUR_SEX_GUNPLOT_top_hits_forest_combined.png",
+                       "copy":  "figures/gnuplot/PUBLIC_SCZ_EUR_SEX_GNUPLOT_top_hits_forest_combined.png",
                        "family":  "forest",
                        "sha256":  "ea88067ec61e88fc392c622c3cad4520ee0e1d6f6539a5634642c90ea73aae14",
-                       "source":  "original-run/PUBLIC_SCZ_EUR_SEX_GUNPLOT_top_hits_forest_combined.png"
+                       "source":  "original-run/PUBLIC_SCZ_EUR_SEX_GNUPLOT_top_hits_forest_combined.png"
                    },
                    {
                        "backend":  "SAS ODA",

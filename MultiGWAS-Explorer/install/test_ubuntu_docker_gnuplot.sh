@@ -11,7 +11,7 @@ SPEC_PATH="configs/spec_pgc_scz_sex_common_automation.json"
 TARGET_SNP="rs185665940"
 PLOTS="local_manhattan,local_gtf"
 DISPLAY_GWAS=""
-OUTPUT_STEM="PGC_SCZ_GUNPLOT_DOCKER_TEST"
+OUTPUT_STEM="PGC_SCZ_GNUPLOT_DOCKER_TEST"
 HOST_DATA_ROOT=""
 INCLUDE_MANHATTAN=0
 SKIP_BUILD=0
@@ -31,12 +31,12 @@ Options:
   --include-manhattan      Prepend the slower genome-wide Manhattan stage.
   --display-gwas LIST      Optional displayed GWAS override.
   --output-stem STEM       Output basename stem for the Docker smoke test.
-                           Default: PGC_SCZ_GUNPLOT_DOCKER_TEST
+                           Default: PGC_SCZ_GNUPLOT_DOCKER_TEST
   --data-root-host PATH    Host directory to mount onto the spec's /mnt/<drive> root.
                            If omitted, the script auto-detects /cygdrive/<drive> or /mnt/<drive>.
   --image NAME             Docker image name. Default: multigwas-explorer-pipeline:latest
   --skip-build             Reuse the existing image instead of rebuilding it.
-  --force                  Forward --force to the gunplot wrapper.
+  --force                  Forward --force to the gnuplot wrapper.
   --help                   Show this help text.
 
 Notes:
@@ -317,7 +317,7 @@ data["output_prefix"] = os.environ["SMOKE_OUTPUT_PREFIX"]
 data["local_output_prefix"] = os.environ["SMOKE_LOCAL_OUTPUT_PREFIX"]
 data["local_top_hits_csv_basename"] = os.environ["SMOKE_LOCAL_TOP_HITS_CSV"]
 data["output_html_basename"] = os.environ["SMOKE_OUTPUT_HTML_BASENAME"]
-data["html_title"] = (data.get("html_title") or "Gunplot Manhattan Plot") + os.environ["SMOKE_HTML_TITLE_SUFFIX"]
+data["html_title"] = (data.get("html_title") or "Gnuplot Manhattan Plot") + os.environ["SMOKE_HTML_TITLE_SUFFIX"]
 data["local_html_title"] = os.environ["SMOKE_LOCAL_HTML_TITLE"]
 data["open_result"] = 0
 dst.write_text(json.dumps(data, indent=2) + "\n")
@@ -338,7 +338,7 @@ if [ "${SMOKE_FORCE}" = "1" ]; then
   cmd+=(--force)
 fi
 
-printf '[install] Running Docker gunplot smoke test:'
+printf '[install] Running Docker gnuplot smoke test:'
 printf ' %q' "${cmd[@]}"
 printf '\n'
 "${cmd[@]}"
@@ -359,7 +359,7 @@ docker run --rm \
   -v "${DOCKER_HELPER}:/tmp/test_ubuntu_docker_gnuplot.sh:ro" \
   "${IMAGE_NAME}" \
   bash /tmp/test_ubuntu_docker_gnuplot.sh
-log "Docker gunplot smoke test finished in $(($(date +%s) - run_started))s"
+log "Docker gnuplot smoke test finished in $(($(date +%s) - run_started))s"
 
 require_file() {
   local path="$1"
@@ -387,4 +387,4 @@ if csv_contains "${PLOTS}" "local_manhattan" || csv_contains "${PLOTS}" "local_g
   require_file "${HOST_OUTPUT_DIR}/${LOCAL_TOP_HITS_CSV}"
 fi
 
-log "Ubuntu Docker gunplot smoke test completed successfully"
+log "Ubuntu Docker gnuplot smoke test completed successfully"

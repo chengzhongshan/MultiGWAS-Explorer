@@ -133,7 +133,7 @@ unlike($sas_import, qr/\bMETA_Z\s*=/,
 SKIP: {
     skip 'gnuplot or PDL is unavailable', 14
         unless system('gnuplot', '--version') == 0 && eval { require PDL; 1 };
-    my $gnu_spec = "$dir/gunplot.spec.json";
+    my $gnu_spec = "$dir/gnuplot.spec.json";
     is(system($^X, "$Bin/../auto_prepare_and_run_diff_gwas_with_gnuplot.pl",
         '--input-merged', $input, '--spec-out', $gnu_spec,
         '--plots', 'manhattan', '--display-gwas', 'Meta'), 0,
@@ -142,10 +142,10 @@ SKIP: {
     is($gnu_runner->{MANHATTAN_P_VAR}, 'META_P', 'gnuplot uses the supplied meta P column');
     opendir my $plot_dh, $dir or die $!;
     my @png = map { "$dir/$_" }
-        grep { /GUNPLOT_manhattan_display_META_.*\.png$/ } readdir $plot_dh;
+        grep { /GNUPLOT_manhattan_display_META_.*\.png$/ } readdir $plot_dh;
     closedir $plot_dh;
     ok(@png && -s $png[0], 'gnuplot writes a nonempty meta Manhattan image');
-    my $relative_gnu_spec = "$dir/relative_gunplot.spec.json";
+    my $relative_gnu_spec = "$dir/relative_gnuplot.spec.json";
     chdir dirname($relative_dir) or die $!;
     my $relative_gnu_status = system($^X,
         "$Bin/../auto_prepare_and_run_diff_gwas_with_gnuplot.pl",
@@ -158,10 +158,10 @@ SKIP: {
         'gnuplot generates an absolute output directory');
     opendir my $relative_plot_dh, $relative_dir or die $!;
     my @relative_png = map { "$relative_dir/$_" }
-        grep { /GUNPLOT_manhattan_display_META_.*\.png$/ } readdir $relative_plot_dh;
+        grep { /GNUPLOT_manhattan_display_META_.*\.png$/ } readdir $relative_plot_dh;
     closedir $relative_plot_dh;
     ok(@relative_png && -s $relative_png[0], 'gnuplot renders a meta plot from the relative directory');
-    my $default_gnu_spec = "$dir/relative_gunplot_default.spec.json";
+    my $default_gnu_spec = "$dir/relative_gnuplot_default.spec.json";
     chdir dirname($relative_dir) or die $!;
     my $default_gnu_status = system($^X,
         "$Bin/../auto_prepare_and_run_diff_gwas_with_gnuplot.pl",
@@ -169,12 +169,12 @@ SKIP: {
         '--plots', 'manhattan');
     chdir $previous_cwd or die $!;
     is($default_gnu_status, 0, 'default merged gnuplot refreshes Meta-only runner and renders all tracks');
-    my $default_runner = read_json("$dir/auto_" . $relative_spec->{artifact_stem} . '_gunplot_runner.json');
+    my $default_runner = read_json("$dir/auto_" . $relative_spec->{artifact_stem} . '_gnuplot_runner.json');
     is_deeply($default_runner->{MANHATTAN_OTHER_P_VARS},
         [qw(MP2PRT_DS_ALL_GROUP2_P MP2PRT_DS_ALL_GROUP1_P META_P)],
         'gnuplot translates cohort aliases to columns in the wide file');
     my $default_prefix = $default_runner->{OUTPUT_PREFIX};
-    $default_prefix =~ s/_SAS_/_GUNPLOT_/g;
+    $default_prefix =~ s/_SAS_/_GNUPLOT_/g;
     ok(-s "$relative_dir/$default_prefix.png",
         'default merged gnuplot writes a nonempty Manhattan image');
     open my $default_manifest_fh, '<', "$relative_dir/$default_prefix.manifest.tsv" or die $!;
@@ -194,7 +194,7 @@ SKIP: {
     close $default_manifest_fh;
     is($default_manifest{rows_scanned}, 3,
         'explicit all-SNP mode bypasses the nominal P filter');
-    my $custom_spec = "$dir/custom_gunplot.spec.json";
+    my $custom_spec = "$dir/custom_gnuplot.spec.json";
     is(system($^X, "$Bin/../auto_prepare_and_run_diff_gwas_with_gnuplot.pl",
         '--input-merged', $input, '--spec-out', $custom_spec, '--plots', 'manhattan',
         '--exclude-manhattan-tracks', 'MP2PRT_DS_ALL,MP2PRT',

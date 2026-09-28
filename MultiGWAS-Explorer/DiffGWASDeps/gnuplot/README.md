@@ -6,8 +6,8 @@ meant to serve as a drop-in alternative to SAS ODA plotting for the
 `auto_prepare_and_run_diff_gwas` pipeline.
 
 Files
-- `pdl_gunplot_manhattan.pl` - generate genome-wide multi-track Manhattan PNG
-- `pdl_gunplot_local_gtf.pl` - generate a local locus PNG with optional GTF gene track
+- `pdl_gnuplot_manhattan.pl` - generate genome-wide multi-track Manhattan PNG
+- `pdl_gnuplot_local_gtf.pl` - generate a local locus PNG with optional GTF gene track
 
 Notes
 - Scripts read a wide-format TSV.gz with columns `CHR`, `BP`, `SNP`, and one or
@@ -51,11 +51,11 @@ Usage examples
 
 Generate a Manhattan from a prepared wide subset:
 
-  perl pdl_gunplot_manhattan.pl --data /path/to/wide_subset.tsv.gz --outdir ./gnuplot_out
+  perl pdl_gnuplot_manhattan.pl --data /path/to/wide_subset.tsv.gz --outdir ./gnuplot_out
 
 Generate a local locus plot for SNP `rs12345` with a GTF:
 
-  perl pdl_gunplot_local_gtf.pl --data /path/to/wide_subset.tsv.gz --snp rs12345 --gtf /path/to/gencode.gtf --outdir ./gnuplot_out
+  perl pdl_gnuplot_local_gtf.pl --data /path/to/wide_subset.tsv.gz --snp rs12345 --gtf /path/to/gencode.gtf --outdir ./gnuplot_out
 
 Wrapper
 

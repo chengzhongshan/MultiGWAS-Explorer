@@ -73,9 +73,9 @@ ODA backends.
 
 - Gallery: `MultiGWAS-Explorer/public-gwas-test/results.html`
 - Numerical report: `MultiGWAS-Explorer/public-gwas-test/numeric_validation.json`
-- Image report: `MultiGWAS-Explorer/public-gwas-test/image_validation_gunplot.json`
+- Image report: `MultiGWAS-Explorer/public-gwas-test/image_validation_gnuplot.json`
 - SAS image report: `MultiGWAS-Explorer/public-gwas-test/image_validation_sas.json`
 - Figures and signed-LD manifests:
-  `MultiGWAS-Explorer/public-gwas-test/PUBLIC_SCZ_EUR_SEX_GUNPLOT_*`
+  `MultiGWAS-Explorer/public-gwas-test/PUBLIC_SCZ_EUR_SEX_GNUPLOT_*`
 
 The SAS ODA and native gnuplot workflows both completed without fallback.

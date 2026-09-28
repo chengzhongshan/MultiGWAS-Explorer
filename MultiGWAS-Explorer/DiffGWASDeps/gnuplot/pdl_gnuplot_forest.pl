@@ -10,7 +10,7 @@ use Text::ParseWords qw(parse_line);
 sub usage {
     return <<"USAGE";
 Usage:
-  perl pdl_gunplot_forest.pl --csv top_hits.csv --out-prefix prefix [options]
+  perl pdl_gnuplot_forest.pl --csv top_hits.csv --out-prefix prefix [options]
 
 Options:
   --track-ids A|B|C         Required.
