@@ -325,7 +325,7 @@ print(dst)
 PY
 
 cmd=(
-  perl ./auto_prepare_and_run_diff_gwas_with_gunplot.pl
+  perl ./auto_prepare_and_run_diff_gwas_with_gnuplot.pl
   --spec "${SMOKE_SPEC_DST}"
   --plots "${SMOKE_PLOTS}"
   --target-snps "${SMOKE_TARGET_SNP}"

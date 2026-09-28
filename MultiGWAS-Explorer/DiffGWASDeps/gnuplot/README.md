@@ -59,7 +59,7 @@ Generate a local locus plot for SNP `rs12345` with a GTF:
 
 Wrapper
 
-`auto_prepare_and_run_diff_gwas_with_gunplot.pl` (in repository root) wraps
+`auto_prepare_and_run_diff_gwas_with_gnuplot.pl` (in repository root) wraps
 the existing data-preparation logic (optionally calling the original
 `auto_prepare_and_run_diff_gwas.pl` to produce a wide subset) and then calls
 these plotting helpers. Use `--data-gz` to supply an existing wide subset.
@@ -70,7 +70,7 @@ GTF cache is `.gnuplot_gtf_cache`.
 For example, render two nearby query SNPs in one locus and highlight a known
 LD-linked SNP:
 
-  perl auto_prepare_and_run_diff_gwas_with_gunplot.pl \
+  perl auto_prepare_and_run_diff_gwas_with_gnuplot.pl \
     --spec configs/spec_pgc_scz_sex_common_automation.json \
     --target-snps rs2070788,rs383510 \
     --plots local_gtf \

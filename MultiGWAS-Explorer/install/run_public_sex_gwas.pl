@@ -90,7 +90,7 @@ if ($phase eq 'all' || $phase eq 'plots') {
  die "Invalid target SNP list\n" unless $targets=~/^rs\d+(?:,rs\d+)*$/;
  validate_plink_reference($spec);
  if ($backend eq 'gnuplot' || $backend eq 'both') {
-  run('gnuplot_inquiry',$^X,'auto_prepare_and_run_diff_gwas_with_gunplot.pl',
+  run('gnuplot_inquiry',$^X,'auto_prepare_and_run_diff_gwas_with_gnuplot.pl',
    '--spec',$spec,'--plots','manhattan,local_manhattan,local_gtf,forest',
    '--target-snps',$targets,'--no-remove-X-chr','--ld-display-mode','heatmap');
   verify_images('GUNPLOT');

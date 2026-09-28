@@ -4075,7 +4075,7 @@ sub run_step {
 
 sub run_gnuplot_space_fallback {
     my (%args) = @_;
-    my $wrapper = File::Spec->catfile($Bin, 'auto_prepare_and_run_diff_gwas_with_gunplot.pl');
+    my $wrapper = File::Spec->catfile($Bin, 'auto_prepare_and_run_diff_gwas_with_gnuplot.pl');
     return (0, "Gnuplot wrapper is missing: $wrapper") unless -f $wrapper;
 
     my @cmd = ($^X, $wrapper, '--spec', $spec_file, '--step', $args{step});

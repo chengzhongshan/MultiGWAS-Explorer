@@ -14,7 +14,7 @@ The [main README](README.md) is the canonical installation guide.
 
 - `auto_prepare_and_run_diff_gwas.pl`
   Main automation entry point for the SAS ODA workflow.
-- `auto_prepare_and_run_diff_gwas_with_gunplot.pl`
+- `auto_prepare_and_run_diff_gwas_with_gnuplot.pl`
   Main automation entry point for the non-SAS gunplot workflow.
 - `run_sas_codes_or_script_in_ODA.pl`
   Low-level helper for SAS ODA submit, upload, download, delete, and session
@@ -131,7 +131,7 @@ data and reference files; edit the bundled spec's input, output, work-directory,
 and PLINK/reference paths to match your machine first:
 
 ```bash
-perl ./auto_prepare_and_run_diff_gwas_with_gunplot.pl \
+perl ./auto_prepare_and_run_diff_gwas_with_gnuplot.pl \
   --spec configs/spec_pgc_scz_sex_common_automation.json \
   --plots local_manhattan,local_gtf \
   --target-snps rs185665940
@@ -140,7 +140,7 @@ perl ./auto_prepare_and_run_diff_gwas_with_gunplot.pl \
 To include the slower genome-wide Manhattan panel:
 
 ```bash
-perl ./auto_prepare_and_run_diff_gwas_with_gunplot.pl \
+perl ./auto_prepare_and_run_diff_gwas_with_gnuplot.pl \
   --spec configs/spec_pgc_scz_sex_common_automation.json \
   --plots manhattan,local_manhattan,local_gtf \
   --target-snps rs185665940
@@ -164,7 +164,7 @@ perl ./auto_prepare_and_run_diff_gwas.pl \
 Gunplot:
 
 ```bash
-perl ./auto_prepare_and_run_diff_gwas_with_gunplot.pl \
+perl ./auto_prepare_and_run_diff_gwas_with_gnuplot.pl \
   --spec configs/spec_pgc_scz_sex_common_automation.json \
   --plots forest \
   --target-snps rs185665940

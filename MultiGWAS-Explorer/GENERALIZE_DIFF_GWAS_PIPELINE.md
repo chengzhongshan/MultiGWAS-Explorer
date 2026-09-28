@@ -80,7 +80,7 @@ This script takes one comparison spec JSON and will:
 
 The repository also keeps a parallel non-SAS plotting entry point:
 
-- [auto_prepare_and_run_diff_gwas_with_gunplot.pl](/G:/NGS_lib/Linux_codes_SAM/Conda_and_Docker_Related_Scripts/perlMCP4Gemini_Paper/auto_prepare_and_run_diff_gwas_with_gunplot.pl)
+- [auto_prepare_and_run_diff_gwas_with_gnuplot.pl](/G:/NGS_lib/Linux_codes_SAM/Conda_and_Docker_Related_Scripts/perlMCP4Gemini_Paper/auto_prepare_and_run_diff_gwas_with_gnuplot.pl)
 
 Keep that gunplot pipeline separate from the SAS ODA workflow. It is intended
 for independent rendering and layout experimentation, not as an automatic
@@ -416,7 +416,7 @@ Portable Cygwin wrapper validation:
 - practical validation command:
 
 ```bash
-perl ./auto_prepare_and_run_diff_gwas_with_gunplot.pl \
+perl ./auto_prepare_and_run_diff_gwas_with_gnuplot.pl \
   --spec configs/spec_pgc_scz_sex_common_automation.json \
   --plots manhattan,local_manhattan,local_gtf
 ```
@@ -424,7 +424,7 @@ perl ./auto_prepare_and_run_diff_gwas_with_gunplot.pl \
 Quick Ubuntu Docker gunplot validation:
 
 ```bash
-perl ./auto_prepare_and_run_diff_gwas_with_gunplot.pl \
+perl ./auto_prepare_and_run_diff_gwas_with_gnuplot.pl \
   --spec configs/spec_pgc_scz_sex_common_automation.json \
   --plots local_manhattan,local_gtf \
   --target-snps rs185665940
@@ -433,7 +433,7 @@ perl ./auto_prepare_and_run_diff_gwas_with_gunplot.pl \
 Quick gunplot forest validation:
 
 ```bash
-perl ./auto_prepare_and_run_diff_gwas_with_gunplot.pl \
+perl ./auto_prepare_and_run_diff_gwas_with_gnuplot.pl \
   --spec configs/spec_pgc_scz_sex_common_automation.json \
   --plots forest \
   --target-snps rs185665940
@@ -558,7 +558,7 @@ The same inquiry-SNP flexibility now also applies to forest plots:
 Example combined local-Manhattan gunplot rerun:
 
 ```bash
-perl auto_prepare_and_run_diff_gwas_with_gunplot.pl \
+perl auto_prepare_and_run_diff_gwas_with_gnuplot.pl \
   --spec ./configs/spec_pgc_scz_sex_common_automation.json \
   --target-snps rs17425819,rs185665940 \
   --plots local_manhattan \
@@ -569,7 +569,7 @@ perl auto_prepare_and_run_diff_gwas_with_gunplot.pl \
 Example single-GWAS plot set in the gunplot path:
 
 ```bash
-perl auto_prepare_and_run_diff_gwas_with_gunplot.pl \
+perl auto_prepare_and_run_diff_gwas_with_gnuplot.pl \
   --spec ./configs/spec_pgc_scz_sex_common_automation.json \
   --display-gwas ALL_FEMALE \
   --plots manhattan,local_manhattan,local_gtf
@@ -578,7 +578,7 @@ perl auto_prepare_and_run_diff_gwas_with_gunplot.pl \
 Example gunplot forest rerun for one target SNP:
 
 ```bash
-perl auto_prepare_and_run_diff_gwas_with_gunplot.pl \
+perl auto_prepare_and_run_diff_gwas_with_gnuplot.pl \
   --spec ./configs/spec_pgc_scz_sex_common_automation.json \
   --plots forest \
   --target-snps rs185665940
@@ -587,7 +587,7 @@ perl auto_prepare_and_run_diff_gwas_with_gunplot.pl \
 Example gunplot forest rerun for multiple target SNPs:
 
 ```bash
-perl auto_prepare_and_run_diff_gwas_with_gunplot.pl \
+perl auto_prepare_and_run_diff_gwas_with_gnuplot.pl \
   --spec ./configs/spec_pgc_scz_sex_common_automation.json \
   --plots forest \
   --target-snps rs185665940,rs4950119

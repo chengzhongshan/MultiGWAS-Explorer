@@ -103,7 +103,7 @@ perl -MIO::Socket::SSL -MNet::SSLeay -MHTTP::Tiny -e 'my ($ok, $why) = HTTP::Tin
 perl DiffGWASDeps/test_sas_oda_debug_macro_guard.pl >/dev/null
 perl DiffGWASDeps/test_sas_oda_connection_lifecycle.pl >/dev/null
 perl -I DiffGWASDeps -c auto_prepare_and_run_diff_gwas.pl >/dev/null
-perl -c auto_prepare_and_run_diff_gwas_with_gunplot.pl >/dev/null
+perl -c auto_prepare_and_run_diff_gwas_with_gnuplot.pl >/dev/null
 perl -I DiffGWASDeps -c server.pl >/dev/null
 perl -I DiffGWASDeps -c run_sas_codes_or_script_in_ODA.pl >/dev/null
 perl -c DiffGWASDeps/gnuplot/pdl_gunplot_manhattan.pl >/dev/null

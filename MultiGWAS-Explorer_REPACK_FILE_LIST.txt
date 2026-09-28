@@ -5,7 +5,7 @@
 
 .gitignore
 auto_prepare_and_run_diff_gwas.pl
-auto_prepare_and_run_diff_gwas_with_gunplot.pl
+auto_prepare_and_run_diff_gwas_with_gnuplot.pl
 BENCHMARK_PGC_SEX_20260428.md
 bgzip_tabix_diff_gwas.pl
 check_sas_oda_reachable.pl

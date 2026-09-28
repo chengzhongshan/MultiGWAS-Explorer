@@ -134,7 +134,7 @@ SKIP: {
     skip 'gnuplot or PDL is unavailable', 14
         unless system('gnuplot', '--version') == 0 && eval { require PDL; 1 };
     my $gnu_spec = "$dir/gunplot.spec.json";
-    is(system($^X, "$Bin/../auto_prepare_and_run_diff_gwas_with_gunplot.pl",
+    is(system($^X, "$Bin/../auto_prepare_and_run_diff_gwas_with_gnuplot.pl",
         '--input-merged', $input, '--spec-out', $gnu_spec,
         '--plots', 'manhattan', '--display-gwas', 'Meta'), 0,
         'gnuplot entry point imports and plots supplied meta results directly');
@@ -148,7 +148,7 @@ SKIP: {
     my $relative_gnu_spec = "$dir/relative_gunplot.spec.json";
     chdir dirname($relative_dir) or die $!;
     my $relative_gnu_status = system($^X,
-        "$Bin/../auto_prepare_and_run_diff_gwas_with_gunplot.pl",
+        "$Bin/../auto_prepare_and_run_diff_gwas_with_gnuplot.pl",
         '--gwas-dir', basename($relative_dir), '--spec-out', $relative_gnu_spec,
         '--plots', 'manhattan', '--display-gwas', 'Meta');
     chdir $previous_cwd or die $!;
@@ -164,7 +164,7 @@ SKIP: {
     my $default_gnu_spec = "$dir/relative_gunplot_default.spec.json";
     chdir dirname($relative_dir) or die $!;
     my $default_gnu_status = system($^X,
-        "$Bin/../auto_prepare_and_run_diff_gwas_with_gunplot.pl",
+        "$Bin/../auto_prepare_and_run_diff_gwas_with_gnuplot.pl",
         '--gwas-dir', basename($relative_dir), '--spec-out', $default_gnu_spec,
         '--plots', 'manhattan');
     chdir $previous_cwd or die $!;
@@ -184,7 +184,7 @@ SKIP: {
         'genome-wide gnuplot scans only rows with a displayed P below 0.05');
     chdir dirname($relative_dir) or die $!;
     my $all_gnu_status = system($^X,
-        "$Bin/../auto_prepare_and_run_diff_gwas_with_gunplot.pl",
+        "$Bin/../auto_prepare_and_run_diff_gwas_with_gnuplot.pl",
         '--gwas-dir', basename($relative_dir), '--spec-out', $default_gnu_spec,
         '--plots', 'manhattan', '--manhattan-all-snps');
     chdir $previous_cwd or die $!;
@@ -195,7 +195,7 @@ SKIP: {
     is($default_manifest{rows_scanned}, 3,
         'explicit all-SNP mode bypasses the nominal P filter');
     my $custom_spec = "$dir/custom_gunplot.spec.json";
-    is(system($^X, "$Bin/../auto_prepare_and_run_diff_gwas_with_gunplot.pl",
+    is(system($^X, "$Bin/../auto_prepare_and_run_diff_gwas_with_gnuplot.pl",
         '--input-merged', $input, '--spec-out', $custom_spec, '--plots', 'manhattan',
         '--exclude-manhattan-tracks', 'MP2PRT_DS_ALL,MP2PRT',
         '--manhattan-track-order', 'META,DS_ALL',

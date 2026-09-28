@@ -25,7 +25,7 @@ for my $file (qw(
 }
 
 my @active_files = (
-    File::Spec->catfile($project_root, 'auto_prepare_and_run_diff_gwas_with_gunplot.pl'),
+    File::Spec->catfile($project_root, 'auto_prepare_and_run_diff_gwas_with_gnuplot.pl'),
     File::Spec->catfile($Bin, 'generate_requested_top_hits_csv.pl'),
     File::Spec->catfile($project_root, 'install', 'check_pipeline_install.sh'),
 );

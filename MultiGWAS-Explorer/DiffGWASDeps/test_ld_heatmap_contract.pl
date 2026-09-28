@@ -84,7 +84,7 @@ my %reference_contract = (
         '_r2_${threshold_tag}_w${window_tag}.plink2_1kg_phase3.tsv',
         '1000G Phase 3 / PLINK2',
     ],
-    'auto_prepare_and_run_diff_gwas_with_gunplot.pl' => [
+    'auto_prepare_and_run_diff_gwas_with_gnuplot.pl' => [
         'ld-reference-snp=s',
         'query_snps => [$ld_reference_snp]',
         "push \@cmd, ('--ld-reference-snp', \$ld_reference_snp)",
@@ -126,7 +126,7 @@ for my $name (sort keys %reference_contract) {
     }
 }
 
-my $gnuplot_wrapper_path = File::Spec->catfile($root, 'auto_prepare_and_run_diff_gwas_with_gunplot.pl');
+my $gnuplot_wrapper_path = File::Spec->catfile($root, 'auto_prepare_and_run_diff_gwas_with_gnuplot.pl');
 open my $gnuplot_wrapper_fh, '<:raw', $gnuplot_wrapper_path or die "Cannot read $gnuplot_wrapper_path: $!\n";
 my $gnuplot_wrapper_text = do { local $/; <$gnuplot_wrapper_fh> };
 close $gnuplot_wrapper_fh;

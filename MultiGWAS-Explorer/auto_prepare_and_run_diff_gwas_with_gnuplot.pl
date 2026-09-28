@@ -38,9 +38,9 @@ use IO::Uncompress::Gunzip qw($GunzipError);
 sub usage {
     return <<"USAGE";
 Usage:
-  perl auto_prepare_and_run_diff_gwas_with_gunplot.pl --spec spec.json [options]
-  perl auto_prepare_and_run_diff_gwas_with_gunplot.pl --gwas-dir DIR [options]
-  perl auto_prepare_and_run_diff_gwas_with_gunplot.pl --input-merged combined.tsv.gz [options]
+  perl auto_prepare_and_run_diff_gwas_with_gnuplot.pl --spec spec.json [options]
+  perl auto_prepare_and_run_diff_gwas_with_gnuplot.pl --gwas-dir DIR [options]
+  perl auto_prepare_and_run_diff_gwas_with_gnuplot.pl --input-merged combined.tsv.gz [options]
 
 Options:
   --gwas-dir DIR                Auto-detect GWAS inputs in this directory.

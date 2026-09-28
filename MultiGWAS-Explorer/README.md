@@ -71,13 +71,13 @@ perl auto_prepare_and_run_diff_gwas.pl \
   --spec configs/aoa_merged.json --skip-plots
 
 # Plot the supplied meta-analysis P values directly with gnuplot:
-perl auto_prepare_and_run_diff_gwas_with_gunplot.pl \
+perl auto_prepare_and_run_diff_gwas_with_gnuplot.pl \
   --input-merged /path/to/DS_ALL_and_MP2PRT_plus_meta.gz \
   --spec-out configs/aoa_gunplot.json \
   --plots manhattan --display-gwas Meta
 
 # Or detect the same table in a directory, including a relative directory:
-perl auto_prepare_and_run_diff_gwas_with_gunplot.pl \
+perl auto_prepare_and_run_diff_gwas_with_gnuplot.pl \
   --gwas-dir AOA_GWAS_Data --plots manhattan --display-gwas Meta
 ```
 
@@ -122,7 +122,7 @@ Regression check: `perl install/test_merged_meta_import.pl`.
   plot submission. It now also accepts `--gwas-dir` for auto-detecting either
   raw multi-file GWAS inputs or a single merged-wide GWAS table and can emit
   an inferred spec through `--preview-spec` / `--generate-spec-only`.
-- `auto_prepare_and_run_diff_gwas_with_gunplot.pl`
+- `auto_prepare_and_run_diff_gwas_with_gnuplot.pl`
   Parallel non-SAS visualization pipeline for genome-wide Manhattan, combined
   local Manhattan, local GTF-style plots, and forest plots rendered through
   gnuplot / PDL, with the same displayed-GWAS and inquiry-SNP flexibility as
@@ -136,7 +136,7 @@ Regression check: `perl install/test_merged_meta_import.pl`.
 The canonical implementation directory for the non-SAS renderer is
 `DiffGWASDeps/gnuplot/`. Earlier releases misspelled this directory as
 `DiffGWASDeps/gunplot/`; active pipeline code no longer uses that path. The
-wrapper filename `auto_prepare_and_run_diff_gwas_with_gunplot.pl`, MCP tool
+top-level wrapper is `auto_prepare_and_run_diff_gwas_with_gnuplot.pl`. MCP tool
 name `run_gunplot_wrapper`, renderer filenames, configuration keys, and output
 field names containing `gunplot` are retained as compatibility interfaces.
 The wrapper also migrates the legacy `.gunplot_gtf_cache` directory to
@@ -370,7 +370,7 @@ Current behavior:
 Example gunplot single-SNP forest rerun:
 
 ```bash
-perl ./auto_prepare_and_run_diff_gwas_with_gunplot.pl \
+perl ./auto_prepare_and_run_diff_gwas_with_gnuplot.pl \
   --spec configs/spec_pgc_scz_sex_common_automation.json \
   --plots forest \
   --target-snps rs185665940
@@ -379,7 +379,7 @@ perl ./auto_prepare_and_run_diff_gwas_with_gunplot.pl \
 Example gunplot multi-SNP forest rerun:
 
 ```bash
-perl ./auto_prepare_and_run_diff_gwas_with_gunplot.pl \
+perl ./auto_prepare_and_run_diff_gwas_with_gnuplot.pl \
   --spec configs/spec_pgc_scz_sex_common_automation.json \
   --plots forest \
   --target-snps rs185665940,rs4950119
@@ -576,7 +576,7 @@ bash install/check_pipeline_install.sh
 Then run the pipeline from that same Cygwin terminal, for example:
 
 ```bash
-perl ./auto_prepare_and_run_diff_gwas_with_gunplot.pl \
+perl ./auto_prepare_and_run_diff_gwas_with_gnuplot.pl \
   --spec configs/spec_pgc_scz_sex_common_automation.json \
   --plots local_manhattan,local_gtf \
   --target-snps rs185665940
@@ -1079,7 +1079,7 @@ Validation status:
 
 Portable Cygwin validation note:
 
-- the top-level `auto_prepare_and_run_diff_gwas_with_gunplot.pl` wrapper was
+- the top-level `auto_prepare_and_run_diff_gwas_with_gnuplot.pl` wrapper was
   validated from an isolated portable Cygwin install under the user profile
   portable root
 - `bash install/check_pipeline_install.sh` now also reports the active Perl
@@ -1093,7 +1093,7 @@ Portable Cygwin validation note:
 - a practical wrapper-level validation command after installation is:
 
 ```bash
-perl ./auto_prepare_and_run_diff_gwas_with_gunplot.pl \
+perl ./auto_prepare_and_run_diff_gwas_with_gnuplot.pl \
   --spec configs/spec_pgc_scz_sex_common_automation.json \
   --plots manhattan,local_manhattan,local_gtf
 ```
@@ -1139,7 +1139,7 @@ perl ./DiffGWASDeps/run_sas_codes_or_script_in_ODA.pl \
 ```bash
 cp configs/spec_pgc_scz_sex_common_automation.json \
   /tmp/spec_pgc_scz_sex_common_automation.docker_gnuplot.json
-perl ./auto_prepare_and_run_diff_gwas_with_gunplot.pl \
+perl ./auto_prepare_and_run_diff_gwas_with_gnuplot.pl \
   --spec /tmp/spec_pgc_scz_sex_common_automation.docker_gnuplot.json \
   --plots local_manhattan,local_gtf \
   --target-snps rs185665940
@@ -1313,7 +1313,7 @@ macOS, and Ubuntu Linux.
 The same repo-local runtime is then reused by:
 
 - `auto_prepare_and_run_diff_gwas.pl`
-- `auto_prepare_and_run_diff_gwas_with_gunplot.pl`
+- `auto_prepare_and_run_diff_gwas_with_gnuplot.pl`
 - `server.pl`
 - `run_sas_codes_or_script_in_ODA.pl`
 
@@ -1349,7 +1349,7 @@ The default workflow is:
 The repository also keeps a separate gunplot workflow in parallel with the SAS
 ODA pipeline:
 
-- `auto_prepare_and_run_diff_gwas_with_gunplot.pl`
+- `auto_prepare_and_run_diff_gwas_with_gnuplot.pl`
 
 This pipeline should stay independent from `auto_prepare_and_run_diff_gwas.pl`.
 Use it when you want local rendering without SAS ODA, or when you want to
@@ -1452,7 +1452,7 @@ perl auto_prepare_and_run_diff_gwas.pl \
 gunplot single-GWAS plot set:
 
 ```bash
-perl auto_prepare_and_run_diff_gwas_with_gunplot.pl \
+perl auto_prepare_and_run_diff_gwas_with_gnuplot.pl \
   --spec ./configs/spec_pgc_scz_sex_common_automation.json \
   --display-gwas ALL_FEMALE \
   --plots manhattan,local_manhattan,local_gtf
@@ -1461,7 +1461,7 @@ perl auto_prepare_and_run_diff_gwas_with_gunplot.pl \
 gunplot forest plot for one inquiry SNP:
 
 ```bash
-perl auto_prepare_and_run_diff_gwas_with_gunplot.pl \
+perl auto_prepare_and_run_diff_gwas_with_gnuplot.pl \
   --spec ./configs/spec_pgc_scz_sex_common_automation.json \
   --plots forest \
   --target-snps rs185665940
@@ -1470,7 +1470,7 @@ perl auto_prepare_and_run_diff_gwas_with_gunplot.pl \
 Fast Docker-first gunplot validation:
 
 ```bash
-perl auto_prepare_and_run_diff_gwas_with_gunplot.pl \
+perl auto_prepare_and_run_diff_gwas_with_gnuplot.pl \
   --spec ./configs/spec_pgc_scz_sex_common_automation.json \
   --plots local_manhattan,local_gtf \
   --target-snps rs185665940
@@ -1484,7 +1484,7 @@ rendering.
 Inquiry-SNP local panels with a custom displayed GWAS subset:
 
 ```bash
-perl auto_prepare_and_run_diff_gwas_with_gunplot.pl \
+perl auto_prepare_and_run_diff_gwas_with_gnuplot.pl \
   --spec ./configs/spec_pgc_scz_sex_common_automation.json \
   --display-gwas EUR,EUR_FEMALE,EUR_MALE \
   --target-snps rs185665940 \
@@ -1494,7 +1494,7 @@ perl auto_prepare_and_run_diff_gwas_with_gunplot.pl \
 Example:
 
 ```bash
-perl auto_prepare_and_run_diff_gwas_with_gunplot.pl \
+perl auto_prepare_and_run_diff_gwas_with_gnuplot.pl \
   --spec ./configs/spec_pgc_scz_sex_common_automation.json \
   --target-snps rs17425819,rs185665940 \
   --plots local_manhattan \
@@ -2542,7 +2542,7 @@ perl auto_prepare_and_run_diff_gwas.pl \
 The equivalent local renderer is:
 
 ```bash
-perl auto_prepare_and_run_diff_gwas_with_gunplot.pl \
+perl auto_prepare_and_run_diff_gwas_with_gnuplot.pl \
   --spec configs/your_spec.json \
   --target-snps rs185665940,rs10166057,rs4852780 \
   --step plot_local_gtf \

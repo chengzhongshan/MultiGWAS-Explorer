@@ -152,6 +152,6 @@ and [platform installation checks](https://github.com/chengzhongshan/MultiGWAS-E
   configuration, filtering, plotting options, SAS utilities, and MCP integration
 - [Benchmark documentation](MultiGWAS-Explorer/benchmark/README.md)
 
-The main entry points are `auto_prepare_and_run_diff_gwas_with_gunplot.pl`
+The main entry points are `auto_prepare_and_run_diff_gwas_with_gnuplot.pl`
 for local gnuplot and `auto_prepare_and_run_diff_gwas.pl` for SAS ODA. Their
 historical filenames are retained for compatibility.
