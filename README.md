@@ -81,20 +81,49 @@ renders gnuplot and SAS ODA figures. SAS ODA must already be configured. The
 four downloads are about 820 MB and the complete test needs several GB of free
 space.
 
-### Completed real-data example
+### Completed real-data gallery
 
-These are representative outputs from the full 6,650,636-comparison Windows
-portable-Cygwin validation. Both panels use the same sex-stratified
-schizophrenia analysis.
+The following 22 figures come from the full 6,650,636-comparison Windows
+portable-Cygwin validation of the sex-stratified schizophrenia GWAS. Inquiry
+targets are `rs2232429` (common association), `rs185665940` (autosomal
+differential signal), and `rs62604261` (chromosome-X differential signal).
+Click any figure to open its full-resolution PNG.
 
-| gnuplot | SAS OnDemand for Academics |
+#### gnuplot outputs
+
+| Genome-wide Manhattan | Combined local Manhattan |
 | --- | --- |
-| [![gnuplot genome-wide Manhattan](MultiGWAS-Explorer/examples/public-scz-sex/figures/gunplot/PUBLIC_SCZ_EUR_SEX_GUNPLOT_manhattan.png)](MultiGWAS-Explorer/examples/public-scz-sex/figures/gunplot/PUBLIC_SCZ_EUR_SEX_GUNPLOT_manhattan.png) | [![SAS ODA genome-wide Manhattan](MultiGWAS-Explorer/examples/public-scz-sex/figures/sas/PUBLIC_SCZ_EUR_SEX_SAS_manhattan.png)](MultiGWAS-Explorer/examples/public-scz-sex/figures/sas/PUBLIC_SCZ_EUR_SEX_SAS_manhattan.png) |
+| [![gnuplot genome-wide Manhattan](MultiGWAS-Explorer/examples/public-scz-sex/figures/gunplot/PUBLIC_SCZ_EUR_SEX_GUNPLOT_manhattan.png)](MultiGWAS-Explorer/examples/public-scz-sex/figures/gunplot/PUBLIC_SCZ_EUR_SEX_GUNPLOT_manhattan.png) | [![gnuplot combined local Manhattan](MultiGWAS-Explorer/examples/public-scz-sex/figures/gunplot/PUBLIC_SCZ_EUR_SEX_GUNPLOT_local_top_hits_manhattan.png)](MultiGWAS-Explorer/examples/public-scz-sex/figures/gunplot/PUBLIC_SCZ_EUR_SEX_GUNPLOT_local_top_hits_manhattan.png) |
+| Local Manhattan: `rs2232429` | Local Manhattan: `rs185665940` |
+| [![gnuplot local Manhattan rs2232429](MultiGWAS-Explorer/examples/public-scz-sex/figures/gunplot/PUBLIC_SCZ_EUR_SEX_GUNPLOT_local_top_hits_manhattan_rs2232429.png)](MultiGWAS-Explorer/examples/public-scz-sex/figures/gunplot/PUBLIC_SCZ_EUR_SEX_GUNPLOT_local_top_hits_manhattan_rs2232429.png) | [![gnuplot local Manhattan rs185665940](MultiGWAS-Explorer/examples/public-scz-sex/figures/gunplot/PUBLIC_SCZ_EUR_SEX_GUNPLOT_local_top_hits_manhattan_rs185665940.png)](MultiGWAS-Explorer/examples/public-scz-sex/figures/gunplot/PUBLIC_SCZ_EUR_SEX_GUNPLOT_local_top_hits_manhattan_rs185665940.png) |
+| Local Manhattan: `rs62604261` | Signed-LD gene track: `rs2232429` |
+| [![gnuplot local Manhattan rs62604261](MultiGWAS-Explorer/examples/public-scz-sex/figures/gunplot/PUBLIC_SCZ_EUR_SEX_GUNPLOT_local_top_hits_manhattan_rs62604261.png)](MultiGWAS-Explorer/examples/public-scz-sex/figures/gunplot/PUBLIC_SCZ_EUR_SEX_GUNPLOT_local_top_hits_manhattan_rs62604261.png) | [![gnuplot signed LD gene track rs2232429](MultiGWAS-Explorer/examples/public-scz-sex/figures/gunplot/PUBLIC_SCZ_EUR_SEX_GUNPLOT_local_top_hits_with_gtf_rs2232429.png)](MultiGWAS-Explorer/examples/public-scz-sex/figures/gunplot/PUBLIC_SCZ_EUR_SEX_GUNPLOT_local_top_hits_with_gtf_rs2232429.png) |
+| Signed-LD gene track: `rs185665940` | Signed-LD gene track: `rs62604261` |
+| [![gnuplot signed LD gene track rs185665940](MultiGWAS-Explorer/examples/public-scz-sex/figures/gunplot/PUBLIC_SCZ_EUR_SEX_GUNPLOT_local_top_hits_with_gtf_rs185665940.png)](MultiGWAS-Explorer/examples/public-scz-sex/figures/gunplot/PUBLIC_SCZ_EUR_SEX_GUNPLOT_local_top_hits_with_gtf_rs185665940.png) | [![gnuplot signed LD gene track rs62604261](MultiGWAS-Explorer/examples/public-scz-sex/figures/gunplot/PUBLIC_SCZ_EUR_SEX_GUNPLOT_local_top_hits_with_gtf_rs62604261.png)](MultiGWAS-Explorer/examples/public-scz-sex/figures/gunplot/PUBLIC_SCZ_EUR_SEX_GUNPLOT_local_top_hits_with_gtf_rs62604261.png) |
+| Female forest plot | Male forest plot |
+| [![gnuplot female forest plot](MultiGWAS-Explorer/examples/public-scz-sex/figures/gunplot/PUBLIC_SCZ_EUR_SEX_GUNPLOT_top_hits_forest_EUR_FEMALE.png)](MultiGWAS-Explorer/examples/public-scz-sex/figures/gunplot/PUBLIC_SCZ_EUR_SEX_GUNPLOT_top_hits_forest_EUR_FEMALE.png) | [![gnuplot male forest plot](MultiGWAS-Explorer/examples/public-scz-sex/figures/gunplot/PUBLIC_SCZ_EUR_SEX_GUNPLOT_top_hits_forest_EUR_MALE.png)](MultiGWAS-Explorer/examples/public-scz-sex/figures/gunplot/PUBLIC_SCZ_EUR_SEX_GUNPLOT_top_hits_forest_EUR_MALE.png) |
+| Combined female/male forest plot | |
+| [![gnuplot combined forest plot](MultiGWAS-Explorer/examples/public-scz-sex/figures/gunplot/PUBLIC_SCZ_EUR_SEX_GUNPLOT_top_hits_forest_combined.png)](MultiGWAS-Explorer/examples/public-scz-sex/figures/gunplot/PUBLIC_SCZ_EUR_SEX_GUNPLOT_top_hits_forest_combined.png) | |
+
+#### SAS OnDemand for Academics outputs
+
+| Genome-wide Manhattan | Combined local Manhattan |
+| --- | --- |
+| [![SAS ODA genome-wide Manhattan](MultiGWAS-Explorer/examples/public-scz-sex/figures/sas/PUBLIC_SCZ_EUR_SEX_SAS_manhattan.png)](MultiGWAS-Explorer/examples/public-scz-sex/figures/sas/PUBLIC_SCZ_EUR_SEX_SAS_manhattan.png) | [![SAS ODA combined local Manhattan](MultiGWAS-Explorer/examples/public-scz-sex/figures/sas/PUBLIC_SCZ_EUR_SEX_SAS_local_top_hits_manhattan.png)](MultiGWAS-Explorer/examples/public-scz-sex/figures/sas/PUBLIC_SCZ_EUR_SEX_SAS_local_top_hits_manhattan.png) |
+| Combined signed-LD gene-track output | Gene-track export: panel 1 |
+| [![SAS ODA combined signed LD gene track](MultiGWAS-Explorer/examples/public-scz-sex/figures/sas/PUBLIC_SCZ_EUR_SEX_SAS_local_top_hits_with_gtf.png)](MultiGWAS-Explorer/examples/public-scz-sex/figures/sas/PUBLIC_SCZ_EUR_SEX_SAS_local_top_hits_with_gtf.png) | [![SAS ODA gene track panel 1](MultiGWAS-Explorer/examples/public-scz-sex/figures/sas/PUBLIC_SCZ_EUR_SEX_SAS_local_top_hits_with_gtf_part1.png)](MultiGWAS-Explorer/examples/public-scz-sex/figures/sas/PUBLIC_SCZ_EUR_SEX_SAS_local_top_hits_with_gtf_part1.png) |
+| Gene-track export: panel 2 | Gene-track export: panel 3 |
+| [![SAS ODA gene track panel 2](MultiGWAS-Explorer/examples/public-scz-sex/figures/sas/PUBLIC_SCZ_EUR_SEX_SAS_local_top_hits_with_gtf_part2.png)](MultiGWAS-Explorer/examples/public-scz-sex/figures/sas/PUBLIC_SCZ_EUR_SEX_SAS_local_top_hits_with_gtf_part2.png) | [![SAS ODA gene track panel 3](MultiGWAS-Explorer/examples/public-scz-sex/figures/sas/PUBLIC_SCZ_EUR_SEX_SAS_local_top_hits_with_gtf_part3.png)](MultiGWAS-Explorer/examples/public-scz-sex/figures/sas/PUBLIC_SCZ_EUR_SEX_SAS_local_top_hits_with_gtf_part3.png) |
+| Signed-LD gene track: `rs2232429` | Signed-LD gene track: `rs185665940` |
+| [![SAS ODA signed LD gene track rs2232429](MultiGWAS-Explorer/examples/public-scz-sex/figures/sas/PUBLIC_SCZ_EUR_SEX_SAS_local_top_hits_with_gtf_rs2232429.png)](MultiGWAS-Explorer/examples/public-scz-sex/figures/sas/PUBLIC_SCZ_EUR_SEX_SAS_local_top_hits_with_gtf_rs2232429.png) | [![SAS ODA signed LD gene track rs185665940](MultiGWAS-Explorer/examples/public-scz-sex/figures/sas/PUBLIC_SCZ_EUR_SEX_SAS_local_top_hits_with_gtf_rs185665940.png)](MultiGWAS-Explorer/examples/public-scz-sex/figures/sas/PUBLIC_SCZ_EUR_SEX_SAS_local_top_hits_with_gtf_rs185665940.png) |
+| Signed-LD gene track: `rs62604261` | Female forest plot |
+| [![SAS ODA signed LD gene track rs62604261](MultiGWAS-Explorer/examples/public-scz-sex/figures/sas/PUBLIC_SCZ_EUR_SEX_SAS_local_top_hits_with_gtf_rs62604261.png)](MultiGWAS-Explorer/examples/public-scz-sex/figures/sas/PUBLIC_SCZ_EUR_SEX_SAS_local_top_hits_with_gtf_rs62604261.png) | [![SAS ODA female forest plot](MultiGWAS-Explorer/examples/public-scz-sex/figures/sas/PUBLIC_SCZ_EUR_SEX_SAS_top_hits_forest_EUR_FEMALE.png)](MultiGWAS-Explorer/examples/public-scz-sex/figures/sas/PUBLIC_SCZ_EUR_SEX_SAS_top_hits_forest_EUR_FEMALE.png) |
+| Male forest plot | |
+| [![SAS ODA male forest plot](MultiGWAS-Explorer/examples/public-scz-sex/figures/sas/PUBLIC_SCZ_EUR_SEX_SAS_top_hits_forest_EUR_MALE.png)](MultiGWAS-Explorer/examples/public-scz-sex/figures/sas/PUBLIC_SCZ_EUR_SEX_SAS_top_hits_forest_EUR_MALE.png) | |
 
 Clone the repository and open
 [`examples/public-scz-sex/results.html`](MultiGWAS-Explorer/examples/public-scz-sex/results.html)
-to browse all 11 gnuplot and 11 SAS ODA figures, including local Manhattan,
-signed-LD gene-track, and forest plots. The
+for the standalone gallery and SHA-256 manifest. The
 [example record](MultiGWAS-Explorer/examples/public-scz-sex/README.md) includes
 the validation scope and checksums.
 
