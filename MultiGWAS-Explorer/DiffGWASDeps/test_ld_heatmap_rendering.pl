@@ -32,13 +32,13 @@ close $gf or die "Cannot close $gtf: $!\n";
 
 open my $lf, '>:raw', $ld_cache or die "Cannot write $ld_cache: $!\n";
 print {$lf} "query_snp\tproxy_snp\tld_population\tproxy_r2\n";
-print {$lf} "RS100\tRS200\tEUR\t0.55\n";
+print {$lf} "RS100\tRS200\tEUR\t0.05\n";
 print {$lf} "RS100\tRS300\tEUR\t0.91\n";
 close $lf or die "Cannot close $ld_cache: $!\n";
 open my $lrf, '>:raw', $ld_r2_file or die "Cannot write $ld_r2_file: $!\n";
-print {$lrf} "SNP\tR2\n";
-print {$lrf} "rs200\t0.55\n";
-print {$lrf} "rs300\t0.91\n";
+print {$lrf} "SNP\tR2\tIS_MARKER\n";
+print {$lrf} "rs200\t0.05\t0\n";
+print {$lrf} "rs300\t0.91\t1\n";
 close $lrf or die "Cannot close $ld_r2_file: $!\n";
 my $resolver = File::Spec->catfile($Bin, 'resolve_haploreg_high_ld.pl');
 open my $resolver_fh, '-|', $^X, $resolver,
@@ -48,7 +48,7 @@ open my $resolver_fh, '-|', $^X, $resolver,
 my $resolver_output = do { local $/; <$resolver_fh> };
 close $resolver_fh or die "LD resolver fixture failed\n";
 die "LD resolver did not preserve numeric r2 pairs\n"
-    unless $resolver_output =~ /^LD_R2_PAIRS\tRS300:0\.91,RS200:0\.55$/m;
+    unless $resolver_output =~ /^LD_R2_PAIRS\tRS300:0\.91$/m;
 
 my $renderer = File::Spec->catfile($Bin, 'gnuplot', 'pdl_gunplot_local_locus.pl');
 my @cmd = (
@@ -63,8 +63,10 @@ my @cmd = (
     '--labels', 'EUR',
     '--gtf', $gtf,
     '--gnuplot', $gnuplot,
+    '--ld-marker-threshold', '0.5',
     '--ld-r2-file', $ld_r2_file,
-    '--ld-display-mode', 'heatmap',
+    '--ld-r2-signature', 'fixture-complete-r2',
+    '--ld-display-mode', 'both',
     '--ld-reference-snp', 'rs100',
     '--ld-population', 'EUR',
 );
@@ -87,12 +89,14 @@ my $header = <$pt> // '';
 my $point_text = do { local $/; <$pt> };
 close $pt;
 die "LD numeric/color columns are missing\n" unless $header =~ /\tLD_R2\tLD_RGB\s*$/;
-die "A non-reference query SNP did not retain both target-label and LD-r2 status\n"
-    unless $point_text =~ /^120\t[^\n]*\t1\trs200\t[^\n]*\t1\t0\.5500\t/m;
-die "Signed-R2 value for positive-z LD proxy is missing\n"
-    unless $point_text =~ /^120\t[^\t]*\t0\t[^\t]*\t1\trs200\t0\.5500\t1\t0\.5500/m;
+die "A below-threshold proxy was not colored with its complete R2 value\n"
+    unless $point_text =~ /^120\t[^\t]*\t0\t[^\t]*\t1\trs200\t0\.0500\t0\t0\.0500/m;
+die "A below-threshold proxy was incorrectly promoted to a high-LD marker\n"
+    if $point_text =~ /^120\t[^\t]*\t0\t[^\t]*\t1\trs200\t[^\t]*\t1\t/m;
+die "The above-threshold proxy did not retain its separate marker status\n"
+    unless $point_text =~ /^140\t[^\t]*\t0\t[^\t]*\t0\trs300\t0\.9100\t1\t0\.9100/m;
 die "Signed-R2 value for negative-z reference is missing\n"
-    unless $point_text =~ /^100\t[^\t]*\t0\t[^\t]*\t1\trs100\t-1\.0000\t1\t1\.0000/m;
+    unless $point_text =~ /^100\t[^\t]*\t0\t[^\t]*\t1\trs100\t-1\.0000\t0\t1\.0000/m;
 
 open my $manifest_fh, '<:raw', "$prefix.manifest.tsv" or die $!;
 my $manifest_text = do { local $/; <$manifest_fh> };
@@ -102,5 +106,17 @@ die "LD reference SNP is missing from the render manifest\n"
 die "1000 Genomes/PLINK2 reference panel is missing from the render manifest\n"
     unless $manifest_text =~ /^ld_reference_panel\t1000 Genomes Phase 3 \/ PLINK2$/m
         && $manifest_text =~ /^signed_r2_coloring\t1$/m;
+die "Complete-R2 source coverage is missing from the render manifest\n"
+    unless $manifest_text =~ /^ld_r2_signature\tfixture-complete-r2$/m
+        && $manifest_text =~ /^ld_r2_source_rows\t2$/m
+        && $manifest_text =~ /^ld_r2_variants_available\t3$/m
+        && $manifest_text =~ /^ld_r2_points\t3$/m
+        && $manifest_text =~ /^ld_r2_points_plotted\t3$/m;
+die "High-LD marker counts were conflated with complete-R2 color counts\n"
+    unless $manifest_text =~ /^ld_snps\trs300$/m
+        && $manifest_text =~ /^ld_snps_found\trs300$/m
+        && $manifest_text =~ /^ld_points_plotted\t1$/m;
+die "High-LD marker threshold is missing from the manifest\n"
+    unless $manifest_text =~ /^ld_marker_threshold\t0\.5$/m;
 
 print "Optional LD heatmap rendering: PASS\n";

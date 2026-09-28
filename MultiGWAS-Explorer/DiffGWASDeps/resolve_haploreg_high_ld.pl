@@ -33,6 +33,7 @@ use File::Path qw(make_path);
 my ($query_snps, $population, $min_r2, $web_cache, $output);
 my @local_cache;
 my $web_fallback = 1;
+my $require_complete = 0;
 $population = 'EUR';
 $min_r2 = 0.8;
 
@@ -43,6 +44,7 @@ GetOptions(
     'local-cache=s@'  => \@local_cache,
     'web-cache=s'     => \$web_cache,
     'web-fallback!'   => \$web_fallback,
+    'require-complete!' => \$require_complete,
     'output=s'        => \$output,
 ) or die usage();
 
@@ -64,7 +66,7 @@ for my $snp (split /[,\s]+/, $query_snps) {
 die "No valid rsIDs were supplied with --query-snps\n" unless @queries;
 
 push @local_cache, $web_cache if defined($web_cache) && length($web_cache);
-my (%proxy_for, %source_for);
+my (%proxy_for, %source_for, %cache_min_r2_for);
 for my $cache (@local_cache) {
     next unless defined($cache) && -s $cache;
     load_normalized_cache(
@@ -74,10 +76,15 @@ for my $cache (@local_cache) {
         queries    => \%is_query,
         proxy_for  => \%proxy_for,
         source_for => \%source_for,
+        cache_min_r2_for => \%cache_min_r2_for,
     );
 }
 
-my @missing = grep { !keys %{ $proxy_for{$_} || {} } } @queries;
+my @missing = grep {
+    !keys(%{ $proxy_for{$_} || {} })
+      || ($require_complete
+          && (!exists($cache_min_r2_for{$_}) || $cache_min_r2_for{$_} > $min_r2))
+} @queries;
 my @new_rows;
 if (@missing && $web_fallback) {
     for my $query (@missing) {
@@ -193,6 +200,14 @@ sub load_normalized_cache {
         my $r2 = $f[$idx{proxy_r2}] // '';
         next unless $r2 =~ /\A(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?\z/i;
         next if $r2 < $args{min_r2};
+        if (exists($idx{cache_min_r2})) {
+            my $coverage = $f[$idx{cache_min_r2}] // '';
+            if ($coverage =~ /\A(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?\z/i) {
+                $args{cache_min_r2_for}{$query} = 0 + $coverage
+                    if !exists($args{cache_min_r2_for}{$query})
+                        || $coverage < $args{cache_min_r2_for}{$query};
+            }
+        }
         my $proxy = uc($f[$idx{proxy_snp}] // '');
         next unless $proxy =~ /\ARS\d+\z/;
         $args{proxy_for}{$query}{$proxy} = 0 + $r2;
@@ -275,6 +290,8 @@ Options:
   --local-cache FILE      Normalized HaploReg TSV or SQLite edges cache; repeatable
   --web-cache FILE        Persistent normalized cache for successful web fallbacks
   --[no-]web-fallback     Query HaploReg when local caches lack a query (default on)
+  --require-complete      Refresh a query unless cache_min_r2 proves the cache
+                          covers the requested threshold (used for full color maps)
   --output FILE           Optional resolved query/proxy audit TSV
 USAGE
 }

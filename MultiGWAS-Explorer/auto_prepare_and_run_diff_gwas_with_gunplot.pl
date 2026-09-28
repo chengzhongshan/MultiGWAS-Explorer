@@ -98,6 +98,8 @@ Options:
   --ld-population POP           1KG population(s), or MAJOR4 for
                                 EUR+AFR+AMR+EAS (default EUR).
   --ld-r2-threshold N           High-LD star threshold (default 0.8).
+                                Heatmaps still use every estimable in-window r2;
+                                this threshold does not discard color values.
   --[no-]ld-web-fallback        Query HaploReg only when the local cache misses
                                 a query SNP (default enabled); successful queries
                                 are saved in cache/haploreg_ld for reuse.
@@ -1338,9 +1340,14 @@ sub plink2_ld_cache_has_proxy {
 sub resolve_ld_snps_for_query {
     my (%args) = @_;
     my %query = map { lc(trim($_)) => 1 } @{ $args{query_snps} || [] };
-    my (%seen, %r2_for, @ld);
+    my $runner = $args{runner} || {};
+    my $population = uc($args{ld_population} || $runner->{LOCAL_LD_POPULATION} || 'EUR');
+    my $min_r2 = 0 + (defined($args{ld_r2_threshold}) ? $args{ld_r2_threshold}
+      : (defined($runner->{LOCAL_LD_R2_THRESHOLD}) ? $runner->{LOCAL_LD_R2_THRESHOLD} : 0));
+    my $include_all_r2 = $args{include_all_r2} ? 1 : 0;
+    my (%seen_marker, %seen_r2, %r2_for, @ld, @r2_snps);
     my $add = sub {
-        my ($snp, $r2) = @_;
+        my ($snp, $r2, $as_marker) = @_;
         $snp = trim($snp // '');
         return unless length $snp;
         return if $query{lc $snp};
@@ -1348,27 +1355,27 @@ sub resolve_ld_snps_for_query {
         if (defined($r2) && $r2 =~ /^(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i) {
             $r2 = 0 + $r2;
             $r2_for{$key} = $r2 if !exists($r2_for{$key}) || $r2 > $r2_for{$key};
+            push @r2_snps, $snp unless $seen_r2{$key}++;
         }
-        return if $seen{$key}++;
-        push @ld, $snp;
+        if ($as_marker && !$seen_marker{$key}++) {
+            push @ld, $snp;
+        }
     };
     for my $item (split /,/, ($args{explicit} // '')) {
         my ($snp, $r2) = split /:/, $item, 2;
-        $add->($snp, $r2);
+        $add->($snp, $r2, 1);
     }
     for my $item (split /,/, ($args{explicit_r2} // '')) {
         my ($snp, $r2) = split /:/, $item, 2;
-        $add->($snp, $r2);
+        my $marker = defined($r2) && $r2 =~ /^(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i
+            && $r2 >= $min_r2 ? 1 : 0;
+        $add->($snp, $r2, $marker);
     }
     if (length(trim($args{explicit} // ''))) {
         print "[prep] User-supplied LD SNP marker overlay: " . join(',', @ld) . "\n";
-        return (\@ld, \%r2_for);
+        return (\@ld, \%r2_for, \@r2_snps);
     }
 
-    my $runner = $args{runner} || {};
-    my $population = uc($args{ld_population} || $runner->{LOCAL_LD_POPULATION} || 'EUR');
-    my $min_r2 = 0 + (defined($args{ld_r2_threshold}) ? $args{ld_r2_threshold}
-      : (defined($runner->{LOCAL_LD_R2_THRESHOLD}) ? $runner->{LOCAL_LD_R2_THRESHOLD} : 0));
     my $audit_file = $args{prefer_direct_cache} ? '' : ($args{audit_file} || '');
     $audit_file = localize_path($audit_file) if length $audit_file;
     if (!$args{prefer_direct_cache} && !length($audit_file) && length($runner->{TOP_HIT_LD_AUDIT_BASENAME} || '')) {
@@ -1398,7 +1405,7 @@ sub resolve_ld_snps_for_query {
                 my $r2 = $f[$idx{proxy_r2}] // '';
                 next unless $r2 =~ /^(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i
                     && $r2 >= $min_r2;
-                $add->($f[$idx{candidate_snp}], $r2);
+                $add->($f[$idx{candidate_snp}], $r2, 1);
             }
         }
         close $fh;
@@ -1428,9 +1435,13 @@ sub resolve_ld_snps_for_query {
                 }
                 if (exists $idx{proxy_r2}) {
                     my $r2 = $f[$idx{proxy_r2}] // '';
-                    next unless $r2 =~ /^(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i && $r2 >= $min_r2;
+                    next unless $r2 =~ /^(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i;
+                    next if !$include_all_r2 && $r2 < $min_r2;
                 }
-                $add->($f[$idx{proxy_snp}], (exists($idx{proxy_r2}) ? $f[$idx{proxy_r2}] : undef));
+                my $r2 = exists($idx{proxy_r2}) ? $f[$idx{proxy_r2}] : undef;
+                my $marker = defined($r2) && $r2 =~ /^(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i
+                    && $r2 >= $min_r2 ? 1 : 0;
+                $add->($f[$idx{proxy_snp}], $r2, $marker);
             }
         }
         close $fh;
@@ -1446,27 +1457,37 @@ sub resolve_ld_snps_for_query {
             $^X, $helper,
             '--query-snps', join(',', @{ $args{query_snps} || [] }),
             '--population', $haploreg_population,
-            '--min-r2', $min_r2,
+            '--min-r2', ($include_all_r2 ? 0 : $min_r2),
             '--web-cache', $web_cache,
         );
+        push @cmd, '--require-complete' if $include_all_r2;
         push @cmd, ('--local-cache', $cache_file) if length($cache_file) && -s $cache_file;
         push @cmd, '--no-web-fallback' unless $args{ld_web_fallback};
         if (open my $pipe, '-|', @cmd) {
+            my (@fallback_snps, @fallback_pairs);
             while (my $line = <$pipe>) {
                 chomp $line;
                 if ($line =~ /^LD_SNPS\t(.*)$/) {
-                    $add->($_) for split /,/, $1;
+                    @fallback_snps = split /,/, $1;
                 }
                 elsif ($line =~ /^LD_R2_PAIRS\t(.*)$/) {
-                    for my $item (split /,/, $1) {
-                        my ($snp, $r2) = split /:/, $item, 2;
-                        $add->($snp, $r2);
-                    }
+                    push @fallback_pairs, split /,/, $1;
                 }
             }
             my $ok = close $pipe;
             warn "WARNING: High-LD resolver exited unsuccessfully; continuing without automatic stars.\n"
                 unless $ok;
+            if (@fallback_pairs) {
+                for my $item (@fallback_pairs) {
+                    my ($snp, $r2) = split /:/, $item, 2;
+                    my $marker = defined($r2) && $r2 =~ /^(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i
+                        && $r2 >= $min_r2 ? 1 : 0;
+                    $add->($snp, $r2, $marker);
+                }
+            }
+            else {
+                $add->($_, undef, 1) for @fallback_snps;
+            }
         }
         else {
             warn "WARNING: Cannot start high-LD resolver $helper: $!\n";
@@ -1483,7 +1504,11 @@ sub resolve_ld_snps_for_query {
     }
     print "[warn] No high-LD proxies resolved for " . join(',', @{ $args{query_snps} || [] })
         . " ($population, r2 >= $min_r2); no LD marker overlay will be drawn.\n" unless @ld;
-    return (\@ld, \%r2_for);
+    if ($include_all_r2) {
+        print "[prep] Complete available LD color map contains " . scalar(@r2_snps)
+            . " non-reference variants (all estimable r2 values; marker threshold remains $min_r2).\n";
+    }
+    return (\@ld, \%r2_for, \@r2_snps);
 }
 
 sub plot_local_series {
@@ -1593,6 +1618,7 @@ sub plot_local_series {
                 && grep { lc($_) eq lc($ld_reference_snp) } @label_snps;
         my $locus_ld_cache = $args{ld_cache};
         my $locus_web_fallback = $args{ld_web_fallback};
+        my $complete_ld_colors = ($args{ld_display_mode} || '') =~ /^(?:heatmap|both)$/ ? 1 : 0;
         my $ld_source = uc($runner->{TOP_HIT_LD_SOURCE} || 'PLINK2_1KG');
         if ($args{highlight_high_ld_snps}
             && !length(trim($args{ld_snps} // ''))
@@ -1634,7 +1660,9 @@ sub plot_local_series {
                 chr         => $hit->{CHR},
                 bp          => $hit->{BP},
                 populations => $args{ld_population},
-                min_r2      => $args{ld_r2_threshold},
+                # A heatmap needs every estimable in-window R2 value.  The
+                # user threshold is applied later, only to the marker layer.
+                min_r2      => ($complete_ld_colors ? 0 : $args{ld_r2_threshold}),
                 window_kb   => ($runner->{TOP_HIT_LD_WINDOW_KB} || int(($args{window_bp} || 1) / 1000) || 1000),
                 pfile       => $pfile,
                 bfile       => $bfile,
@@ -1654,7 +1682,7 @@ sub plot_local_series {
                 warn "WARNING: PLINK2/1000 Genomes Phase 3 LD is unavailable for $ld_reference_snp.\n";
             }
         }
-        my ($ld_snps_ref, $ld_r2_ref) = $args{highlight_high_ld_snps} ? resolve_ld_snps_for_query(
+        my ($ld_snps_ref, $ld_r2_ref, $ld_r2_snps_ref) = $args{highlight_high_ld_snps} ? resolve_ld_snps_for_query(
             explicit   => $args{ld_snps},
             explicit_r2=> $args{ld_r2_values},
             audit_file => $args{ld_audit_file},
@@ -1662,17 +1690,20 @@ sub plot_local_series {
             prefer_direct_cache => ($args{require_plink2} && length($locus_ld_cache || '')),
             ld_population => $args{ld_population},
             ld_r2_threshold => $args{ld_r2_threshold},
+            include_all_r2 => $complete_ld_colors,
             ld_web_fallback => $locus_web_fallback,
             runner     => $runner,
             output_dir => $args{output_dir},
             query_snps => [$ld_reference_snp],
-        ) : ([], {});
+        ) : ([], {}, []);
         my @ld_snps = @{ $ld_snps_ref || [] };
+        my @ld_r2_snps = @{ $ld_r2_snps_ref || [] };
+        my %ld_marker_for = map { lc($_) => 1 } @ld_snps;
         my $ld_snps_csv = join(',', @ld_snps);
-        my $ld_r2_values = join(',', map {
+        my $ld_r2_signature = sha1_hex(join("\n", sort map {
             my $key = lc $_;
             exists($ld_r2_ref->{$key}) ? $_ . ':' . sprintf('%.6g', $ld_r2_ref->{$key}) : ()
-        } @ld_snps);
+        } @ld_r2_snps));
         my $safe_snp = safe_name($hit->{SNP});
         my $safe_window = safe_name($args{window_bp});
         my $batch_index = int($render_idx / $batch_size);
@@ -1686,15 +1717,15 @@ sub plot_local_series {
         my $batch_col = $batch_pos % $batch_cols;
         my $locus_prefix = File::Spec->catfile($args{output_dir}, $base_name . '_' . $safe_snp);
         my $ld_r2_file = $locus_prefix . '.ld_r2.tsv';
-        if (@ld_snps) {
+        if (@ld_r2_snps) {
             open my $ldfh, '>:raw', $ld_r2_file
                 or die "Cannot write LD R2 sidecar $ld_r2_file: $!\n";
-            print {$ldfh} "SNP\tR2\n";
-            for my $snp (@ld_snps) {
+            print {$ldfh} "SNP\tR2\tIS_MARKER\n";
+            for my $snp (@ld_r2_snps) {
                 my $key = lc $snp;
                 my $r2 = exists($ld_r2_ref->{$key})
                     ? sprintf('%.6g', $ld_r2_ref->{$key}) : '';
-                print {$ldfh} "$snp\t$r2\n";
+                print {$ldfh} join("\t", $snp, $r2, ($ld_marker_for{$key} ? 1 : 0)), "\n";
             }
             close $ldfh or die "Cannot close LD R2 sidecar $ld_r2_file: $!\n";
         }
@@ -1715,7 +1746,7 @@ sub plot_local_series {
         if ($args{with_gtf} || $batch_annotation_mode eq 'gtf') {
             push @required_locus_outputs, $locus_prefix . '.genes.tsv';
         }
-        push @required_locus_outputs, $ld_r2_file if @ld_snps;
+        push @required_locus_outputs, $ld_r2_file if @ld_r2_snps;
         my $expected_gtf_file = infer_cached_locus_gtf_path(
             output_dir => $args{output_dir},
             snp        => $hit->{SNP},
@@ -1744,8 +1775,9 @@ sub plot_local_series {
             ld_snps           => $ld_snps_csv,
             ld_marker_symbol  => $args{ld_marker_symbol},
             ld_marker_color   => $args{ld_marker_color},
+            ld_marker_threshold => $args{ld_r2_threshold},
             ld_display_mode   => $args{ld_display_mode},
-            ld_r2_values      => $ld_r2_values,
+            ld_r2_signature   => $ld_r2_signature,
             ld_heatmap_colors => $args{ld_heatmap_colors},
             ld_population     => $args{ld_population},
             ld_reference_snp  => $ld_reference_snp,
@@ -1899,12 +1931,14 @@ sub plot_local_series {
             '--sig', ($runner->{TOP_HIT_SIGNAL_THRSHD} || '1e-6'),
         );
         push @cmd, ('--ld-reference-snp', $ld_reference_snp);
-        push @cmd, ('--ld-r2-file', $ld_r2_file) if @ld_snps;
+        push @cmd, ('--ld-r2-file', $ld_r2_file) if @ld_r2_snps;
+        push @cmd, ('--ld-r2-signature', $ld_r2_signature) if @ld_r2_snps;
         push @cmd, ('--ld-source-file', $locus_ld_cache)
             if length(trim($locus_ld_cache // ''));
         if ($args{highlight_high_ld_snps}) {
             push @cmd, ('--ld-marker-symbol', ($args{ld_marker_symbol} || 'star'));
             push @cmd, ('--ld-marker-color', ($args{ld_marker_color} || 'black'));
+            push @cmd, ('--ld-marker-threshold', $args{ld_r2_threshold});
             push @cmd, ('--ld-display-mode', ($args{ld_display_mode} || 'markers'));
             push @cmd, ('--ld-population', ($args{ld_population} || 'EUR'));
             my $panel_build = ($runner->{REFERENCE_BUILD} || '') =~ /^(?:hg38|grch38)$/i
@@ -2124,7 +2158,7 @@ sub local_locus_cache_is_reusable {
     return (0, 'plot manifest is absent or empty') unless defined $manifest && -s $manifest;
     my $metrics = read_manifest_tsv($manifest);
     return (0, 'legacy plot manifest has no cache schema')
-        unless defined $metrics->{cache_schema} && $metrics->{cache_schema} =~ /^\d+$/ && $metrics->{cache_schema} >= 2;
+        unless defined $metrics->{cache_schema} && $metrics->{cache_schema} =~ /^\d+$/ && $metrics->{cache_schema} >= 7;
 
     my @checks = (
         ['snp',               ($args{snp} // '')],
@@ -2133,8 +2167,9 @@ sub local_locus_cache_is_reusable {
         ['ld_snps',           ($args{ld_snps} // '')],
         ['ld_marker_symbol',  ($args{ld_marker_symbol} // 'star')],
         ['ld_marker_color',   ($args{ld_marker_color} // 'black')],
+        ['ld_marker_threshold', (defined($args{ld_marker_threshold}) ? $args{ld_marker_threshold} : '')],
         ['ld_display_mode',   ($args{ld_display_mode} // 'none')],
-        ['ld_r2_values',      ($args{ld_r2_values} // '')],
+        ['ld_r2_signature',   ($args{ld_r2_signature} // '')],
         ['ld_heatmap_colors', ($args{ld_heatmap_colors} // '#f7fbff,#6baed6,#54278f')],
         ['ld_population',     ($args{ld_population} // 'EUR')],
         ['ld_reference_snp',  ($args{ld_reference_snp} // '')],

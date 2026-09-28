@@ -60,6 +60,12 @@ perl install/run_public_sex_gwas.pl \
   --backend gnuplot
 ```
 
+The gnuplot validation requires threshold-0 PLINK2 caches for both the local
+Manhattan and local GTF figures. It checks that every non-reference cache row
+is copied into the R² sidecar, that the marker threshold remains 0.1, and that
+the sidecar has a stable provenance signature. Thus a figure cannot pass by
+coloring only the high-LD marker subset.
+
 To test both plotting backends with an already configured SAS ODA account:
 
 ```bash

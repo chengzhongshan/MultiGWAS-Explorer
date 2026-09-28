@@ -88,6 +88,20 @@ my %reference_contract = (
         'ld-reference-snp=s',
         'query_snps => [$ld_reference_snp]',
         "push \@cmd, ('--ld-reference-snp', \$ld_reference_snp)",
+        'min_r2      => ($complete_ld_colors ? 0 : $args{ld_r2_threshold})',
+        'include_all_r2 => $complete_ld_colors',
+        'SNP\tR2\tIS_MARKER',
+        "push \@cmd, '--require-complete' if \$include_all_r2",
+    ],
+    File::Spec->catfile('DiffGWASDeps', 'gnuplot', 'pdl_gunplot_local_locus.pl') => [
+        'exists($header_idx{is_marker})',
+        'my $has_ld_r2 = exists($ld_r2_for{lc $snp})',
+        'my $is_ld = exists($is_ld_snp{lc $snp})',
+        "'ld_r2_source_rows'",
+    ],
+    File::Spec->catfile('DiffGWASDeps', 'resolve_haploreg_high_ld.pl') => [
+        "'require-complete!'",
+        '$cache_min_r2_for{$_} > $min_r2',
     ],
     'server.pl' => [
         'local_ld_reference_snp',
@@ -106,6 +120,13 @@ for my $name (sort keys %reference_contract) {
             unless index($text, $token) >= 0;
     }
 }
+
+my $gnuplot_wrapper_path = File::Spec->catfile($root, 'auto_prepare_and_run_diff_gwas_with_gunplot.pl');
+open my $gnuplot_wrapper_fh, '<:raw', $gnuplot_wrapper_path or die "Cannot read $gnuplot_wrapper_path: $!\n";
+my $gnuplot_wrapper_text = do { local $/; <$gnuplot_wrapper_fh> };
+close $gnuplot_wrapper_fh;
+die "Complete LD marker lists must travel in the sidecar, not a potentially oversized command argument\n"
+    if index($gnuplot_wrapper_text, "push \@cmd, ('--ld-snps'") >= 0;
 
 my $sas_auto_path = File::Spec->catfile($root, 'auto_prepare_and_run_diff_gwas.pl');
 open my $sas_auto_fh, '<:raw', $sas_auto_path or die "Cannot read $sas_auto_path: $!\n";

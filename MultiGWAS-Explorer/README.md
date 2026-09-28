@@ -2479,6 +2479,11 @@ overlay. Supported symbols are `star`, `plus`, `cross`, `circle`, `square`,
 configured phased 1000 Genomes reference is available, both plotters calculate
 local LD directly with PLINK2 and persist a compact normalized cache. HaploReg4
 is queried only as a backup when the local genotype reference is unavailable.
+In gnuplot `heatmap` and `both` modes, PLINK2 is requested with minimum r² 0,
+so every estimable pair in the configured window is retained for coloring.
+`--ld-r2-threshold` controls only the optional high-LD marker symbols; it does
+not remove lower-r² values from the color map. The normalized sidecar and plot
+manifest record the complete available row count and a provenance signature.
 
 The gnuplot `local_gtf` plot defaults to a signed-LD heatmap. For GRCh38/hg38
 GWAS it downloads the matching chromosome from the official
@@ -2915,9 +2920,32 @@ fails before SAS submission:
 
 ## Local PLINK2 LD Reference
 
-The HaploReg resolver is an optional high-LD proxy fallback. It returns only
-variants meeting the configured display threshold and cannot provide complete
-window-wide LD. Use the local PLINK2 reference for reproducible GTF plots.
+The HaploReg resolver is an optional fallback when a local genotype panel is
+unavailable. For a heatmap, the resolver requests threshold 0 and uses every
+numeric r² value returned by HaploReg4. A persistent response is accepted as
+complete only when its `cache_min_r2` metadata covers that request; otherwise
+the query is refreshed. HaploReg4 may still omit variants that its service does
+not report, so the build-matched local PLINK2 reference is the reproducible
+source for complete estimable window-wide LD.
+
+### Regression-prevention rule: colors and markers are separate datasets
+
+The heatmap color map must retain all estimable r² values from 0 through 1.
+The marker threshold is applied only when deciding which points receive the
+star, diamond, or other marker. Do not pass the marker threshold to PLINK2 as
+`--ld-window-r2` when producing a heatmap, and do not treat every row in the
+R² sidecar as a high-LD marker. The gnuplot wrapper now creates a threshold-0
+cache for heatmap modes, writes every non-reference pair to the sidecar, and
+stores thresholded marker status in a separate `IS_MARKER` field. This also
+avoids operating-system command-length limits at permissive thresholds.
+
+The focused Perl regression test includes one proxy below the marker threshold
+and one above it. It verifies that both receive their R² color while only the
+second receives a marker:
+
+```bash
+perl DiffGWASDeps/test_ld_heatmap_rendering.pl
+```
 
 ### Regression-prevention rule: one LD reference per plotted locus
 
@@ -2964,7 +2992,8 @@ perl DiffGWASDeps/test_ld_heatmap_contract.pl
 For complete window-wide LD, use the repository helper
 `DiffGWASDeps/resolve_plink2_local_ld.pl` with a local PLINK2 1000 Genomes
 fileset. It runs `--r2-phased` by default (or `--unphased` for dosage
-correlation), applies the requested chromosome/window and r² threshold, and
+correlation), applies the requested chromosome/window, and with `--min-r2 0`
+retains every estimable pair for a heatmap. It
 emits the same normalized `query_snp/proxy_snp/proxy_r2` format consumed by
 the plotting pipeline:
 

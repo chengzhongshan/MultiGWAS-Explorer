@@ -154,37 +154,59 @@ sub verify_gnuplot_signed_ld {
  my ($targets)=@_;
  my @wanted=split /,/,$targets;
  opendir my $dh,$out or die "Cannot inspect $out: $!\n";
- my @files=grep {/GUNPLOT_local_top_hits_with_gtf_.*\.manifest\.tsv\z/} readdir $dh;
+ my @files=grep {/GUNPLOT_local_top_hits_(?:manhattan|with_gtf)_.*\.manifest\.tsv\z/} readdir $dh;
  closedir $dh;
  for my $snp (@wanted) {
-  my ($file)=grep {/\Q$snp\E\.manifest\.tsv\z/} @files;
-  die "Missing gnuplot local-GTF manifest for $snp\n" unless $file;
+  for my $family (qw(local_top_hits_manhattan local_top_hits_with_gtf)) {
+  my ($file)=grep { /GUNPLOT_\Q$family\E_.*\Q$snp\E\.manifest\.tsv\z/ } @files;
+  die "Missing gnuplot $family manifest for $snp\n" unless $file;
   open my $fh,'<',"$out/$file" or die $!;
   my %metric;
   while (<$fh>) { chomp; s/\r\z//; my ($k,$v)=split /\t/,$_,2; $metric{$k}=$v if defined $v; }
   close $fh;
   die "$snp did not use heatmap LD display\n" unless ($metric{ld_display_mode}//'') eq 'heatmap';
-  die "$snp did not render r2 x sign(Z)\n" unless ($metric{signed_r2_coloring}//0)==1;
+  my $expected_signed=$family eq 'local_top_hits_with_gtf' ? 1 : 0;
+  die "$snp $family signed-R2 mode is incorrect\n"
+   unless ($metric{signed_r2_coloring}//0)==$expected_signed;
   die "$snp has no PLINK2 LD proxies in the plotted locus\n" unless ($metric{ld_r2_points}//0)>1;
+  die "$snp did not retain the configured high-LD marker threshold\n"
+   unless ($metric{ld_marker_threshold}//'') eq '0.1';
+  die "$snp has no complete-R2 provenance signature\n"
+   unless ($metric{ld_r2_signature}//'') =~ /^[0-9a-f]{40}$/;
   die "$snp LD values did not come from the PLINK2 Phase 3 cache\n"
-   unless ($metric{ld_source_file}//'') =~ /\.plink2_1kg_phase3\.tsv\z/;
+   unless ($metric{ld_source_file}//'') =~ /_r2_0_w[^\/\\]+\.plink2_1kg_phase3\.tsv\z/;
   my $source=$metric{ld_source_file};
   die "$snp PLINK2 Phase 3 cache is missing\n" unless -s $source;
   open my $lf,'<',$source or die $!;
   my @header=split /\t/,scalar(<$lf>),-1;
-  my @first=split /\t/,scalar(<$lf>),-1;
+  my @rows=<$lf>;
   close $lf;
-  s/[\r\n]+\z// for @header,@first;
+  s/[\r\n]+\z// for @header,@rows;
   my %idx=map {$header[$_]=>$_} 0..$#header;
   die "$snp LD cache has an incomplete provenance header\n"
-   unless !grep {!exists $idx{$_}} qw(ld_population source reference_build ld_method);
+   unless !grep {!exists $idx{$_}} qw(query_snp proxy_snp proxy_r2 ld_population source reference_build ld_method);
+  my (%proxy_r2,@first);
+  for my $row (@rows) {
+   my @f=split /\t/,$row,-1;
+   @first=@f unless @first;
+   next unless lc($f[$idx{query_snp}]//'') eq lc($snp);
+   my $proxy=$f[$idx{proxy_snp}]//'';
+   my $r2=$f[$idx{proxy_r2}]//'';
+   die "$snp LD cache contains a nonnumeric R2 value\n"
+    unless $r2 =~ /^(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i;
+   next if lc($proxy) eq lc($snp);
+   $proxy_r2{lc $proxy}=0+$r2;
+  }
+  die "$snp complete-R2 sidecar omitted PLINK2 cache rows\n"
+   unless ($metric{ld_r2_source_rows}//-1)==scalar(keys %proxy_r2);
   die "$snp LD cache is not phased EUR Phase 3 GRCh37 output\n"
    unless ($first[$idx{ld_population}]//'') eq 'EUR'
     && ($first[$idx{source}]//'') eq 'PLINK2_1KG_DIRECT'
     && ($first[$idx{reference_build}]//'') eq 'GRCh37_hg19'
     && ($first[$idx{ld_method}]//'') eq 'PLINK2_R2_PHASED';
+  }
  }
- print "PASS: gnuplot local-GTF panels use PLINK2 Phase 3 r2 x sign(Z)\n";
+ print "PASS: gnuplot local Manhattan/GTF panels use complete PLINK2 Phase 3 R2 data\n";
 }
 sub verify_sas_target_gtf {
  my ($targets)=@_;

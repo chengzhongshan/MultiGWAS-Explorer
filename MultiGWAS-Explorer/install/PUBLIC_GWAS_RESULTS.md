@@ -1,5 +1,29 @@
 # Public sex-stratified GWAS validation (September 2026)
 
+## Follow-up correction: complete local-LD color data
+
+The original gnuplot local plots used the high-LD marker threshold as PLINK2's
+minimum reported r². That incorrectly removed lower-r² variants from the color
+map. The corrected runner requests phased EUR 1000 Genomes Phase 3 LD at
+minimum r² 0 for heatmap modes and applies 0.1 only to marker symbols. The
+R² sidecar carries a separate `IS_MARKER` field, avoiding both semantic
+conflation and command-length limits.
+
+The three real loci were regenerated and visually inspected on 2026-09-28.
+Every non-reference PLINK2 cache row was transferred to both the local
+Manhattan and local GTF sidecars:
+
+| Reference SNP | Complete R² source rows | GWAS variants matched in plot | Matched variants at marker threshold |
+| --- | ---: | ---: | ---: |
+| `rs2232429` | 18,917 | 2,405 | 688 |
+| `rs185665940` | 15,367 | 1,870 | 8 |
+| `rs62604261` | 7,519 | 1,166 | 21 |
+
+Each locus has four association tracks, so the manifests record 9,620, 7,480,
+and 4,664 colored point records respectively. The focused Perl regression also
+verifies that a below-threshold proxy remains colored without receiving a
+high-LD marker.
+
 ## Follow-up correction: forest text and output discoverability
 
 User inspection found that the original gnuplot forest PNGs decoded correctly
@@ -38,7 +62,7 @@ public Figshare endpoint.
 | Real integration subset numerical checks | PASS: all 69,926 comparisons, chromosomes 1–22 and X |
 | Subset gnuplot | PASS: genome-wide Manhattan, local Manhattan, GTF tracks, forest plots |
 | Subset SAS ODA | PASS: same four plot families; PNG decoding verified |
-| Real LD service and overlay | PASS: HaploReg lookup; 147 LD points plotted |
+| Real complete local LD coloring | PASS: phased EUR 1000 Genomes Phase 3 threshold-0 caches; all cache proxies transferred to local Manhattan and GTF sidecars |
 | Windows and Ubuntu path/index regressions | PASS: spaces in paths, autosomal/X tabix queries, nested precomputed configuration |
 | Full SAS ODA | PASS: all four plot families; 11 decoded PNGs |
 
@@ -78,6 +102,9 @@ The full numerical scan took 401 seconds; gnuplot genome-wide rendering took
 - Select the repository's SAS helper instead of an unrelated version on PATH.
 - Replace macOS-incompatible `zcat` calls in standardization with list-form
   `gzip -dc` calls. The new CI regression caught this platform-specific failure.
+- Separate complete R² color data from thresholded high-LD markers. Heatmap
+  caches now use PLINK2 minimum r² 0, and sidecars store marker status in a
+  distinct column.
 
 The first full standardized-index attempt failed before the path correction;
 the existing standardized table was subsequently indexed successfully without

@@ -26,10 +26,12 @@ Options:
   --ld-marker-symbol NAME  star, plus, cross, circle, square, triangle, diamond
                            (default: star).
   --ld-marker-color COLOR  Named or #RRGGBB color (default: black).
+  --ld-marker-threshold N  R2 cutoff already applied to --ld-snps.
   --ld-display-mode MODE   none, markers, heatmap, or both (default: none).
   --ld-r2-values MAP       Comma-separated SNP:r2 values for LD proxies.
   --ld-r2-file FILE        Two-column SNP/R2 TSV. Preferred for large LD sets
                            because it avoids operating-system argument limits.
+  --ld-r2-signature SHA1   Provenance signature for the complete R2 sidecar.
   --ld-source-file FILE    Source cache used to derive the plotted LD values.
   --ld-population POP      Population label shown with the signed LD r2 scale;
                            MAJOR4 means EUR+AFR+AMR+EAS (default: EUR).
@@ -78,9 +80,11 @@ GetOptions(
     'ld-reference-snp=s' => \$opt{ld_reference_snp},
     'ld-marker-symbol=s' => \$opt{ld_marker_symbol},
     'ld-marker-color=s'  => \$opt{ld_marker_color},
+    'ld-marker-threshold=f' => \$opt{ld_marker_threshold},
     'ld-display-mode=s'  => \$opt{ld_display_mode},
     'ld-r2-values=s'     => \$opt{ld_r2_values},
     'ld-r2-file=s'       => \$opt{ld_r2_file},
+    'ld-r2-signature=s'  => \$opt{ld_r2_signature},
     'ld-source-file=s'   => \$opt{ld_source_file},
     'ld-population=s'    => \$opt{ld_population},
     'ld-reference-panel=s' => \$opt{ld_reference_panel},
@@ -99,9 +103,13 @@ GetOptions(
 
 die usage() unless $opt{data} && $opt{snp} && $opt{out_prefix} && $opt{window_bp} && $opt{pcols};
 die "Input file not found: $opt{data}\n" unless -s $opt{data};
+die "--ld-marker-threshold must be between 0 and 1\n"
+    if defined($opt{ld_marker_threshold})
+        && ($opt{ld_marker_threshold} < 0 || $opt{ld_marker_threshold} > 1);
+my $ld_r2_file_rows = 0;
+my (@ld_r2_file_pairs, @ld_marker_file_snps);
 if (defined($opt{ld_r2_file}) && length(trim($opt{ld_r2_file}))) {
     die "LD R2 file not found or empty: $opt{ld_r2_file}\n" unless -s $opt{ld_r2_file};
-    my (@file_snps, @file_pairs);
     open my $ldf, '<:raw', $opt{ld_r2_file}
         or die "Cannot read LD R2 file $opt{ld_r2_file}: $!\n";
     my $header = <$ldf> // '';
@@ -113,6 +121,8 @@ if (defined($opt{ld_r2_file}) && length(trim($opt{ld_r2_file}))) {
         : exists($header_idx{proxy_snp}) ? $header_idx{proxy_snp} : 0;
     my $r2_idx = exists($header_idx{r2}) ? $header_idx{r2}
         : exists($header_idx{proxy_r2}) ? $header_idx{proxy_r2} : 1;
+    my $marker_idx = exists($header_idx{is_marker}) ? $header_idx{is_marker}
+        : exists($header_idx{ld_marker}) ? $header_idx{ld_marker} : undef;
     while (my $line = <$ldf>) {
         chomp $line;
         $line =~ s/\r$//;
@@ -121,15 +131,16 @@ if (defined($opt{ld_r2_file}) && length(trim($opt{ld_r2_file}))) {
         my $snp = trim($f[$snp_idx] // '');
         my $r2 = trim($f[$r2_idx] // '');
         next unless length $snp;
-        push @file_snps, $snp;
-        push @file_pairs, "$snp:$r2"
-            if $r2 =~ /^(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i;
+        if ($r2 =~ /^(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i) {
+            push @ld_r2_file_pairs, "$snp:$r2";
+            $ld_r2_file_rows++;
+        }
+        if (defined($marker_idx)) {
+            my $marker = trim($f[$marker_idx] // '');
+            push @ld_marker_file_snps, $snp if $marker =~ /^(?:1|true|yes)$/i;
+        }
     }
     close $ldf or die "Cannot close LD R2 file $opt{ld_r2_file}: $!\n";
-    $opt{ld_snps} = join(',', grep { defined($_) && length($_) }
-        ($opt{ld_snps}, join(',', @file_snps)));
-    $opt{ld_r2_values} = join(',', grep { defined($_) && length($_) }
-        ($opt{ld_r2_values}, join(',', @file_pairs)));
 }
 my $ld_point_type = ld_marker_point_type($opt{ld_marker_symbol});
 die "--ld-marker-color must be a named color or #RRGGBB\n"
@@ -170,7 +181,7 @@ my %is_ld_snp;
 my %ld_r2_for;
 # The LD reference is in perfect LD with itself.
 $ld_r2_for{lc $ld_reference_snp} = 1;
-for my $snp (split /,/, ($opt{ld_snps} // '')) {
+for my $snp ((split /,/, ($opt{ld_snps} // '')), @ld_marker_file_snps) {
     $snp = trim($snp);
     next unless length $snp;
     # The reference has r2=1 by definition and keeps its ordinary query-SNP
@@ -180,7 +191,7 @@ for my $snp (split /,/, ($opt{ld_snps} // '')) {
     next if $is_ld_snp{lc $snp}++;
     push @ld_snps, $snp;
 }
-for my $item (split /,/, ($opt{ld_r2_values} // '')) {
+for my $item ((split /,/, ($opt{ld_r2_values} // '')), @ld_r2_file_pairs) {
     my ($snp, $r2) = split /:/, $item, 2;
     $snp = trim($snp // '');
     next unless length($snp) && defined($r2)
@@ -261,6 +272,8 @@ print {$pt} join("\t", qw(BP Y TRACK LOGP IS_TARGET SNP COLORVAL IS_LD LD_R2 LD_
 my $kept_points = 0;
 my $ld_points = 0;
 my %found_ld_snp;
+my $ld_r2_point_records = 0;
+my %found_ld_r2;
 my $has_zcols = @resolved_zcols == @resolved_pcols ? 1 : 0;
 my $use_signed_r2 = ($has_gtf && $has_zcols && %ld_r2_for
     && $opt{ld_display_mode} =~ /^(?:heatmap|both)$/) ? 1 : 0;
@@ -287,19 +300,24 @@ while (my $line = <$fh>) {
         my $capped = $logp > $opt{top_logp} ? $opt{top_logp} : $logp;
         my $y = $track_i * $opt{top_logp} + $capped;
         my $is_target = $is_label_snp{lc $snp} ? 1 : 0;
-        my $is_ld = exists($ld_r2_for{lc $snp}) ? 1 : 0;
-        my $ld_r2 = $is_ld ? $ld_r2_for{lc $snp} : -1;
+        my $has_ld_r2 = exists($ld_r2_for{lc $snp}) ? 1 : 0;
+        my $is_ld = exists($is_ld_snp{lc $snp}) ? 1 : 0;
+        my $ld_r2 = $has_ld_r2 ? $ld_r2_for{lc $snp} : -1;
         my $ld_rgb = $ld_r2 >= 0 ? ld_rgb_integer($ld_r2, \@ld_heatmap_colors) : 0;
         if ($is_ld) {
             $ld_points++;
             $found_ld_snp{lc $snp} = $snp;
+        }
+        if ($has_ld_r2) {
+            $ld_r2_point_records++;
+            $found_ld_r2{lc $snp} = $snp;
         }
         my $colorval = $track_i + 1;
         if ($has_zcols) {
             my $z = extract_requested_numeric($resolved_zcols[$track_i], $row, \%idx);
             $colorval = defined $z ? cap_num($z, -8, 8) : 0;
             if ($use_signed_r2) {
-                $colorval = ($is_ld && defined $z)
+                $colorval = ($has_ld_r2 && defined $z)
                     ? cap_num(($z < 0 ? -1 : $z > 0 ? 1 : 0) * $ld_r2, -1, 1)
                     : 0;
             }
@@ -386,7 +404,7 @@ if ($has_gtf) {
 my $sig_y = safe_neglog10($opt{sig});
 my $gene_height = $has_gtf ? max_num(6.0, 1.8 * gene_lane_count($gene_tsv)) : 0;
 my $ld_r2_points = scalar(grep {
-    exists $ld_r2_for{$_} && exists $found_ld_snp{$_}
+    exists $ld_r2_for{$_} && exists $found_ld_r2{$_}
 } keys %ld_r2_for);
 write_gnuplot(
     gp_file     => $gp_file,
@@ -426,7 +444,7 @@ system($opt{gnuplot}, $gp_file) == 0
 
 open my $mf, '>', $manifest or die "Cannot write $manifest: $!\n";
 print {$mf} join("\t", qw(METRIC VALUE)), "\n";
-print {$mf} join("\t", 'cache_schema', 5), "\n";
+print {$mf} join("\t", 'cache_schema', 7), "\n";
 print {$mf} join("\t", 'input', $opt{data}), "\n";
 print {$mf} join("\t", 'png', $png_file), "\n";
 print {$mf} join("\t", 'plot_tsv', $plot_tsv), "\n";
@@ -441,11 +459,16 @@ print {$mf} join("\t", 'ld_snps_found', join(',', map { $found_ld_snp{$_} } sort
 print {$mf} join("\t", 'ld_points_plotted', $ld_points), "\n";
 print {$mf} join("\t", 'ld_marker_symbol', lc($opt{ld_marker_symbol})), "\n";
 print {$mf} join("\t", 'ld_marker_color', $opt{ld_marker_color}), "\n";
+print {$mf} join("\t", 'ld_marker_threshold', (defined($opt{ld_marker_threshold}) ? $opt{ld_marker_threshold} : '')), "\n";
 print {$mf} join("\t", 'ld_display_mode', $opt{ld_display_mode}), "\n";
 print {$mf} join("\t", 'ld_r2_values', ($opt{ld_r2_values} // '')), "\n";
 print {$mf} join("\t", 'ld_r2_file', ($opt{ld_r2_file} // '')), "\n";
+print {$mf} join("\t", 'ld_r2_signature', ($opt{ld_r2_signature} // '')), "\n";
 print {$mf} join("\t", 'ld_source_file', ($opt{ld_source_file} // '')), "\n";
+print {$mf} join("\t", 'ld_r2_source_rows', $ld_r2_file_rows), "\n";
+print {$mf} join("\t", 'ld_r2_variants_available', scalar(keys %ld_r2_for)), "\n";
 print {$mf} join("\t", 'ld_r2_points', $ld_r2_points), "\n";
+print {$mf} join("\t", 'ld_r2_points_plotted', $ld_r2_point_records), "\n";
 print {$mf} join("\t", 'ld_population', $opt{ld_population}), "\n";
 print {$mf} join("\t", 'ld_reference_panel', $opt{ld_reference_panel}), "\n";
 print {$mf} join("\t", 'ld_reference_snp', $ld_reference_snp), "\n";
