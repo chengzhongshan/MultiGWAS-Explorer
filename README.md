@@ -29,10 +29,16 @@ It includes prerequisites, commands, container setup, SAS configuration, and
 troubleshooting links. Installation commands run from the inner pipeline
 directory shown above.
 
-## Update your GitHub repository
+## Synchronize your local copy and GitHub repository
 
-From the outer clone directory (the one containing `.git`), preview and then
-upload source changes:
+From the outer clone directory (the one containing `.git`), download updates
+made on another computer:
+
+```bash
+./update_github_upload.sh --pull-only
+```
+
+To download updates and upload your local source changes:
 
 ```bash
 ./update_github_upload.sh --dry-run
@@ -42,8 +48,17 @@ upload source changes:
 The script stages tracked edits and new source or documentation files. It
 excludes SAS ODA and gnuplot run results, even if they were staged earlier;
 the local files remain available. The preview does not change the Git index
-or contact GitHub. If GitHub has newer commits, the upload stops before
-committing so you can integrate those changes first.
+or contact GitHub; its remote comparison uses the last fetched state. A normal
+run fetches GitHub even when there are no new local edits. It commits eligible
+local edits, fast-forwards or merges updates from other computers, and pushes
+the combined history without force-pushing. `--pull-only` does not commit or
+push your local edits. Existing local commits are preserved in both modes.
+
+When a merge requires a clean working tree, tracked edits are temporarily
+saved in a Git stash and restored afterward, including their staging state.
+Large untracked or ignored GWAS inputs and run files stay on disk. If changes
+conflict, the script stops before pushing, retains any saved edits, and prints
+recovery instructions. Resolve the conflicts, then rerun the script.
 
 ## Try a local example
 
