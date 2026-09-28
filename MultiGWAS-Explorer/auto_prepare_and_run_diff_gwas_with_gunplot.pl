@@ -569,6 +569,13 @@ my @gtf_pcols = grep { length } split /\s+/, ($runner->{GTF_ASSOC_PVARS} || '');
 my @gtf_zcols = grep { length } split /\s+/, ($runner->{GTF_ZSCORE_VARS} || '');
 my @gtf_labels = grep { length } split /\s+/, ($runner->{GTF_LABELS} || '');
 @gtf_labels = @gtf_pcols unless @gtf_labels == @gtf_pcols;
+my @local_manhattan_zcols;
+if (@gtf_pcols && @gtf_pcols == @gtf_zcols) {
+    my %zcol_for_pcol;
+    @zcol_for_pcol{map { lc $_ } @gtf_pcols} = @gtf_zcols;
+    my @candidate = map { $zcol_for_pcol{lc $_} // '' } @local_manhattan_pcols;
+    @local_manhattan_zcols = @candidate unless grep { !length } @candidate;
+}
 
 my $indexed_source_long_local = '';
 if ($requested{plot_local_manhattan} || $requested{plot_local_gtf}) {
@@ -652,6 +659,7 @@ if ($requested{plot_local_manhattan}) {
             gnuplot      => $gnuplot,
             hits         => \@hits,
             pcols        => \@local_manhattan_pcols,
+            zcols        => \@local_manhattan_zcols,
             labels       => \@local_manhattan_labels,
             window_bp    => ($runner->{LOCAL_WINDOW_BP} || '1e7'),
             batch_size   => ($local_max_hits_per_fig_override || ($runner->{LOCAL_MAX_HITS_PER_FIG} || 15)),
@@ -2158,7 +2166,7 @@ sub local_locus_cache_is_reusable {
     return (0, 'plot manifest is absent or empty') unless defined $manifest && -s $manifest;
     my $metrics = read_manifest_tsv($manifest);
     return (0, 'legacy plot manifest has no cache schema')
-        unless defined $metrics->{cache_schema} && $metrics->{cache_schema} =~ /^\d+$/ && $metrics->{cache_schema} >= 7;
+        unless defined $metrics->{cache_schema} && $metrics->{cache_schema} =~ /^\d+$/ && $metrics->{cache_schema} >= 8;
 
     my @checks = (
         ['snp',               ($args{snp} // '')],
@@ -2493,9 +2501,15 @@ sub render_combined_local_manhattan_gtf_batch {
     print {$scaled_out} join("\t", qw(KIND KIND_CODE LOCUS X1 X2 Y TRACK COLORVAL GENE LANE BP SNP IS_TARGET)), "\n";
 
     my $max_lane = 0;
+    my $combined_signed_r2 = 1;
+    my ($combined_ld_population, $combined_ld_reference_panel);
     for my $i (0 .. $#items) {
         my $item = $items[$i];
         my $manifest = read_manifest_tsv($item->{manifest});
+        $combined_signed_r2 = 0
+            unless ($manifest->{signed_r2_coloring} || 0) == 1;
+        $combined_ld_population ||= $manifest->{ld_population} || '';
+        $combined_ld_reference_panel ||= $manifest->{ld_reference_panel} || '';
         my $target_bp = $manifest->{BP} || $manifest->{bp} || $manifest->{TARGET_BP} || $manifest->{target_bp} || $item->{bp};
         my $window_bp = $manifest->{WINDOW_BP} || $manifest->{window_bp} || 0;
         my $start = $manifest->{WINDOW_START} || $manifest->{window_start} || ($target_bp - $window_bp);
@@ -2689,8 +2703,20 @@ sub render_combined_local_manhattan_gtf_batch {
     my @plots = (
         "'" . escape_gp($combined_scaled_tsv) . "' using ((\$2==1)?\$4:1/0):6:8 with points pt 7 ps 0.72 lc palette"
     );
-    print {$gp} "set palette maxcolors 12 defined (1 '#1f77b4', 2 '#ff7f0e', 3 '#2ca02c', 4 '#d62728', 5 '#9467bd', 6 '#8c564b', 7 '#e377c2', 8 '#7f7f7f', 9 '#bcbd22', 10 '#17becf', 11 '#3366cc', 12 '#dd4477')\n";
-    print {$gp} "unset colorbox\n";
+    if ($combined_signed_r2) {
+        my $cblabel = 'Signed LD r^2 (r^2 x sign(Z); '
+            . ($combined_ld_population || 'EUR') . '; '
+            . ($combined_ld_reference_panel || '1000 Genomes Phase 3 / PLINK2') . ')';
+        print {$gp} "set cbrange [-1:1]\n";
+        print {$gp} "set cbtics ('-1' -1, '0' 0, '1' 1)\n";
+        print {$gp} "set cblabel '" . escape_gp($cblabel) . "'\n";
+        print {$gp} "set colorbox vertical user origin 0.94,0.12 size 0.02,0.76\n";
+        print {$gp} "set palette defined (-1 '#63d67f', -0.5 '#63d8d2', 0 '#ffbf00', 0.5 '#ff5b00', 1 '#df1f2d')\n";
+    }
+    else {
+        print {$gp} "set palette maxcolors 12 defined (1 '#1f77b4', 2 '#ff7f0e', 3 '#2ca02c', 4 '#d62728', 5 '#9467bd', 6 '#8c564b', 7 '#e377c2', 8 '#7f7f7f', 9 '#bcbd22', 10 '#17becf', 11 '#3366cc', 12 '#dd4477')\n";
+        print {$gp} "unset colorbox\n";
+    }
     print {$gp} "plot " . join(", \\\n     ", @plots) . "\n";
     close $gp or die "Cannot close $gp_file: $!\n";
 

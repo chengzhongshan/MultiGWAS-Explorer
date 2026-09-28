@@ -11,28 +11,28 @@
                        "backend":  "gnuplot",
                        "copy":  "figures/gunplot/PUBLIC_SCZ_EUR_SEX_GUNPLOT_local_top_hits_manhattan.png",
                        "family":  "local_manhattan",
-                       "sha256":  "6d27cd72938dce178a39e4385e9fe8f1193b7ed584cafe4ef02aa59e3eadddf4",
+                       "sha256":  "746ff975b1a1545d1fa32acef34ec0c1e9530da4800e19c35aac80fbcabd17aa",
                        "source":  "original-run/PUBLIC_SCZ_EUR_SEX_GUNPLOT_local_top_hits_manhattan.png"
                    },
                    {
                        "backend":  "gnuplot",
                        "copy":  "figures/gunplot/PUBLIC_SCZ_EUR_SEX_GUNPLOT_local_top_hits_manhattan_rs185665940.png",
                        "family":  "local_manhattan",
-                       "sha256":  "7692a8a2817fcf645ac2ed58ac2c504ed867bbd5472dac8e2b9fe0c093bd892c",
+                       "sha256":  "c27d84ed06395c8ce8b896e4e5bb5ea5f1183255ba70f70f363080079078c79d",
                        "source":  "original-run/PUBLIC_SCZ_EUR_SEX_GUNPLOT_local_top_hits_manhattan_rs185665940.png"
                    },
                    {
                        "backend":  "gnuplot",
                        "copy":  "figures/gunplot/PUBLIC_SCZ_EUR_SEX_GUNPLOT_local_top_hits_manhattan_rs2232429.png",
                        "family":  "local_manhattan",
-                       "sha256":  "16d0f0b687a7578f6faecc3a0bf73cb3daadd2efeb959ce5ecca8a5bfbe75d03",
+                       "sha256":  "5e28223b2619a9197e2e676951b3120f6259922c036872fc2ea61520f0e620b3",
                        "source":  "original-run/PUBLIC_SCZ_EUR_SEX_GUNPLOT_local_top_hits_manhattan_rs2232429.png"
                    },
                    {
                        "backend":  "gnuplot",
                        "copy":  "figures/gunplot/PUBLIC_SCZ_EUR_SEX_GUNPLOT_local_top_hits_manhattan_rs62604261.png",
                        "family":  "local_manhattan",
-                       "sha256":  "f14d94fc6a4ebd4e2d5de4aeba20972ff4d0a032ee6c78bf2c04167d59da7c4a",
+                       "sha256":  "d8a1f7ff50a4fa98195d4b5af1d5b6a94bc0193ff3e3de831c8afa255dee47a8",
                        "source":  "original-run/PUBLIC_SCZ_EUR_SEX_GUNPLOT_local_top_hits_manhattan_rs62604261.png"
                    },
                    {

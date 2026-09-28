@@ -91,12 +91,17 @@ my %reference_contract = (
         'min_r2      => ($complete_ld_colors ? 0 : $args{ld_r2_threshold})',
         'include_all_r2 => $complete_ld_colors',
         'SNP\tR2\tIS_MARKER',
+        'zcols        => \@local_manhattan_zcols',
+        'my $combined_signed_r2 = 1',
+        "set cbrange [-1:1]",
         "push \@cmd, '--require-complete' if \$include_all_r2",
     ],
     File::Spec->catfile('DiffGWASDeps', 'gnuplot', 'pdl_gunplot_local_locus.pl') => [
         'exists($header_idx{is_marker})',
         'my $has_ld_r2 = exists($ld_r2_for{lc $snp})',
         'my $is_ld = exists($is_ld_snp{lc $snp})',
+        'my $use_signed_r2 = ($has_zcols && %ld_r2_for',
+        'use_signed_r2 => $use_signed_r2',
         "'ld_r2_source_rows'",
     ],
     File::Spec->catfile('DiffGWASDeps', 'resolve_haploreg_high_ld.pl') => [

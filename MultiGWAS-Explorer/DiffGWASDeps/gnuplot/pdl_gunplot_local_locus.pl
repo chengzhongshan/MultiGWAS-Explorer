@@ -275,7 +275,7 @@ my %found_ld_snp;
 my $ld_r2_point_records = 0;
 my %found_ld_r2;
 my $has_zcols = @resolved_zcols == @resolved_pcols ? 1 : 0;
-my $use_signed_r2 = ($has_gtf && $has_zcols && %ld_r2_for
+my $use_signed_r2 = ($has_zcols && %ld_r2_for
     && $opt{ld_display_mode} =~ /^(?:heatmap|both)$/) ? 1 : 0;
 my $rows_in_window = 0;
 $fh = IO::Uncompress::Gunzip->new($opt{data})
@@ -434,8 +434,11 @@ write_gnuplot(
     ld_heatmap_colors => \@ld_heatmap_colors,
     ld_r2_points    => $ld_r2_points,
     gene_height => $gene_height,
-    use_zcolors => ($has_gtf && $has_zcols ? 1 : 0),
-    use_signed_r2 => ($has_gtf && $use_signed_r2 ? 1 : 0),
+    # Signed LD is useful in both the local Manhattan-only panel and the
+    # gene-track panel.  Plain local Manhattan plots retain their usual
+    # chromosome colors when no complete LD heatmap is available.
+    use_zcolors => ($use_signed_r2 || ($has_gtf && $has_zcols) ? 1 : 0),
+    use_signed_r2 => $use_signed_r2,
     colorbar_label => infer_effect_metric_label_from_cols(@resolved_zcols),
 );
 
@@ -444,7 +447,7 @@ system($opt{gnuplot}, $gp_file) == 0
 
 open my $mf, '>', $manifest or die "Cannot write $manifest: $!\n";
 print {$mf} join("\t", qw(METRIC VALUE)), "\n";
-print {$mf} join("\t", 'cache_schema', 7), "\n";
+print {$mf} join("\t", 'cache_schema', 8), "\n";
 print {$mf} join("\t", 'input', $opt{data}), "\n";
 print {$mf} join("\t", 'png', $png_file), "\n";
 print {$mf} join("\t", 'plot_tsv', $plot_tsv), "\n";
@@ -700,8 +703,23 @@ sub write_gnuplot {
         if (length $gene_label) {
             print {$gp} "set label 2 \"" . escape_gp($gene_label) . "\" at " . ($args{target_bp} + $label_dx) . ",$label_y center rotate by 90 font '" . italic_font_spec_gp(11) . "'\n";
         }
-        print {$gp} "unset colorbox\n";
-        my @plots = ("'" . escape_gp($args{plot_tsv}) . "' using 1:2 with points pt 7 ps 0.9 lc rgb '" . escape_gp($chr_color) . "'");
+        my @plots;
+        if ($args{use_signed_r2}) {
+            my $cblabel = 'Signed LD r^2 (r^2 x sign(Z); ' . ($args{ld_population} || 'EUR')
+                . '; ' . ($args{ld_reference_panel} || '1000 Genomes Phase 3 / PLINK2') . ')';
+            print {$gp} "set cbrange [-1:1]\n";
+            print {$gp} "set cbtics ('-1' -1, '0' 0, '1' 1)\n";
+            print {$gp} "set cblabel '" . escape_gp($cblabel) . "'\n";
+            print {$gp} "set colorbox vertical user origin 0.94,0.12 size 0.02,0.76\n";
+            print {$gp} "set palette defined (-1 '#63d67f', -0.5 '#63d8d2', 0 '#ffbf00', 0.5 '#ff5b00', 1 '#df1f2d')\n";
+            push @plots, "'" . escape_gp($args{plot_tsv})
+                . "' using 1:2:7 with points pt 7 ps 0.9 lc palette";
+        }
+        else {
+            print {$gp} "unset colorbox\n";
+            push @plots, "'" . escape_gp($args{plot_tsv})
+                . "' using 1:2 with points pt 7 ps 0.9 lc rgb '" . escape_gp($chr_color) . "'";
+        }
         push @plots, @ld_layers;
         print {$gp} "plot " . join(', ', @plots) . "\n";
     }

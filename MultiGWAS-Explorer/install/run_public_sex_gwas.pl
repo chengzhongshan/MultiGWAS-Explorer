@@ -165,9 +165,8 @@ sub verify_gnuplot_signed_ld {
   while (<$fh>) { chomp; s/\r\z//; my ($k,$v)=split /\t/,$_,2; $metric{$k}=$v if defined $v; }
   close $fh;
   die "$snp did not use heatmap LD display\n" unless ($metric{ld_display_mode}//'') eq 'heatmap';
-  my $expected_signed=$family eq 'local_top_hits_with_gtf' ? 1 : 0;
   die "$snp $family signed-R2 mode is incorrect\n"
-   unless ($metric{signed_r2_coloring}//0)==$expected_signed;
+   unless ($metric{signed_r2_coloring}//0)==1;
   die "$snp has no PLINK2 LD proxies in the plotted locus\n" unless ($metric{ld_r2_points}//0)>1;
   die "$snp did not retain the configured high-LD marker threshold\n"
    unless ($metric{ld_marker_threshold}//'') eq '0.1';
@@ -206,7 +205,14 @@ sub verify_gnuplot_signed_ld {
     && ($first[$idx{ld_method}]//'') eq 'PLINK2_R2_PHASED';
   }
  }
- print "PASS: gnuplot local Manhattan/GTF panels use complete PLINK2 Phase 3 R2 data\n";
+ my @combined_gp=glob("$out/*GUNPLOT_local_top_hits_manhattan.combined_gtf.gp");
+ die "Missing combined gnuplot local Manhattan script\n" unless @combined_gp==1 && -s $combined_gp[0];
+ open my $cg,'<',$combined_gp[0] or die $!;
+ my $combined_text=do {local $/;<$cg>}; close $cg;
+ die "Combined gnuplot local Manhattan plot is not using signed R2\n"
+  unless $combined_text =~ /set cbrange \[-1:1\]/
+   && $combined_text =~ /Signed LD r\^2 \(r\^2 x sign\(Z\)/;
+ print "PASS: gnuplot local Manhattan/GTF panels use complete signed PLINK2 Phase 3 R2 data\n";
 }
 sub verify_sas_target_gtf {
  my ($targets)=@_;

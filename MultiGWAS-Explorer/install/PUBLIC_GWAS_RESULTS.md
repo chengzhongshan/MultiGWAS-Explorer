@@ -22,7 +22,9 @@ Manhattan and local GTF sidecars:
 Each locus has four association tracks, so the manifests record 9,620, 7,480,
 and 4,664 colored point records respectively. The focused Perl regression also
 verifies that a below-threshold proxy remains colored without receiving a
-high-LD marker.
+high-LD marker. Local Manhattan and local GTF panels both use the signed
+`R² × sign(Z)` scale from -1 to 1; this keeps direction and LD strength
+comparable across the two gnuplot plot families.
 
 ## Follow-up correction: forest text and output discoverability
 
@@ -105,6 +107,8 @@ The full numerical scan took 401 seconds; gnuplot genome-wide rendering took
 - Separate complete R² color data from thresholded high-LD markers. Heatmap
   caches now use PLINK2 minimum r² 0, and sidecars store marker status in a
   distinct column.
+- Apply `R² × sign(Z)` to gnuplot local Manhattan panels as well as gene-track
+  panels, and invalidate older unsigned local-plot caches.
 
 The first full standardized-index attempt failed before the path correction;
 the existing standardized table was subsequently indexed successfully without

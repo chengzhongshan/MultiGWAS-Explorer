@@ -21,7 +21,8 @@ SHA-256 checksum of each copied image.
 - Inquiry targets were `rs2232429`, `rs185665940`, and `rs62604261`.
 - Gnuplot local Manhattan and GTF heatmaps use phased EUR 1000 Genomes Phase 3
   threshold-0 LD caches. Their complete sidecars contain 18,917, 15,367, and
-  7,519 non-reference R² values; the 0.1 cutoff controls marker symbols only.
+  7,519 non-reference R² values; both plot families display `R² × sign(Z)`
+  from -1 to 1, while the 0.1 cutoff controls marker symbols only.
 
 The machine-readable row counts and targets are in `numeric_validation.json`
 and `targets.txt`. See the

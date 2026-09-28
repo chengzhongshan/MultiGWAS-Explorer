@@ -167,9 +167,11 @@ only. The local Manhattan and local GTF manifests agree and report:
 | rs185665940 | 15,367 | 1,870 | 8 |
 | rs62604261 | 7,519 | 1,166 | 21 |
 
-All six local PNGs were visually inspected: three local Manhattan plots show
-the full 0-to-1 R² scale, and three local GTF plots show the signed -1-to-1
-scale. Manifest provenance records the plotting TSV, threshold-0 PLINK2 source,
+All six target-specific local PNGs were visually inspected. The three local
+Manhattan plots and three local GTF plots use the signed -1-to-1
+`R² × sign(Z)` scale. The combined three-locus local Manhattan panel uses the
+same scale and colorbar. Manifest provenance records the plotting TSV,
+threshold-0 PLINK2 source,
 complete sidecar row count, marker threshold, and sidecar signature. The public
 validation rejects missing rows, a thresholded source cache, incorrect signed
 mode, or a source other than the PLINK2 Phase 3 cache.

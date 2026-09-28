@@ -119,4 +119,48 @@ die "High-LD marker counts were conflated with complete-R2 color counts\n"
 die "High-LD marker threshold is missing from the manifest\n"
     unless $manifest_text =~ /^ld_marker_threshold\t0\.5$/m;
 
-print "Optional LD heatmap rendering: PASS\n";
+my $manhattan_prefix = File::Spec->catfile($tmp, 'local_manhattan');
+my @manhattan_cmd;
+for (my $i = 0; $i < @cmd; $i++) {
+    if ($cmd[$i] eq '--gtf') {
+        $i++;
+        next;
+    }
+    if ($cmd[$i] eq '--out-prefix') {
+        push @manhattan_cmd, $cmd[$i], $manhattan_prefix;
+        $i++;
+        next;
+    }
+    push @manhattan_cmd, $cmd[$i];
+}
+system(@manhattan_cmd) == 0
+    or die "Local Manhattan signed-LD renderer failed (exit " . ($? >> 8) . ")\n";
+
+open my $manhattan_gp, '<:raw', "$manhattan_prefix.gp" or die $!;
+my $manhattan_gp_text = do { local $/; <$manhattan_gp> };
+close $manhattan_gp;
+die "Local Manhattan plot did not use the signed-R2 colorbar\n"
+    unless $manhattan_gp_text =~ /set cbrange \[-1:1\]/
+        && $manhattan_gp_text =~ /Signed LD r\^2 \(r\^2 x sign\(Z\)/;
+die "Local Manhattan plot emitted the unsigned LD inset\n"
+    if $manhattan_gp_text =~ /LD r\^2 to rs100/
+        || $manhattan_gp_text =~ /using \(\(\$9>=0\)\?\$1:1\/0\):2:10/;
+
+open my $manhattan_pt, '<:raw', "$manhattan_prefix.plot.tsv" or die $!;
+<$manhattan_pt>;
+my $manhattan_point_text = do { local $/; <$manhattan_pt> };
+close $manhattan_pt;
+die "Local Manhattan plot did not apply sign(Z) to the reference R2\n"
+    unless $manhattan_point_text =~ /^100\t[^\t]*\t0\t[^\t]*\t1\trs100\t-1\.0000\t0\t1\.0000/m;
+die "Local Manhattan plot lost the below-threshold complete R2 color\n"
+    unless $manhattan_point_text =~ /^120\t[^\t]*\t0\t[^\t]*\t1\trs200\t0\.0500\t0\t0\.0500/m;
+
+open my $manhattan_manifest, '<:raw', "$manhattan_prefix.manifest.tsv" or die $!;
+my $manhattan_manifest_text = do { local $/; <$manhattan_manifest> };
+close $manhattan_manifest;
+die "Local Manhattan manifest did not record signed-R2 mode without GTF\n"
+    unless $manhattan_manifest_text =~ /^cache_schema\t8$/m
+        && $manhattan_manifest_text =~ /^has_gtf\t0$/m
+        && $manhattan_manifest_text =~ /^signed_r2_coloring\t1$/m;
+
+print "Optional LD heatmap rendering for local Manhattan/GTF: PASS\n";

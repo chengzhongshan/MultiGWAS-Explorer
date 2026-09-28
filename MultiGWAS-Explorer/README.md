@@ -2485,14 +2485,16 @@ so every estimable pair in the configured window is retained for coloring.
 not remove lower-r² values from the color map. The normalized sidecar and plot
 manifest record the complete available row count and a provenance signature.
 
-The gnuplot `local_gtf` plot defaults to a signed-LD heatmap. For GRCh38/hg38
+The gnuplot local Manhattan and `local_gtf` plots default to a signed-LD
+heatmap when Z scores and LD values are available. For GRCh38/hg38
 GWAS it downloads the matching chromosome from the official
 [PLINK2 1000 Genomes Phase 3 resources](https://www.cog-genomics.org/plink/2.0/resources)
 on first use; GRCh37/hg19 GWAS use the configured hg19 panel. It calculates
 phased r2 against each plotted target SNP. Downloaded reference files and the
 PLINK2 binary are cached locally and excluded from Git. Use
-`--ld-display-mode none` to turn off the gnuplot GTF heatmap, or `both` to add
-LD markers. The gnuplot local Manhattan default remains unchanged. A
+`--ld-display-mode none` to turn off the gnuplot heatmap, or `both` to add
+LD markers. Both local plot families color each point by `r² × sign(Z)` on a
+diverging scale from -1 to 1. A
 SAS ODA `plot_local_gtf` run with explicit target SNPs also defaults to the
 signed-LD heatmap when no LD display mode is set. For a merged-wide GWAS, it sorts and
 tabix-indexes the wide table once, reuses that index on later runs, and
