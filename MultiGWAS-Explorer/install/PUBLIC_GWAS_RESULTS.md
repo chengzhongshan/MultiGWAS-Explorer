@@ -14,8 +14,8 @@ pixel-region regression checks visible label text and passed on Windows and
 Ubuntu with the pipeline-installed gnuplot. The earlier PNG-decoding pass
 alone did not establish forest-label correctness.
 
-Seven SAS PNGs existed in the pipeline working directory. A new results
-gallery collects both backends under the selected output directory and
+The completed full run produced 11 SAS PNGs in the results gallery. The gallery
+collects both backends under the selected output directory and
 verifies the copied images using SHA-256. The public SAS test also disables
 gnuplot fallback and forces fresh rendering to prevent ambiguous test results.
 
@@ -40,7 +40,7 @@ public Figshare endpoint.
 | Subset SAS ODA | PASS: same four plot families; PNG decoding verified |
 | Real LD service and overlay | PASS: HaploReg lookup; 147 LD points plotted |
 | Windows and Ubuntu path/index regressions | PASS: spaces in paths, autosomal/X tabix queries, nested precomputed configuration |
-| Full SAS ODA | PASS: all four plot families; 7 decoded PNGs |
+| Full SAS ODA | PASS: all four plot families; 11 decoded PNGs |
 
 The integration subset retained source rows with BP modulo 100 equal to zero
 or source P below 1e-5. It is a real-data subset, distinct from the unthinned
@@ -52,9 +52,9 @@ Local execution used Windows 10, portable Cygwin 3.6.10, Perl 5.44 and gnuplot
 tests fresh installation and synthetic rendering across its platform matrix;
 those checks do not constitute a full public-GWAS run on every platform.
 
-All six installation jobs also passed for commit `7162f99`: Windows, Ubuntu
+All six installation jobs also passed for commit `4881381`: Windows, Ubuntu
 24.04, macOS 15 Apple Silicon, macOS 15 Intel, Docker, and Apptainer.
-[GitHub Actions run](https://github.com/chengzhongshan/MultiGWAS-Explorer/actions/runs/36332413482).
+[GitHub Actions run](https://github.com/chengzhongshan/MultiGWAS-Explorer/actions/runs/36365873811).
 
 Full-data inquiry targets were rs2232429 (common association), rs185665940
 (minimum autosomal differential P), and rs62604261 (minimum X differential P).
