@@ -6,6 +6,7 @@ use Getopt::Long qw(GetOptions);
 use IO::Compress::Gzip qw($GzipError);
 use IO::Uncompress::Gunzip qw($GunzipError);
 use lib $Bin;
+use HTSToolResolver qw(resolve_hts_tool external_tool_path);
 use FixedEffectMeta qw(fixed_effect_meta);
 use DiffGWASConfig qw(
   load_config_file
@@ -412,12 +413,12 @@ sub open_window_reader {
     $start = 1 if $start < 1;
     my $end = int($bp + $window_bp);
 
-    my $tabix = resolve_hts_tool($htsbin, 'tabix');
+    my $tabix = resolve_hts_tool('tabix', explicit => $htsbin, start_dir => $Bin);
     if (defined $tabix && has_tabix_index($path)) {
         my @regions = $stats->{target_lookup_mode} && $stats->{target_lookup_mode} eq 'hint'
           ? candidate_regions($raw_chr, $start, $end)
           : ("$raw_chr:$start-$end");
-        my $cmd = join(' ', shell_quote($tabix), shell_quote(external_tool_path($path)), map { shell_quote($_) } @regions);
+        my $cmd = join(' ', shell_quote($tabix), shell_quote(external_tool_path($tabix, $path)), map { shell_quote($_) } @regions);
         open my $fh, '-|', $cmd or die "Cannot tabix-query $path: $!\n";
         $stats->{region_query_mode} = 'tabix';
         return $fh;
@@ -455,27 +456,6 @@ sub prefer_shell_gzip {
     return 0;
 }
 
-sub resolve_hts_tool {
-    my ($dir, $tool) = @_;
-    my @names = ($tool);
-    push @names, "$tool.exe" if $^O =~ /^(?:cygwin|MSWin32)$/i;
-    my @dirs = grep { defined $_ && length $_ } (
-        $dir, $Bin, map { "$Bin/" . ('../' x $_) . 'local/bin' } 1 .. 3
-    );
-    my @candidates = ((map { my $base = $_; map { "$base/$_" } @names } @dirs), @names);
-    for my $candidate (@candidates) {
-        next unless defined $candidate && length $candidate;
-        return $candidate if -x $candidate || command_exists($candidate);
-    }
-    return undef;
-}
-
-sub command_exists {
-    my ($cmd) = @_;
-    return 0 unless defined $cmd && length $cmd;
-    return scalar(`command -v '$cmd' 2>/dev/null`) ? 1 : 0;
-}
-
 sub has_tabix_index {
     my ($path) = @_;
     return 1 if -e "$path.tbi" || -e "$path.csi";
@@ -484,18 +464,6 @@ sub has_tabix_index {
         return 1 if -e "$stem.tbi" || -e "$stem.csi";
     }
     return 0;
-}
-
-sub external_tool_path {
-    my ($path) = @_;
-    return $path unless defined($path) && length($path) && $^O =~ /cygwin/i;
-    my $converted = '';
-    if (open my $fh, '-|', 'cygpath', '-m', $path) {
-        $converted = <$fh> // '';
-        chomp $converted;
-        close $fh;
-    }
-    return length($converted) ? $converted : $path;
 }
 
 sub candidate_regions {

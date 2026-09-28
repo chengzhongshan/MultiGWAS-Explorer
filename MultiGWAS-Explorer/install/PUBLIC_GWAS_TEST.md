@@ -22,6 +22,30 @@ Open the same Cygwin installation that installed the dependencies on Windows.
 Perl modules built with a different Perl version can fail to load even when
 both installations are Cygwin. On Ubuntu use a terminal.
 
+The entry points examine the current checkout and its ancestors for a local
+Perl library. They test the complete compression/GD/PDL module stack in a
+separate process before adding a candidate to `@INC`. An incomplete or
+ABI-incompatible tree is removed from inherited `PERL5LIB`, so a stale
+`MultiGWAS-Explorer/local/perl5-cygwin` cannot override a working ancestor or
+system installation. `PIPELINE_PERL_LOCAL_DIR` remains available as an
+explicit override, but the referenced tree must pass the same compatibility
+test.
+
+Portable Cygwin may inherit Windows programs through the global `PATH`. The
+installer and pipeline indexers accept only `bgzip` and `tabix` linked to the
+active Cygwin runtime. They prefer `local/bin`, then `/usr/bin` and
+`/usr/local/bin`, and ignore unrelated Windows executables. The pipeline uses
+portable `bgzip -c`; it does not assume that an older binary supports `-@`.
+Repair an existing installation with:
+
+```bash
+bash install/repair_and_test_cygwin.sh
+```
+
+The repair builds native htslib tools under `local/bin` when needed. Confirm
+the selected paths with `bash install/check_pipeline_install.sh`; its output
+lists the accepted native `bgzip` and `tabix` executables.
+
 Start in the inner `MultiGWAS-Explorer` directory containing `install/`:
 
 ```bash
@@ -93,6 +117,11 @@ Open `results.html` to browse both sets together. Rebuild this gallery with
 `perl install/build_public_gwas_gallery.pl --output-dir /path/to/results`.
 `results_gallery_manifest.json` records each source image and SHA-256 checksum;
 each gallery copy is checked against its source.
+
+A curated completed gallery is included under
+[`examples/public-scz-sex`](../examples/public-scz-sex/README.md). It lets
+readers inspect the SAS ODA and gnuplot results without rerunning the
+multi-gigabyte test.
 
 Inspect HTML and SAS logs as well. A successful login alone does not establish that SAS
 plots succeeded. Keep source data and generated results outside Git.

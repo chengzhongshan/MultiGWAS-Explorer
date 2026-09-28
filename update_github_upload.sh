@@ -58,13 +58,15 @@ is_generated_file() {
   local path="$1"
   # Tracked benchmark fixtures are deliberate source material.
   [[ "$path" == MultiGWAS-Explorer/benchmark/* ]] && return 1
+  # Curated, checksum-recorded public validation figures are documentation.
+  [[ "$path" == MultiGWAS-Explorer/examples/public-scz-sex/* ]] && return 1
   case "$path" in
     MultiGWAS-Explorer/cache/*|MultiGWAS-Explorer/local/*|\
     MultiGWAS-Explorer/run_local*/*|MultiGWAS-Explorer/run_manhattan_*/*|\
     MultiGWAS-Explorer/run_single_snp_with_gtf_*/*|MultiGWAS-Explorer/upload_*/*|\
     MultiGWAS-Explorer/.autogen_*/*|\
     MultiGWAS-Explorer/tmp*/*|MultiGWAS-Explorer/debug_single_local_gtf_*/*|\
-    MultiGWAS-Explorer/configs/auto_*_diff_merged_*|\
+    MultiGWAS-Explorer/configs/auto_*|\
     MultiGWAS-Explorer/auto_gtf_import_single_snp.*.sas|\
     MultiGWAS-Explorer/auto_wide_import_single_snp.*.sas|\
     MultiGWAS-Explorer/auto_wide_import_local_hits*.sas|\
@@ -94,6 +96,7 @@ is_generated_file() {
 is_new_source_file() {
   local path="$1"
   is_generated_file "$path" && return 1
+  [[ "$path" == MultiGWAS-Explorer/examples/public-scz-sex/* ]] && return 0
   case "${path##*/}" in
     .gitignore|Makefile|*.pl|*.pm|*.sh|*.sas|*.py|*.R|*.Rmd|\
     *.md|*.txt|*.json|*.yaml|*.yml|*.toml|*.ini|*.cfg|*.sql|\

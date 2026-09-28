@@ -52,14 +52,9 @@ Local execution used Windows 10, portable Cygwin 3.6.10, Perl 5.44 and gnuplot
 tests fresh installation and synthetic rendering across its platform matrix;
 those checks do not constitute a full public-GWAS run on every platform.
 
-All six installation jobs passed for commit `f8780f7`: Windows, Ubuntu 24.04,
-macOS 15 Apple Silicon, macOS 15 Intel, Docker, and Apptainer.
-[GitHub Actions run](https://github.com/chengzhongshan/MultiGWAS-Explorer/actions/runs/35095368132).
-
-The subsequent code revision `a551a5a` changes only inquiry/MAF log messages
-and documentation. Its [repeat installation run](https://github.com/chengzhongshan/MultiGWAS-Explorer/actions/runs/35128834251)
-had passed five jobs when this report was published; Intel macOS was still
-running. The completed six-platform result above belongs to `f8780f7`.
+All six installation jobs also passed for commit `7162f99`: Windows, Ubuntu
+24.04, macOS 15 Apple Silicon, macOS 15 Intel, Docker, and Apptainer.
+[GitHub Actions run](https://github.com/chengzhongshan/MultiGWAS-Explorer/actions/runs/36332413482).
 
 Full-data inquiry targets were rs2232429 (common association), rs185665940
 (minimum autosomal differential P), and rs62604261 (minimum X differential P).
@@ -69,6 +64,12 @@ The full numerical scan took 401 seconds; gnuplot genome-wide rendering took
 ## Bugs corrected during testing
 
 - Convert Cygwin data paths for native Windows tabix; require genuine indexes.
+- Reject Windows `bgzip.exe` and `tabix.exe` inherited through Cygwin's global
+  PATH, prefer Cygwin-native tools, and use the broadly supported `bgzip -c`
+  interface.
+- Probe local Perl trees for the complete module stack before importing them;
+  remove rejected paths from inherited `PERL5LIB` so nested stale checkouts do
+  not load incompatible DLLs.
 - Use platform-specific Perl dependencies and install Perl HTTPS dependencies.
 - Correct gnuplot forest freshness-helper lookup.
 - Create nested configuration directories and apply precomputed input paths

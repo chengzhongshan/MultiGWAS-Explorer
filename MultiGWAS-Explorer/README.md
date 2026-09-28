@@ -626,6 +626,25 @@ environment activation refuses a mismatched tree and prints this repair
 command. Run one of those entry points after changing Cygwin Perl and before
 launching a pipeline Perl script, so stale DLLs cannot be loaded first.
 
+Pipeline entry points also defend against nested or copied checkouts. They
+walk up the directory tree looking for `local/perl5-cygwin` or `local/perl5`,
+then load a candidate only after a subprocess successfully imports the full
+compression, GD, and PDL stack needed by that entry point. Rejected paths are
+removed from inherited `PERL5LIB`. This prevents a stale inner checkout from
+loading (for example) a `Compress::Raw::Zlib` DLL built for another Cygwin
+Perl. Set `PIPELINE_PERL_LOCAL_DIR` only when selecting a specific compatible
+installation; the same probe still applies.
+
+Portable Cygwin can also inherit unrelated Windows `bgzip.exe` and
+`tabix.exe` programs from the global Windows PATH. The installer, installation
+check, and Perl extractors require tools linked to the active `cygwin1.dll` and
+prefer `local/bin`, `/usr/bin`, and `/usr/local/bin`. The compression command
+uses `bgzip -c` so it works with htslib versions that do not support the `-@`
+thread option. Run `bash install/repair_and_test_cygwin.sh` to build native
+copies under `local/bin`; `bash install/check_pipeline_install.sh` prints the
+exact executables it accepted. Do not manually delete command options or rely
+on a Windows executable found later in PATH.
+
 SASPy ODA also needs a Java runtime. Install a Windows JDK and set `JAVA_HOME`
 or `SASPY_JAVA_WIN` before installing. The smoke test runs Java and reports a
 missing or unusable executable, but does not open an actual ODA session.

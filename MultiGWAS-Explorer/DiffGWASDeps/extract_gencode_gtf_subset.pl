@@ -4,6 +4,7 @@ use warnings;
 
 use FindBin qw($Bin);
 use lib $Bin;
+use HTSToolResolver qw(resolve_hts_tool external_tool_path);
 use File::Basename qw(basename dirname);
 use File::Path qw(make_path);
 use File::Spec;
@@ -260,8 +261,8 @@ sub overlaps_any_region {
 sub open_gtf_input {
     my (%args) = @_;
     return unless $args{use_tabix};
-    my $tabix = find_executable($args{tabix_bin}, 'tabix');
-    my $bgzip = find_executable($args{bgzip_bin}, 'bgzip');
+    my $tabix = resolve_hts_tool('tabix', explicit => $args{tabix_bin}, start_dir => $Bin);
+    my $bgzip = resolve_hts_tool('bgzip', explicit => $args{bgzip_bin}, start_dir => $Bin);
     unless ($tabix && $bgzip) {
         die "tabix and bgzip are required for GTF extraction. Put native tools in "
           . "local/bin or PATH; alternatively set --tabix-bin/--bgzip-bin.\n";
@@ -274,7 +275,7 @@ sub open_gtf_input {
     );
     return unless $indexed && -s $indexed && -s "$indexed.tbi";
 
-    my $indexed_arg = external_tool_path($indexed);
+    my $indexed_arg = external_tool_path($tabix, $indexed);
     open my $list_fh, '-|', $tabix, '-l', $indexed_arg
       or do {
           die "[tabix] Could not list indexed GTF contigs from $indexed.\n";
@@ -374,7 +375,7 @@ sub prepare_bgzf_gtf {
         }
 
         warn "[tabix] Cached GTF index is unreadable; rebuilding the index with the active tabix: $indexed\n";
-        system { $args{tabix} } $args{tabix}, '-f', '-p', 'gff', external_tool_path($indexed);
+        system { $args{tabix} } $args{tabix}, '-f', '-p', 'gff', external_tool_path($args{tabix}, $indexed);
         if ($? == 0 && -s "$indexed.tbi"
             && tabix_index_readable($args{tabix}, $indexed)) {
             print STDERR "[tabix] Repaired cached GTF index: $indexed.tbi\n";
@@ -451,7 +452,7 @@ sub prepare_bgzf_gtf {
     unlink $tmp_sorted;
     die "bgzip failed while creating $tmp_bgz\n" unless $? == 0 && -s $tmp_bgz;
 
-    system { $args{tabix} } $args{tabix}, '-f', '-p', 'gff', external_tool_path($tmp_bgz);
+    system { $args{tabix} } $args{tabix}, '-f', '-p', 'gff', external_tool_path($args{tabix}, $tmp_bgz);
     die "tabix failed while indexing $tmp_bgz\n" unless $? == 0 && -s $tmp_tbi;
     unlink $indexed if -e $indexed;
     unlink "$indexed.tbi" if -e "$indexed.tbi";
@@ -470,7 +471,7 @@ sub tabix_index_readable {
     return 0 unless defined $pid;
     if ($pid == 0) {
         open STDERR, '>', File::Spec->devnull();
-        exec { $tabix } $tabix, '-l', external_tool_path($indexed);
+        exec { $tabix } $tabix, '-l', external_tool_path($tabix, $indexed);
         exit 127;
     }
 
@@ -482,39 +483,19 @@ sub tabix_index_readable {
     return $closed && $has_contig ? 1 : 0;
 }
 
-sub external_tool_path {
-    my ($path) = @_;
-    return $path unless defined($path) && length($path) && $^O =~ /cygwin/i;
-    my $converted = '';
-    if (open my $fh, '-|', 'cygpath', '-m', $path) {
-        $converted = <$fh> // '';
-        chomp $converted;
-        close $fh;
-    }
-    return defined($converted) && length($converted) ? $converted : $path;
-}
-
 sub find_executable {
     my ($explicit, $name) = @_;
-    if (defined $explicit && length $explicit) {
-        if ($^O !~ /^(?:cygwin|MSWin32)$/i && $explicit =~ /\.exe$/i) {
-            warn "[tabix] Refusing Windows executable on $^O: $explicit\n";
-            return;
-        }
+    if (defined($explicit) && length($explicit)) {
         return $explicit if -f $explicit && -x $explicit;
-        warn "[tabix] Configured $name executable is unavailable: $explicit\n";
         return;
     }
     my @suffixes = $^O =~ /MSWin32/i ? ('', '.exe', '.bat', '.cmd')
       : $^O =~ /cygwin/i ? ('', '.exe')
       : ('');
-    my @dirs = ($Bin);
-    my $ancestor = $Bin;
-    for (1 .. 3) {
-        $ancestor = dirname($ancestor);
-        push @dirs, File::Spec->catdir($ancestor, 'local', 'bin');
-    }
-    push @dirs, '/usr/bin' if $^O =~ /cygwin/i;
+    my @dirs;
+    # Cygwin shells can inherit Windows System32 ahead of /usr/bin. Prefer
+    # the active POSIX runtime for ordinary helpers such as sort and curl.
+    push @dirs, '/usr/local/bin', '/usr/bin' if $^O =~ /cygwin/i;
     push @dirs, File::Spec->path();
     my %seen;
     for my $dir (grep { defined($_) && length($_) && !$seen{$_}++ } @dirs) {

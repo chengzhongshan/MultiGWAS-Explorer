@@ -15,33 +15,26 @@ fi
 mkdir -p "${TMPDIR_SORT}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-for candidate in "${HTSBIN}" "${SCRIPT_DIR}/../local/bin" \
-                 "${SCRIPT_DIR}/../../local/bin" "${SCRIPT_DIR}/../../../local/bin"; do
-  [[ -n "${candidate}" ]] || continue
-  if { [[ -x "${candidate}/bgzip" ]] || [[ -x "${candidate}/bgzip.exe" ]]; } \
-      && { [[ -x "${candidate}/tabix" ]] || [[ -x "${candidate}/tabix.exe" ]]; }; then
-    export PATH="${candidate}:$PATH"
-    break
-  fi
-done
-
-HAS_BGZIP=0
-HAS_TABIX=0
-if command -v bgzip >/dev/null 2>&1; then
-  HAS_BGZIP=1
+if [[ "$(uname -s)" == CYGWIN* ]]; then
+  PATH="/usr/local/bin:/usr/bin:${PATH}"
+  export PATH
 fi
-if command -v tabix >/dev/null 2>&1; then
-  HAS_TABIX=1
-fi
-
-if [[ "${HAS_BGZIP}" -eq 0 ]]; then
-  echo "bgzip not found on PATH; activate the pipeline environment or set HTSBIN" >&2
+resolve_hts_tool() {
+  perl -I"${SCRIPT_DIR}" -MHTSToolResolver=resolve_hts_tool -e '
+    my ($name, $explicit, $start) = @ARGV;
+    my $path = resolve_hts_tool($name, explicit => $explicit, start_dir => $start);
+    exit 1 unless defined($path) && length($path);
+    print $path;
+  ' "$1" "${HTSBIN}" "${SCRIPT_DIR}"
+}
+bgzip_bin="$(resolve_hts_tool bgzip)" || {
+  echo "Native bgzip not found; run install/repair_and_test_cygwin.sh or set HTSBIN" >&2
   exit 1
-fi
-if [[ "${HAS_TABIX}" -eq 0 ]]; then
-  echo "tabix not found on PATH; activate the pipeline environment or set HTSBIN" >&2
+}
+tabix_bin="$(resolve_hts_tool tabix)" || {
+  echo "Native tabix not found; run install/repair_and_test_cygwin.sh or set HTSBIN" >&2
   exit 1
-fi
+}
 
 echo "Input:    ${INPUT_GZ}"
 echo "Output:   ${OUTPUT_GZ}"
@@ -49,7 +42,7 @@ echo "Excluded: ${EXCLUDED_GZ}"
 echo "Tmpdir:   ${TMPDIR_SORT}"
 echo "Start:    $(date)"
 
-COMPRESS_CMD=(bgzip -c)
+COMPRESS_CMD=("${bgzip_bin}" -c)
 
 {
   set +o pipefail
@@ -71,16 +64,7 @@ gzip -dc "${INPUT_GZ}" |
   awk -F $'\t' '$1 == "" || $2 !~ /^[0-9]+$/' |
   gzip -c > "${EXCLUDED_GZ}"
 
-# Windows htslib cannot open Cygwin /mnt or /cygdrive paths. Native Cygwin
-# tabix accepts them, so convert only for PE binaries without cygwin1.dll.
-tabix_input="${OUTPUT_GZ}"
-if [[ "$(uname -s)" == CYGWIN* ]]; then
-  tabix_bin="$(command -v tabix)"
-  if ! cygcheck "$tabix_bin" 2>/dev/null | grep -qi 'cygwin1.dll'; then
-    tabix_input="$(cygpath -w "${OUTPUT_GZ}")"
-  fi
-fi
-tabix -f -s 1 -b 2 -e 2 -S 1 "$tabix_input"
+"${tabix_bin}" -f -s 1 -b 2 -e 2 -S 1 "${OUTPUT_GZ}"
 
 echo "Done: $(date)"
 ls -lh "${OUTPUT_GZ}" "${OUTPUT_GZ}.tbi" "${EXCLUDED_GZ}"

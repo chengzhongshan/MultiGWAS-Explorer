@@ -16,6 +16,13 @@ if [ -z "${PIPELINE_PLATFORM_TAG}" ]; then
     *)       PIPELINE_PLATFORM_TAG="" ;;
   esac
 fi
+if [ "${PIPELINE_PLATFORM_TAG}" = "cygwin" ]; then
+  # Portable Cygwin can inherit a Windows PATH with system32 and third-party
+  # programs before /usr/bin. Put Cygwin tools first so curl, tar, bgzip and
+  # tabix cannot silently resolve to incompatible native Windows programs.
+  PATH="/usr/local/bin:/usr/bin${PATH:+:${PATH}}"
+  export PATH
+fi
 PIPELINE_PERL_LOCAL_DIR="${PIPELINE_PERL_LOCAL_DIR:-${PIPELINE_LOCAL_DIR}/perl5${PIPELINE_PLATFORM_TAG:+-${PIPELINE_PLATFORM_TAG}}}"
 PIPELINE_PERL_ABI_STAMP="${PIPELINE_PERL_LOCAL_DIR}/.perl-abi"
 PIPELINE_VENV_DIR="${PIPELINE_ROOT}/.venv-pipeline"
@@ -53,6 +60,43 @@ die() {
 
 command_exists() {
   command -v "$1" >/dev/null 2>&1
+}
+
+cygwin_native_binary() {
+  local candidate="$1"
+  [ -x "${candidate}" ] || return 1
+  if ! command_exists uname || ! uname -s | grep -qi '^CYGWIN'; then
+    return 0
+  fi
+  [ "${PIPELINE_ALLOW_WINDOWS_HTSLIB:-0}" = "1" ] && return 0
+  command_exists cygcheck || return 1
+  cygcheck "${candidate}" 2>/dev/null | grep -qi 'cygwin1\.dll'
+}
+
+resolve_native_hts_tool() {
+  local name="$1" candidate=""
+  for candidate in \
+    "${PIPELINE_LOCAL_DIR}/bin/${name}" \
+    "${PIPELINE_LOCAL_DIR}/bin/${name}.exe" \
+    "/usr/bin/${name}" \
+    "/usr/bin/${name}.exe" \
+    "/usr/local/bin/${name}" \
+    "/usr/local/bin/${name}.exe"; do
+    cygwin_native_binary "${candidate}" || continue
+    printf '%s\n' "${candidate}"
+    return 0
+  done
+  candidate="$(command -v "${name}" 2>/dev/null || true)"
+  if [ -n "${candidate}" ] && cygwin_native_binary "${candidate}"; then
+    printf '%s\n' "${candidate}"
+    return 0
+  fi
+  return 1
+}
+
+native_hts_tools_available() {
+  resolve_native_hts_tool bgzip >/dev/null 2>&1 \
+    && resolve_native_hts_tool tabix >/dev/null 2>&1
 }
 
 make_project_scripts_executable() {
@@ -990,13 +1034,19 @@ install_pdl_perl_deps() {
 ensure_local_hts_tools() {
   prepend_path "${PIPELINE_LOCAL_DIR}/bin"
   prepend_path "${PIPELINE_ROOT}"
-  if command_exists bgzip && command_exists tabix; then
-    log "Using bgzip/tabix from PATH"
+  if native_hts_tools_available; then
+    log "Using native bgzip: $(resolve_native_hts_tool bgzip)"
+    log "Using native tabix: $(resolve_native_hts_tool tabix)"
     return 0
   fi
-  log "bgzip/tabix not found; building a repo-local htslib copy"
+  if command_exists bgzip || command_exists tabix; then
+    warn "Ignoring Windows bgzip/tabix inherited through Cygwin PATH; they are not linked to cygwin1.dll."
+  fi
+  log "Native bgzip/tabix not found; building a repo-local Cygwin htslib copy"
   bash "${PIPELINE_INSTALL_DIR}/build_local_htslib.sh"
   prepend_path "${PIPELINE_LOCAL_DIR}/bin"
+  native_hts_tools_available \
+    || die "Repo-local htslib build did not provide native bgzip and tabix"
 }
 
 run_pipeline_check() {

@@ -1,4 +1,23 @@
 #!/usr/bin/env perl
+BEGIN {
+ require Cwd;
+ require File::Basename;
+ require File::Spec;
+ my $script_dir=Cwd::abs_path(File::Basename::dirname(__FILE__)) || File::Basename::dirname(__FILE__);
+ my $pipeline_dir=Cwd::abs_path(File::Spec->catdir($script_dir,File::Spec->updir())) || File::Spec->catdir($script_dir,File::Spec->updir());
+ my $bootstrap=File::Spec->catfile($pipeline_dir,'DiffGWASDeps','PipelineRuntimeEnv.pm');
+ require $bootstrap;
+ PipelineRuntimeEnv::bootstrap_local_perl(
+  script_dir=>$pipeline_dir,
+  required_modules=>[qw(
+   Compress::Raw::Zlib
+   IO::Compress::Gzip
+   IO::Uncompress::Gunzip
+   GD
+   PDL
+  )],
+ );
+}
 use strict;
 use warnings;
 use FindBin qw($Bin);

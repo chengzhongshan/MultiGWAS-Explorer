@@ -9,6 +9,8 @@ use File::Spec;
 use Cwd qw(abs_path);
 use JSON::PP qw(decode_json encode_json);
 use IO::Uncompress::Gunzip qw($GunzipError);
+use lib File::Spec->catdir($Bin, File::Spec->updir());
+use HTSToolResolver qw(resolve_hts_tool external_tool_path);
 
 my ($input, $output, $bgzip_bin, $tabix_bin) = ('', '', '', '');
 GetOptions(
@@ -35,8 +37,8 @@ if (-s $output && -s "$output.tbi" && -s $manifest) {
     }
 }
 
-my $bgzip = find_tool('bgzip', $bgzip_bin || $ENV{BGZIP_BIN});
-my $tabix = find_tool('tabix', $tabix_bin || $ENV{TABIX_BIN});
+my $bgzip = resolve_hts_tool('bgzip', explicit => $bgzip_bin, start_dir => $Bin);
+my $tabix = resolve_hts_tool('tabix', explicit => $tabix_bin, start_dir => $Bin);
 die "Native bgzip and tabix are required for merged-wide indexing; put them in local/bin or PATH\n"
     unless $bgzip && $tabix;
 make_path(dirname($output)) unless -d dirname($output);
@@ -90,8 +92,17 @@ if ($unsorted) {
     $data_file = $sorted_file;
 }
 
-open my $bgzip_out, '|-', $bgzip, '-@', '4', '-o', $indexed_file, '-'
-    or die "Cannot start bgzip: $!\n";
+pipe(my $bgzip_reader, my $bgzip_out) or die "Cannot create bgzip pipe: $!\n";
+my $bgzip_pid = fork();
+die "Cannot fork bgzip: $!\n" unless defined $bgzip_pid;
+if ($bgzip_pid == 0) {
+    close $bgzip_out;
+    open STDIN, '<&', $bgzip_reader or die "Cannot connect bgzip stdin: $!\n";
+    open STDOUT, '>', $indexed_file or die "Cannot open $indexed_file: $!\n";
+    exec { $bgzip } $bgzip, '-c';
+    die "Cannot execute $bgzip: $!\n";
+}
+close $bgzip_reader;
 print {$bgzip_out} "$header\n";
 open my $rows_in, '<', $data_file or die "Cannot read $data_file: $!\n";
 while (read($rows_in, my $buffer, 1024 * 1024)) {
@@ -99,9 +110,12 @@ while (read($rows_in, my $buffer, 1024 * 1024)) {
 }
 close $rows_in or die "Cannot close $data_file: $!\n";
 close $bgzip_out or die "bgzip failed for $indexed_file\n";
+waitpid($bgzip_pid, 0);
+die "bgzip failed for $indexed_file\n" unless $? == 0;
 unlink $data_file or die "Cannot remove $data_file: $!\n";
 die "bgzip produced no output: $indexed_file\n" unless -s $indexed_file;
-system($tabix, '-f', '-s', '1', '-b', '2', '-e', '2', '-S', '1', $indexed_file) == 0
+system($tabix, '-f', '-s', '1', '-b', '2', '-e', '2', '-S', '1',
+    external_tool_path($tabix, $indexed_file)) == 0
     or die "tabix failed for $indexed_file\n";
 die "tabix index missing: $indexed_file.tbi\n" unless -s "$indexed_file.tbi";
 for my $pair ([$indexed_file, $output], ["$indexed_file.tbi", "$output.tbi"]) {
@@ -119,28 +133,3 @@ close $mf or die "Cannot close $tmp_manifest: $!\n";
 unlink $manifest if -e $manifest;
 rename $tmp_manifest, $manifest or die "Cannot install $manifest: $!\n";
 print "[tabix] Indexed $rows merged-wide rows: $output; skipped bad coordinates=$bad_rows\n";
-
-sub find_tool {
-    my ($name, $explicit) = @_;
-    if ($explicit) {
-        return $explicit if -f $explicit && -x $explicit;
-        die "Configured $name is unavailable: $explicit\n";
-    }
-    my @suffixes = $^O =~ /^(?:cygwin|MSWin32)$/i ? ('.exe', '') : ('');
-    my @dirs = ($Bin);
-    my $ancestor = $Bin;
-    for (1 .. 5) {
-        $ancestor = dirname($ancestor);
-        push @dirs, File::Spec->catdir($ancestor, 'local', 'bin');
-    }
-    push @dirs, '/usr/bin' if $^O =~ /cygwin/i;
-    push @dirs, File::Spec->path();
-    my %seen;
-    for my $dir (grep { defined($_) && length($_) && !$seen{$_}++ } @dirs) {
-        for my $suffix (@suffixes) {
-            my $candidate = File::Spec->catfile($dir, $name . $suffix);
-            return $candidate if -f $candidate && -x $candidate;
-        }
-    }
-    return;
-}

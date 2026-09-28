@@ -62,7 +62,41 @@ download or SAS account.
 The [Perl real-data test guide](MultiGWAS-Explorer/install/PUBLIC_GWAS_TEST.md)
 provides a complete female/male schizophrenia example with autosomes and X.
 It covers download checksums, numerical validation, and both plotting backends.
-Its `results.html` page groups gnuplot and SAS figures in one place.
+Run it from the inner pipeline directory after installation:
+
+```bash
+. install/common.sh
+activate_perl_env
+activate_python_env
+export PATH="$PIPELINE_ROOT/local/bin:$PATH"
+bash install/check_pipeline_install.sh
+perl install/run_public_sex_gwas.pl \
+  --output-dir "$PWD/public-gwas-test" \
+  --backend both
+```
+
+The command downloads the public PGC schizophrenia female/male files, verifies
+their published checksums, validates all differential-effect calculations, and
+renders gnuplot and SAS ODA figures. SAS ODA must already be configured. The
+four downloads are about 820 MB and the complete test needs several GB of free
+space.
+
+### Completed real-data example
+
+These are representative outputs from the full 6,650,636-comparison Windows
+portable-Cygwin validation. Both panels use the same sex-stratified
+schizophrenia analysis.
+
+| gnuplot | SAS OnDemand for Academics |
+| --- | --- |
+| [![gnuplot genome-wide Manhattan](MultiGWAS-Explorer/examples/public-scz-sex/figures/gunplot/PUBLIC_SCZ_EUR_SEX_GUNPLOT_manhattan.png)](MultiGWAS-Explorer/examples/public-scz-sex/figures/gunplot/PUBLIC_SCZ_EUR_SEX_GUNPLOT_manhattan.png) | [![SAS ODA genome-wide Manhattan](MultiGWAS-Explorer/examples/public-scz-sex/figures/sas/PUBLIC_SCZ_EUR_SEX_SAS_manhattan.png)](MultiGWAS-Explorer/examples/public-scz-sex/figures/sas/PUBLIC_SCZ_EUR_SEX_SAS_manhattan.png) |
+
+Clone the repository and open
+[`examples/public-scz-sex/results.html`](MultiGWAS-Explorer/examples/public-scz-sex/results.html)
+to browse all 11 gnuplot and 11 SAS ODA figures, including local Manhattan,
+signed-LD gene-track, and forest plots. The
+[example record](MultiGWAS-Explorer/examples/public-scz-sex/README.md) includes
+the validation scope and checksums.
 
 See the [test results and limitations](MultiGWAS-Explorer/install/PUBLIC_GWAS_RESULTS.md)
 and [platform installation checks](https://github.com/chengzhongshan/MultiGWAS-Explorer/actions/workflows/installation.yml).

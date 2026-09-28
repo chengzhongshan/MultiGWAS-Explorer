@@ -1,4 +1,20 @@
 #!/usr/bin/env perl
+BEGIN {
+    require Cwd;
+    require File::Basename;
+    require File::Spec;
+    my $script_dir = Cwd::abs_path(File::Basename::dirname(__FILE__)) || File::Basename::dirname(__FILE__);
+    my $bootstrap = File::Spec->catfile($script_dir, 'DiffGWASDeps', 'PipelineRuntimeEnv.pm');
+    require $bootstrap;
+    PipelineRuntimeEnv::bootstrap_local_perl(
+        script_dir       => $script_dir,
+        required_modules => [qw(
+            Compress::Raw::Zlib
+            IO::Compress::Gzip
+            IO::Uncompress::Gunzip
+        )],
+    );
+}
 use strict;
 use warnings;
 use FindBin qw($Bin);
@@ -619,14 +635,16 @@ my $deps_dir = normalize_unix_path(File::Spec->catdir($Bin, 'DiffGWASDeps'));
 verify_diff_gwas_deps($deps_dir);
 my $oda_helper_unix = resolve_oda_helper_unix($Bin);
 
+my $has_explicit_step_flag = scalar grep { $step_flag{$_} } keys %step_flag;
 my $local_plot_requested =
        $step_flag{plot_local_manhattan}
     || $step_flag{plot_local_gtf}
     || scalar(grep { /^(?:plot_)?local_(?:manhattan|gtf)$/ } @step_args)
-    || (!$skip_plots && ($plots || '') =~ /(?:^|,)local_(?:manhattan|gtf)(?:,|$)/);
+    || (!@step_args && !$has_explicit_step_flag && !$skip_plots
+        && ($plots || '') =~ /(?:^|,)local_(?:manhattan|gtf)(?:,|$)/);
 my $local_gtf_requested = $step_flag{plot_local_gtf}
     || scalar(grep { /^(?:plot_)?local_gtf$/ } @step_args)
-    || (!@step_args && !$step_flag{plot_local_manhattan} && !$skip_plots
+    || (!@step_args && !$has_explicit_step_flag && !$skip_plots
         && ($plots || '') =~ /(?:^|,)local_gtf(?:,|$)/);
 my $target_gtf_requested = @configured_target_snps > 0 && $local_gtf_requested;
 my $default_gtf_signed_ld = $local_gtf_requested

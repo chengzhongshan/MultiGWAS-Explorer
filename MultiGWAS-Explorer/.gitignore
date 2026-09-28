@@ -105,3 +105,7 @@ Thumbs.db
 *resubmission*
 *reviewer_summary*
 *benchmark_report*
+
+# Curated public validation documentation is intentionally versioned.
+!examples/public-scz-sex/results.html
+!examples/public-scz-sex/figures/**/*.png

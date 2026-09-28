@@ -3,6 +3,8 @@ use strict;
 use warnings;
 use FindBin qw($Bin);
 use Getopt::Long qw(GetOptions);
+use lib $Bin;
+use HTSToolResolver qw(resolve_hts_tool external_tool_path);
 
 my $input =
   '/mnt/e/LongCOVID_HGI_GWAS/PGC_Large_GWASs/PGC_SCZ_Sex_Stratified_GWASs/PGC_SCZ_female_vs_male_diff_effects.tsv.gz';
@@ -39,8 +41,8 @@ die "--clip-lower-quantile must be smaller than --clip-upper-quantile\n"
 my ($header, $cols, $idx) = read_header($input);
 my %idx = %$idx;
 die "Column $z_col not found in $input\n" unless exists $idx{$z_col};
-my $bgzip = resolve_hts_tool($htsbin, 'bgzip');
-my $tabix = resolve_hts_tool($htsbin, 'tabix');
+my $bgzip = resolve_hts_tool('bgzip', explicit => $htsbin, start_dir => $Bin);
+my $tabix = resolve_hts_tool('tabix', explicit => $htsbin, start_dir => $Bin);
 my $can_index_output = (
     $index_output
     && defined $bgzip
@@ -98,7 +100,8 @@ my $index_status = 'disabled';
 if ($can_index_output) {
     my $seq_col = $idx{CHR} + 1;
     my $bp_col  = $idx{BP} + 1;
-    if (system($tabix, '-f', '-s', $seq_col, '-b', $bp_col, '-e', $bp_col, '-S', 1, $output) == 0) {
+    if (system($tabix, '-f', '-s', $seq_col, '-b', $bp_col, '-e', $bp_col, '-S', 1,
+        external_tool_path($tabix, $output)) == 0) {
         $index_status = 'created';
     }
     else {
@@ -151,27 +154,6 @@ if ($method eq 'mean_sd_clipped') {
 }
 print "Rows written: $rows\n";
 print "Index:        $output.tbi\n" if $index_status eq 'created';
-
-sub resolve_hts_tool {
-    my ($dir, $tool) = @_;
-    my @names = ($tool);
-    push @names, "$tool.exe" if $^O =~ /^(?:cygwin|MSWin32)$/i;
-    my @dirs = grep { defined $_ && length $_ } (
-        $dir, map { "$Bin/" . ('../' x $_) . 'local/bin' } 1 .. 3
-    );
-    my @candidates = ((map { my $base = $_; map { "$base/$_" } @names } @dirs), @names);
-    for my $candidate (@candidates) {
-        next unless defined $candidate && length $candidate;
-        return $candidate if -x $candidate || command_exists($candidate);
-    }
-    return undef;
-}
-
-sub command_exists {
-    my ($cmd) = @_;
-    return 0 unless defined $cmd && length $cmd;
-    return scalar(`command -v '$cmd' 2>/dev/null`) ? 1 : 0;
-}
 
 sub read_header {
     my ($path) = @_;

@@ -4,6 +4,8 @@ use warnings;
 use Getopt::Long qw(GetOptions);
 use FindBin qw($Bin);
 use File::Spec;
+use lib "$Bin/DiffGWASDeps";
+use HTSToolResolver qw(resolve_hts_tool external_tool_path);
 
 my $input =
   '/mnt/e/LongCOVID_HGI_GWAS/PGC_Large_GWASs/PGC_SCZ_Sex_Stratified_GWASs/PGC_SCZ_female_vs_male_diff_effects.tsv.gz';
@@ -23,14 +25,27 @@ GetOptions(
     'end=i'    => \$end_col,
 ) or die usage();
 
-my $bgzip = resolve_hts_tool('bgzip', $htsbin);
-my $tabix = resolve_hts_tool('tabix', $htsbin);
+my $bgzip = resolve_hts_tool('bgzip', explicit => $htsbin, start_dir => $Bin);
+my $tabix = resolve_hts_tool('tabix', explicit => $htsbin, start_dir => $Bin);
+
+die "Native bgzip/tabix were not found. On Cygwin run bash install/repair_and_test_cygwin.sh; "
+  . "Windows executables inherited from the global PATH are intentionally ignored.\n"
+  unless $bgzip && $tabix;
 
 die "Input file not found: $input\n" unless -s $input;
 
-open my $in, '-|', "zcat '$input'" or die "Cannot read $input with zcat: $!\n";
-open my $out, '|-', "'$bgzip' -@ 4 -c > '$output'"
-  or die "Cannot write bgzip output $output: $!\n";
+open my $in, '-|', 'gzip', '-dc', '--', $input or die "Cannot read $input with gzip: $!\n";
+pipe(my $bgzip_reader, my $out) or die "Cannot create bgzip pipe: $!\n";
+my $bgzip_pid = fork();
+die "Cannot fork bgzip: $!\n" unless defined $bgzip_pid;
+if ($bgzip_pid == 0) {
+  close $out;
+  open STDIN, '<&', $bgzip_reader or die "Cannot connect bgzip stdin: $!\n";
+  open STDOUT, '>', $output or die "Cannot open bgzip output $output: $!\n";
+  exec { $bgzip } $bgzip, '-c';
+  die "Cannot execute $bgzip: $!\n";
+}
+close $bgzip_reader;
 
 my $header = <$in>;
 die "Input is empty: $input\n" unless defined $header;
@@ -46,9 +61,12 @@ while (my $line = <$in>) {
 }
 
 close $in;
-close $out or die "Failed closing bgzip output $output: $!\n";
+close $out or die "Failed closing bgzip input for $output: $!\n";
+waitpid($bgzip_pid, 0);
+die "bgzip failed for $output\n" unless $? == 0 && -s $output;
 
-system($tabix, '-f', '-s', $seq_col, '-b', $start_col, '-e', $end_col, '-S', 1, $output) == 0
+system($tabix, '-f', '-s', $seq_col, '-b', $start_col, '-e', $end_col, '-S', 1,
+  external_tool_path($tabix, $output)) == 0
   or die "tabix failed for $output\n";
 
 die "tabix did not create the expected index: $output.tbi\n" unless -s "$output.tbi";
@@ -59,24 +77,6 @@ print "Index:  $output.tbi\n";
 print "Rows:   $rows\n";
 print "bgzip:  $bgzip\n";
 print "tabix:  $tabix\n";
-
-sub resolve_hts_tool {
-    my ($name, $requested_dir) = @_;
-    my @dirs = grep { defined($_) && length($_) } (
-        $requested_dir,
-    );
-    my %seen;
-    for my $dir (@dirs) {
-        next if $seen{$dir}++;
-        my @tool_names = $^O =~ /^(?:cygwin|MSWin32)$/i ? ("$name.exe", $name) : ($name);
-        for my $tool_name (@tool_names) {
-            my $candidate = File::Spec->catfile($dir, $tool_name);
-            return $candidate if -f $candidate
-              && (-x $candidate || ($^O eq 'cygwin' && $candidate =~ /\.exe$/i));
-        }
-    }
-    return $name;
-}
 
 sub usage {
     return <<"USAGE";

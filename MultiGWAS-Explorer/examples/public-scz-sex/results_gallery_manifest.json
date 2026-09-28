@@ -1,0 +1,158 @@
+{
+    "images":  [
+                   {
+                       "backend":  "gnuplot",
+                       "copy":  "figures/gunplot/PUBLIC_SCZ_EUR_SEX_GUNPLOT_manhattan.png",
+                       "family":  "manhattan",
+                       "sha256":  "3dfa94beeae6fb3c124a07c2c606f955c70e9ccaf6a8c702438190d527b9a72b",
+                       "source":  "original-run/PUBLIC_SCZ_EUR_SEX_GUNPLOT_manhattan.png"
+                   },
+                   {
+                       "backend":  "gnuplot",
+                       "copy":  "figures/gunplot/PUBLIC_SCZ_EUR_SEX_GUNPLOT_local_top_hits_manhattan.png",
+                       "family":  "local_manhattan",
+                       "sha256":  "6d27cd72938dce178a39e4385e9fe8f1193b7ed584cafe4ef02aa59e3eadddf4",
+                       "source":  "original-run/PUBLIC_SCZ_EUR_SEX_GUNPLOT_local_top_hits_manhattan.png"
+                   },
+                   {
+                       "backend":  "gnuplot",
+                       "copy":  "figures/gunplot/PUBLIC_SCZ_EUR_SEX_GUNPLOT_local_top_hits_manhattan_rs185665940.png",
+                       "family":  "local_manhattan",
+                       "sha256":  "3ec5e7c2f00a150c239675663f3d6d990fbdbde441e016567cac18aad0f39edd",
+                       "source":  "original-run/PUBLIC_SCZ_EUR_SEX_GUNPLOT_local_top_hits_manhattan_rs185665940.png"
+                   },
+                   {
+                       "backend":  "gnuplot",
+                       "copy":  "figures/gunplot/PUBLIC_SCZ_EUR_SEX_GUNPLOT_local_top_hits_manhattan_rs2232429.png",
+                       "family":  "local_manhattan",
+                       "sha256":  "1fd1c1da34ab366c650345457fa70046259f9280b7f351af502d363581f0a566",
+                       "source":  "original-run/PUBLIC_SCZ_EUR_SEX_GUNPLOT_local_top_hits_manhattan_rs2232429.png"
+                   },
+                   {
+                       "backend":  "gnuplot",
+                       "copy":  "figures/gunplot/PUBLIC_SCZ_EUR_SEX_GUNPLOT_local_top_hits_manhattan_rs62604261.png",
+                       "family":  "local_manhattan",
+                       "sha256":  "4b527455692152fe295777a0ef524f22a100b6956721a0c347f121ddd030e20e",
+                       "source":  "original-run/PUBLIC_SCZ_EUR_SEX_GUNPLOT_local_top_hits_manhattan_rs62604261.png"
+                   },
+                   {
+                       "backend":  "gnuplot",
+                       "copy":  "figures/gunplot/PUBLIC_SCZ_EUR_SEX_GUNPLOT_local_top_hits_with_gtf_rs185665940.png",
+                       "family":  "local_gtf",
+                       "sha256":  "5372c4804dfb48e1002cb0a5ef89f54c4b344c3677be8a932dabd009a2d862b7",
+                       "source":  "original-run/PUBLIC_SCZ_EUR_SEX_GUNPLOT_local_top_hits_with_gtf_rs185665940.png"
+                   },
+                   {
+                       "backend":  "gnuplot",
+                       "copy":  "figures/gunplot/PUBLIC_SCZ_EUR_SEX_GUNPLOT_local_top_hits_with_gtf_rs2232429.png",
+                       "family":  "local_gtf",
+                       "sha256":  "c4b04372fffe6bbd285759631b0c0491305665644618ff64a21e619bdbc7a8be",
+                       "source":  "original-run/PUBLIC_SCZ_EUR_SEX_GUNPLOT_local_top_hits_with_gtf_rs2232429.png"
+                   },
+                   {
+                       "backend":  "gnuplot",
+                       "copy":  "figures/gunplot/PUBLIC_SCZ_EUR_SEX_GUNPLOT_local_top_hits_with_gtf_rs62604261.png",
+                       "family":  "local_gtf",
+                       "sha256":  "15d315d77a513e01b905aabc66ff4ee53861be07aea45ae362ff469a8140108b",
+                       "source":  "original-run/PUBLIC_SCZ_EUR_SEX_GUNPLOT_local_top_hits_with_gtf_rs62604261.png"
+                   },
+                   {
+                       "backend":  "gnuplot",
+                       "copy":  "figures/gunplot/PUBLIC_SCZ_EUR_SEX_GUNPLOT_top_hits_forest_EUR_FEMALE.png",
+                       "family":  "forest",
+                       "sha256":  "28dc2a946cdb1563edfeaabb08cb66c282417c0776f91ce9fa6de368be0907a0",
+                       "source":  "original-run/PUBLIC_SCZ_EUR_SEX_GUNPLOT_top_hits_forest_EUR_FEMALE.png"
+                   },
+                   {
+                       "backend":  "gnuplot",
+                       "copy":  "figures/gunplot/PUBLIC_SCZ_EUR_SEX_GUNPLOT_top_hits_forest_EUR_MALE.png",
+                       "family":  "forest",
+                       "sha256":  "bf0df0e6cf4ad6317c2bcd0c0ac35ff5f2845f464089c63b03125b37a87b9d85",
+                       "source":  "original-run/PUBLIC_SCZ_EUR_SEX_GUNPLOT_top_hits_forest_EUR_MALE.png"
+                   },
+                   {
+                       "backend":  "gnuplot",
+                       "copy":  "figures/gunplot/PUBLIC_SCZ_EUR_SEX_GUNPLOT_top_hits_forest_combined.png",
+                       "family":  "forest",
+                       "sha256":  "ea88067ec61e88fc392c622c3cad4520ee0e1d6f6539a5634642c90ea73aae14",
+                       "source":  "original-run/PUBLIC_SCZ_EUR_SEX_GUNPLOT_top_hits_forest_combined.png"
+                   },
+                   {
+                       "backend":  "SAS ODA",
+                       "copy":  "figures/sas/PUBLIC_SCZ_EUR_SEX_SAS_manhattan.png",
+                       "family":  "manhattan",
+                       "sha256":  "edaa3549cb0f53cdac76ce6669e4f90150632bd8e344c9ad07fb6ac8650690ee",
+                       "source":  "original-run/PUBLIC_SCZ_EUR_SEX_SAS_manhattan.png"
+                   },
+                   {
+                       "backend":  "SAS ODA",
+                       "copy":  "figures/sas/PUBLIC_SCZ_EUR_SEX_SAS_local_top_hits_manhattan.png",
+                       "family":  "local_manhattan",
+                       "sha256":  "cd50198f65f480012d5743718ac2caf0098b9f17dc2ebf98ee82b6ef497156c7",
+                       "source":  "original-run/PUBLIC_SCZ_EUR_SEX_SAS_local_top_hits_manhattan.png"
+                   },
+                   {
+                       "backend":  "SAS ODA",
+                       "copy":  "figures/sas/PUBLIC_SCZ_EUR_SEX_SAS_local_top_hits_with_gtf.png",
+                       "family":  "local_gtf",
+                       "sha256":  "b1ca42cb419f38571e428cc9304e132e38c75051ad104fea6960b1fddbc2c067",
+                       "source":  "original-run/PUBLIC_SCZ_EUR_SEX_SAS_local_top_hits_with_gtf.png"
+                   },
+                   {
+                       "backend":  "SAS ODA",
+                       "copy":  "figures/sas/PUBLIC_SCZ_EUR_SEX_SAS_local_top_hits_with_gtf_part1.png",
+                       "family":  "local_gtf",
+                       "sha256":  "3e4a63e0c5ec7d67970031ee61b95bb1ece40afebf92f8151587c980bf97283f",
+                       "source":  "original-run/PUBLIC_SCZ_EUR_SEX_SAS_local_top_hits_with_gtf_part1.png"
+                   },
+                   {
+                       "backend":  "SAS ODA",
+                       "copy":  "figures/sas/PUBLIC_SCZ_EUR_SEX_SAS_local_top_hits_with_gtf_part2.png",
+                       "family":  "local_gtf",
+                       "sha256":  "7f775771ae1db5b34ae4f91a36434f8d2e113356867674927972ee2f1bf48ad9",
+                       "source":  "original-run/PUBLIC_SCZ_EUR_SEX_SAS_local_top_hits_with_gtf_part2.png"
+                   },
+                   {
+                       "backend":  "SAS ODA",
+                       "copy":  "figures/sas/PUBLIC_SCZ_EUR_SEX_SAS_local_top_hits_with_gtf_part3.png",
+                       "family":  "local_gtf",
+                       "sha256":  "4cf6f41dc86cde752e2a5631df04875f1ba916f97e12c71374f7b907a886fea0",
+                       "source":  "original-run/PUBLIC_SCZ_EUR_SEX_SAS_local_top_hits_with_gtf_part3.png"
+                   },
+                   {
+                       "backend":  "SAS ODA",
+                       "copy":  "figures/sas/PUBLIC_SCZ_EUR_SEX_SAS_local_top_hits_with_gtf_rs185665940.png",
+                       "family":  "local_gtf",
+                       "sha256":  "1fc77a4d6fd7ceac77f153278db7ec17c2745d28da7a92173a96706b96c7ab52",
+                       "source":  "original-run/PUBLIC_SCZ_EUR_SEX_SAS_local_top_hits_with_gtf_rs185665940.png"
+                   },
+                   {
+                       "backend":  "SAS ODA",
+                       "copy":  "figures/sas/PUBLIC_SCZ_EUR_SEX_SAS_local_top_hits_with_gtf_rs2232429.png",
+                       "family":  "local_gtf",
+                       "sha256":  "54b8ed99fabf8473b62432418694357f452efd99232b34eab266e60b430f65f4",
+                       "source":  "original-run/PUBLIC_SCZ_EUR_SEX_SAS_local_top_hits_with_gtf_rs2232429.png"
+                   },
+                   {
+                       "backend":  "SAS ODA",
+                       "copy":  "figures/sas/PUBLIC_SCZ_EUR_SEX_SAS_local_top_hits_with_gtf_rs62604261.png",
+                       "family":  "local_gtf",
+                       "sha256":  "07cea64a25d0201c30b2114b50e51b0df61921a6a9e06d09d21bff66160e38f1",
+                       "source":  "original-run/PUBLIC_SCZ_EUR_SEX_SAS_local_top_hits_with_gtf_rs62604261.png"
+                   },
+                   {
+                       "backend":  "SAS ODA",
+                       "copy":  "figures/sas/PUBLIC_SCZ_EUR_SEX_SAS_top_hits_forest_EUR_FEMALE.png",
+                       "family":  "forest",
+                       "sha256":  "e7c1fc53d5861ba31930b91b2949d14924d213ad3bf680dc3a63ef037165f61b",
+                       "source":  "original-run/PUBLIC_SCZ_EUR_SEX_SAS_top_hits_forest_EUR_FEMALE.png"
+                   },
+                   {
+                       "backend":  "SAS ODA",
+                       "copy":  "figures/sas/PUBLIC_SCZ_EUR_SEX_SAS_top_hits_forest_EUR_MALE.png",
+                       "family":  "forest",
+                       "sha256":  "6357e920ef69e8c2f81101422b03884d506dba3879bc9ec1509625643500e042",
+                       "source":  "original-run/PUBLIC_SCZ_EUR_SEX_SAS_top_hits_forest_EUR_MALE.png"
+                   }
+               ]
+}

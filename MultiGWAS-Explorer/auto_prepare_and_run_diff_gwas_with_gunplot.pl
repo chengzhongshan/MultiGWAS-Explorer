@@ -2,46 +2,20 @@
 BEGIN {
     require File::Basename;
     require File::Spec;
-    require Config;
     require Cwd;
-    require lib;
-    my $current_arch = lc($Config::Config{archname} || '');
-    my $current_os = lc($^O || '');
-    my $is_arch_dir = sub {
-        my ($dir) = @_;
-        return 0 unless -d $dir;
-        my $name = File::Basename::basename($dir);
-        my $looks_arch_specific = ($name =~ /(?:-thread-multi|linux|gnu|darwin|MSWin32|cygwin|^x86_64|^aarch64|^arm64|^i[3-6]86)/i)
-            || -d File::Spec->catdir($dir, 'auto');
-        return 0 unless $looks_arch_specific;
-        return 1 if $current_arch && (lc($name) eq $current_arch || index($current_arch, lc($name)) >= 0 || index(lc($name), $current_arch) >= 0);
-        return 1 if $current_os eq 'cygwin' && $name =~ /cygwin/i;
-        return 1 if $current_os =~ /linux/  && $name =~ /(?:linux|gnu)/i;
-        return 1 if $current_os =~ /darwin/ && $name =~ /darwin/i;
-        return 1 if $current_os =~ /mswin32/ && $name =~ /MSWin32/i;
-        return 0;
-    };
     my $script_dir = Cwd::abs_path(File::Basename::dirname(__FILE__)) || File::Basename::dirname(__FILE__);
-    my $platform_tag = lc($^O || '');
-    $platform_tag =~ s/[^a-z0-9]+/_/g;
-    for my $root ($script_dir, File::Spec->catdir($script_dir, File::Spec->updir())) {
-        my @base_candidates;
-        if (defined $ENV{PIPELINE_PERL_LOCAL_DIR} && length $ENV{PIPELINE_PERL_LOCAL_DIR}) {
-            push @base_candidates, File::Spec->catdir($ENV{PIPELINE_PERL_LOCAL_DIR}, 'lib', 'perl5');
-        }
-        push @base_candidates, File::Spec->catdir($root, 'local', "perl5-$platform_tag", 'lib', 'perl5');
-        push @base_candidates, File::Spec->catdir($root, 'local', 'perl5', 'lib', 'perl5');
-        my %seen_base;
-        for my $base (@base_candidates) {
-            next unless -d $base;
-            next if $seen_base{$base}++;
-            lib->import($base);
-            for my $arch (glob(File::Spec->catdir($base, '*'))) {
-                next unless $is_arch_dir->($arch);
-                lib->import($arch);
-            }
-        }
-    }
+    my $bootstrap = File::Spec->catfile($script_dir, 'DiffGWASDeps', 'PipelineRuntimeEnv.pm');
+    require $bootstrap;
+    PipelineRuntimeEnv::bootstrap_local_perl(
+        script_dir      => $script_dir,
+        required_modules => [qw(
+            Compress::Raw::Zlib
+            IO::Compress::Gzip
+            IO::Uncompress::Gunzip
+            GD
+            PDL
+        )],
+    );
 }
 use strict;
 use warnings;

@@ -24,12 +24,12 @@ log "perl archname: $(perl -MConfig -e 'print $Config{archname}')"
 log "gnuplot on PATH: $(command -v gnuplot)"
 log "gnuplot version: $(gnuplot --version | head -n 1)"
 
-if ! command_exists bgzip; then
-  die "bgzip not found in local/bin or PATH"
-fi
-if ! command_exists tabix; then
-  die "tabix not found in local/bin or PATH"
-fi
+bgzip_path="$(resolve_native_hts_tool bgzip || true)"
+tabix_path="$(resolve_native_hts_tool tabix || true)"
+[ -n "${bgzip_path}" ] || die "Native bgzip not found. On Cygwin, Windows bgzip.exe from the global PATH is not accepted; run install/repair_and_test_cygwin.sh."
+[ -n "${tabix_path}" ] || die "Native tabix not found. On Cygwin, Windows tabix.exe from the global PATH is not accepted; run install/repair_and_test_cygwin.sh."
+log "native bgzip: ${bgzip_path}"
+log "native tabix: ${tabix_path}"
 for bundled_hts_tool in DiffGWASDeps/bgzip.exe DiffGWASDeps/tabix.exe; do
   [ ! -e "${bundled_hts_tool}" ] \
     || die "Foreign platform executable must not be bundled: ${bundled_hts_tool}"

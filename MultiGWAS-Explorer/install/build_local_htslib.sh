@@ -9,8 +9,9 @@ SCRIPT_DIR="$(cd "$(/usr/bin/dirname "${_build_local_htslib_source}")" && pwd)"
 SRC_DIR="${PIPELINE_ROOT}/tools/htslib-${PIPELINE_HTSLIB_VERSION}"
 TARBALL="${PIPELINE_ROOT}/tools/htslib-${PIPELINE_HTSLIB_VERSION}.tar.bz2"
 
-if command_exists bgzip && command_exists tabix; then
-  log "System bgzip/tabix already available; skipping local htslib build"
+prepend_path "${PIPELINE_LOCAL_DIR}/bin"
+if native_hts_tools_available; then
+  log "Native bgzip/tabix already available; skipping local htslib build"
   exit 0
 fi
 
@@ -34,5 +35,9 @@ make install
 if [ ! -x "${PIPELINE_LOCAL_DIR}/bin/bgzip" ] || [ ! -x "${PIPELINE_LOCAL_DIR}/bin/tabix" ]; then
   die "htslib build completed but bgzip/tabix were not installed under ${PIPELINE_LOCAL_DIR}/bin"
 fi
+cygwin_native_binary "${PIPELINE_LOCAL_DIR}/bin/bgzip" \
+  || die "The installed bgzip is not native to the active Cygwin environment"
+cygwin_native_binary "${PIPELINE_LOCAL_DIR}/bin/tabix" \
+  || die "The installed tabix is not native to the active Cygwin environment"
 
 log "Installed repo-local bgzip/tabix into ${PIPELINE_LOCAL_DIR}/bin"

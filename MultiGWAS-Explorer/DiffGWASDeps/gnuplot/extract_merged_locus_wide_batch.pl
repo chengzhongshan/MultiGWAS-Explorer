@@ -6,6 +6,8 @@ use Getopt::Long qw(GetOptions);
 use File::Basename qw(dirname);
 use File::Path qw(make_path);
 use File::Spec;
+use lib File::Spec->catdir($Bin, File::Spec->updir());
+use HTSToolResolver qw(resolve_hts_tool external_tool_path);
 use JSON::PP qw(decode_json);
 use Text::CSV;
 use IO::Compress::Gzip qw($GzipError);
@@ -130,9 +132,10 @@ my $record = sub {
 };
 if ($indexed_input) {
     close $in or die "Cannot close $input: $GunzipError\n";
-    my $tabix = find_tool('tabix', $tabix_bin || $ENV{TABIX_BIN});
+    my $tabix = resolve_hts_tool('tabix', explicit => $tabix_bin, start_dir => $Bin);
     die "Native tabix is required to query $indexed_input\n" unless $tabix;
-    open my $contigs, '-|', $tabix, '-l', $indexed_input
+    my $indexed_arg = external_tool_path($tabix, $indexed_input);
+    open my $contigs, '-|', $tabix, '-l', $indexed_arg
         or die "Cannot list tabix contigs in $indexed_input: $!\n";
     my %indexed_chr;
     while (my $contig = <$contigs>) {
@@ -144,7 +147,7 @@ if ($indexed_input) {
     for my $target (@targets) {
         for my $contig (@{ $indexed_chr{$target->{chr}} || [] }) {
             my $region = "$contig:$target->{start}-$target->{end}";
-            open my $query, '-|', $tabix, $indexed_input, $region
+            open my $query, '-|', $tabix, $indexed_arg, $region
                 or die "Cannot query $region in $indexed_input: $!\n";
             while (my $line = <$query>) {
                 $record->($line, [$target]);
@@ -215,29 +218,4 @@ sub replace_file {
     my ($from, $to) = @_;
     unlink $to if -e $to;
     rename $from, $to or die "Cannot replace $to: $!\n";
-}
-
-sub find_tool {
-    my ($name, $explicit) = @_;
-    if ($explicit) {
-        return $explicit if -f $explicit && -x $explicit;
-        die "Configured $name is unavailable: $explicit\n";
-    }
-    my @suffixes = $^O =~ /^(?:cygwin|MSWin32)$/i ? ('.exe', '') : ('');
-    my @dirs = ($Bin);
-    my $ancestor = $Bin;
-    for (1 .. 5) {
-        $ancestor = dirname($ancestor);
-        push @dirs, File::Spec->catdir($ancestor, 'local', 'bin');
-    }
-    push @dirs, '/usr/bin' if $^O =~ /cygwin/i;
-    push @dirs, File::Spec->path();
-    my %seen;
-    for my $dir (grep { defined($_) && length($_) && !$seen{$_}++ } @dirs) {
-        for my $suffix (@suffixes) {
-            my $candidate = File::Spec->catfile($dir, $name . $suffix);
-            return $candidate if -f $candidate && -x $candidate;
-        }
-    }
-    return;
 }
