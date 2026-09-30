@@ -27,7 +27,9 @@ $plink2 ||= File::Spec->catfile(dirname($output_dir), 'plink2_bin',
     $^O =~ /cygwin|MSWin32/i ? 'plink2.exe' : 'plink2');
 chmod 0755, $plink2 if -f $plink2 && !-x $plink2;
 
-if (-s "$prefix.pgen" && -s "$prefix.pvar.zst" && -s "$prefix.psam"
+my $pvar = "$prefix.pvar.zst";
+my $pvar_has_rsids = -s $pvar && pvar_has_rsids($pvar);
+if (-s "$prefix.pgen" && $pvar_has_rsids && -s "$prefix.psam"
     && -f $plink2 && -x $plink2) {
     print "[reuse] Official PLINK2 1000 Genomes Phase 3 hg38 chr$chr: $prefix\n";
     exit 0;
@@ -54,13 +56,34 @@ system($plink2, '--version') == 0
     or die "PLINK2 executable does not run: $plink2\n";
 
 my $pgen_name = "chr${chr}_hg38.pgen.zst";
-my $pvar_name = "chr${chr}_hg38_rs_noannot.pvar.zst";
 my $psam_name = 'hg38_corrected.psam';
 my $pgen_url = official_link($html, $pgen_name);
-my $pvar_url = official_link($html, $pvar_name);
+my $pvar_url = official_link($html,
+    "chr${chr}_hg38_rs_noannot.pvar.zst",
+    "chr${chr}_hg38_rs.pvar.zst");
 my $psam_url = official_link($html, $psam_name);
 download($curl, $pgen_url, "$prefix.pgen.zst") unless -s "$prefix.pgen";
-download($curl, $pvar_url, "$prefix.pvar.zst") unless -s "$prefix.pvar.zst";
+if (!$pvar_has_rsids) {
+    my $staged_pvar = "$prefix.rsid.pvar.zst";
+    unlink $staged_pvar if -s $staged_pvar && !pvar_has_rsids($staged_pvar);
+    download($curl, $pvar_url, $staged_pvar);
+    die "Downloaded PVAR has no rsIDs: $staged_pvar\n"
+        unless pvar_has_rsids($staged_pvar);
+    if (-e $pvar) {
+        my $backup = "$prefix.no_rsid.pvar.zst";
+        my $suffix = 1;
+        $backup = "$prefix.no_rsid.$suffix.pvar.zst" while -e $backup && $suffix++;
+        rename $pvar, $backup or die "Cannot preserve $pvar as $backup: $!\n";
+        print "[backup] Preserved PVAR without rsIDs: $backup\n";
+        unless (rename $staged_pvar, $pvar) {
+            my $error = $!;
+            rename $backup, $pvar or warn "Cannot restore $pvar from $backup: $!\n";
+            die "Cannot install rsID PVAR $pvar: $error\n";
+        }
+    } else {
+        rename $staged_pvar, $pvar or die "Cannot install rsID PVAR $pvar: $!\n";
+    }
+}
 my $shared_psam = File::Spec->catfile($output_dir, $psam_name);
 download($curl, $psam_url, $shared_psam) unless -s $shared_psam;
 copy($shared_psam, "$prefix.psam") or die "Cannot prepare $prefix.psam: $!\n"
@@ -74,7 +97,7 @@ if (!-s "$prefix.pgen") {
     rename $tmp_pgen, "$prefix.pgen" or die "Cannot install $prefix.pgen: $!\n";
 }
 die "Official hg38 chromosome fileset is incomplete: $prefix\n"
-    unless -s "$prefix.pgen" && -s "$prefix.pvar.zst" && -s "$prefix.psam";
+    unless -s "$prefix.pgen" && pvar_has_rsids($pvar) && -s "$prefix.psam";
 print "[ready] PLINK2 1000 Genomes Phase 3 GRCh38/hg38 chr$chr: $prefix\n";
 
 sub fetch_page {
@@ -89,13 +112,37 @@ sub fetch_page {
 }
 
 sub official_link {
-    my ($html, $filename) = @_;
-    my ($url) = $html =~ /href="([^"]*\Q$filename\E[^"]*)"/i;
-    die "Official PLINK2 resources page has no link for $filename\n" unless $url;
-    $url =~ s/&amp;/&/g;
-    die "Unexpected download host for $filename: $url\n"
-        unless $url =~ m{^https://www\.dropbox\.com/};
-    return $url;
+    my ($html, @filenames) = @_;
+    for my $filename (@filenames) {
+        # Match the URL filename: a displayed .pvar.zst link can point to a .log.
+        my ($url) = $html =~ /href="([^"]*\/\Q$filename\E(?:\?[^"]*)?)"/i;
+        next unless $url;
+        $url =~ s/&amp;/&/g;
+        die "Unexpected download host for $filename: $url\n"
+            unless $url =~ m{^https://www\.dropbox\.com/};
+        print "[source] Using official rsID PVAR $filename\n" if @filenames > 1;
+        return $url;
+    }
+    die "Official PLINK2 resources page has no link for "
+        . join(' or ', @filenames) . "\n";
+}
+
+sub pvar_has_rsids {
+    my ($path) = @_;
+    return 0 unless -s $path;
+    my $zstdcat = $^O eq 'cygwin' ? '/usr/bin/zstdcat' : 'zstdcat';
+    open my $pipe, '-|', $zstdcat, $path
+        or die "Cannot inspect PVAR $path with $zstdcat: $!\n";
+    my ($rows, $rsids) = (0, 0);
+    while (my $line = <$pipe>) {
+        next if $line =~ /^#/;
+        my @fields = split /\t/, $line, 4;
+        ++$rows;
+        ++$rsids if defined $fields[2] && $fields[2] =~ /^rs\d+$/i;
+        last if $rows >= 1000;
+    }
+    close $pipe; # Stopping after a sample can give the decompressor SIGPIPE.
+    return $rows > 0 && $rsids >= $rows * 0.05;
 }
 
 sub download {
