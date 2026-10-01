@@ -35,6 +35,8 @@ use Fcntl qw(LOCK_EX LOCK_NB);
 use POSIX qw(strftime ceil);
 use Time::HiRes qw(time);
 use IO::Uncompress::Gunzip qw($GunzipError);
+use lib File::Spec->catdir($Bin, 'DiffGWASDeps');
+use ChromosomeBounds qw(locus_window);
 
 sub usage {
     return <<"USAGE";
@@ -1621,6 +1623,7 @@ sub plot_local_series {
         preset_config => $args{preset_config},
         required_cols => \@locus_required_pcols,
         force         => $args{force},
+        reference_build => $runner->{REFERENCE_BUILD},
     );
 
     my (%label_snps_for_index, %skip_hit_index);
@@ -1820,6 +1823,7 @@ sub plot_local_series {
             renderer          => File::Spec->catfile($Bin, 'DiffGWASDeps', 'gnuplot', 'pdl_gnuplot_local_locus.pl'),
             snp               => $hit->{SNP},
             window_bp         => $args{window_bp},
+            reference_build   => ($runner->{REFERENCE_BUILD} // ''),
             pcols             => join(',', @{ $args{pcols} }),
             zcols             => join(',', @{ $args{zcols} || [] }),
             labels            => join('|', @{ $args{labels} }),
@@ -1955,9 +1959,9 @@ sub plot_local_series {
                 $args{output_dir},
                 "gnuplot_locus_${safe_snp}_window_${safe_window}_npc${npc_flag}.gtf.tsv"
             );
-            my $region_start = $hit->{BP} - (0 + $args{window_bp});
-            $region_start = 1 if $region_start < 1;
-            my $region_end = $hit->{BP} + (0 + $args{window_bp});
+            my ($region_start, $region_end) = locus_window(
+                $runner->{REFERENCE_BUILD}, $hit->{CHR}, $hit->{BP},
+                0 + $args{window_bp});
             if (!$args{force} && -s $gtf_file) {
                 print "[skip] reusing cached gnuplot GTF subset $gtf_file\n";
             }
@@ -1988,6 +1992,7 @@ sub plot_local_series {
             '--label-snps', $label_snps_csv,
             '--out-prefix', $locus_prefix,
             '--window-bp', $args{window_bp},
+            '--reference-build', ($runner->{REFERENCE_BUILD} // ''),
             '--pcols', join(',', @{ $args{pcols} }),
             '--labels', join('|', @{ $args{labels} }),
             '--title', sprintf('%s: %s (%s:%s)', $args{html_title}, $locus_title_snps, $hit->{CHR}, $hit->{BP}),
@@ -2224,10 +2229,11 @@ sub local_locus_cache_is_reusable {
     return (0, 'plot manifest is absent or empty') unless defined $manifest && -s $manifest;
     my $metrics = read_manifest_tsv($manifest);
     return (0, 'legacy plot manifest has no cache schema')
-        unless defined $metrics->{cache_schema} && $metrics->{cache_schema} =~ /^\d+$/ && $metrics->{cache_schema} >= 8;
+        unless defined $metrics->{cache_schema} && $metrics->{cache_schema} =~ /^\d+$/ && $metrics->{cache_schema} >= 9;
 
     my @checks = (
         ['snp',               ($args{snp} // '')],
+        ['reference_build',   ($args{reference_build} // '')],
         ['pcols',             ($args{pcols} // '')],
         ['label_snps',        ($args{label_snps} // $args{snp} // '')],
         ['ld_snps',           ($args{ld_snps} // '')],
@@ -2875,6 +2881,7 @@ sub prepare_locus_wide_sources {
                 '--indexed-input', $indexed_wide,
                 '--output-dir', $args{output_dir},
                 '--window-bp', $args{window_bp},
+                '--reference-build', ($args{reference_build} // ''),
             );
             for my $hit (@batch_targets) {
                 push @cmd, ('--target', encode_json({

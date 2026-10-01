@@ -7,13 +7,14 @@ use File::Basename qw(dirname);
 use File::Path qw(make_path);
 use File::Spec;
 use lib File::Spec->catdir($Bin, File::Spec->updir());
+use ChromosomeBounds qw(locus_window);
 use HTSToolResolver qw(resolve_hts_tool external_tool_path);
 use JSON::PP qw(decode_json);
 use Text::CSV;
 use IO::Compress::Gzip qw($GzipError);
 use IO::Uncompress::Gunzip qw($GunzipError);
 
-my ($input, $indexed_input, $tabix_bin, $output_dir, $window_bp, $targets_csv, $combined_output) = ('') x 7;
+my ($input, $indexed_input, $tabix_bin, $output_dir, $window_bp, $targets_csv, $combined_output, $reference_build) = ('') x 8;
 my @target_args;
 GetOptions(
     'input=s'      => \$input,
@@ -21,6 +22,7 @@ GetOptions(
     'tabix-bin=s'  => \$tabix_bin,
     'output-dir=s' => \$output_dir,
     'window-bp=s'  => \$window_bp,
+    'reference-build=s' => \$reference_build,
     'target=s@'    => \@target_args,
     'targets-csv=s' => \$targets_csv,
     'combined-output=s' => \$combined_output,
@@ -67,10 +69,11 @@ for my $arg (@target_args) {
     next if $seen{uc($snp)}++;
     my $stem = 'gnuplot_locus_' . safe_name($snp)
         . '_window_' . safe_name($window_bp) . '.wide';
+    my ($start, $end) = locus_window($reference_build, $chr, $bp, 0 + $window_bp);
     my $target = {
         snp => $snp, chr => $chr, bp => 0 + $bp,
-        start => $bp - $window_bp > 1 ? $bp - $window_bp : 1,
-        end => $bp + $window_bp,
+        start => $start,
+        end => $end,
         data => File::Spec->catfile($output_dir, "$stem.tsv.gz"),
         manifest => File::Spec->catfile($output_dir, "$stem.manifest.tsv"),
         rows_written => 0, target_found => 0,
@@ -177,6 +180,9 @@ for my $target (@targets) {
         ['target_chr', $target->{chr}],
         ['target_bp', $target->{bp}],
         ['window_bp', $window_bp],
+        ['reference_build', $reference_build],
+        ['window_start', $target->{start}],
+        ['window_end', $target->{end}],
         ['rows_written', $target->{rows_written}],
         ['columns', join(',', @cols)],
         ['source', $input],

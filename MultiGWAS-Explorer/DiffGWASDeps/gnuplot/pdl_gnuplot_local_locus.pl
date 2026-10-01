@@ -6,6 +6,9 @@ use Getopt::Long qw(GetOptions);
 use IO::Uncompress::Gunzip qw($GunzipError);
 use File::Path qw(make_path);
 use File::Basename qw(dirname basename);
+use FindBin qw($Bin);
+use lib "$Bin/..";
+use ChromosomeBounds qw(locus_window);
 
 sub usage {
     return <<"USAGE";
@@ -14,6 +17,7 @@ Usage:
 
 Options:
   --window-bp N            Required.
+  --reference-build BUILD  hg38/GRCh38, hg19/GRCh37, or t2t/hs1; clip at chromosome end.
   --pcols A,B,C            Required.
   --zcols A,B,C            Optional z-score columns for color mapping.
   --labels A|B|C           Optional display labels.
@@ -72,6 +76,7 @@ GetOptions(
     'snp=s'        => \$opt{snp},
     'out-prefix=s' => \$opt{out_prefix},
     'window-bp=s'  => \$opt{window_bp},
+    'reference-build=s' => \$opt{reference_build},
     'pcols=s'      => \$opt{pcols},
     'zcols=s'      => \$opt{zcols},
     'labels=s'     => \$opt{labels},
@@ -254,9 +259,8 @@ close $fh;
 
 die "Target SNP $opt{snp} was not found in $opt{data}\n" unless defined $target_chr && defined $target_bp;
 my $window_bp = 0 + $opt{window_bp};
-my $start = $target_bp - $window_bp;
-$start = 1 if $start < 1;
-my $end = $target_bp + $window_bp;
+my ($start, $end) = locus_window(
+    $opt{reference_build}, $target_chr, $target_bp, $window_bp);
 
 my @target_markers;
 for my $requested (@label_snps) {
@@ -447,7 +451,7 @@ system($opt{gnuplot}, $gp_file) == 0
 
 open my $mf, '>', $manifest or die "Cannot write $manifest: $!\n";
 print {$mf} join("\t", qw(METRIC VALUE)), "\n";
-print {$mf} join("\t", 'cache_schema', 8), "\n";
+print {$mf} join("\t", 'cache_schema', 9), "\n";
 print {$mf} join("\t", 'input', $opt{data}), "\n";
 print {$mf} join("\t", 'png', $png_file), "\n";
 print {$mf} join("\t", 'plot_tsv', $plot_tsv), "\n";
@@ -480,6 +484,9 @@ print {$mf} join("\t", 'signed_r2_coloring', $use_signed_r2), "\n";
 print {$mf} join("\t", 'chr', $target_chr), "\n";
 print {$mf} join("\t", 'bp', $target_bp), "\n";
 print {$mf} join("\t", 'window_bp', $window_bp), "\n";
+print {$mf} join("\t", 'reference_build', ($opt{reference_build} // '')), "\n";
+print {$mf} join("\t", 'window_start', $start), "\n";
+print {$mf} join("\t", 'window_end', $end), "\n";
 print {$mf} join("\t", 'pcols', join(',', @pcols)), "\n";
 print {$mf} join("\t", 'zcols', join(',', @zcols)), "\n";
 print {$mf} join("\t", 'labels', ($opt{labels} // '')), "\n";
