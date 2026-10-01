@@ -1085,16 +1085,10 @@ sub collect_top_hits {
     my (%args) = @_;
     my $runner = $args{runner};
     my $target_snps = $args{target_snps} || '';
-    my $differential_thresholds = resolve_runner_differential_threshold_ladder($runner);
     my $out_tsv = File::Spec->catfile(
         $args{output_dir},
         gnuplotize_name(($runner->{PROJECT_TAG} || 'diff_gwas') . '.gnuplot_top_hits.tsv')
     );
-
-    if (!$args{force} && -s $out_tsv && !$target_snps) {
-        print "[skip] reusing existing gnuplot top-hit table $out_tsv\n";
-        return read_hits_tsv($out_tsv);
-    }
 
     if ($target_snps) {
         my @hits = map { +{ SNP => $_ } } grep { length } map { trim($_) } split /,/, $target_snps;
@@ -1102,26 +1096,11 @@ sub collect_top_hits {
     }
 
     if (($runner->{TOP_HIT_MODE} || '') =~ /^common_association$/i) {
-        my @cmd = (
-            $^X,
-            File::Spec->catfile($Bin, 'DiffGWASDeps', 'verify_common_association_loci.pl'),
-            '--spec', $args{spec_file},
-            '--input', $args{wide_data},
-            '--output', $out_tsv,
-            '--top-p-thresholds', ($runner->{TOP_HIT_SIGNAL_THRSHDS} || $runner->{TOP_HIT_SIGNAL_THRSHD} || '1e-6'),
-            '--top-hit-dist-bp', ($runner->{TOP_HIT_DIST_BP} || '1e8'),
-            '--max-loci', 15,
-            '--maf-threshold', runner_maf_threshold($runner),
+        return collect_top_hits_for_mode(
+            %args,
+            mode => 'common_association',
+            output_tsv => $out_tsv,
         );
-        push @cmd, ('--runner-config', $args{runner_config_path})
-            if defined $args{runner_config_path} && length $args{runner_config_path};
-        push @cmd, ('--gnomad-freq-file', $runner->{TOP_HIT_GNOMAD_FREQ_FILE})
-            if defined $runner->{TOP_HIT_GNOMAD_FREQ_FILE} && length $runner->{TOP_HIT_GNOMAD_FREQ_FILE};
-        push @cmd, ('--gnomad-pop-map', $runner->{TOP_HIT_GNOMAD_POP_MAP})
-            if defined $runner->{TOP_HIT_GNOMAD_POP_MAP} && length $runner->{TOP_HIT_GNOMAD_POP_MAP};
-        push @cmd, '--remove-x-chr' if $args{remove_x_chr};
-        run_cmd(\@cmd, 'common-association top-hit selection');
-        return read_hits_tsv($out_tsv);
     }
     if (($runner->{TOP_HIT_MODE} || '') =~ /^(?:common_and_differential|union_common_and_differential)$/i) {
         my @diff = collect_top_hits_for_mode(
@@ -1132,6 +1111,7 @@ sub collect_top_hits {
             runner_config_path => $args{runner_config_path},
             wide_data => $args{wide_data},
             remove_x_chr => $args{remove_x_chr},
+            force => $args{force},
         );
         my @common = collect_top_hits_for_mode(
             mode => 'common_association',
@@ -1141,6 +1121,7 @@ sub collect_top_hits {
             runner_config_path => $args{runner_config_path},
             wide_data => $args{wide_data},
             remove_x_chr => $args{remove_x_chr},
+            force => $args{force},
         );
         return merge_hit_lists_for_gnuplot(
             max_hits => 15,
@@ -1157,6 +1138,7 @@ sub collect_top_hits {
         wide_data => $args{wide_data},
         remove_x_chr => $args{remove_x_chr},
         output_tsv => $out_tsv,
+        force => $args{force},
     );
 }
 
@@ -1175,10 +1157,28 @@ sub collect_top_hits_for_mode {
     my $mode = $args{mode} || 'differential';
     my $out_tsv = $args{output_tsv}
         || File::Spec->catfile($args{output_dir}, "gnuplot_top_hits_${mode}.tsv");
+    my $selector = $mode =~ /^common_association$/i
+        ? File::Spec->catfile($Bin, 'DiffGWASDeps', 'verify_common_association_loci.pl')
+        : File::Spec->catfile($Bin, 'DiffGWASDeps', 'gnuplot', 'select_top_hits_from_wide.pl');
+    my $request_key = top_hit_selection_request_key(
+        %args, mode => $mode, selector => $selector,
+    );
+    my $request_file = "$out_tsv.request.sha1";
+    if (!$args{force} && -s $out_tsv && -s $request_file) {
+        open my $cached, '<', $request_file
+            or die "Cannot read top-hit request cache $request_file: $!\n";
+        my $previous_key = <$cached> // '';
+        close $cached;
+        $previous_key =~ s/\s+\z//;
+        if ($previous_key eq $request_key) {
+            print "[skip] reusing existing gnuplot $mode top-hit table $out_tsv\n";
+            return read_hits_tsv($out_tsv);
+        }
+    }
     if ($mode =~ /^common_association$/i) {
         my @cmd = (
             $^X,
-            File::Spec->catfile($Bin, 'DiffGWASDeps', 'verify_common_association_loci.pl'),
+            $selector,
             '--spec', $args{spec_file},
             '--input', $args{wide_data},
             '--output', $out_tsv,
@@ -1195,12 +1195,14 @@ sub collect_top_hits_for_mode {
             if defined $runner->{TOP_HIT_GNOMAD_POP_MAP} && length $runner->{TOP_HIT_GNOMAD_POP_MAP};
         push @cmd, '--remove-x-chr' if $args{remove_x_chr};
         run_cmd(\@cmd, 'common-association top-hit selection');
-        return read_hits_tsv($out_tsv);
+        my @hits = read_hits_tsv($out_tsv);
+        write_top_hit_request_key($request_file, $request_key);
+        return @hits;
     }
     my $differential_thresholds = resolve_runner_differential_threshold_ladder($runner);
     my @cmd = (
         $^X,
-        File::Spec->catfile($Bin, 'DiffGWASDeps', 'gnuplot', 'select_top_hits_from_wide.pl'),
+        $selector,
         '--input', $args{wide_data},
         '--output', $out_tsv,
         '--focus-pvar', ($runner->{TOP_HIT_FOCUS_PVAR} || $runner->{MANHATTAN_P_VAR} || 'P'),
@@ -1216,7 +1218,55 @@ sub collect_top_hits_for_mode {
         if defined $runner->{TOP_HIT_GNOMAD_POP_MAP} && length $runner->{TOP_HIT_GNOMAD_POP_MAP};
     push @cmd, '--remove-x-chr' if $args{remove_x_chr};
     run_cmd(\@cmd, 'differential top-hit selection');
-    return read_hits_tsv($out_tsv);
+    my @hits = read_hits_tsv($out_tsv);
+    write_top_hit_request_key($request_file, $request_key);
+    return @hits;
+}
+
+sub top_hit_selection_request_key {
+    my (%args) = @_;
+    my $runner = $args{runner} || {};
+    my $mode = $args{mode} || 'differential';
+    my $wide = localize_path($args{wide_data} || '');
+    my @wide_stat = stat($wide);
+    die "Cannot cache top-hit selection without wide GWAS input $wide\n"
+        unless @wide_stat;
+    my @selector_stat = stat($args{selector});
+    die "Top-hit selector is missing: $args{selector}\n"
+        unless @selector_stat;
+    my $gnomad_path = localize_path($runner->{TOP_HIT_GNOMAD_FREQ_FILE} || '');
+    my @gnomad_stat = length($gnomad_path) ? stat($gnomad_path) : ();
+    my %request = (
+        schema       => 1,
+        mode         => $mode,
+        wide         => [$wide, @wide_stat[7, 9]],
+        selector     => [$args{selector}, @selector_stat[7, 9]],
+        remove_x_chr => $args{remove_x_chr} ? 1 : 0,
+        thresholds   => $mode eq 'differential'
+            ? resolve_runner_differential_threshold_ladder($runner)
+            : ($runner->{TOP_HIT_SIGNAL_THRSHDS} || $runner->{TOP_HIT_SIGNAL_THRSHD} || '1e-6'),
+        focus_pvar   => $runner->{TOP_HIT_FOCUS_PVAR} || $runner->{MANHATTAN_P_VAR} || 'P',
+        dist_bp      => $runner->{TOP_HIT_DIST_BP} || '1e8',
+        max_hits     => 15,
+        maf          => runner_maf_threshold($runner),
+        gnomad       => [($runner->{TOP_HIT_GNOMAD_FREQ_FILE} || ''),
+            (@gnomad_stat ? @gnomad_stat[7, 9] : ())],
+        gnomad_map   => $runner->{TOP_HIT_GNOMAD_POP_MAP} || '',
+    );
+    if ($mode =~ /^common_association$/i) {
+        $request{spec} = load_json($args{spec_file});
+        $request{runner} = $runner;
+    }
+    return sha1_hex(JSON::PP->new->canonical(1)->encode(\%request));
+}
+
+sub write_top_hit_request_key {
+    my ($path, $key) = @_;
+    my $tmp = "$path.tmp.$$";
+    open my $out, '>', $tmp or die "Cannot write top-hit request cache $tmp: $!\n";
+    print {$out} "$key\n";
+    close $out or die "Cannot close top-hit request cache $tmp: $!\n";
+    rename $tmp, $path or die "Cannot install top-hit request cache $path: $!\n";
 }
 
 sub merge_hit_lists_for_gnuplot {
@@ -1697,10 +1747,10 @@ sub plot_local_series {
         my @ld_r2_snps = @{ $ld_r2_snps_ref || [] };
         my %ld_marker_for = map { lc($_) => 1 } @ld_snps;
         my $ld_snps_csv = join(',', @ld_snps);
-        my $ld_r2_signature = sha1_hex(join("\n", sort map {
+        my $ld_r2_signature = @ld_r2_snps ? sha1_hex(join("\n", sort map {
             my $key = lc $_;
             exists($ld_r2_ref->{$key}) ? $_ . ':' . sprintf('%.6g', $ld_r2_ref->{$key}) : ()
-        } @ld_r2_snps));
+        } @ld_r2_snps)) : '';
         my $safe_snp = safe_name($hit->{SNP});
         my $safe_window = safe_name($args{window_bp});
         my $batch_index = int($render_idx / $batch_size);
@@ -1714,18 +1764,6 @@ sub plot_local_series {
         my $batch_col = $batch_pos % $batch_cols;
         my $locus_prefix = File::Spec->catfile($args{output_dir}, $base_name . '_' . $safe_snp);
         my $ld_r2_file = $locus_prefix . '.ld_r2.tsv';
-        if (@ld_r2_snps) {
-            open my $ldfh, '>:raw', $ld_r2_file
-                or die "Cannot write LD R2 sidecar $ld_r2_file: $!\n";
-            print {$ldfh} "SNP\tR2\tIS_MARKER\n";
-            for my $snp (@ld_r2_snps) {
-                my $key = lc $snp;
-                my $r2 = exists($ld_r2_ref->{$key})
-                    ? sprintf('%.6g', $ld_r2_ref->{$key}) : '';
-                print {$ldfh} join("\t", $snp, $r2, ($ld_marker_for{$key} ? 1 : 0)), "\n";
-            }
-            close $ldfh or die "Cannot close LD R2 sidecar $ld_r2_file: $!\n";
-        }
         my $existing_locus_manifest = $locus_prefix . '.manifest.tsv';
         if (-s $existing_locus_manifest && (!defined $hit->{CHR} || !defined $hit->{BP})) {
             my $prior_metrics = read_manifest_tsv($existing_locus_manifest);
@@ -1772,7 +1810,7 @@ sub plot_local_series {
             ld_snps           => $ld_snps_csv,
             ld_marker_symbol  => $args{ld_marker_symbol},
             ld_marker_color   => $args{ld_marker_color},
-            ld_marker_threshold => $args{ld_r2_threshold},
+            ld_marker_threshold => $args{highlight_high_ld_snps} ? $args{ld_r2_threshold} : '',
             ld_display_mode   => $args{ld_display_mode},
             ld_r2_signature   => $ld_r2_signature,
             ld_heatmap_colors => $args{ld_heatmap_colors},
@@ -1816,6 +1854,19 @@ sub plot_local_series {
                 manifest => $locus_prefix . '.manifest.tsv',
             };
             next;
+        }
+
+        if (@ld_r2_snps) {
+            open my $ldfh, '>:raw', $ld_r2_file
+                or die "Cannot write LD R2 sidecar $ld_r2_file: $!\n";
+            print {$ldfh} "SNP\tR2\tIS_MARKER\n";
+            for my $snp (@ld_r2_snps) {
+                my $key = lc $snp;
+                my $r2 = exists($ld_r2_ref->{$key})
+                    ? sprintf('%.6g', $ld_r2_ref->{$key}) : '';
+                print {$ldfh} join("\t", $snp, $r2, ($ld_marker_for{$key} ? 1 : 0)), "\n";
+            }
+            close $ldfh or die "Cannot close LD R2 sidecar $ld_r2_file: $!\n";
         }
 
         my $locus_input = $args{wide_data};
@@ -2920,7 +2971,18 @@ sub locus_wide_cache_matches {
     return (0, {}) unless $args{data} && -s $args{data} && $args{manifest} && -s $args{manifest};
     my $metrics = read_manifest_tsv($args{manifest});
     if (@{ $args{required_cols} || [] }) {
-        my %columns = map { $_ => 1 } split /,/, ($metrics->{columns} || '');
+        my $recorded_columns = $metrics->{columns} || '';
+        if (!length $recorded_columns) {
+            # Older batch manifests omitted columns even though the data header
+            # contains them; inspect only the header instead of re-extracting.
+            my $fh = IO::Uncompress::Gunzip->new($args{data})
+                or return (0, $metrics);
+            my $header = <$fh> // '';
+            close $fh;
+            $header =~ s/[\r\n]+\z//;
+            $recorded_columns = join(',', split /\t/, $header, -1);
+        }
+        my %columns = map { $_ => 1 } split /,/, $recorded_columns;
         return (0, $metrics) if grep { !$columns{$_} } @{ $args{required_cols} };
     }
     if ($args{source}) {

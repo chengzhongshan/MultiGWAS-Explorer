@@ -178,6 +178,7 @@ for my $target (@targets) {
         ['target_bp', $target->{bp}],
         ['window_bp', $window_bp],
         ['rows_written', $target->{rows_written}],
+        ['columns', join(',', @cols)],
         ['source', $input],
         ['source_size', $source_stat[7]],
         ['source_mtime', $source_stat[9]],

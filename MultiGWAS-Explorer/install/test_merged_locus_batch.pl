@@ -37,6 +37,8 @@ my %manifest = map { chomp; split /\t/, $_, 2 } <$mf>;
 close $mf;
 is($manifest{target_snp}, 'rsA', 'manifest identifies the target SNP');
 is($manifest{window_bp}, 50, 'manifest records the requested window');
+is($manifest{columns}, 'CHR,BP,SNP,P,BETA',
+    'manifest records columns needed to reuse a locus without extraction');
 
 my $indexed = "$dir/wide.bgz";
 is(system($^X, "$Bin/../DiffGWASDeps/gnuplot/index_merged_wide_tabix.pl",
