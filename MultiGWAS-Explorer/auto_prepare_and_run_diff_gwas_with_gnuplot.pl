@@ -31,6 +31,7 @@ use Digest::SHA qw(sha1_hex);
 use File::Copy qw(copy);
 use File::Path qw(make_path);
 use File::Temp qw(tempfile);
+use Fcntl qw(LOCK_EX LOCK_NB);
 use POSIX qw(strftime ceil);
 use Time::HiRes qw(time);
 use IO::Uncompress::Gunzip qw($GunzipError);
@@ -1164,6 +1165,14 @@ sub collect_top_hits_for_mode {
         %args, mode => $mode, selector => $selector,
     );
     my $request_file = "$out_tsv.request.sha1";
+    my $lock_file = "$request_file.lock";
+    open my $lock, '>>', $lock_file
+        or die "Cannot open top-hit selection lock $lock_file: $!\n";
+    unless (flock($lock, LOCK_EX | LOCK_NB)) {
+        print "[cache] waiting for another $mode top-hit selection to finish\n";
+        flock($lock, LOCK_EX)
+            or die "Cannot lock top-hit selection $lock_file: $!\n";
+    }
     if (!$args{force} && -s $out_tsv && -s $request_file) {
         open my $cached, '<', $request_file
             or die "Cannot read top-hit request cache $request_file: $!\n";
@@ -1172,8 +1181,14 @@ sub collect_top_hits_for_mode {
         $previous_key =~ s/\s+\z//;
         if ($previous_key eq $request_key) {
             print "[skip] reusing existing gnuplot $mode top-hit table $out_tsv\n";
+            close $lock;
             return read_hits_tsv($out_tsv);
         }
+        print "[cache] $mode top-hit request changed; refreshing selection\n";
+    }
+    if (!$args{force} && -s $out_tsv && !-s $request_file) {
+        print "[cache] existing $mode top-hit table has no request signature; "
+            . "selecting once to establish a verified cache\n";
     }
     if ($mode =~ /^common_association$/i) {
         my @cmd = (
@@ -1197,6 +1212,7 @@ sub collect_top_hits_for_mode {
         run_cmd(\@cmd, 'common-association top-hit selection');
         my @hits = read_hits_tsv($out_tsv);
         write_top_hit_request_key($request_file, $request_key);
+        close $lock;
         return @hits;
     }
     my $differential_thresholds = resolve_runner_differential_threshold_ladder($runner);
@@ -1220,6 +1236,7 @@ sub collect_top_hits_for_mode {
     run_cmd(\@cmd, 'differential top-hit selection');
     my @hits = read_hits_tsv($out_tsv);
     write_top_hit_request_key($request_file, $request_key);
+    close $lock;
     return @hits;
 }
 
@@ -1267,6 +1284,7 @@ sub write_top_hit_request_key {
     print {$out} "$key\n";
     close $out or die "Cannot close top-hit request cache $tmp: $!\n";
     rename $tmp, $path or die "Cannot install top-hit request cache $path: $!\n";
+    print "[cache] recorded top-hit request signature $path\n";
 }
 
 sub merge_hit_lists_for_gnuplot {
