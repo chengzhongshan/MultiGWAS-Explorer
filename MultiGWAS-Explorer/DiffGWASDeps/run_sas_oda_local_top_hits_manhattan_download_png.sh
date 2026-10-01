@@ -58,6 +58,11 @@ normalize_reference_build_shell() {
   esac
 }
 REFERENCE_BUILD="$(normalize_reference_build_shell "${REFERENCE_BUILD:-hg38}")"
+REFERENCE_CHROMOSOME_LENGTHS="$(
+  perl -I"${DEPS_DIR}" -MChromosomeBounds=chromosome_length \
+    -e 'print join(q{,}, map { chromosome_length($ARGV[0], $_) || 0 } 1..24)' \
+    "${REFERENCE_BUILD}"
+)"
 case "${REFERENCE_BUILD}" in
   hg19)
     DEFAULT_GTF_DSD="FM.GTF_HG19"
@@ -828,6 +833,7 @@ perl "${RENDER_SAS_HELPER}" \
   --replace "GTF_LD_HEATMAP_LEGEND_TITLE=${GTF_LD_HEATMAP_LEGEND_TITLE}" \
   --replace "COMMON_ASSOC_P_VARS=${COMMON_ASSOC_P_VARS:-}" \
   --replace "LOCAL_WINDOW_BP=${LOCAL_WINDOW_BP}" \
+  --replace "REFERENCE_CHROMOSOME_LENGTHS=${REFERENCE_CHROMOSOME_LENGTHS}" \
   --replace "GTF_DSD=${GTF_DSD}" \
   --replace "FM_LIBPATH=${FM_LIBPATH}" \
   --replace "GTF_LOCAL_DSD=${GTF_LOCAL_DSD}" \

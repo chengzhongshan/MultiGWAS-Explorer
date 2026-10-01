@@ -32,6 +32,7 @@ companion runner/script pair:
 %let top_hit_max_loci=__TOP_HIT_MAX_LOCI__;
 %let top_hit_ld_audit_basename=__TOP_HIT_LD_AUDIT_BASENAME__;
 %let local_window_bp=__LOCAL_WINDOW_BP__;
+%let reference_chromosome_lengths=__REFERENCE_CHROMOSOME_LENGTHS__;
 %let local_max_hits_per_fig=__LOCAL_MAX_HITS_PER_FIG__;
 %let local_n_gwas_tracks=%eval(1 + %sysfunc(countw(%str(__MANHATTAN_OTHER_P_VARS__),%str( ))));
 %let local_top_hits_csv_basename=__LOCAL_TOP_HITS_CSV_BASENAME__;
@@ -322,7 +323,10 @@ quit;
   proc sql noprint;
     select strip(put(CHR,best32.)),
            strip(put(case when BP>&flank_bp then BP-&flank_bp else 1 end,best32.)),
-           strip(put(BP+&flank_bp,best32.))
+           strip(put(case when CHR between 1 and 24 then
+             min(BP+&flank_bp,
+               input(scan("&reference_chromosome_lengths",CHR,','),best32.))
+             else BP+&flank_bp end,best32.))
       into :gtf_region_chrs separated by '|',
            :gtf_region_starts separated by '|',
            :gtf_region_ends separated by '|'

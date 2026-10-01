@@ -25,6 +25,7 @@ Note:
 %let top_hit_signal_thrshds=__TOP_HIT_SIGNAL_THRSHDS__;
 %let top_hit_dist_bp=__TOP_HIT_DIST_BP__;
 %let local_window_bp=__LOCAL_WINDOW_BP__;
+%let reference_chromosome_lengths=__REFERENCE_CHROMOSOME_LENGTHS__;
 %let local_max_hits_per_fig=__LOCAL_MAX_HITS_PER_FIG__;
 %let local_top_hits_csv_basename=__LOCAL_TOP_HITS_CSV_BASENAME__;
 %let lth_input_csv=__LOCAL_TOP_HITS_INPUT_CSV_BASENAME__;
@@ -323,7 +324,10 @@ __GTF_IMPORT_BLOCK__
   proc sql noprint;
     select strip(put(CHR,best32.)),
            strip(put(case when BP>&flank_bp then BP-&flank_bp else 1 end,best32.)),
-           strip(put(BP+&flank_bp,best32.))
+           strip(put(case when CHR between 1 and 24 then
+             min(BP+&flank_bp,
+               input(scan("&reference_chromosome_lengths",CHR,','),best32.))
+             else BP+&flank_bp end,best32.))
       into :gtf_region_chrs separated by '|',
            :gtf_region_starts separated by '|',
            :gtf_region_ends separated by '|'
@@ -496,7 +500,7 @@ __GTF_IMPORT_BLOCK__
 
 %macro _set_force_signal_xaxis_bounds(signal_dsd=,top_hits_dsd=);
   %global force_lattice_xaxis_viewmin force_lattice_xaxis_viewmax;
-  %local _n_target_snps _n_target_chrs _center_bp _target_min_bp _target_max_bp;
+  %local _n_target_snps _n_target_chrs _center_bp _target_chr _target_chrom_end _target_min_bp _target_max_bp;
   %let force_lattice_xaxis_viewmin=;
   %let force_lattice_xaxis_viewmax=;
 
@@ -515,8 +519,8 @@ __GTF_IMPORT_BLOCK__
 
   %if %eval(&_n_target_snps=1 and &_n_target_chrs=1) %then %do;
     proc sql noprint;
-      select int(mean(BP))
-        into :_center_bp trimmed
+      select int(mean(BP)), int(mean(CHR))
+        into :_center_bp trimmed, :_target_chr trimmed
       from &top_hits_dsd
       where not missing(BP)
       ;
@@ -526,6 +530,15 @@ __GTF_IMPORT_BLOCK__
       %let _target_min_bp=%sysfunc(int(%sysevalf(&_center_bp-&effective_gtf_dist2snp)));
       %let _target_max_bp=%sysfunc(int(%sysevalf(&_center_bp+&effective_gtf_dist2snp)));
       %if %sysevalf(&_target_min_bp<1) %then %let _target_min_bp=1;
+      %if %sysevalf(%superq(_target_chr)^=,boolean) %then %do;
+        %if %eval(&_target_chr>=1 and &_target_chr<=24) %then %do;
+          %let _target_chrom_end=%scan(&reference_chromosome_lengths,&_target_chr,%str(,));
+          %if %sysevalf(%superq(_target_chrom_end)^=,boolean) %then %do;
+            %if %sysevalf(&_target_max_bp>&_target_chrom_end) %then
+              %let _target_max_bp=&_target_chrom_end;
+          %end;
+        %end;
+      %end;
       %let force_lattice_xaxis_viewmin=&_target_min_bp;
       %let force_lattice_xaxis_viewmax=&_target_max_bp;
       %put NOTE: Forcing the displayed x-axis to the requested SNP-centered window [&force_lattice_xaxis_viewmin, &force_lattice_xaxis_viewmax].;

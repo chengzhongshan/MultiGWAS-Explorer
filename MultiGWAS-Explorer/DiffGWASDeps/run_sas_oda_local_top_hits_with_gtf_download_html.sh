@@ -66,6 +66,11 @@ normalize_reference_build_shell() {
   esac
 }
 REFERENCE_BUILD="$(normalize_reference_build_shell "${REFERENCE_BUILD:-hg38}")"
+REFERENCE_CHROMOSOME_LENGTHS="$(
+  perl -I"${DEPS_DIR}" -MChromosomeBounds=chromosome_length \
+    -e 'print join(q{,}, map { chromosome_length($ARGV[0], $_) || 0 } 1..24)' \
+    "${REFERENCE_BUILD}"
+)"
 case "${REFERENCE_BUILD}" in
   hg19)
     DEFAULT_GTF_DSD="FM.GTF_HG19"
@@ -1519,10 +1524,10 @@ if [[ -s "${CSV_OUT}" ]]; then
   while IFS= read -r gtf_region_arg; do
     gtf_region_args+=("${gtf_region_arg}")
   done < <(
-    perl -e '
+    perl -I"${DEPS_DIR}" -MChromosomeBounds=locus_window -e '
       use strict;
       use warnings;
-      my ($csv, $win) = @ARGV;
+      my ($csv, $win, $build) = @ARGV;
       open my $fh, q{<}, $csv or die "Cannot open $csv: $!\n";
       my $header = <$fh>;
       defined $header or exit 0;
@@ -1541,15 +1546,13 @@ if [[ -s "${CSV_OUT}" ]]; then
         my $bp  = $f[$idx{BP}];
         next unless defined $chr && defined $bp;
         next unless $chr =~ /^\d+$/ && $bp =~ /^\d+(?:\.\d+)?$/;
-        my $start = int($bp - $win);
-        $start = 1 if $start < 1;
-        my $end = int($bp + $win);
+        my ($start, $end) = locus_window($build, $chr, int($bp), int($win));
         my $region = $chr . q{:} . $start . q{:} . $end;
         next if $seen{$region}++;
         print "--region\n", $region, "\n";
       }
       close $fh;
-    ' "${CSV_OUT}" "${LOCAL_GTF_WINDOW_BP}"
+    ' "${CSV_OUT}" "${LOCAL_GTF_WINDOW_BP}" "${REFERENCE_BUILD}"
   )
 elif [[ -n "${TARGET_SNP_LIST}" ]]; then
   echo "ERROR: Explicit target SNPs were requested but their target CSV is unavailable: ${TARGET_SNP_LIST}" >&2
@@ -1559,10 +1562,10 @@ elif [[ -n "${VERIFY_TOP_HITS_TSV}" && -s "${VERIFY_TOP_HITS_TSV}" ]]; then
   while IFS= read -r gtf_region_arg; do
     gtf_region_args+=("${gtf_region_arg}")
   done < <(
-    perl -e '
+    perl -I"${DEPS_DIR}" -MChromosomeBounds=locus_window -e '
       use strict;
       use warnings;
-      my ($tsv, $win) = @ARGV;
+      my ($tsv, $win, $build) = @ARGV;
       open my $fh, q{<}, $tsv or die "Cannot open $tsv: $!\n";
       my $header = <$fh>;
       defined $header or exit 0;
@@ -1581,15 +1584,13 @@ elif [[ -n "${VERIFY_TOP_HITS_TSV}" && -s "${VERIFY_TOP_HITS_TSV}" ]]; then
         my $bp  = $f[$idx{BP}];
         next unless defined $chr && defined $bp;
         next unless $chr =~ /^\d+$/ && $bp =~ /^\d+(?:\.\d+)?$/;
-        my $start = int($bp - $win);
-        $start = 1 if $start < 1;
-        my $end = int($bp + $win);
+        my ($start, $end) = locus_window($build, $chr, int($bp), int($win));
         my $region = $chr . q{:} . $start . q{:} . $end;
         next if $seen{$region}++;
         print "--region\n", $region, "\n";
       }
       close $fh;
-    ' "${VERIFY_TOP_HITS_TSV}" "${LOCAL_GTF_WINDOW_BP}"
+    ' "${VERIFY_TOP_HITS_TSV}" "${LOCAL_GTF_WINDOW_BP}" "${REFERENCE_BUILD}"
   )
 fi
 
@@ -1700,6 +1701,7 @@ render_gtf_runner() {
     --replace "COMMON_ASSOC_P_VARS=${COMMON_ASSOC_P_VARS:-}" \
     --replace "PREP_ONLY=${prep_only}" \
     --replace "LOCAL_WINDOW_BP=${LOCAL_GTF_WINDOW_BP}" \
+    --replace "REFERENCE_CHROMOSOME_LENGTHS=${REFERENCE_CHROMOSOME_LENGTHS}" \
     --replace "OUTPUT_HTML=${output_html_basename}" \
     --replace "GTF_DSD=${GTF_DSD}" \
     --replace "FM_LIBPATH=${FM_LIBPATH}" \
