@@ -1030,6 +1030,7 @@ run;
     Pos_Var=BP,
     gtf_dsd=&effective_gtf_dsd,
     dist2snp=&effective_gtf_dist2snp,
+    chromosome_lengths=%superq(reference_chromosome_lengths),
     ZscoreVars=&gtf_zscore_vars,
     gwas_labels_in_order=&gtf_labels,
     design_width=&gtf_design_width,

@@ -15,6 +15,7 @@ This script draws a local Manhattan plot with gene tracks for a single target SN
 
 %let target_snp=__TARGET_SNP__;
 %let local_window_bp=__LOCAL_WINDOW_BP__;
+%let reference_chromosome_lengths=__REFERENCE_CHROMOSOME_LENGTHS__;
 %let gtf_label_snps=__GTF_LABEL_SNPS__;
 %let gtf_ld_snps=__GTF_LD_SNPS__;
 %let gtf_ld_display_mode=__GTF_LD_DISPLAY_MODE__;
@@ -258,6 +259,7 @@ quit;
   AssocPVars=&gtf_assoc_pvars,
   SNP_IDs=&target_snp,
   dist2snp=&effective_gtf_dist2snp,
+  chromosome_lengths=%superq(reference_chromosome_lengths),
   SNP_Var=SNP,
   Pos_Var=BP,
   gtf_dsd=&effective_gtf_dsd,

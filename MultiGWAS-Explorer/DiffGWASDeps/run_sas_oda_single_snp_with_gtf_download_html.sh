@@ -141,6 +141,11 @@ normalize_reference_build_shell() {
   esac
 }
 REFERENCE_BUILD="$(normalize_reference_build_shell "${REFERENCE_BUILD:-hg38}")"
+REFERENCE_CHROMOSOME_LENGTHS="$(
+  perl -I"${DEPS_DIR}" -MChromosomeBounds=chromosome_length \
+    -e 'print join(q{,}, map { chromosome_length($ARGV[0], $_) || 0 } 1..24)' \
+    "${REFERENCE_BUILD}"
+)"
 case "${REFERENCE_BUILD}" in
   hg19)
     DEFAULT_GTF_DSD="FM.GTF_HG19"
@@ -1184,14 +1189,11 @@ if [[ -z "${TARGET_CHR}" || -z "${TARGET_BP}" || "${TARGET_CHR}" == "NA" || "${T
   exit 1
 fi
 
-REGION_START="$(
-  perl -e 'my ($bp, $win) = @ARGV; my $start = int($bp - $win); $start = 1 if $start < 1; print $start;' \
-    "${TARGET_BP}" "${LOCAL_WINDOW_BP}"
-)"
-REGION_END="$(
-  perl -e 'my ($bp, $win) = @ARGV; my $end = int($bp + $win); print $end;' \
-    "${TARGET_BP}" "${LOCAL_WINDOW_BP}"
-)"
+read -r REGION_START REGION_END < <(
+  perl -I"${DEPS_DIR}" -MChromosomeBounds=locus_window \
+    -e 'print join(q{ }, locus_window($ARGV[0], $ARGV[1], 0+$ARGV[2], 0+$ARGV[3])), "\n"' \
+    "${REFERENCE_BUILD}" "${TARGET_CHR}" "${TARGET_BP}" "${LOCAL_WINDOW_BP}"
+)
 
 GTF_SOURCE_CACHE_TAG="$(perl -MDigest::MD5=md5_hex -e 'print substr(md5_hex($ARGV[0]), 0, 12)' "${REFERENCE_BUILD}|${GTF_GZ_URL}")"
 single_gtf_cache_base="${LOCAL_GTF_REUSE_CACHE_DIR}/single_snp_gtf_${REFERENCE_BUILD}_src${GTF_SOURCE_CACHE_TAG}_${SAFE_TARGET_SNP}_chr${TARGET_CHR}_${REGION_START}_${REGION_END}_npc${LOCAL_GTF_INCLUDE_NON_PROTEIN_CODING_GENES}"
@@ -1253,6 +1255,7 @@ perl "${RENDER_SAS_HELPER}" \
   --output "${RUN_SAS_RENDERED}" \
   --replace "TARGET_SNP=${TARGET_SNP}" \
   --replace "LOCAL_WINDOW_BP=${LOCAL_WINDOW_BP}" \
+  --replace "REFERENCE_CHROMOSOME_LENGTHS=${REFERENCE_CHROMOSOME_LENGTHS}" \
   --replace "GTF_LABEL_SNPS=${GTF_LABEL_SNPS}" \
   --replace "GTF_LD_SNPS=${GTF_LD_SNPS}" \
   --replace "GTF_LD_DISPLAY_MODE=${GTF_LD_DISPLAY_MODE}" \

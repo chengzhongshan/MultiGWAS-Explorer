@@ -49,6 +49,7 @@ SNP_IDs=rs370604612 rs2070788 9:5114773,
 Please also enlarge the dist2snp to extract the whole gene body and its exons,
 although the final plots will be only restricted by the input start and end positions!*/
 dist2snp=2000000,
+chromosome_lengths=,/*Comma-separated lengths for chromosomes 1-22, X, Y in the GWAS build.*/
 /*assign value in bp, and the final figure will be add extend this distance for both start and end positions*/
 SNP_Var=snp,
 Pos_Var=pos,
@@ -206,7 +207,7 @@ adjust top SNPs labels if these labels are rotated 90 degree, which is helpful w
 verbose=0 /*Not print any notes in SAS log*/
 );
 
-%local effective_ld_marker_var effective_ld_heatmap_var effective_heatmap_legend_title;
+%local effective_ld_marker_var effective_ld_heatmap_var effective_heatmap_legend_title _chrom_end_for_window;
 %let effective_ld_marker_var=;
 %let effective_ld_heatmap_var=;
 %let effective_heatmap_legend_title=&heatmap_legend_title;
@@ -374,6 +375,13 @@ run;
   %if %symexist(chr)=0 %then %do;
    %put no record for your query SNP &qsnp;
    %abort 255;
+  %end;
+  %if %length(%superq(chromosome_lengths))>0 %then %do;
+    %if %sysfunc(prxmatch(/^(?:[1-9]|1[0-9]|2[0-4])$/,%superq(chr))) %then %do;
+      %let _chrom_end_for_window=%scan(&chromosome_lengths,&chr,%str(,));
+      %if %sysevalf(&maxend>&_chrom_end_for_window) %then
+        %let maxend=&_chrom_end_for_window;
+    %end;
   %end;
   %let force_lattice_xaxis_viewmin=&minst;
   %let force_lattice_xaxis_viewmax=&maxend;
