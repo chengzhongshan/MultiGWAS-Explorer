@@ -533,8 +533,9 @@ __GTF_IMPORT_BLOCK__
       %let _target_max_bp=%sysfunc(int(%sysevalf(&_center_bp+&effective_gtf_dist2snp)));
       %if %sysevalf(&_target_min_bp<1) %then %let _target_min_bp=1;
       %if %sysevalf(%superq(_target_chr)^=,boolean) %then %do;
-        %if %eval(&_target_chr>=1 and &_target_chr<=24) %then %do;
-          %let _target_chrom_end=%scan(&reference_chromosome_lengths,&_target_chr,%str(,));
+        %let _target_chr_for_window=%sysfunc(strip(%superq(_target_chr)));
+        %if %eval(&_target_chr_for_window>=1 and &_target_chr_for_window<=24) %then %do;
+          %let _target_chrom_end=%scan(%superq(reference_chromosome_lengths),&_target_chr_for_window,%str(,));
           %if %sysevalf(%superq(_target_chrom_end)^=,boolean) %then %do;
             %if %sysevalf(&_target_max_bp>&_target_chrom_end) %then
               %let _target_max_bp=&_target_chrom_end;

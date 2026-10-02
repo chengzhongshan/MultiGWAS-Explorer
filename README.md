@@ -94,10 +94,13 @@ perl auto_prepare_and_run_diff_gwas.pl \
   --target-snps rs12028518 --local-gtf-window-bp 2650000 --force
 ```
 
-For the AOA `rs12028518` example, that 2.65 Mb half-window completed in SAS
-ODA with a 1484 × 1562 PNG and no Java size warning. A 10 Mb half-window
-(69,807 variants) still lost its remote session without a diagnostic SAS log;
-the pipeline produced its full-window gnuplot fallback. See the
+For the AOA `rs12028518` example, half-windows of 1–5 Mb, including 4.5 Mb,
+completed in SAS ODA. One 10 Mb attempt (69,807 variants) lost its remote
+session without a diagnostic SAS log; the pipeline produced its full-window
+gnuplot fallback. New specs default the local-GTF half-window to 5 Mb. Above
+5 Mb the pipeline warns about possible failure. SAS ODA
+helper exit 73 means explicit space exhaustion; helper exit 74 means remote
+session termination without a confirmed server-side cause. See the
 [local-GTF troubleshooting details](MultiGWAS-Explorer/README.md#sas-oda-local-gtf-rendering-and-session-loss).
 
 ## Test with public GWAS data

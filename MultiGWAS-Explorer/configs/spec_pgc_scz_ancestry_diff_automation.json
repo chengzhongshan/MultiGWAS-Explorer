@@ -14,7 +14,7 @@
   "top_hit_dist_bp": "1e6",
   "top_hit_max_loci": 0,
   "local_window_bp": "1e7",
-  "local_gtf_window_bp": "1e7",
+  "local_gtf_window_bp": "5e6",
   "include_non_protein_coding_genes_in_local_gtf": 0,
   "groups": [
     {

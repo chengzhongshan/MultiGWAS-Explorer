@@ -577,14 +577,15 @@ my $top_hit_max_loci = defined($top_hit_max_loci_override)
     ? $top_hit_max_loci_override
     : cfg_or($spec, 'top_hit_max_loci', 0);
 my $local_window_bp = cfg_or($spec, 'local_window_bp', '1e7');
-my $local_gtf_window_bp = cfg_or($spec, 'local_gtf_window_bp', $local_window_bp);
+my $local_gtf_window_bp = cfg_or($spec, 'local_gtf_window_bp', '5e6');
 if ($local_gtf_window_bp =~ /^(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i
     && (0 + $local_gtf_window_bp) > 5_000_000) {
     my $total_span = 2 * (0 + $local_gtf_window_bp);
     warn sprintf(
         "[warn] Large local-GTF half-window requested: %.0f bp (approximately %.0f bp total span). " .
         "Large intervals increase GWAS/GTF extraction, SAS ODA upload size, memory use, and rendering time. " .
-        "For faster plots, use --local-gtf-window-bp 5000000 or less, preferably the smallest window containing the requested SNPs.\n",
+        "For faster plots, use --local-gtf-window-bp 5000000 or less, preferably the smallest window containing the requested SNPs. " .
+        "If SAS ODA fails, helper exit 73 means confirmed space exhaustion; helper exit 74 means remote session termination without a confirmed cause.\n",
         0 + $local_gtf_window_bp,
         $total_span,
     );
@@ -947,7 +948,7 @@ my @local_gtf_outputs = (
     "$Bin/$local_gtf_expected_csv_basename",
 );
 if (length($single_target_gtf_snp) && !$local_sas_only) {
-    my $single_window = $runner_cfg->{LOCAL_GTF_WINDOW_BP} || $runner_cfg->{LOCAL_WINDOW_BP} || '1e7';
+    my $single_window = $runner_cfg->{LOCAL_GTF_WINDOW_BP} || '5e6';
     my $single_html = $runner_cfg->{OUTPUT_HTML_BASENAME} || "${project_tag}_SAS_local_top_hits_with_gtf.html";
     $local_gtf_command = qq{"$bash_path" -lc 'cd "$workdir" && RUNNER_CONFIG_JSON="$generated->{runner_config}" SESSION_ID="$runner_session" TARGET_SNP="$single_target_gtf_snp" LOCAL_WINDOW_BP="$single_window" OUTPUT_HTML_BASENAME="$single_html" SINGLE_SNP_ALLOW_GENERIC_OUTPUT_BASENAME=1 SINGLE_SNP_TOP_HITS_CSV_BASENAME="$local_gtf_expected_csv_basename" OPEN_RESULT="$open_result" CLEAN_ODA_INPUT="$clean_oda_input" CLEAN_ODA_MACROS=0 "$deps_dir/run_sas_oda_single_snp_with_gtf_download_html.sh"'};
     $local_gtf_description = 'Run the fast single-target GTF-backed SAS ODA plot';
@@ -961,8 +962,7 @@ elsif ($target_gtf_snp_count > 1
     my $output_base = $runner_cfg->{OUTPUT_HTML_BASENAME}
       || "${project_tag}_SAS_local_top_hits_with_gtf.html";
     $output_base =~ s/\.html$//i;
-    my $single_window = $runner_cfg->{LOCAL_GTF_WINDOW_BP}
-      || $runner_cfg->{LOCAL_WINDOW_BP} || '1e7';
+    my $single_window = $runner_cfg->{LOCAL_GTF_WINDOW_BP} || '5e6';
     my @target_commands;
     @local_gtf_outputs = ();
     for my $target_snp (@target_gtf_snps) {
@@ -1633,7 +1633,7 @@ sub infer_spec_from_gwas_dir {
         top_hit_ld_r2_threshold => '0.1',
         top_hit_ld_population_rule => 'ANY',
         local_window_bp        => '1e7',
-        local_gtf_window_bp    => '1e7',
+        local_gtf_window_bp    => '5e6',
         include_non_protein_coding_genes_in_local_gtf => 0,
         open_result            => 0,
         clean_oda_input        => 1,
@@ -1912,7 +1912,7 @@ sub infer_merged_spec_from_dir {
         top_hit_ld_r2_threshold => '0.1',
         top_hit_ld_population_rule => 'ANY',
         local_window_bp       => '1e7',
-        local_gtf_window_bp   => '1e7',
+        local_gtf_window_bp   => '5e6',
         include_non_protein_coding_genes_in_local_gtf => 0,
         open_result           => 0,
         clean_oda_input       => 1,
@@ -2296,7 +2296,7 @@ sub infer_precomputed_spec_from_dir {
         top_hit_ld_r2_threshold => '0.1',
         top_hit_ld_population_rule => 'ANY',
         local_window_bp       => '1e7',
-        local_gtf_window_bp   => '1e7',
+        local_gtf_window_bp   => '5e6',
         include_non_protein_coding_genes_in_local_gtf => 0,
         open_result           => 0,
         clean_oda_input       => 1,
@@ -4838,7 +4838,9 @@ Options:
                        local GTF top-label layout: auto|vertical|horizontal.
   --local-gtf-window-bp BP
                        Override the genomic half-window used only for the local
-                       GTF plot stage. This does not change local Manhattan.
+                       GTF plot stage (default: 5e6). Values above 5e6 warn
+                       about possible SAS ODA failure (exit 73 or 74).
+                       This does not change local Manhattan.
   --local-ld-snps rs1,rs2
                        Explicit LD-linked variants to mark in SAS ODA and
                        gnuplot local plots. Supplying this option enables LD
@@ -5179,7 +5181,7 @@ sub full_help {
         $text .= "  Rotate local Manhattan SNP/gene labels and enlarge their base font:\n";
         $text .= "    perl auto_prepare_and_run_diff_gwas.pl --spec your_spec.json --step plot_local_manhattan --local-manhattan-angle4xaxis-label 60 --local-manhattan-fontsize 3.0\n";
         $text .= "  Use a custom genomic window only for the local GTF plot:\n";
-        $text .= "    perl auto_prepare_and_run_diff_gwas.pl --spec your_spec.json --step plot_local_gtf --local-gtf-window-bp 2e7\n";
+        $text .= "    perl auto_prepare_and_run_diff_gwas.pl --spec your_spec.json --step plot_local_gtf --local-gtf-window-bp 5e6\n";
         $text .= "  Plot an explicit SNP list instead of auto-picked top hits:\n";
         $text .= "    perl auto_prepare_and_run_diff_gwas.pl --spec your_spec.json --step plot_local_gtf --target-snps rs123,rs456,rs789\n";
         $text .= "  Label multiple SNPs on top of one local GTF window with vertical text:\n";
@@ -5219,7 +5221,7 @@ sub sample_spec_json {
   "top_hit_focus_prefix": "ASN_EUR",
   "top_hit_signal_thrshd": "1e-6",
   "local_window_bp": "1e7",
-  "local_gtf_window_bp": "1e7",
+  "local_gtf_window_bp": "5e6",
   "include_non_protein_coding_genes_in_local_gtf": 0,
   "groups": [
     {

@@ -701,14 +701,15 @@ if ($requested{plot_local_manhattan}) {
 }
 
 if ($requested{plot_local_gtf}) {
-    my $gtf_window = $local_gtf_window_bp_override || ($runner->{LOCAL_GTF_WINDOW_BP} || $runner->{LOCAL_WINDOW_BP} || '1e7');
+    my $gtf_window = $local_gtf_window_bp_override || ($runner->{LOCAL_GTF_WINDOW_BP} || '5e6');
     if ($gtf_window =~ /^(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i
         && (0 + $gtf_window) > 5_000_000) {
         my $total_span = 2 * (0 + $gtf_window);
         warn sprintf(
             "[warn] Large local-GTF half-window requested: %.0f bp (approximately %.0f bp total span). " .
             "Large intervals increase association/GTF extraction and rendering time; SAS ODA runs also require larger uploads and more memory. " .
-            "For faster plots, use --local-gtf-window-bp 5000000 or less, preferably the smallest window containing the requested SNPs.\n",
+            "For faster plots, use --local-gtf-window-bp 5000000 or less, preferably the smallest window containing the requested SNPs. " .
+            "For SAS ODA failures, helper exit 73 means confirmed space exhaustion; helper exit 74 means remote session termination without a confirmed cause.\n",
             0 + $gtf_window,
             $total_span,
         );

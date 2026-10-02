@@ -228,11 +228,13 @@ Before running a workflow, identify:
    The subset upload path now gzip-compresses that local GTF table before
    transfer, and the SAS import block reads it through
    `filename ... zip ... gzip`. Start with the smallest half-window that
-   contains the requested locus. In the AOA `rs12028518` validation, 2.65 Mb
-   completed with a 150-DPI PNG, while 10 Mb (69,807 variants) still lost its
-   ODA session without a SAS log after the duplicate printer render was
-   removed. Do not treat this case as a universal limit or repeat the identical
-   large submit. Keep all local SNPs; nominal-`P < 0.05` selection belongs to
+   contains the requested locus. For AOA `rs12028518`, 1–5 Mb half-windows,
+   including 4.5 Mb, completed; one 10 Mb attempt (69,807 variants) lost its
+   ODA session without a SAS log. The >5 Mb warning lists possible helper exit
+   codes: 73 for explicit space exhaustion and 74 for remote session termination
+   with no confirmed cause. On failure, check the status JSON and failure marker
+   for the actual helper exit code. Do not treat this case as a universal limit
+   or repeat the identical large submit. Keep all local SNPs; nominal-`P < 0.05` selection belongs to
    genome-wide Manhattan plots only.
    When many genes overlap one local locus, keep the overall figure size fixed
    and instead let the pipeline slightly increase the lower gene-track share by
@@ -251,6 +253,13 @@ Before running a workflow, identify:
    search across chromosome start, preserve the final displayed x-axis by
    forcing it back to the min/max association-signal positions from the GWAS
    subset instead of accepting a left boundary of `0`.
+   When capping an rsID-centered window at the reference chromosome end,
+   strip the space padding SAS `PROC SQL` may leave in the chromosome macro
+   value. Quote the comma-separated chromosome-length macro list with
+   `%superq(...)` before passing it to `%scan`; otherwise SAS can treat the
+   commas as macro argument separators. A small SAS ODA probe confirmed that
+   padded `chr=       1` with a requested end of 251,321,905 is clipped to the
+   hg38 chr1 end of 248,956,422 bp.
    If SASPy reports no downloadable HTML artifact, still download the plot's
    remote HTML5 file. Extract its embedded PNG, then rebuild the user-facing
    compact HTML around the saved PNG and remove the temporary raw SAS HTML;

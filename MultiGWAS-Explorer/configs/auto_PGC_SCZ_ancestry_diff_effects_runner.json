@@ -69,7 +69,7 @@
    "HTML_TITLE" : "PGC_SCZ_ancestry_diff differential GWAS Manhattan Plot",
    "LOCAL_GTF_INCLUDE_NON_PROTEIN_CODING_GENES" : 0,
    "LOCAL_GTF_MAX_HITS_PER_FIG" : 1,
-   "LOCAL_GTF_WINDOW_BP" : "1e7",
+   "LOCAL_GTF_WINDOW_BP" : "5e6",
    "LOCAL_HTML_TITLE" : "PGC_SCZ_ancestry_diff Local Top Hits Manhattan Plot",
    "LOCAL_MANHATTAN_ANGLE4XAXIS_LABEL" : "",
    "LOCAL_MANHATTAN_FIG_HEIGHT" : 1165,

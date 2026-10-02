@@ -377,10 +377,15 @@ run;
    %abort 255;
   %end;
   %if %length(%superq(chromosome_lengths))>0 %then %do;
-    %if %sysfunc(prxmatch(/^(?:[1-9]|1[0-9]|2[0-4])$/,%superq(chr))) %then %do;
-      %let _chrom_end_for_window=%scan(&chromosome_lengths,&chr,%str(,));
-      %if %sysevalf(&maxend>&_chrom_end_for_window) %then
+    /* PROC SQL can pad numeric chromosome values in macro variables. Strip
+       that padding before checking the chromosome and looking up its length. */
+    %let _chrom_for_window=%sysfunc(strip(%superq(chr)));
+    %if %sysfunc(prxmatch(/^(?:[1-9]|1[0-9]|2[0-4])$/,%superq(_chrom_for_window))) %then %do;
+      %let _chrom_end_for_window=%scan(%superq(chromosome_lengths),&_chrom_for_window,%str(,));
+      %if %sysevalf(&maxend>&_chrom_end_for_window) %then %do;
+        %put NOTE: Clipping the local GTF x-axis for chromosome &_chrom_for_window from &maxend to its reference end &_chrom_end_for_window.;
         %let maxend=&_chrom_end_for_window;
+      %end;
     %end;
   %end;
   %let force_lattice_xaxis_viewmin=&minst;

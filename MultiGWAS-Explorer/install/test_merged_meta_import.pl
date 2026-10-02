@@ -38,6 +38,8 @@ my $relative_status = system($^X, $driver, '--gwas-dir', basename($relative_dir)
 chdir $previous_cwd or die $!;
 is($relative_status, 0, 'relative --gwas-dir generates a spec');
 my $relative_spec = read_json($relative_spec_path);
+is($relative_spec->{local_gtf_window_bp}, '5e6',
+    'auto-detected local GTF half-window defaults to 5 Mb');
 is(abs_path($relative_spec->{output_dir}), abs_path($relative_dir),
     'auto-detected output directory is absolute and independent of the script location');
 $relative_spec->{configs_dir} = "$dir/relative_configs";

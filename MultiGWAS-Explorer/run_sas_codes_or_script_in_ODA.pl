@@ -3569,9 +3569,14 @@ if ($sas_execution_failed) {
     }) if ($execution_file || ($execution_code && $execution_code !~ /^\s*$/));
     my $failure_exit_code = 1;
     if ($sas_execution_failure_class eq 'sas_oda_space_exhaustion') {
+        $failure_exit_code = (defined($ENV{SAS_ODA_SPACE_EXHAUSTION_EXIT_CODE})
+          && $ENV{SAS_ODA_SPACE_EXHAUSTION_EXIT_CODE} =~ /^\d+$/)
+          ? int($ENV{SAS_ODA_SPACE_EXHAUSTION_EXIT_CODE})
+          : 73;
         my $marker_file = "$output_prefix_path.non_retryable_space_failure.txt";
         if (open my $marker_fh, '>:encoding(UTF-8)', $marker_file) {
             print {$marker_fh} "failure_class=sas_oda_space_exhaustion\n";
+            print {$marker_fh} "exit_code=$failure_exit_code\n";
             print {$marker_fh} "retryable=false\n";
             print {$marker_fh} "sas_status=$status_file\n";
             print {$marker_fh} "message=$sas_execution_error\n";
@@ -3581,16 +3586,17 @@ if ($sas_execution_failed) {
         } else {
             warn "WARNING: Could not write SAS ODA space-failure marker $marker_file: $!\n";
         }
-        $failure_exit_code = (defined($ENV{SAS_ODA_SPACE_EXHAUSTION_EXIT_CODE})
-          && $ENV{SAS_ODA_SPACE_EXHAUSTION_EXIT_CODE} =~ /^\d+$/)
-          ? int($ENV{SAS_ODA_SPACE_EXHAUSTION_EXIT_CODE})
-          : 73;
         print STDERR "ERROR: Stopping without retry; exit code $failure_exit_code identifies a non-retryable ODA space failure.\n";
     } elsif ($sas_execution_failure_class eq 'sas_oda_remote_session_termination') {
+        $failure_exit_code = (defined($ENV{SAS_ODA_REMOTE_TERMINATION_EXIT_CODE})
+          && $ENV{SAS_ODA_REMOTE_TERMINATION_EXIT_CODE} =~ /^\d+$/)
+          ? int($ENV{SAS_ODA_REMOTE_TERMINATION_EXIT_CODE})
+          : 74;
         my $marker_file = "$output_prefix_path.non_retryable_remote_termination.txt";
         if (open my $marker_fh, '>:encoding(UTF-8)', $marker_file) {
             print {$marker_fh} "failure_class=sas_oda_remote_session_termination\n";
             print {$marker_fh} "error_code=SAS_ODA_REMOTE_SESSION_TERMINATED\n";
+            print {$marker_fh} "exit_code=$failure_exit_code\n";
             print {$marker_fh} "retryable=false\n";
             print {$marker_fh} "sas_status=$status_file\n";
             print {$marker_fh} "message=$sas_execution_error\n";
@@ -3601,12 +3607,10 @@ if ($sas_execution_failed) {
         } else {
             warn "WARNING: Could not write SAS ODA remote-termination marker $marker_file: $!\n";
         }
-        $failure_exit_code = (defined($ENV{SAS_ODA_REMOTE_TERMINATION_EXIT_CODE})
-          && $ENV{SAS_ODA_REMOTE_TERMINATION_EXIT_CODE} =~ /^\d+$/)
-          ? int($ENV{SAS_ODA_REMOTE_TERMINATION_EXIT_CODE})
-          : 74;
         print STDERR "ERROR: Stopping without retry; exit code $failure_exit_code identifies a remote SAS session termination.\n";
     }
+    write_status_file($status_file, { exit_code => $failure_exit_code })
+      if ($execution_file || ($execution_code && $execution_code !~ /^\s*$/));
     cleanup_empty_output_dir_if_created($output_dir);
     print "ERROR: $sas_execution_error\n";
     exit $failure_exit_code;

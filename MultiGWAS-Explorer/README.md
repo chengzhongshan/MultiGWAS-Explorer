@@ -2469,10 +2469,15 @@ and SAS returned no diagnostic log, WORK exhaustion, Java memory, and ODA
 service failure remain possibilities rather than confirmed causes. Do not
 repeat the identical large submit. Choose the smallest half-window that
 contains the requested SNPs and rerun, or use the full-window gnuplot output.
-In the AOA test, a 10 Mb half-window containing 69,807 variants still lost
-its ODA session after the duplicate render was removed; a 2.65 Mb half-window
-completed. This is an observed case, not a universal size limit. Keep all
-SNPs in the chosen local window; the nominal-`P < 0.05` filter is for
+In the AOA tests, half-windows of 1–5 Mb, including 4.5 Mb, completed, while
+one 10 Mb attempt containing 69,807 variants lost its ODA session. A separate
+10 Mb run rendered but exposed an axis that extended past chr1's end; the
+plotting macro now strips padding from the SAS chromosome value and quotes the
+comma-separated chromosome-length list before applying the reference bound.
+A small SAS ODA macro probe confirmed that chr1 now stops at 248,956,422 bp;
+the full 10 Mb plot has not been rerun after that correction. These are
+observed cases, not a universal size limit. Keep all SNPs in the chosen local
+window; the nominal-`P < 0.05` filter is for
 genome-wide Manhattan plots only.
 
 ```bash
@@ -2625,12 +2630,18 @@ locus. In this three-SNP example, the panel is centered on the first SNP;
 while substantially reducing the displayed region and the number of genes in
 the lower track.
 
-When the configured half-window exceeds 5,000,000 bp (a total displayed span
+New specs and bundled configs default the local-GTF half-window to 5,000,000
+bp; the separate local-Manhattan window is unchanged. When the configured
+local-GTF half-window exceeds 5,000,000 bp (a total displayed span
 of more than approximately 10 Mb), both entry points print a performance
-warning. Large intervals require more association and GTF records and can
-substantially increase SAS ODA upload size, memory use, and rendering time. For
-fast local-GTF plots, use the smallest half-window that contains the requested
-variants.
+warning with the potential SAS ODA helper failure codes. Helper exit `73`
+identifies explicit space exhaustion; helper exit `74` identifies a remote
+session termination whose server-side cause is unconfirmed. On failure, the
+code is also saved in `output.run.status.json` and its non-retryable failure
+marker. The warning alone does not change the exit status. Large intervals
+require more association and GTF records and can substantially increase SAS
+ODA upload size, memory use, and rendering time. For fast local-GTF plots, use
+the smallest half-window that contains the requested variants.
 
 For explicit `--target-snps` runs, the compact top-hit CSV no longer scans the
 entire GENCODE file merely to fill missing nearest-gene labels; the plotted gene
@@ -2748,7 +2759,7 @@ Use a dedicated local-GTF window without changing the local Manhattan window:
 perl auto_prepare_and_run_diff_gwas.pl \
   --spec ./configs/your_spec.json \
   --step plot_local_gtf \
-  --local-gtf-window-bp 2e7
+  --local-gtf-window-bp 5e6
 ```
 
 `local_gtf_window_bp` now controls two things together:

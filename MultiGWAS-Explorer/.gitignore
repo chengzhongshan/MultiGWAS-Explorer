@@ -52,6 +52,10 @@ cache/pgc_scz_sex_public/
 /sas_action_args_*.json
 /sas_action_result_*.json
 /sas_submit_result_*
+/sas_inline_code_*.sas
+/sas_inline_result_*.json
+/sas_inline_runner_*.py
+/sas_submit_worker_result_*.json
 
 # Reviewer-benchmark reruns and large downloadable HaploReg intermediates.
 benchmark/reproduction/
