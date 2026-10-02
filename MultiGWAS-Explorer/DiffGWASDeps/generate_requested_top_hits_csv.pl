@@ -8,6 +8,7 @@ use JSON::PP qw(decode_json);
 use IO::Uncompress::Gunzip qw($GunzipError);
 use File::Spec;
 use File::Temp qw(tempfile);
+use Digest::MD5 qw(md5_hex);
 
 my %opt = (
     top_hit_mode       => '',
@@ -24,6 +25,7 @@ my %opt = (
     target_snp_genes   => '',
     max_hits           => 0,
     remove_x_chr       => 0,
+    reuse_cache         => 0,
 );
 
 GetOptions(
@@ -45,6 +47,7 @@ GetOptions(
     'target-snp-genes=s'    => \$opt{target_snp_genes},
     'max-hits=i'            => \$opt{max_hits},
     'remove-x-chr!'         => \$opt{remove_x_chr},
+    'reuse-cache!'          => \$opt{reuse_cache},
 ) or die usage();
 
 die usage() unless length($opt{input} || '') && length($opt{output} || '');
@@ -104,6 +107,40 @@ my $target_snps = first_nonempty(
     $runner->{TARGET_SNP_LIST},
     '',
 );
+
+my $cache_file = "$opt{output}.request.md5";
+my %selection_config = map { $_ => $runner->{$_} }
+    grep { /^(?:TOP_HIT_|COMMON_ASSOC_|REFERENCE_BUILD$|SOURCE_MODE$|PAIR_DEFS$|GROUP_TRACKS$)/ }
+    keys %$runner;
+my $cache_key = md5_hex(JSON::PP->new->canonical(1)->encode({
+    version => 1,
+    input => file_signature($opt{input}),
+    options => {
+        focus_pvar => $focus_pvar, mode => $top_hit_mode,
+        thresholds => $thresholds, dist_bp => $top_hit_dist_bp,
+        maf_threshold => $maf_threshold, max_hits => $opt{max_hits},
+        remove_x_chr => $opt{remove_x_chr}, target_snps => $target_snps,
+        target_snp_genes => ($opt{target_snp_genes} || $runner->{TARGET_SNP_GENES} || ''),
+        gnomad_freq_file => file_signature($gnomad_freq_file),
+        gnomad_pop_map => file_signature($gnomad_pop_map),
+        gene_annotation_gtf => file_signature($gene_annotation_gtf),
+    },
+    runner => \%selection_config,
+    spec => small_file_digest($opt{spec}),
+    code => [map { file_signature(File::Spec->catfile($Bin, $_)) }
+        qw(generate_requested_top_hits_csv.pl verify_common_association_loci.pl
+           gnuplot/select_top_hits_from_wide.pl)],
+}));
+if ($opt{reuse_cache} && -s $opt{output} && -s $cache_file) {
+    open my $cache_fh, '<', $cache_file or die "Cannot read $cache_file: $!\n";
+    my $saved_key = <$cache_fh> // '';
+    close $cache_fh;
+    $saved_key =~ s/\s+\z//;
+    if ($saved_key eq $cache_key) {
+        print "[skip] Reusing requested top-hit CSV: $opt{output}\n";
+        exit 0;
+    }
+}
 
 my @hits;
 if (length $target_snps) {
@@ -180,8 +217,32 @@ write_csv(
     rows   => [ map { $rows->{ uc($_->{SNP} || '') } } @hits ],
 );
 
+if ($opt{reuse_cache}) {
+    open my $cache_fh, '>', $cache_file or die "Cannot write $cache_file: $!\n";
+    print {$cache_fh} "$cache_key\n";
+    close $cache_fh or die "Cannot close $cache_file: $!\n";
+}
+
 print "Wrote requested top-hit CSV: $opt{output}\n";
 print "Retained hits: " . scalar(@hits) . "\n";
+
+sub file_signature {
+    my ($path) = @_;
+    return { path => ($path // ''), size => 0, mtime => 0 }
+        unless defined($path) && length($path) && -f $path;
+    my @stat = stat($path);
+    return { path => $path, size => $stat[7], mtime => $stat[9] };
+}
+
+sub small_file_digest {
+    my ($path) = @_;
+    return '' unless defined($path) && length($path) && -f $path;
+    open my $fh, '<:raw', $path or die "Cannot read $path: $!\n";
+    local $/;
+    my $digest = md5_hex(<$fh> // '');
+    close $fh;
+    return $digest;
+}
 
 sub run_common_selector {
     my (%args) = @_;

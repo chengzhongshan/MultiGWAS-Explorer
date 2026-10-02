@@ -362,6 +362,7 @@ stamp="$(date +%Y%m%d_%H%M%S)"
 ODA_UPLOAD_ALIAS_DIR="${WORKDIR}/.oda_upload_aliases/${stamp}_$$"
 HTML_OUT="${WORKDIR}/${OUTPUT_HTML_BASENAME}"
 CSV_OUT="${WORKDIR}/${LOCAL_TOP_HITS_CSV_BASENAME}"
+CANDIDATE_CSV_OUT="${WORKDIR}/cache/requested_top_hits/${LOCAL_TOP_HITS_CSV_BASENAME}"
 LOCAL_TOP_HITS_CSV_PREGENERATED=0
 LD_AUDIT_OUT="${WORKDIR}/${TOP_HIT_LD_AUDIT_BASENAME}"
 TOP_HIT_LD_CACHE_BASENAME=""
@@ -1195,18 +1196,20 @@ upload_home_file_if_needed() {
 
 generate_requested_top_hits_csv_locally() {
   [[ -x "${LOCAL_TOP_HITS_CSV_HELPER}" || -f "${LOCAL_TOP_HITS_CSV_HELPER}" ]] || return 1
-  echo "[prep] Generating requested local-top-hit CSV locally..."
+  mkdir -p "$(dirname "${CANDIDATE_CSV_OUT}")"
+  echo "[prep] Preparing requested local-top-hit CSV locally..."
   local candidate_dist_bp="${TOP_HIT_DIST_BP}"
   local candidate_max_hits="${TOP_HIT_MAX_LOCI}"
   if [[ "$(printf '%s' "${TOP_HIT_SELECTION_METHOD}" | tr '[:lower:]' '[:upper:]')" == "LD" && -z "${TARGET_SNP_LIST}" ]]; then
     candidate_dist_bp="0"
     candidate_max_hits="0"
-    echo "[prep] Generating all MAF-passing significant candidates; SAS will perform LD clumping."
+    echo "[prep] Preparing all MAF-passing significant candidates; LD independence is not asserted for this list."
   fi
   local -a cmd=(
     perl "${LOCAL_TOP_HITS_CSV_HELPER}"
     --input "${DATA_GZ}"
-    --output "${CSV_OUT}"
+    --output "${CANDIDATE_CSV_OUT}"
+    --reuse-cache
     --top-hit-mode "${TOP_HIT_MODE:-differential}"
     --top-hit-focus-pvar "${TOP_HIT_FOCUS_PVAR}"
     --top-hit-signal-thrshd "${TOP_HIT_SIGNAL_THRSHD}"
@@ -1230,7 +1233,9 @@ generate_requested_top_hits_csv_locally() {
   if [[ -n "${TOP_HIT_GNOMAD_POP_MAP}" ]]; then
     cmd+=(--gnomad-pop-map "${TOP_HIT_GNOMAD_POP_MAP}")
   fi
-  "${cmd[@]}"
+  "${cmd[@]}" || return $?
+  [[ -s "${CANDIDATE_CSV_OUT}" ]] || return 1
+  cp -f "${CANDIDATE_CSV_OUT}" "${CSV_OUT}"
 }
 
 explicit_target_csv_matches_request() {
@@ -1469,6 +1474,25 @@ if [[ -n "${TARGET_SNP_LIST}" ]]; then
   fi
 fi
 
+GTF_LD_DISPLAY_MODE_NORMALIZED="$(printf '%s' "${GTF_LD_DISPLAY_MODE}" | tr '[:upper:]' '[:lower:]')"
+dispatch_selected_signed_ld_gtf() {
+  [[ -z "${TARGET_SNP_LIST}" ]] || return 1
+  [[ "${GTF_LD_DISPLAY_MODE_NORMALIZED}" == "heatmap" || "${GTF_LD_DISPLAY_MODE_NORMALIZED}" == "both" ]] || return 1
+  [[ "${LOCAL_SAS_DEBUG_ONLY}" != "1" && "${ODA_TRANSFER_MANIFEST_ONLY:-0}" != "1" ]] || return 1
+  [[ -s "${CSV_OUT}" ]] || {
+    echo "ERROR: Signed-LD local GTF plots require a selected-hit CSV: ${CSV_OUT}" >&2
+    exit 1
+  }
+  perl "${DEPS_DIR}/run_selected_signed_ld_gtf.pl" \
+    --targets-csv "${CSV_OUT}" \
+    --runner-config "${RUNNER_CONFIG_JSON}" \
+    --output-html "${HTML_OUT}" \
+    --single-runner "${DEPS_DIR}/run_sas_oda_single_snp_with_gtf_download_html.sh" \
+    --window-bp "${LOCAL_GTF_WINDOW_BP}" \
+    --population "${LOCAL_LD_POPULATION:-EUR}" \
+    --mode "${GTF_LD_DISPLAY_MODE}"
+}
+
 # Common/differential candidates are selected locally from the complete wide table.
 # Upload only their full (unfiltered) locus windows to SAS ODA, preserving
 # nonsignificant in-window SNPs needed by the local association/GTF panels.
@@ -1483,6 +1507,13 @@ if [[ "${SOURCE_MODE:-}" == "merged_gwas_table" \
   fi
   LOCAL_TOP_HITS_CSV_PREGENERATED=1
   LOCAL_TOP_HITS_INPUT_CSV_BASENAME="${LOCAL_TOP_HITS_CSV_BASENAME}"
+  if [[ ( "${GTF_LD_DISPLAY_MODE_NORMALIZED}" == "heatmap" || "${GTF_LD_DISPLAY_MODE_NORMALIZED}" == "both" ) \
+      && "${LOCAL_SAS_DEBUG_ONLY}" != "1" \
+      && "${ODA_TRANSFER_MANIFEST_ONLY:-0}" != "1" ]]; then
+    echo "[prep] Dispatching locally selected hits one at a time; no combined GWAS/GTF upload will be made."
+    dispatch_selected_signed_ld_gtf
+    exit 0
+  fi
   indexed_source="${DATA_GZ}"
   if command -v cygpath >/dev/null 2>&1; then
     indexed_source="$(cygpath -m "${DATA_GZ}")"
@@ -1761,25 +1792,6 @@ if [[ "$(printf '%s' "${TOP_HIT_SELECTION_METHOD}" | tr '[:lower:]' '[:upper:]')
     "0"
 fi
 
-dispatch_selected_signed_ld_gtf() {
-  [[ -z "${TARGET_SNP_LIST}" ]] || return 1
-  [[ "${GTF_LD_DISPLAY_MODE_NORMALIZED}" == "heatmap" || "${GTF_LD_DISPLAY_MODE_NORMALIZED}" == "both" ]] || return 1
-  [[ "${LOCAL_SAS_DEBUG_ONLY}" != "1" && "${ODA_TRANSFER_MANIFEST_ONLY:-0}" != "1" ]] || return 1
-  [[ -s "${CSV_OUT}" ]] || {
-    echo "ERROR: Signed-LD local GTF plots require a selected-hit CSV: ${CSV_OUT}" >&2
-    exit 1
-  }
-  perl "${DEPS_DIR}/run_selected_signed_ld_gtf.pl" \
-    --targets-csv "${CSV_OUT}" \
-    --runner-config "${RUNNER_CONFIG_JSON}" \
-    --output-html "${HTML_OUT}" \
-    --single-runner "${DEPS_DIR}/run_sas_oda_single_snp_with_gtf_download_html.sh" \
-    --window-bp "${LOCAL_GTF_WINDOW_BP}" \
-    --population "${LOCAL_LD_POPULATION:-EUR}" \
-    --mode "${GTF_LD_DISPLAY_MODE}"
-}
-
-GTF_LD_DISPLAY_MODE_NORMALIZED="$(printf '%s' "${GTF_LD_DISPLAY_MODE}" | tr '[:upper:]' '[:lower:]')"
 if [[ "$(printf '%s' "${TOP_HIT_SELECTION_METHOD}" | tr '[:lower:]' '[:upper:]')" != "LD" \
     && -z "${TARGET_SNP_LIST}" \
     && ( "${GTF_LD_DISPLAY_MODE_NORMALIZED}" == "heatmap" || "${GTF_LD_DISPLAY_MODE_NORMALIZED}" == "both" ) \

@@ -1208,23 +1208,31 @@ for my $step (@step_defs) {
             : ($step->{name} eq 'plot_local_manhattan'
                 ? ($runner_cfg->{LOCAL_OUTPUT_PREFIX} || "${project_tag}_SAS_local_top_hits_manhattan")
                 : ($runner_cfg->{OUTPUT_HTML_BASENAME} || "${project_tag}_SAS_local_top_hits_with_gtf.html"));
-        $step->{cache_key} = md5_hex(join("\0",
+        my @input_identity = @input_stat ? ($input_stat[7], $input_stat[9]) : (0, 0);
+        $step->{legacy_cache_key} = md5_hex(join("\0",
             $step->{name}, JSON::PP->new->canonical(1)->encode($runner_cfg),
-            @input_stat ? ($input_stat[7], $input_stat[9]) : (0, 0)));
+            @input_identity));
+        $step->{cache_key} = md5_hex(join("\0",
+            'plot_cache_v2', $step->{name},
+            JSON::PP->new->canonical(1)->encode(plot_cache_config($step->{name}, $runner_cfg)),
+            @input_identity));
         $step->{cache_file} = $step->{name} eq 'plot_local_gtf'
             ? $local_gtf_request_cache_file
             : "$Bin/$plot_prefix.request.md5";
     }
-    #Only skip the step when all output were found;
+    # A missing output forces only this step; do not carry that flag into
+    # later plots that already have valid outputs.
+    my $step_force = $force;
     foreach my $of (@{$step->{outputs}}) {
-        $force = 1 unless -f $of;
+        $step_force = 1 unless -f cygpath_to_win($of);
     }
     run_step(
         name    => $step->{name},
         command => $step->{command},
         outputs => $step->{outputs} || [],
-        force   => exists $step->{force} ? $step->{force} : $force,
+        force   => exists $step->{force} ? $step->{force} : $step_force,
         cache_key  => $step->{cache_key} || '',
+        legacy_cache_key => $step->{legacy_cache_key} || '',
         cache_file => $step->{cache_file} || '',
     );
 }
@@ -3841,6 +3849,13 @@ sub assert_wide_manifest_matches_pairs {
     return unless @expected_prefixes;
     my %expected = map { $_ => 1 } @expected_prefixes;
     my %seen = map { $_ => 1 } grep { length } split /\s*,\s*/, ($metric{pair_prefixes} // '');
+    my %columns = map { $_ => 1 } grep { length } split /\s*,\s*/, ($metric{columns} // '');
+    # Merged-wide extraction manifests list columns but may omit pair_prefixes.
+    # The required pair columns identify those pairs without a false warning.
+    for my $prefix (@expected_prefixes) {
+        $seen{$prefix} = 1 if $columns{"${prefix}_GROUP1_P"}
+            && $columns{"${prefix}_GROUP2_P"} && $columns{"${prefix}_DIFF_P"};
+    }
 
     my @missing_prefixes = grep { !$seen{$_} } @expected_prefixes;
     if (@missing_prefixes) {
@@ -3851,7 +3866,6 @@ sub assert_wide_manifest_matches_pairs {
         return;
     }
 
-    my %columns = map { $_ => 1 } grep { length } split /\s*,\s*/, ($metric{columns} // '');
     my @required_columns;
     for my $prefix (@expected_prefixes) {
         push @required_columns,
@@ -3961,6 +3975,28 @@ sub format_elapsed_seconds {
     return sprintf('%.1fs', $seconds);
 }
 
+sub plot_cache_config {
+    my ($step_name, $runner) = @_;
+    return $runner unless $step_name eq 'plot_manhattan'
+        || $step_name eq 'plot_local_manhattan';
+    my %shared = map { $_ => 1 } qw(
+        DATA_GZ SOURCE_LONG_GZ SOURCE_MODE PROJECT_TAG REFERENCE_BUILD
+        EXTRACTOR_CONFIG_JSON DISPLAY_GWAS DISPLAY_GWAS_AVAILABLE
+        DISPLAY_GWAS_MODE GROUP_TRACKS PAIR_DEFS
+    );
+    my %scoped;
+    for my $key (keys %$runner) {
+        my $used = $shared{$key};
+        if ($step_name eq 'plot_manhattan') {
+            $used ||= $key =~ /^(?:MANHATTAN_|OUTPUT_PREFIX$|HTML_TITLE$)/;
+        } else {
+            $used ||= $key =~ /^(?:LOCAL_|TOP_HIT_|COMMON_ASSOC_|GTF_|MANHATTAN_)/;
+        }
+        $scoped{$key} = $runner->{$key} if $used;
+    }
+    return \%scoped;
+}
+
 sub run_step {
     my (%args) = @_;
     my $name = $args{name};
@@ -3968,6 +4004,7 @@ sub run_step {
     my $outputs = $args{outputs} || [];
     my $force = $args{force} || 0;
     my $cache_key = $args{cache_key} || '';
+    my $legacy_cache_key = $args{legacy_cache_key} || '';
     my $cache_file = $args{cache_file} || '';
     my $step_started = time();
     unless ($force) {
@@ -3989,6 +4026,15 @@ sub run_step {
                 $cached_key = <$cache_fh> // '';
                 close $cache_fh;
                 $cached_key =~ s/\s+\z//;
+            }
+            if ($cached_key ne $cache_key && length($legacy_cache_key)
+                && $cached_key eq $legacy_cache_key) {
+                open my $cache_out, '>', $cache_file_win
+                    or die "Cannot update plot request cache $cache_file_win: $!\n";
+                print {$cache_out} "$cache_key\n";
+                close $cache_out or die "Cannot close plot request cache $cache_file_win: $!\n";
+                $cached_key = $cache_key;
+                print "[cache] Migrated matching $name request key without rerunning the plot\n";
             }
             if ($cached_key ne $cache_key) {
                 $all_exist = 0;

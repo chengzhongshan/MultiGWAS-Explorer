@@ -227,6 +227,12 @@ Before running a workflow, identify:
    For large local windows, prefer the project path that pre-extracts the GTF
    subset locally and uploads that compact subset to SAS ODA, rather than
    asking SAS `WORK` to materialize a very large GTF region on demand.
+   For automatic signed-LD local-GTF plots, finish local candidate selection
+   and dispatch each SNP to the single-SNP runner before constructing or
+   uploading a combined GWAS/GTF table for all candidates. Upload one
+   tabix-extracted GWAS window and its GTF subset per SAS job, then remove
+   successful per-locus remote inputs. Do not describe an unpruned candidate
+   list as LD-independent leads.
    In this project, `--local-gtf-window-bp` now controls both the extracted GTF
    half-window and the displayed local GTF plot half-window.
    The subset upload path now gzip-compresses that local GTF table before

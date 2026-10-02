@@ -2410,6 +2410,22 @@ For large windows, the local top-hit GTF path now pre-extracts the requested
 Gencode region locally and uploads only that subset to SAS ODA. This avoids the
 older failure mode where SAS `WORK` had to materialize an oversized GTF table
 for the selected locus window.
+For automatic signed-LD heatmaps from a merged wide table, the runner now
+dispatches each locally listed hit directly to the single-SNP runner before
+building any union of all hit windows. Each SAS ODA job uploads only its own
+tabix-extracted GWAS window and GTF subset; successful per-hit jobs remove
+their remote inputs. A candidate list produced with distance pruning disabled
+is not itself evidence that the hits are LD-independent. A rerun reuses the
+locally selected candidate CSV only when its request key and source file still
+match, and reuses each completed per-locus PNG/HTML only when its request key
+matches. Older results without a key are generated once more.
+Plot reuse is evaluated for each stage separately. Changing local-GTF or LD
+display options does not invalidate a completed genome-wide Manhattan plot,
+and a missing output in one stage does not force later stages to rerun.
+In the October 2026 AOA check, the old combined transfer contained 147
+candidate windows and a 109.6 MB archive; the transfer stopped at 89% without
+an established cause. A 5 Mb single-locus rerun for `rs12028518` transferred
+2.4 MB, generated a nonempty PNG/HTML plot, and removed its remote inputs.
 That uploaded subset is now gzip-compressed before transfer, and the SAS import
 path reads it explicitly through:
 

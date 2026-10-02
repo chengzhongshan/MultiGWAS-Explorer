@@ -3,6 +3,8 @@ use strict;
 use warnings;
 use Getopt::Long qw(GetOptions);
 use File::Spec;
+use Digest::MD5 qw(md5_hex);
+use JSON::PP qw(decode_json);
 
 my %opt = (mode => 'heatmap', population => 'EUR', window_bp => '1e6');
 GetOptions(
@@ -45,17 +47,52 @@ while (my $line = <$fh>) {
 }
 close $fh;
 die "Selected-hit CSV contains no SNPs: $opt{targets_csv}\n" unless @targets;
+print "[signed-LD] Rendering " . scalar(@targets)
+    . " listed loci separately; the list is not proof of LD-independent leads.\n";
 
 my ($volume, $dir, $base) = File::Spec->splitpath($opt{output_html});
 die "Output HTML must end in .html: $opt{output_html}\n" unless $base =~ /\.html$/i;
 my $output_stem = $base;
 $output_stem =~ s/\.html$//i;
+open my $config_fh, '<', $opt{runner_config}
+    or die "Cannot read $opt{runner_config}: $!\n";
+local $/;
+my $runner_config = decode_json(<$config_fh>);
+close $config_fh;
+die "Runner configuration must be a JSON object\n"
+    unless ref($runner_config) eq 'HASH';
+my %render_config = map { $_ => $runner_config->{$_} }
+    grep { /^(?:GTF_|LOCAL_|DISPLAY_GWAS|GROUP_TRACKS$|PAIR_DEFS$|DATA_GZ$|SOURCE_LONG_GZ$|SOURCE_MODE$|EXTRACTOR_CONFIG_JSON$|REFERENCE_BUILD$)/ }
+    keys %$runner_config;
+my $render_request = JSON::PP->new->canonical(1)->encode({
+    version => 1, config => \%render_config,
+    data => file_signature($runner_config->{DATA_GZ}),
+    source_long => file_signature($runner_config->{SOURCE_LONG_GZ}),
+    single_runner => file_signature($opt{single_runner}),
+    dispatcher => file_signature(__FILE__),
+    window_bp => $opt{window_bp}, population => uc($opt{population}),
+    mode => lc($opt{mode}),
+});
 my @links;
 for my $snp (@targets) {
     (my $safe_snp = $snp) =~ s/[^A-Za-z0-9._-]/_/g;
     my $target_html = @targets == 1 ? $base : "${output_stem}_${safe_snp}.html";
     my $target_csv = "${output_stem}_${safe_snp}_top_hit.csv";
     my $target_path = File::Spec->catpath($volume, $dir, $target_html);
+    (my $target_png = $target_path) =~ s/\.html$/.png/i;
+    my $request_file = "$target_path.request.md5";
+    my $request_key = md5_hex(join("\0", $render_request, $snp));
+    if (-s $target_path && -s $target_png && -s $request_file) {
+        open my $request_fh, '<', $request_file or die "Cannot read $request_file: $!\n";
+        my $saved = <$request_fh> // '';
+        close $request_fh;
+        $saved =~ s/\s+\z//;
+        if ($saved eq $request_key) {
+            print "[signed-LD] Reusing completed plot for $snp\n";
+            push @links, [$snp, $target_html];
+            next;
+        }
+    }
     local %ENV = %ENV;
     delete @ENV{qw(DATA_GZ REMOTE_DATA_BASENAME)};
     $ENV{RUNNER_CONFIG_JSON} = $opt{runner_config};
@@ -72,11 +109,27 @@ for my $snp (@targets) {
         "Signed LD r2 to $snp (" . uc($opt{population}) . ", 1000G Phase 3 / PLINK2)";
     $ENV{OPEN_RESULT} = 0 if @targets > 1;
     $ENV{CLEAN_ODA_MACROS} = 0;
+    # The parent automation may retain a shared genome-wide upload.  These
+    # target-specific inputs must be removed after each successful locus.
+    $ENV{KEEP_REMOTE_PLOT_DATA} = 0;
+    $ENV{CLEAN_ODA_INPUT} = 1;
     print "[signed-LD] Rendering $snp with its own PLINK2 LD reference\n";
     system('/bin/bash', $opt{single_runner}) == 0
         or die "Signed-LD SAS runner failed for $snp: $?\n";
     die "Signed-LD SAS runner did not create $target_path\n" unless -s $target_path;
+    die "Signed-LD SAS runner did not create $target_png\n" unless -s $target_png;
+    open my $request_fh, '>', $request_file or die "Cannot write $request_file: $!\n";
+    print {$request_fh} "$request_key\n";
+    close $request_fh or die "Cannot close $request_file: $!\n";
     push @links, [$snp, $target_html];
+}
+
+sub file_signature {
+    my ($path) = @_;
+    return { path => ($path // ''), size => 0, mtime => 0 }
+        unless defined($path) && length($path) && -f $path;
+    my @stat = stat($path);
+    return { path => $path, size => $stat[7], mtime => $stat[9] };
 }
 
 if (@links > 1) {

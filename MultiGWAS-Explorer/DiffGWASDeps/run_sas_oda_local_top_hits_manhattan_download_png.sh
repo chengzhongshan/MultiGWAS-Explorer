@@ -310,6 +310,7 @@ stamp="$(date +%Y%m%d_%H%M%S)"
 PNG_OUT="${WORKDIR}/${LOCAL_OUTPUT_PREFIX}.png"
 HTML_OUT="${WORKDIR}/${LOCAL_OUTPUT_PREFIX}.html"
 CSV_OUT="${WORKDIR}/${LOCAL_TOP_HITS_CSV_BASENAME}"
+REQUESTED_CSV_OUT="${WORKDIR}/cache/requested_top_hits/${REQUESTED_TOP_HITS_CSV_BASENAME}"
 LD_AUDIT_OUT="${WORKDIR}/${TOP_HIT_LD_AUDIT_BASENAME}"
 TOP_HIT_LD_CACHE_BASENAME=""
 if [[ -n "${TOP_HIT_LD_CACHE_TSV}" ]]; then
@@ -616,18 +617,20 @@ upload_data_with_integrity_check() {
 
 generate_requested_top_hits_csv_locally() {
   [[ -x "${LOCAL_TOP_HITS_CSV_HELPER}" || -f "${LOCAL_TOP_HITS_CSV_HELPER}" ]] || return 1
-  echo "[prep] Generating requested local-top-hit CSV locally..."
+  mkdir -p "$(dirname "${REQUESTED_CSV_OUT}")"
+  echo "[prep] Preparing requested local-top-hit CSV locally..."
   local candidate_dist_bp="${TOP_HIT_DIST_BP}"
   local candidate_max_hits="${TOP_HIT_MAX_LOCI}"
   if [[ "$(printf '%s' "${TOP_HIT_SELECTION_METHOD}" | tr '[:lower:]' '[:upper:]')" == "LD" && -z "${TARGET_SNP_LIST}" ]]; then
     candidate_dist_bp="0"
     candidate_max_hits="0"
-    echo "[prep] Generating all MAF-passing significant candidates; SAS will perform LD clumping."
+    echo "[prep] Preparing all MAF-passing significant candidates for SAS LD clumping."
   fi
   local -a cmd=(
     perl "${LOCAL_TOP_HITS_CSV_HELPER}"
     --input "${DATA_GZ}"
-    --output "${CSV_OUT}"
+    --output "${REQUESTED_CSV_OUT}"
+    --reuse-cache
     --top-hit-mode "${TOP_HIT_MODE:-differential}"
     --top-hit-focus-pvar "${TOP_HIT_FOCUS_PVAR}"
     --top-hit-signal-thrshd "${TOP_HIT_SIGNAL_THRSHD}"
@@ -965,7 +968,7 @@ if [[ "${EMIT_LOCAL_SAS_DEBUG}" == "1" || "${LOCAL_SAS_DEBUG_ONLY}" == "1" ]]; t
     --workdir "${WORKDIR}" \
     --deps-dir "${DEPS_DIR}" \
     --data-gz "${DATA_GZ}" \
-    --top-hits-csv "${CSV_OUT}" \
+    --top-hits-csv "${REQUESTED_CSV_OUT}" \
     --gtf-macro-upload "${GET_GTF_MACRO_UPLOAD}" \
     --gtf-local-dataset "${GTF_LOCAL_DSD}" \
     --manhattan-macro "${MACRO_SAS}" \
@@ -1037,10 +1040,10 @@ if [[ -n "${TOP_HIT_LD_CACHE_TSV}" ]]; then
     "upload_local_hits_ld_cache_${stamp}"
 fi
 
-if [[ -s "${CSV_OUT}" ]]; then
+if [[ -s "${REQUESTED_CSV_OUT}" ]]; then
   upload_home_file_if_needed \
     "[1b/5]" \
-    "${CSV_OUT}" \
+    "${REQUESTED_CSV_OUT}" \
     "${REQUESTED_TOP_HITS_CSV_BASENAME}" \
     "upload_local_hits_requested_csv_${stamp}"
 fi
