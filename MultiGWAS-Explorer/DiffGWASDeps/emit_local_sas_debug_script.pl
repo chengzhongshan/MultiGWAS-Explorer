@@ -113,7 +113,7 @@ sub apply_mode_rewrites {
         $text =~ s/%let\s+gtf_dsd=.*?;/%let gtf_dsd=$gtf_local_dataset;/g;
         $text =~ s/%let\s+fm_libpath=.*?;/%let fm_libpath=;/g;
         $text =~ s/%let\s+gtf_local_dsd=.*?;/%let gtf_local_dsd=$gtf_local_dataset;/g;
-        $text =~ s/ods\s+html5\s+file="~\/[^"]+"\s*\n\s*options\(bitmap_mode='inline'\)\s*\n\s*style=HTMLBlue;/ods html5 path="&local_debug_output_dir" (url=none) file="&local_debug_output_name"\n  options(bitmap_mode='inline')\n  style=HTMLBlue;/g;
+        $text =~ s/ods\s+html5\s+file="~\/[^"]+"\s*\n\s*image_dpi=([^\n]+)\s*\n\s*options\(bitmap_mode='inline'\)\s*\n\s*style=HTMLBlue;/ods html5 path="&local_debug_output_dir" (url=none) file="&local_debug_output_name"\n  image_dpi=$1\n  options(bitmap_mode='inline')\n  style=HTMLBlue;/g;
         $text =~ s/%include\s+"~\/get_top_signal_within_dist\.sas";/%include "&local_debug_deps\\get_top_signal_within_dist.sas";/g;
         $text =~ s/%include\s+"~\/[^"]*get_genecode_gtf_data[^"]*\.sas";/%include "&local_debug_gtf_macro";/g;
         $text =~ s/%include\s+"~\/adj_grpnum4close_gene_bed_regs\.sas";/%include "&local_debug_deps\\adj_grpnum4close_gene_bed_regs.sas";/g;

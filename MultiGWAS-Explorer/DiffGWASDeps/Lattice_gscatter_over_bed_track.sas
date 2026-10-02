@@ -2282,9 +2282,15 @@ run;
 %end;
 %let outimage_rand_suffix=%RandBetween(1,100);
 
-%put The final figure is put here:;
-%put &workdir/&outimagename._f&outimage_rand_suffix..&fig_fmt;
-ods html image_dpi=&image_dpi;
+%if not %symexist(local_gtf_ods_html5) %then %do;
+  %put The final figure is put here:;
+  %put &workdir/&outimagename._f&outimage_rand_suffix..&fig_fmt;
+%end;
+/* The SAS ODA wrappers already open HTML5 at the requested DPI. Opening HTML
+   here would render the same large graph a second time in another destination. */
+%if not %symexist(local_gtf_ods_html5) %then %do;
+  ods html image_dpi=&image_dpi;
+%end;
 ods graphics on /
 reset=all
 outputfmt=&fig_fmt 

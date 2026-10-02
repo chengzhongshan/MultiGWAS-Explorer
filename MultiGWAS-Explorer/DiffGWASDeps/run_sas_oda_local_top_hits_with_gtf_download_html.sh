@@ -865,8 +865,9 @@ extract_embedded_png_from_html_path_if_present() {
   [[ -s "${html_path}" ]] || return 1
   [[ -s "${png_path}" ]] && return 0
   perl -MMIME::Base64 -0777 -ne '
+    BEGIN { $png_path = pop @ARGV; }
     if (m{data:image/png;base64,([^"'\'' ]+)}s) {
-      open my $fh, ">:raw", $ARGV[1] or die "open $ARGV[1]: $!";
+      open my $fh, ">:raw", $png_path or die "open $png_path: $!";
       print {$fh} MIME::Base64::decode_base64($1);
       close $fh;
       exit 0;

@@ -281,6 +281,7 @@ MAGICK_BIN="${MAGICK_BIN:-}"
 GTF_DIST2SNP="${GTF_DIST2SNP:-500000}"
 GTF_DESIGN_WIDTH="${GTF_DESIGN_WIDTH:-950}"
 GTF_DESIGN_HEIGHT="${GTF_DESIGN_HEIGHT:-1000}"
+GTF_IMAGE_DPI="${GTF_IMAGE_DPI:-150}"
 GTF_DIST2SEP_GENES="${GTF_DIST2SEP_GENES:-100000}"
 GTF_SHIFT_TEXT_YVAL="${GTF_SHIFT_TEXT_YVAL:-0.2}"
 # Match the multi-hit local-GTF default so single-SNP manuscript reruns keep
@@ -742,8 +743,9 @@ extract_embedded_png_from_html_path_if_present() {
   [[ -s "${html_path}" ]] || return 1
   [[ -s "${png_path}" ]] && return 0
   perl -MMIME::Base64 -0777 -ne '
+    BEGIN { $png_path = pop @ARGV; }
     if (m{data:image/png;base64,([^"'\'' ]+)}s) {
-      open my $fh, ">:raw", $ARGV[1] or die "open $ARGV[1]: $!";
+      open my $fh, ">:raw", $png_path or die "open $png_path: $!";
       print {$fh} MIME::Base64::decode_base64($1);
       close $fh;
       exit 0;
@@ -1277,6 +1279,7 @@ perl "${RENDER_SAS_HELPER}" \
   --replace "GTF_DIST2SNP=${GTF_DIST2SNP}" \
   --replace "GTF_DESIGN_WIDTH=${GTF_DESIGN_WIDTH}" \
   --replace "GTF_DESIGN_HEIGHT=${GTF_DESIGN_HEIGHT}" \
+  --replace "GTF_IMAGE_DPI=${GTF_IMAGE_DPI}" \
   --replace "GTF_DIST2SEP_GENES=${GTF_DIST2SEP_GENES}" \
   --replace "GTF_SHIFT_TEXT_YVAL=${GTF_SHIFT_TEXT_YVAL}" \
   --replace "GTF_PCT4NEG_Y=${GTF_PCT4NEG_Y}" \

@@ -72,7 +72,9 @@ proc datasets library=work kill nolist memtype=(data view catalog);
 quit;
 
 ods _all_ close;
+%let local_gtf_ods_html5=1;
 ods html5 file="~/__OUTPUT_HTML__"
+  image_dpi=&gtf_image_dpi
   options(bitmap_mode='inline')
   style=HTMLBlue;
 ods graphics on / outputfmt=png;

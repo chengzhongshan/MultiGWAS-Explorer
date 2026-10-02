@@ -38,6 +38,7 @@ This script draws a local Manhattan plot with gene tracks for a single target SN
 %let gtf_dist2snp=__GTF_DIST2SNP__;
 %let gtf_design_width=__GTF_DESIGN_WIDTH__;
 %let gtf_design_height=__GTF_DESIGN_HEIGHT__;
+%let gtf_image_dpi=__GTF_IMAGE_DPI__;
 %let gtf_dist2sep_genes=__GTF_DIST2SEP_GENES__;
 %let gtf_shift_text_yval=__GTF_SHIFT_TEXT_YVAL__;
 %let gtf_pct4neg_y=__GTF_PCT4NEG_Y__;
@@ -48,7 +49,9 @@ This script draws a local Manhattan plot with gene tracks for a single target SN
 %let gtf_include_non_protein_coding=__GTF_INCLUDE_NON_PROTEIN_CODING__;
 
 ods _all_ close;
+%let local_gtf_ods_html5=1;
 ods html5 file="~/&html_outfile"
+  image_dpi=&gtf_image_dpi
   options(bitmap_mode='inline')
   style=HTMLBlue;
 ods graphics on / outputfmt=png;
@@ -267,6 +270,7 @@ quit;
   gwas_labels_in_order=&gtf_labels,
   design_width=&gtf_design_width,
   design_height=&gtf_design_height,
+  image_dpi=&gtf_image_dpi,
   barthickness=10,
   dotsize=5,
   grp_font_size=&effective_gtf_grp_font_size,
