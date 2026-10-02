@@ -103,6 +103,10 @@ helper exit 73 means explicit space exhaustion; helper exit 74 means remote
 session termination without a confirmed server-side cause. See the
 [local-GTF troubleshooting details](MultiGWAS-Explorer/README.md#sas-oda-local-gtf-rendering-and-session-loss).
 
+Successful SAS ODA plot runs now remove their timestamped local helper folders
+after saving the final plot. Set `KEEP_LOCAL_ODA_ARTIFACTS=1` to keep those logs
+for a successful debugging run; failed-run logs remain available.
+
 ## Test with public GWAS data
 
 The [Perl real-data test guide](MultiGWAS-Explorer/install/PUBLIC_GWAS_TEST.md)

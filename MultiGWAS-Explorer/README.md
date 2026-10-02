@@ -2462,6 +2462,13 @@ plot failure by itself; check the completion marker, run status, SAS log, and
 the wrapper's final downloaded files. The latter message can describe SASPy's
 own result while the plot HTML is still available for download.
 
+After a completed SAS ODA run and verification of the downloaded plot files,
+the runners remove their timestamped local `run_*` and paired `upload_*`
+helper folders. Failed runs keep their run logs for diagnosis. Set
+`KEEP_LOCAL_ODA_ARTIFACTS=1` (or `KEEP_RENDERED_DEBUG_FILES=1`) to retain the
+folders from a successful run when debugging. The finished PNG, HTML, and
+top-hit CSV remain in the pipeline work directory.
+
 For a long run that ends with `No SAS process attached`, inspect
 `run_single_snp_with_gtf_*/output.run.status.json` and
 `output.html.info.txt`. If `failure_class=sas_oda_remote_session_termination`

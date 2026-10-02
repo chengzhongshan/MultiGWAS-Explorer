@@ -171,6 +171,10 @@ Before running a workflow, identify:
    `.sasraw.html` sidecar. For other plot families that emit standalone PNGs,
    download and verify those files explicitly. Open results only after checking
    the local outputs.
+   After a completed run, the pipeline removes timestamped local SAS ODA run
+   and paired upload-helper folders. It keeps run logs on failure. Set
+   `KEEP_LOCAL_ODA_ARTIFACTS=1` or `KEEP_RENDERED_DEBUG_FILES=1` before a
+   successful debugging run when those folders are needed afterward.
    For forest plots, also verify that:
    - a single-SNP run produced one manifest row with `track_id=single_snp`
    - a multi-SNP run produced one manifest row per displayed GWAS / cohort

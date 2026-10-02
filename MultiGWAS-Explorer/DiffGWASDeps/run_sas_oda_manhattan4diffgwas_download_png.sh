@@ -428,3 +428,12 @@ if [[ "${OPEN_RESULT}" == "1" ]]; then
 else
   echo "Not opening result because OPEN_RESULT=${OPEN_RESULT}."
 fi
+
+if ! perl "${DEPS_DIR}/cleanup_successful_oda_artifacts.pl" \
+  --workdir "${WORKDIR}" \
+  --run-dir "${WORKDIR}/run_manhattan_png_${stamp}" \
+  --require-output "${PNG_OUT}" \
+  --require-output "${HTML_OUT}" \
+  --related-dir "${WORKDIR}/upload_manhattan_png_macro_${stamp}"; then
+  echo "WARN: Completed plot is available, but local SAS ODA helper-folder cleanup failed." >&2
+fi
