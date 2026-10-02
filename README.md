@@ -72,6 +72,34 @@ bash install/run_plotting_example.sh
 Open `example-output/example.png`. This synthetic example needs no GWAS
 download or SAS account.
 
+## SAS ODA local-GTF plots and large windows
+
+The SAS ODA local-GTF path renders through one HTML5 destination at 150 DPI by
+default. It skips the standalone `%OpenSVG_Printer` destination, which previously made
+a second 300-DPI bitmap. The runner extracts the PNG embedded in the SAS HTML
+and saves a separate PNG plus a compact HTML page. This avoids a duplicate
+render while retaining every SNP in the selected local window. The `P < 0.05`
+subset rule applies to genome-wide Manhattan plots, not local-GTF plots.
+
+If SAS ODA ends with `No SAS process attached`, inspect the run's
+`output.run.status.json` and `output.html.info.txt` before rerunning. A remote
+session termination without a SAS log does not establish whether Java memory,
+SAS `WORK`, or the ODA service caused it. Use the smallest local half-window
+that contains the requested locus; for example, from the inner pipeline
+directory:
+
+```bash
+perl auto_prepare_and_run_diff_gwas.pl \
+  --spec configs/your_spec.json --step plot_local_gtf \
+  --target-snps rs12028518 --local-gtf-window-bp 2650000 --force
+```
+
+For the AOA `rs12028518` example, that 2.65 Mb half-window completed in SAS
+ODA with a 1484 × 1562 PNG and no Java size warning. A 10 Mb half-window
+(69,807 variants) still lost its remote session without a diagnostic SAS log;
+the pipeline produced its full-window gnuplot fallback. See the
+[local-GTF troubleshooting details](MultiGWAS-Explorer/README.md#sas-oda-local-gtf-rendering-and-session-loss).
+
 ## Test with public GWAS data
 
 The [Perl real-data test guide](MultiGWAS-Explorer/install/PUBLIC_GWAS_TEST.md)

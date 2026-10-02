@@ -151,11 +151,26 @@ Before running a workflow, identify:
    filename mhgz zip "~/file.tsv.gz" gzip;
    ```
 
-6. Generate PNG, not inline SVG/HTML.
-   Close SASPy's internal inline destination with `ods _all_ close;`, use `ods listing` for SAS/GRAPH PNG output, and create a tiny HTML wrapper that references the PNG.
+6. Render SAS ODA local-GTF plots once.
+   After `ods _all_ close;`, the local-GTF wrappers open `ODS HTML5` with
+   `image_dpi=150` by default and `bitmap_mode='inline'`. The spec field
+   `gtf_image_dpi` can change the resolution; reducing it may lower raster
+   memory use but does not guarantee that a large plot will finish. In this mode,
+   `SNP_Local_Manhattan_With_GTF.sas` must skip `%OpenSVG_Printer` and its
+   matching printer/listing cleanup; `Lattice_gscatter_over_bed_track.sas`
+   must not open another `ODS HTML` destination. Otherwise SAS can render a
+   second 300-DPI bitmap and warn about Java memory. Keep the printer macro
+   available for standalone callers. Other plot families retain their own
+   output destinations.
 
 7. Download and verify outputs.
-   Download the PNG and HTML explicitly after the plot run. Check both local files exist and are non-empty. Open the HTML only after verification. When a local GTF run produces a PNG, prefer a small figure-first final HTML that references that PNG. Treat raw SAS HTML as a temporary recovery input and remove the final `.sasraw.html` sidecar.
+   For HTML5-only local-GTF output, download the remote HTML, decode its
+   embedded PNG locally, and save both a non-empty PNG and a small final HTML
+   page that references it. A separate remote PNG path is not expected in this
+   mode. Treat raw SAS HTML as a temporary recovery input and remove the final
+   `.sasraw.html` sidecar. For other plot families that emit standalone PNGs,
+   download and verify those files explicitly. Open results only after checking
+   the local outputs.
    For forest plots, also verify that:
    - a single-SNP run produced one manifest row with `track_id=single_snp`
    - a multi-SNP run produced one manifest row per displayed GWAS / cohort
@@ -186,8 +201,9 @@ Before running a workflow, identify:
    complete set instead of invoking the helper once per file. For local-GTF
    runs, inventory the static SAS support files, requested-hit CSV, compact GTF
    subset, and compact GWAS subset before submission. After submission, parse
-   the SAS log for the dynamically generated PNG path and download all
-   then-known results together. Use `ODA_TRANSFER_MANIFEST_ONLY=1` to audit the
+   the SAS log for a generated PNG path only for renderers that create a
+   separate remote PNG. For HTML5-only local-GTF runs, download the HTML and
+   extract its PNG locally. Use `ODA_TRANSFER_MANIFEST_ONLY=1` to audit the
    planned uploads without connecting to ODA.
    With at least two transfers, keep the default archive mode so the manifest
    crosses the SASPy connection as one ZIP. Verify extracted byte sizes (or
@@ -211,8 +227,13 @@ Before running a workflow, identify:
    half-window and the displayed local GTF plot half-window.
    The subset upload path now gzip-compresses that local GTF table before
    transfer, and the SAS import block reads it through
-   `filename ... zip ... gzip`. For a first stress-test rerun, prefer a window
-   such as `1e8` before trying `1e9`.
+   `filename ... zip ... gzip`. Start with the smallest half-window that
+   contains the requested locus. In the AOA `rs12028518` validation, 2.65 Mb
+   completed with a 150-DPI PNG, while 10 Mb (69,807 variants) still lost its
+   ODA session without a SAS log after the duplicate printer render was
+   removed. Do not treat this case as a universal limit or repeat the identical
+   large submit. Keep all local SNPs; nominal-`P < 0.05` selection belongs to
+   genome-wide Manhattan plots only.
    When many genes overlap one local locus, keep the overall figure size fixed
    and instead let the pipeline slightly increase the lower gene-track share by
    auto-tuning the SAS `pct4neg_y` parameter.
@@ -230,12 +251,11 @@ Before running a workflow, identify:
    search across chromosome start, preserve the final displayed x-axis by
    forcing it back to the min/max association-signal positions from the GWAS
    subset instead of accepting a left boundary of `0`.
-   If SAS already completed remotely but the wrapper had trouble downloading the
-   final HTML, prefer recovering the helper-saved `sas_res_*.html` artifact and
-   the final PNG path mentioned in the SAS log before declaring the rerun
-   failed. If the PNG was recovered successfully, rebuild the user-facing final
-   HTML around that PNG and remove the temporary raw SAS HTML; do not retain a
-   final `.sasraw.html` sidecar.
+   If SASPy reports no downloadable HTML artifact, still download the plot's
+   remote HTML5 file. Extract its embedded PNG, then rebuild the user-facing
+   compact HTML around the saved PNG and remove the temporary raw SAS HTML;
+   do not retain a final `.sasraw.html` sidecar. If the remote HTML itself is
+   unavailable, check the run status and SAS log before retrying.
 
    For explicit target SNPs, generate the MAF-filtered requested-hit CSV before
    extracting the GTF subset and use it as the region source. Do not run the
@@ -428,6 +448,12 @@ For a new project, copy/adapt the script templates in this skill's `scripts/` fo
   before ODA access. For a real two-or-more-file transfer, confirm the SASPy log
   shows one session rather than one connection per file.
 - For SAS ODA output, verify local PNG and HTML sizes. A tiny HTML wrapper is expected; a hundreds-of-MB HTML file means inline ODS output leaked into the result.
+- For local-GTF failures, check `output.run.status.json` and
+  `output.html.info.txt` before blaming Java. A large-image warning is a risk
+  signal, not proof of why a later remote process disconnected. If ODA returns
+  `sas_oda_remote_session_termination` with no SAS log, report the cause as
+  unconfirmed. On success, confirm a saved PNG exists, the configured DPI and
+  resulting dimensions are reasonable, and the compact HTML references it.
 - For custom genome-wide Manhattan subsets, visually verify that the x-axis
   starts with `chr1` and does not contain a phantom pre-`chr1` block caused by
   unsorted rows or `CHR='X'` being imported as numeric missing `.` in SAS.

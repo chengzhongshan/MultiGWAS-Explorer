@@ -2433,12 +2433,53 @@ The local GTF wrapper is also more resilient for long SAS ODA runs:
   persistent-session relay
 - if the first submit returns an incomplete control-plane result, it retries
   once automatically
-- if SAS already finished remotely but the expected final HTML download is
-  flaky, the wrapper can now reuse the helper-saved `sas_res_*.html` artifact
-  and separately download the final PNG path reported in the SAS log
-- when that PNG is available, the wrapper opens a compact figure-first HTML
-  page that references the completed plot; raw SAS HTML is treated as a
-  recovery input and the final `.sasraw.html` sidecar is removed
+- if SASPy does not return its own HTML artifact, the wrapper still downloads
+  the plot's remote HTML5 file and extracts its embedded PNG
+- the wrapper writes a compact figure-first HTML page referencing that PNG;
+  raw SAS HTML is a recovery input and the final `.sasraw.html` sidecar is
+  removed
+
+### SAS ODA local-GTF rendering and session loss
+
+For this plot family, the SAS ODA wrappers open one `ODS HTML5` destination
+with `image_dpi=150` by default and `bitmap_mode='inline'`. The spec field
+`gtf_image_dpi` can change the resolution; lowering it may reduce raster
+memory use but does not guarantee a large plot will finish. The wrappers skip the
+`%OpenSVG_Printer` call inside `SNP_Local_Manhattan_With_GTF.sas` and the
+additional `ODS HTML` destination inside
+`Lattice_gscatter_over_bed_track.sas`. Standalone callers keep the original
+printer behavior. The old ODA path rendered an extra 300-DPI PNG at
+2968 × 3125 pixels and warned that the image size could exhaust Java memory.
+The corrected 2.65 Mb AOA `rs12028518` run rendered one 150-DPI image at
+1484 × 1562 pixels, with no SAS error or Java size warning. [SAS documents
+the memory cost of higher-resolution graphics](https://documentation.sas.com/api/collections/pgmsascdc/9.4_3.5/docsets/grstatproc/content/grstatproc.pdf).
+
+An HTML5-only local-GTF run may have **no separate PNG file on SAS ODA**.
+Download the HTML and decode its embedded PNG, then verify both the saved PNG
+and compact final HTML. Do not interpret an absent remote PNG path or the
+low-level SASPy message `finished without a downloadable HTML artifact` as a
+plot failure by itself; check the completion marker, run status, SAS log, and
+the wrapper's final downloaded files. The latter message can describe SASPy's
+own result while the plot HTML is still available for download.
+
+For a long run that ends with `No SAS process attached`, inspect
+`run_single_snp_with_gtf_*/output.run.status.json` and
+`output.html.info.txt`. If `failure_class=sas_oda_remote_session_termination`
+and SAS returned no diagnostic log, WORK exhaustion, Java memory, and ODA
+service failure remain possibilities rather than confirmed causes. Do not
+repeat the identical large submit. Choose the smallest half-window that
+contains the requested SNPs and rerun, or use the full-window gnuplot output.
+In the AOA test, a 10 Mb half-window containing 69,807 variants still lost
+its ODA session after the duplicate render was removed; a 2.65 Mb half-window
+completed. This is an observed case, not a universal size limit. Keep all
+SNPs in the chosen local window; the nominal-`P < 0.05` filter is for
+genome-wide Manhattan plots only.
+
+```bash
+perl auto_prepare_and_run_diff_gwas.pl \
+  --spec configs/your_spec.json --step plot_local_gtf \
+  --target-snps rs12028518 --local-gtf-window-bp 2650000 --force
+```
 
 For explicit target SNPs, the wrapper first generates the requested MAF-filtered
 target/top-hit CSV and uses that file as the authoritative region source for
@@ -2762,20 +2803,11 @@ So if you request `--local-gtf-window-bp 1e9`, the final local GTF plot is
 expected to render approximately `+/-1e9 bp` around the selected top hit,
 rather than silently staying near the older default display distance.
 
-For practical pipeline testing, a relaxed large window such as `1e8` is usually
-a better first rerun target than `1e9`. It is large enough to stress the local
-GTF path while still keeping the uploaded subset and SAS ODA rendering more
-manageable.
-
-Example:
-
-```bash
-perl auto_prepare_and_run_diff_gwas.pl \
-  --spec ./configs/your_spec.json \
-  --step plot_local_gtf \
-  --get-common-associations \
-  --local-gtf-window-bp 1e8
-```
+For SAS ODA, choose the smallest half-window containing the requested SNPs
+before increasing the span. Even a 10 Mb half-window disconnected in one AOA
+test, so a `1e8` or `1e9` stress test is not a good first rerun. See
+[SAS ODA local-GTF rendering and session loss](#sas-oda-local-gtf-rendering-and-session-loss)
+for a tested smaller-window example and failure checks.
 
 ## Local Manhattan Layout Controls
 
