@@ -83,6 +83,8 @@ benchmark/fixture_all_100k/gwama.out
 *.pptx
 *.log
 *.request.md5
+*.progress.json
+*.dispatch.lock
 *.plot.tsv
 *.manifest.tsv
 *.status.json

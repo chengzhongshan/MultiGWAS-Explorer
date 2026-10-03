@@ -849,6 +849,8 @@ my $runner_cfg = build_runner_config(
     ),
 );
 
+$runner_cfg->{GTF_LD_R2_CACHE_BY_SNP} = { %local_ld_cache_by_snp }
+    if %local_ld_cache_by_snp;
 write_json_if_defined($generated->{merge_config}, $merge_cfg) if $merge_cfg;
 write_json_if_defined($generated->{diff_config}, $diff_cfg) if $diff_cfg;
 write_json_if_defined($generated->{preset_config}, $preset_cfg);
@@ -947,6 +949,11 @@ my @local_gtf_outputs = (
     "$Bin/" . ($runner_cfg->{OUTPUT_HTML_BASENAME} || "${project_tag}_SAS_local_top_hits_with_gtf.html"),
     "$Bin/$local_gtf_expected_csv_basename",
 );
+my $signed_ld_dispatch = !$local_sas_only
+    && $local_ld_display_mode =~ /^(?:heatmap|both)$/
+    && !@target_gtf_snps
+    && $source_mode eq 'merged_gwas_table'
+    && ($runner_cfg->{TOP_HIT_MODE} // '') =~ /^(?:common_association|common_and_differential)$/;
 if (length($single_target_gtf_snp) && !$local_sas_only) {
     my $single_window = $runner_cfg->{LOCAL_GTF_WINDOW_BP} || '1e6';
     my $single_html = $runner_cfg->{OUTPUT_HTML_BASENAME} || "${project_tag}_SAS_local_top_hits_with_gtf.html";
@@ -959,31 +966,18 @@ elsif ($target_gtf_snp_count > 1
     && !$local_sas_only
     && (lc(trim($reference_build_profile->{build} || '')) =~ /^(?:hg38|grch38)$/
         || !grep { !length($local_ld_cache_by_snp{lc $_} // '') } @target_gtf_snps)) {
-    my $output_base = $runner_cfg->{OUTPUT_HTML_BASENAME}
+    my $output_html = $runner_cfg->{OUTPUT_HTML_BASENAME}
       || "${project_tag}_SAS_local_top_hits_with_gtf.html";
-    $output_base =~ s/\.html$//i;
     my $single_window = $runner_cfg->{LOCAL_GTF_WINDOW_BP} || '1e6';
-    my @target_commands;
-    @local_gtf_outputs = ();
     for my $target_snp (@target_gtf_snps) {
         die "Unsafe target SNP for SAS command: $target_snp\n"
           unless $target_snp =~ /^[A-Za-z0-9_.:-]+$/;
-        my $safe_target = $target_snp;
-        $safe_target =~ s/[^A-Za-z0-9._-]/_/g;
-        my $target_html = "${output_base}_${safe_target}.html";
-        my $target_csv = "${output_base}_${safe_target}_top_hit.csv";
-        my $target_cache = $local_ld_cache_by_snp{lc $target_snp} // '';
-        my $legend_population = uc(trim($local_ld_population_override || 'EUR'));
-        my $legend = "Signed LD r2 to $target_snp ($legend_population, 1000G Phase 3 / PLINK2)";
-        push @target_commands,
-          qq{RUNNER_CONFIG_JSON="$generated->{runner_config}" SESSION_ID="$runner_session" TARGET_SNP="$target_snp" LOCAL_WINDOW_BP="$single_window" OUTPUT_HTML_BASENAME="$target_html" SINGLE_SNP_ALLOW_GENERIC_OUTPUT_BASENAME=1 SINGLE_SNP_TOP_HITS_CSV_BASENAME="$target_csv" GTF_LABEL_SNPS="$target_snp" GTF_LD_DISPLAY_MODE="heatmap" GTF_LD_R2_CACHE="$target_cache" GTF_LD_REFERENCE_SNP="$target_snp" GTF_LD_HEATMAP_LEGEND_TITLE="$legend" OPEN_RESULT="$open_result" CLEAN_ODA_INPUT="$clean_oda_input" CLEAN_ODA_MACROS=0 "$deps_dir/run_sas_oda_single_snp_with_gtf_download_html.sh"};
-        push @local_gtf_outputs,
-          "$Bin/$target_html",
-          "$Bin/${output_base}_${safe_target}.png",
-          "$Bin/$target_csv";
     }
-    $local_gtf_command = qq{"$bash_path" -lc 'cd "$workdir" && }
-      . join(' && ', @target_commands) . q{'};
+    my $target_list = join(',', @target_gtf_snps);
+    my $legend_population = uc(trim($local_ld_population_override || 'EUR'));
+    $local_gtf_command = qq{"$bash_path" -lc 'cd "$workdir" && RUNNER_CONFIG_JSON="$generated->{runner_config}" SESSION_ID="$runner_session" OPEN_RESULT="$open_result" perl "$deps_dir/run_selected_signed_ld_gtf.pl" --target-snps "$target_list" --runner-config "$generated->{runner_config}" --output-html "$workdir/$output_html" --single-runner "$deps_dir/run_sas_oda_single_snp_with_gtf_download_html.sh" --window-bp "$single_window" --population "$legend_population" --mode heatmap'};
+    @local_gtf_outputs = ("$Bin/$output_html");
+    $signed_ld_dispatch = 1;
     $local_gtf_description = 'Run one signed-LD GTF-backed SAS ODA plot per target';
     print "[info] Using per-target SAS ODA local-GTF runners so each of $target_gtf_snp_count loci has its own signed-LD cache and colorbar.\n";
 }
@@ -1116,7 +1110,7 @@ if (!$skip_plots) {
         name        => 'plot_local_gtf',
         description => $local_gtf_description,
         command     => $local_gtf_command,
-        outputs     => $local_sas_only ? [] : \@local_gtf_outputs,
+        outputs     => ($local_sas_only || $signed_ld_dispatch) ? [] : \@local_gtf_outputs,
         cache_key   => $local_sas_only ? '' : $local_gtf_request_key,
         cache_file  => $local_sas_only ? '' : $local_gtf_request_cache_file,
         enabled     => $wanted{local_gtf} ? 1 : 0,

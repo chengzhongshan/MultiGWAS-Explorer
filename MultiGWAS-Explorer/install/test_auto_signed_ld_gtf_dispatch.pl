@@ -19,10 +19,11 @@ print {$mock} <<'MOCK';
 set -euo pipefail
 [[ -z "${DATA_GZ+x}" && -z "${REMOTE_DATA_BASENAME+x}" ]]
 [[ "${GTF_LD_DISPLAY_MODE}" == "heatmap" ]]
-[[ -z "${GTF_LD_R2_CACHE}" ]]
 [[ "${GTF_LD_REFERENCE_SNP}" == "${TARGET_SNP}" ]]
 printf '%s\t%s\t%s\n' "${TARGET_SNP}" "${LOCAL_WINDOW_BP}" "${GTF_LD_HEATMAP_LEGEND_TITLE}" >> "${WORKDIR}/calls.tsv"
+printf '%s\t%s\n' "${TARGET_SNP}" "${GTF_LD_R2_CACHE}" >> "${WORKDIR}/cache_calls.tsv"
 printf '<html><img src="%s.png"></html>\n' "${TARGET_SNP}" > "${WORKDIR}/${OUTPUT_HTML_BASENAME}"
+printf 'PNG:%s\n' "${TARGET_SNP}" > "${WORKDIR}/${OUTPUT_HTML_BASENAME%.html}.png"
 MOCK
 close $mock;
 local $ENV{WORKDIR} = $dir;
@@ -59,5 +60,24 @@ is(system($^X, $dispatcher, '--targets-csv', $csv, '--runner-config', $config,
     '--output-html', $single_html, '--single-runner', $runner,
     '--window-bp', 500000), 0, 'one automatic hit keeps the normal local-GTF output filename');
 ok(-s $single_html, 'single-locus HTML was generated');
+
+my $cache = "$dir/first_ld.tsv";
+open my $ld, '>', $cache or die $!;
+print {$ld} "SNP\tLD_R2\nrs75453394\t1\n";
+close $ld;
+open $cfg, '>', $config or die $!;
+print {$cfg} '{"GTF_LD_R2_CACHE_BY_SNP":{"rs75453394":"', $cache, '"}}', "\n";
+close $cfg;
+my $explicit_html = "$dir/explicit.html";
+is(system($^X, $dispatcher, '--target-snps', 'rs75453394,rsOther',
+    '--runner-config', $config, '--output-html', $explicit_html,
+    '--single-runner', $runner, '--window-bp', 500000), 0,
+    'explicit multiple-SNP request uses the resumable dispatcher');
+ok(-s $explicit_html, 'explicit request writes a completed index');
+open my $cache_fh, '<', "$dir/cache_calls.tsv" or die $!;
+my @cache_calls = <$cache_fh>;
+close $cache_fh;
+is($cache_calls[-2], "rs75453394\t$cache\n", 'explicit first SNP receives its own LD cache');
+is($cache_calls[-1], "rsOther\t\n", 'explicit second SNP does not inherit first LD cache');
 
 done_testing();

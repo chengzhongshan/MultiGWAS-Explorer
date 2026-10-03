@@ -2464,6 +2464,22 @@ The local GTF wrapper is also more resilient for long SAS ODA runs:
   raw SAS HTML is a recovery input and the final `.sasraw.html` sidecar is
   removed
 
+For signed-LD local GTF top hits, the pipeline submits one SNP per SAS ODA job.
+Each successful HTML/PNG pair receives a request checksum. If ODA disconnects,
+rerun the same command; the dispatcher verifies completed plots, skips those
+SNPs, and starts with the first unfinished hit. It writes
+`<plot-stem>.progress.json` after each hit with `complete`, `remaining`, and
+per-SNP status, plus `<plot-stem>.partial.html` linking plots finished so far.
+The normal `<plot-stem>.html` index appears only after all hits complete.
+Plot checksums use the GWAS inputs, plot configuration, LD cache, and SAS plot
+source contents, so changing only the launcher or dispatcher does not repeat
+finished plots. Changing a scientific plot input does rerender the affected
+request. Older plots without a matching checksum are generated once under this
+scheme. Explicit multiple-SNP signed-LD requests use the same resume path.
+Within one invocation, shared SAS macros are uploaded and checked for the
+first fresh hit, then reused for later hits; after a disconnect or a new
+invocation, the first fresh hit verifies them again.
+
 ### SAS ODA local-GTF rendering and session loss
 
 For this plot family, the SAS ODA wrappers open one `ODS HTML5` destination

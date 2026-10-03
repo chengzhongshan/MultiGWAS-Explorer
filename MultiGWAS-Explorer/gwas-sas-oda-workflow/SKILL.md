@@ -242,6 +242,15 @@ Before running a workflow, identify:
    already verified `importallmacros_ue.sas` helper too. Keep global macro
    bootstrap enabled for each fresh SAS ODA session unless session
    persistence has been verified explicitly.
+   Preserve per-locus resume checkpoints for multi-hit signed-LD plots: a
+   completed HTML and PNG plus a matching request checksum are required to
+   skip a hit. The dispatcher writes `<plot-stem>.progress.json` after each
+   hit and a partial HTML index while work remains. On ODA exit 74 or another
+   failure, rerun the same command; do not repeat verified hits. Do not mark
+   the full HTML index or parent plotting stage complete until all requested
+   hits finish. Only the first fresh hit of a new invocation establishes
+   shared remote macro readiness. Keep the checksum tied to scientific inputs
+   and SAS plotting sources, not launcher timestamps or dispatcher edits.
    In this project, `--local-gtf-window-bp` now controls both the extracted GTF
    half-window and the displayed local GTF plot half-window.
    Default that half-window to 1 Mb for newly generated runs and direct
