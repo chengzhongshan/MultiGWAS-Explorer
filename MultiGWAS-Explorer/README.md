@@ -2492,16 +2492,43 @@ and SAS returned no diagnostic log, WORK exhaustion, Java memory, and ODA
 service failure remain possibilities rather than confirmed causes. Do not
 repeat the identical large submit. Choose the smallest half-window that
 contains the requested SNPs and rerun, or use the full-window gnuplot output.
-In the AOA tests, half-windows of 1–5 Mb, including 4.5 Mb, completed, while
-one 10 Mb attempt containing 69,807 variants lost its ODA session. A separate
-10 Mb run rendered but exposed an axis that extended past chr1's end; the
-plotting macro now strips padding from the SAS chromosome value and quotes the
+For AOA `rs12028518`, half-windows of 1–5 Mb, including 4.5 Mb, completed,
+while one 10 Mb attempt containing 69,807 variants lost its ODA session. A
+separate 10 Mb run rendered but exposed an axis that extended past chr1's end;
+the plotting macro now strips padding from the SAS chromosome value and quotes the
 comma-separated chromosome-length list before applying the reference bound.
 A small SAS ODA macro probe confirmed that chr1 now stops at 248,956,422 bp;
 the full 10 Mb plot has not been rerun after that correction. These are
 observed cases, not a universal size limit. Keep all SNPs in the chosen local
 window; the nominal-`P < 0.05` filter is for
 genome-wide Manhattan plots only.
+
+An AOA `rs145760339` run illustrates why the status file matters. An older
+auto-generated spec still requested a 5 Mb half-window. The SAS submit ended
+with `No SAS process attached` and no definitive SAS log (helper exit `74`);
+a later SASPy connection attempt printed `We failed in getConnection` and
+`The application could not log on to the server`. Neither message confirms
+WORK exhaustion or bad credentials as the original cause. The local gnuplot
+fallback completed. A later `--check-sas-oda-login-only` probe succeeded, but
+that establishes login availability only at probe time.
+
+After regenerating the AOA spec with the current code, `local_gtf_window_bp`
+was `1e6`. A targeted SAS ODA rerun extracted 8,284 GWAS rows from the
+chr1:219888757-221888757 window and completed in about 4 minutes 10 seconds;
+the PNG and HTML were verified and the per-locus remote inputs were deleted.
+This successful smaller rerun does not establish why the earlier 5 Mb job lost
+its session. Auto-generated specs written before the new default can retain
+`5e6`; regenerate them or pass an explicit window override before a rerun:
+
+```bash
+# From the directory containing auto_prepare_and_run_diff_gwas.pl:
+perl auto_prepare_and_run_diff_gwas.pl \
+  --gwas-dir ../../AOA_GWAS_Data --generate-spec-only
+perl auto_prepare_and_run_diff_gwas.pl \
+  --spec configs/auto_AOA_GWAS_Data_diff_merged_from_dir.spec.json \
+  --step plot_local_gtf --target-snps rs145760339 \
+  --local-gtf-window-bp 1e6 --no-gnuplot-fallback-on-sas-failure
+```
 
 ```bash
 perl auto_prepare_and_run_diff_gwas.pl \
@@ -3139,7 +3166,9 @@ Important interpretation:
   `74` and a `*.non_retryable_remote_termination.txt` marker. This is a
   possible WORK/quota or memory exhaustion, but is deliberately reported as
   unconfirmed; preserve the status/log artifacts and reduce the input before
-  rerunning.
+  rerunning. A subsequent `getConnection` or logon error can be secondary to
+  the lost session; validate current login separately and do not retroactively
+  label the original plot failure an authentication problem.
 - deterministic SAS compile records such as `ERROR 180-322:` are preserved and
   stop immediately; they are not replayed by the bounded transport retry loop
 - in that case, reduce at least one of:

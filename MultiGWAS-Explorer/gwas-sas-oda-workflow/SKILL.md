@@ -237,7 +237,10 @@ Before running a workflow, identify:
    half-window and the displayed local GTF plot half-window.
    Default that half-window to 1 Mb for newly generated runs and direct
    single-SNP SAS ODA runs. Preserve an explicit user-requested window;
-   local Manhattan has its own separate default.
+   local Manhattan has its own separate default. Older generated spec JSON
+   files can still contain an explicit `5e6`; regenerate with
+   `--gwas-dir DIR --generate-spec-only` or pass
+   `--local-gtf-window-bp 1e6` when a smaller window is intended.
    The subset upload path now gzip-compresses that local GTF table before
    transfer, and the SAS import block reads it through
    `filename ... zip ... gzip`. Start with the smallest half-window that
@@ -249,6 +252,17 @@ Before running a workflow, identify:
    for the actual helper exit code. Do not treat this case as a universal limit
    or repeat the identical large submit. Keep all local SNPs; nominal-`P < 0.05` selection belongs to
    genome-wide Manhattan plots only.
+   AOA `rs145760339` lost its SAS ODA session at a 5 Mb half-window with
+   `No SAS process attached` and no definitive SAS log. A later SASPy
+   `getConnection`/logon error did not establish whether the initial failure
+   was authentication, WORK, memory, or service related. A subsequent
+   `--check-sas-oda-login-only` probe passed. After regenerating the spec and
+   using a 1 Mb half-window, a targeted SAS ODA rerun extracted 8,284 GWAS
+   rows, generated verified PNG/HTML in about 4 minutes 10 seconds, and
+   deleted its remote locus inputs. Record this as a successful smaller rerun,
+   not proof that 5 Mb is a universal SAS ODA limit. For a single-locus check,
+   use `--step plot_local_gtf` with `--target-snps rs145760339`,
+   `--local-gtf-window-bp 1e6`, and `--no-gnuplot-fallback-on-sas-failure`.
    When many genes overlap one local locus, keep the overall figure size fixed
    and instead let the pipeline slightly increase the lower gene-track share by
    auto-tuning the SAS `pct4neg_y` parameter.
