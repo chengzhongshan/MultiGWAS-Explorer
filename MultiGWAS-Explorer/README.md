@@ -2653,7 +2653,7 @@ locus. In this three-SNP example, the panel is centered on the first SNP;
 while substantially reducing the displayed region and the number of genes in
 the lower track.
 
-New specs and bundled configs default the local-GTF half-window to 5,000,000
+New specs and bundled configs default the local-GTF half-window to 1,000,000
 bp; the separate local-Manhattan window is unchanged. When the configured
 local-GTF half-window exceeds 5,000,000 bp (a total displayed span
 of more than approximately 10 Mb), both entry points print a performance
@@ -2775,6 +2775,11 @@ base before that auto-tuning runs:
 Both wrappers now default `GTF_PCT4NEG_Y` to `1.4`, which keeps the bottom
 gene/exon track visibly larger in manuscript-scale figures and one-locus debug
 reruns alike.
+
+The default local-GTF half-window is 1 Mb (about 2 Mb total span) for both
+auto-generated runs and direct SAS ODA single-locus runs. Existing explicit
+`local_gtf_window_bp` settings and `--local-gtf-window-bp` overrides take
+precedence; the local Manhattan window remains separate.
 
 Use a dedicated local-GTF window without changing the local Manhattan window:
 

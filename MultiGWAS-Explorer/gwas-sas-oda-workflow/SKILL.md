@@ -235,6 +235,9 @@ Before running a workflow, identify:
    list as LD-independent leads.
    In this project, `--local-gtf-window-bp` now controls both the extracted GTF
    half-window and the displayed local GTF plot half-window.
+   Default that half-window to 1 Mb for newly generated runs and direct
+   single-SNP SAS ODA runs. Preserve an explicit user-requested window;
+   local Manhattan has its own separate default.
    The subset upload path now gzip-compresses that local GTF table before
    transfer, and the SAS import block reads it through
    `filename ... zip ... gzip`. Start with the smallest half-window that

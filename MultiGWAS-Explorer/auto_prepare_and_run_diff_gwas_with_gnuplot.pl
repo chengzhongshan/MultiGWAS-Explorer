@@ -701,7 +701,7 @@ if ($requested{plot_local_manhattan}) {
 }
 
 if ($requested{plot_local_gtf}) {
-    my $gtf_window = $local_gtf_window_bp_override || ($runner->{LOCAL_GTF_WINDOW_BP} || '5e6');
+    my $gtf_window = $local_gtf_window_bp_override || ($runner->{LOCAL_GTF_WINDOW_BP} || '1e6');
     if ($gtf_window =~ /^(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i
         && (0 + $gtf_window) > 5_000_000) {
         my $total_span = 2 * (0 + $gtf_window);
