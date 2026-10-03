@@ -112,6 +112,7 @@ perl -c DiffGWASDeps/gnuplot/pdl_gnuplot_local_locus.pl >/dev/null
 perl DiffGWASDeps/test_gnuplot_directory_layout.pl >/dev/null
 perl DiffGWASDeps/test_ld_heatmap_rendering.pl >/dev/null
 perl DiffGWASDeps/test_ld_heatmap_contract.pl >/dev/null
+perl DiffGWASDeps/test_selected_signed_ld_gtf.pl >/dev/null
 perl DiffGWASDeps/test_ld_cache_queries.pl >/dev/null
 perl install/test_plink2_ld_aliases.pl
 perl install/test_sort_long_gwas.pl >/dev/null

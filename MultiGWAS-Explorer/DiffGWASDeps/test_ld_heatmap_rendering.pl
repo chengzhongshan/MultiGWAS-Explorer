@@ -159,7 +159,7 @@ open my $manhattan_manifest, '<:raw', "$manhattan_prefix.manifest.tsv" or die $!
 my $manhattan_manifest_text = do { local $/; <$manhattan_manifest> };
 close $manhattan_manifest;
 die "Local Manhattan manifest did not record signed-R2 mode without GTF\n"
-    unless $manhattan_manifest_text =~ /^cache_schema\t8$/m
+    unless $manhattan_manifest_text =~ /^cache_schema\t9$/m
         && $manhattan_manifest_text =~ /^has_gtf\t0$/m
         && $manhattan_manifest_text =~ /^signed_r2_coloring\t1$/m;
 

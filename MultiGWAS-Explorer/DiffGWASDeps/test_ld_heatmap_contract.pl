@@ -155,13 +155,26 @@ for my $forbidden (
 for my $token (
     'my %local_ld_cache_by_snp',
     'run_sas_oda_single_snp_with_gtf_download_html.sh',
-    'GTF_LD_R2_CACHE="$target_cache"',
-    'GTF_LD_REFERENCE_SNP="$target_snp"',
-    'GTF_LD_DISPLAY_MODE="heatmap"',
-    'Signed LD r2 to $target_snp',
+    'GTF_LD_R2_CACHE_BY_SNP',
+    'run_selected_signed_ld_gtf.pl',
 ) {
     die "SAS multi-target orchestration is missing its per-target LD contract: $token\n"
         unless index($sas_auto_text, $token) >= 0;
+}
+
+my $dispatcher_path = File::Spec->catfile($Bin, 'run_selected_signed_ld_gtf.pl');
+open my $dispatcher_fh, '<:raw', $dispatcher_path or die "Cannot read $dispatcher_path: $!\n";
+my $dispatcher_text = do { local $/; <$dispatcher_fh> };
+close $dispatcher_fh;
+for my $token (
+    '$runner_config->{GTF_LD_R2_CACHE_BY_SNP}{lc $snp}',
+    '$ENV{GTF_LD_R2_CACHE} = $ld_cache',
+    '$ENV{GTF_LD_REFERENCE_SNP} = $snp',
+    '$ENV{GTF_LD_DISPLAY_MODE} = lc $opt{mode}',
+    'Signed LD r2 to $snp',
+) {
+    die "SAS signed-LD dispatcher is missing its per-target LD contract: $token\n"
+        unless index($dispatcher_text, $token) >= 0;
 }
 
 for my $shell (qw(
