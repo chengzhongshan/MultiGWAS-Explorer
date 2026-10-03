@@ -1202,7 +1202,11 @@ run;
     %let label_n_cutoff=0;
 %end;
 
-  %if &total_target_labels<=&label_n_cutoff %then %do;
+  %if &total_target_labels=0 %then %do;
+      %put WARNING: No requested SNP labels remain in the local GWAS plot data.;
+      %let make_even_pos=0;
+  %end;
+  %else %if &total_target_labels<=&label_n_cutoff %then %do;
 /*	   %let dist_pct_to_cluster_pos=%sysevalf(4*&dist_pct_to_cluster_pos);*/
 /*       %let dist_pct_to_cluster_pos=%sysevalf(1/&total_target_labels);*/
          %let dist_pct_to_cluster_pos=%sysevalf(0.5/&total_target_labels);
@@ -1219,7 +1223,7 @@ run;
   %if &track_width<700 %then %let Pct4OnlyTwoPos=0.25;
   %else %let Pct4OnlyTwoPos=0.1;
 
-  %if (&adj_spaces_among_top_snps=1) %then %do;
+  %if (&adj_spaces_among_top_snps=1 and &total_target_labels>=2) %then %do;
    %adjust_close_positions(
    indsd=_xtag_,
    outdsd=_xtag_,
@@ -1246,7 +1250,7 @@ run;
    *******************************************************************************************************;
    *Use the other macro to improve it, and it can be canceled if it is still not optimum;
    *Only run it when requiring the text to be rotated; 
-   %if (&text_rotate_angle>0 and &adj_spaces_among_top_snps=1) %then %do;
+   %if (&text_rotate_angle>0 and &adj_spaces_among_top_snps=1 and &total_target_labels>=2) %then %do;
    %put We will further optimize the space between each SNP label on the top of the gene track;
    proc sql noprint;
    select pos into: _tgt_pos_ separated by ' '
@@ -1289,6 +1293,8 @@ run;
    *Note: it is important to use put to change larger number into str frist;
    *otherwise, sas will automatically round the large number to nearest number;
    *resulting into the wrong number for the newly created macro var markers_pos;
+   %let markers_pos=;
+   %let new_markers_pos=;
    proc sql noprint;
    select put(pos,best32.),put(newpos,best32.) into: markers_pos separated by ' ',:new_markers_pos separated by ' '
    from _xtag_;

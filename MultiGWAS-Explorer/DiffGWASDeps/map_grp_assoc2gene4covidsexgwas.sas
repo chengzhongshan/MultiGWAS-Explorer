@@ -271,9 +271,11 @@ select min(st)-1000-&dist2genes, max(end)+1000+&dist2genes
 into :min_gpos,:max_gpos
 from exons;
 *Need to compare it with original input min_st and max_end;
-%if &max_end>&max_gpos %then %let max_gpos=&max_end;
-%if &min_st<&min_gpos %then %let min_gpos=&min_st;
-%if &min_gpos<0 %then %let min_gpos=0;
+/* Large positions can be formatted as 6.601E7 or 1.1708E8.  A plain
+   macro %IF may compare those strings lexically and clip away the lead SNP. */
+%if %sysevalf(&max_end>&max_gpos,boolean) %then %let max_gpos=&max_end;
+%if %sysevalf(&min_st<&min_gpos,boolean) %then %let min_gpos=&min_st;
+%if %sysevalf(&min_gpos<0,boolean) %then %let min_gpos=0;
 %put The final chromosomal range for your query region is from &min_gpos to &max_gpos;
 %put However, we will restrict the x-axis to the original min and max genomic position in the final figure;
 *Need to enlarge the grp length by asigning longer comman label for it;

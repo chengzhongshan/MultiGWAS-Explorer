@@ -251,6 +251,16 @@ Before running a workflow, identify:
    hits finish. Only the first fresh hit of a new invocation establishes
    shared remote macro readiness. Keep the checksum tied to scientific inputs
    and SAS plotting sources, not launcher timestamps or dispatcher edits.
+   If SAS reports `WORK._TGT_POS_.DATA does not exist`, unresolved
+   `MARKERS_POS`, or a missing `u1-u` array suffix, check whether the first
+   error arose from an empty top-label set. In the AOA `rs72679403` run,
+   genomic bounds formatted as scientific notation were compared with plain
+   macro `%if`, which dropped the lead SNP from `signal_dsd`. Use numeric
+   `%sysevalf(...,boolean)` for coordinate comparisons and bypass spacing
+   logic for zero or one label. Validate with a real locus plot, including
+   SNPs on both sides of the lead; a zero exit code alone is insufficient.
+   A fix to the genomic selection or plotting macro changes the scientific
+   request checksum, so previously completed plots may need regeneration.
    In this project, `--local-gtf-window-bp` now controls both the extracted GTF
    half-window and the displayed local GTF plot half-window.
    Default that half-window to 1 Mb for newly generated runs and direct

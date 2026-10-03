@@ -2480,6 +2480,18 @@ Within one invocation, shared SAS macros are uploaded and checked for the
 first fresh hit, then reused for later hits; after a disconnect or a new
 invocation, the first fresh hit verifies them again.
 
+If a local GTF job stops with `WORK._TGT_POS_.DATA does not exist`,
+`MARKERS_POS not resolved`, or `Missing numeric suffix on a numbered variable
+list (u1-u)`, inspect the first error in `run_single_snp_with_gtf_*/output.html.info.txt`.
+For AOA `rs72679403`, SAS formatted the expanded chromosome-4 lower bound in
+scientific notation. A plain macro `%if` compared that bound as text and
+excluded the target SNP from the GWAS region; the later spacing code then
+received zero labels. The gene-range comparison now uses numeric `%sysevalf`,
+and zero or one label skips the spacing adjustment. A 1 Mb SAS ODA rerun for
+that SNP completed and produced a signed-LD PNG. Because this changes which
+variants can appear in a locus plot, the scientific request checksum changes;
+previous plots are rendered again on the next full batch run.
+
 ### SAS ODA local-GTF rendering and session loss
 
 For this plot family, the SAS ODA wrappers open one `ODS HTML5` destination
