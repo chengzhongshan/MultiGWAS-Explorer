@@ -297,6 +297,11 @@ USE_PERSISTENT_SESSION="${USE_PERSISTENT_SESSION:-0}"
 CLEAN_ODA_INPUT="${CLEAN_ODA_INPUT:-1}"
 CLEAN_ODA_OUTPUT="${CLEAN_ODA_OUTPUT:-1}"
 CLEAN_ODA_MACROS="${CLEAN_ODA_MACROS:-1}"
+SINGLE_SNP_REUSE_SHARED_MACROS="${SINGLE_SNP_REUSE_SHARED_MACROS:-0}"
+if [[ "${SINGLE_SNP_REUSE_SHARED_MACROS}" == "1" && "${CLEAN_ODA_MACROS}" != "0" ]]; then
+  echo "ERROR: Shared SAS macros can be reused only when CLEAN_ODA_MACROS=0." >&2
+  exit 2
+fi
 CLEAN_LOCAL_AUTOGEN="${CLEAN_LOCAL_AUTOGEN:-1}"
 OPEN_RESULT="${OPEN_RESULT:-1}"
 SINGLE_SNP_PREP_ONLY="${SINGLE_SNP_PREP_ONLY:-0}"
@@ -1301,22 +1306,27 @@ fi
 
 rm -f "${HTML_OUT}"
 
-upload_support_args=(--upload-file "${PATCHED_LATTICE_MACRO_SAS}" --upload-file "${LOCAL_GTF_SUBSET_GZ}" --upload-file "${DATA_GZ}")
-if [[ -f "${MAP_GRP_ASSOC_MACRO_SAS}" ]]; then
-  upload_support_args=(--upload-file "${MAP_GRP_ASSOC_MACRO_SAS}" "${upload_support_args[@]}")
-fi
-if [[ -f "${MULT_GSCATTER_GENE_MACRO_SAS}" ]]; then
-  upload_support_args=(--upload-file "${MULT_GSCATTER_GENE_MACRO_SAS}" "${upload_support_args[@]}")
-fi
-if [[ -f "${ADJ_CLOSE_GENE_GRP_MACRO_SAS}" ]]; then
-  upload_support_args=(--upload-file "${ADJ_CLOSE_GENE_GRP_MACRO_SAS}" "${upload_support_args[@]}")
-fi
-if [[ -f "${SNP_LOCAL_MACRO_SAS}" ]]; then
-  echo "[1/6] Uploading SNP_Local_Manhattan_With_GTF macro and support files..."
-  upload_support_args=(--upload-file "${SNP_LOCAL_MACRO_SAS}" "${upload_support_args[@]}")
+upload_support_args=(--upload-file "${LOCAL_GTF_SUBSET_GZ}" --upload-file "${DATA_GZ}")
+if [[ "${SINGLE_SNP_REUSE_SHARED_MACROS}" == "1" ]]; then
+  echo "[1/6] Reusing shared SAS macros verified by an earlier locus; uploading only this SNP's GWAS and GTF subsets."
 else
-  echo "[1/6] Local SNP_Local_Manhattan_With_GTF macro not found; relying on the SAS ODA built-in macro." >&2
-  echo "[1/6] Uploading support files..."
+  upload_support_args=(--upload-file "${PATCHED_LATTICE_MACRO_SAS}" "${upload_support_args[@]}")
+  if [[ -f "${MAP_GRP_ASSOC_MACRO_SAS}" ]]; then
+    upload_support_args=(--upload-file "${MAP_GRP_ASSOC_MACRO_SAS}" "${upload_support_args[@]}")
+  fi
+  if [[ -f "${MULT_GSCATTER_GENE_MACRO_SAS}" ]]; then
+    upload_support_args=(--upload-file "${MULT_GSCATTER_GENE_MACRO_SAS}" "${upload_support_args[@]}")
+  fi
+  if [[ -f "${ADJ_CLOSE_GENE_GRP_MACRO_SAS}" ]]; then
+    upload_support_args=(--upload-file "${ADJ_CLOSE_GENE_GRP_MACRO_SAS}" "${upload_support_args[@]}")
+  fi
+  if [[ -f "${SNP_LOCAL_MACRO_SAS}" ]]; then
+    echo "[1/6] Uploading SNP_Local_Manhattan_With_GTF macro and support files..."
+    upload_support_args=(--upload-file "${SNP_LOCAL_MACRO_SAS}" "${upload_support_args[@]}")
+  else
+    echo "[1/6] Local SNP_Local_Manhattan_With_GTF macro not found; relying on the SAS ODA built-in macro." >&2
+    echo "[1/6] Uploading support files..."
+  fi
 fi
 oda_upload_many \
   "upload_single_snp_with_gtf_support_${stamp}" \

@@ -74,6 +74,7 @@ my $render_request = JSON::PP->new->canonical(1)->encode({
     mode => lc($opt{mode}),
 });
 my @links;
+my $shared_macros_ready = 0;
 for my $snp (@targets) {
     (my $safe_snp = $snp) =~ s/[^A-Za-z0-9._-]/_/g;
     my $target_html = @targets == 1 ? $base : "${output_stem}_${safe_snp}.html";
@@ -109,6 +110,12 @@ for my $snp (@targets) {
         "Signed LD r2 to $snp (" . uc($opt{population}) . ", 1000G Phase 3 / PLINK2)";
     $ENV{OPEN_RESULT} = 0 if @targets > 1;
     $ENV{CLEAN_ODA_MACROS} = 0;
+    # The first successful locus uploads and checks the shared macro files.
+    # Later loci keep using those remote files while uploading only their
+    # distinct GWAS/GTF inputs. Cached plots do not establish remote readiness.
+    $ENV{SINGLE_SNP_REUSE_SHARED_MACROS} = $shared_macros_ready ? 1 : 0;
+    $ENV{INCLUDE_PREFLIGHT_ENABLED} = 0 if $shared_macros_ready;
+    $ENV{SAS_ODA_REUSE_VERIFIED_MACRO_BOOTSTRAP_HELPER} = $shared_macros_ready ? 1 : 0;
     # The parent automation may retain a shared genome-wide upload.  These
     # target-specific inputs must be removed after each successful locus.
     $ENV{KEEP_REMOTE_PLOT_DATA} = 0;
@@ -118,6 +125,7 @@ for my $snp (@targets) {
         or die "Signed-LD SAS runner failed for $snp: $?\n";
     die "Signed-LD SAS runner did not create $target_path\n" unless -s $target_path;
     die "Signed-LD SAS runner did not create $target_png\n" unless -s $target_png;
+    $shared_macros_ready = 1;
     open my $request_fh, '>', $request_file or die "Cannot write $request_file: $!\n";
     print {$request_fh} "$request_key\n";
     close $request_fh or die "Cannot close $request_file: $!\n";

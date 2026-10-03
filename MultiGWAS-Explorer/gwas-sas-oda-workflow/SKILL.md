@@ -233,6 +233,15 @@ Before running a workflow, identify:
    tabix-extracted GWAS window and its GTF subset per SAS job, then remove
    successful per-locus remote inputs. Do not describe an unpruned candidate
    list as LD-independent leads.
+   In a multi-hit signed-LD run, upload and verify shared SAS plotting macros
+   with the first locus that actually renders. Reuse those remote files for
+   later loci in the same run, skipping repeated include-source preflight;
+   continue uploading each locus's distinct GWAS/GTF data. Cached completed
+   plots do not establish that the shared macros were uploaded in this run.
+   After the first successful locus, skip the remote-file check for the
+   already verified `importallmacros_ue.sas` helper too. Keep global macro
+   bootstrap enabled for each fresh SAS ODA session unless session
+   persistence has been verified explicitly.
    In this project, `--local-gtf-window-bp` now controls both the extracted GTF
    half-window and the displayed local GTF plot half-window.
    Default that half-window to 1 Mb for newly generated runs and direct

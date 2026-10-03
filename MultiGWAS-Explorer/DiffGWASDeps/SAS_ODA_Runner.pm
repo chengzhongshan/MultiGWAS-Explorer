@@ -3540,6 +3540,11 @@ sub _ensure_remote_macro_bootstrap_helper {
     my $local_helper = $self->_find_local_macro_bootstrap_helper();
     return '' unless $local_helper;
 
+    if ($ENV{SAS_ODA_REUSE_VERIFIED_MACRO_BOOTSTRAP_HELPER}) {
+        warn "Reusing macro bootstrap helper verified by an earlier locus: $local_helper\n";
+        return "Reusing previously verified remote macro bootstrap helper: " . basename($local_helper);
+    }
+
     warn "Checking SAS ODA macro bootstrap helper upload/reuse: $local_helper\n";
     my $remote = eval {
         $self->upload(

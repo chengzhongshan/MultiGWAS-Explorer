@@ -2419,6 +2419,15 @@ is not itself evidence that the hits are LD-independent. A rerun reuses the
 locally selected candidate CSV only when its request key and source file still
 match, and reuses each completed per-locus PNG/HTML only when its request key
 matches. Older results without a key are generated once more.
+For a multi-hit signed-LD run, the first locus that actually needs SAS ODA
+uploads and verifies the five shared plotting macros. Later loci in that run
+reuse those remote files without resending or rescanning them; each still
+uploads its own tabix-extracted GWAS window and GTF subset. A cached plot does
+not count as the first upload. The first successful locus also verifies the
+`importallmacros_ue.sas` bootstrap helper; later loci skip its remote-file
+check. Fresh SAS sessions still load their required global macro definitions,
+so this avoids redundant transfers and preflights without assuming session
+state persists between loci.
 Plot reuse is evaluated for each stage separately. Changing local-GTF or LD
 display options does not invalidate a completed genome-wide Manhattan plot,
 and a missing output in one stage does not force later stages to rerun.

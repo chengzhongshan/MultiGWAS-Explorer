@@ -46,6 +46,7 @@ cache/pgc_scz_sex_public/
 /single_snp_ld_augmented_*.tsv.gz
 /target_snp_augmented_*.tsv.gz
 /*_top_hits_*.csv
+/*_top_hit.csv
 /gnuplot_fallback_*.status.json
 /local_gtf_subset_local_hits_*.tsv
 /sas_action_runner_*.py
