@@ -91,7 +91,13 @@ copy($shared_psam, "$prefix.psam") or die "Cannot prepare $prefix.psam: $!\n"
 if (!-s "$prefix.pgen") {
     print "[prepare] Decompressing official chr$chr phased genotypes\n";
     my $tmp_pgen = "$prefix.pgen.tmp.$$";
-    system($plink2, '--zst-decompress', "$prefix.pgen.zst", $tmp_pgen) == 0
+    my ($plink2_input, $plink2_output) = ("$prefix.pgen.zst", $tmp_pgen);
+    if ($^O eq 'cygwin' && $plink2 =~ /\.exe$/i) {
+        # Native Windows PLINK2 cannot open Cygwin /cygdrive/... paths.
+        $plink2_input = Cygwin::posix_to_win_path($plink2_input, 1);
+        $plink2_output = Cygwin::posix_to_win_path($plink2_output, 1);
+    }
+    system($plink2, '--zst-decompress', $plink2_input, $plink2_output) == 0
         or die "PLINK2 could not decompress $prefix.pgen.zst\n";
     die "Decompressed PGEN is empty\n" unless -s $tmp_pgen;
     rename $tmp_pgen, "$prefix.pgen" or die "Cannot install $prefix.pgen: $!\n";

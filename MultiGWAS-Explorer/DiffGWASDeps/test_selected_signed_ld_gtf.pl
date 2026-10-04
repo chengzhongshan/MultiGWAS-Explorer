@@ -123,4 +123,19 @@ open $fh, '<', $calls or die $!;
 @calls = <$fh>;
 close $fh;
 is(scalar(@calls), 9, 'no locus reruns after launcher timestamp change');
+
+my $busy_index = File::Spec->catfile($dir, 'busy.html');
+my $busy_partial = File::Spec->catfile($dir, 'busy.partial.html');
+my $busy_progress = File::Spec->catfile($dir, 'busy.progress.json');
+mkdir $busy_partial or die $!;
+mkdir $busy_progress or die $!;
+my @busy_cmd = ($^X, File::Spec->catfile($Bin, 'run_selected_signed_ld_gtf.pl'),
+    '--target-snps', 'rs444,rs555', '--runner-config', $config,
+    '--output-html', $busy_index, '--single-runner', $runner);
+is(system(@busy_cmd), 0, 'unavailable optional progress pages do not stop plotting');
+ok(-s $busy_index, 'completed plot index is still written');
+ok(-s File::Spec->catfile($dir, 'busy_rs444.html'), 'first plot survives status-page failure');
+ok(-s File::Spec->catfile($dir, 'busy_rs555.html'), 'second plot survives status-page failure');
+my @failed_status_temps = glob(File::Spec->catfile($dir, 'busy.*.tmp.*'));
+is(scalar(@failed_status_temps), 0, 'failed status replacements leave no temporary files');
 done_testing();

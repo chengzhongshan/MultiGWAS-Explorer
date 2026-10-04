@@ -233,6 +233,11 @@ Before running a workflow, identify:
    tabix-extracted GWAS window and its GTF subset per SAS job, then remove
    successful per-locus remote inputs. Do not describe an unpruned candidate
    list as LD-independent leads.
+   On Cygwin, native `plink2.exe` needs Windows paths for `.pgen.zst`
+   decompression. If preparation reports that an existing `/cygdrive/...`
+   archive cannot be opened, update `prepare_plink2_1kg_hg38_chr.pl` and rerun
+   the same command. The preparer reuses the downloaded archive and the
+   signed-LD dispatcher skips completed loci whose request checksums match.
    In a multi-hit signed-LD run, upload and verify shared SAS plotting macros
    with the first locus that actually renders. Reuse those remote files for
    later loci in the same run, skipping repeated include-source preflight;
@@ -251,6 +256,9 @@ Before running a workflow, identify:
    hits finish. Only the first fresh hit of a new invocation establishes
    shared remote macro readiness. Keep the checksum tied to scientific inputs
    and SAS plotting sources, not launcher timestamps or dispatcher edits.
+   A Windows lock on the optional partial index or progress JSON must not stop
+   SAS plotting. Retry status-file replacement, warn if it stays locked, and
+   continue using per-locus HTML/PNG/checksum files as the resume authority.
    If SAS reports `WORK._TGT_POS_.DATA does not exist`, unresolved
    `MARKERS_POS`, or a missing `u1-u` array suffix, check whether the first
    error arose from an empty top-label set. In the AOA `rs72679403` run,

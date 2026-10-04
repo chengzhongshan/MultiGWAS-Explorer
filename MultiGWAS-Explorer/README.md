@@ -2471,6 +2471,11 @@ SNPs, and starts with the first unfinished hit. It writes
 `<plot-stem>.progress.json` after each hit with `complete`, `remaining`, and
 per-SNP status, plus `<plot-stem>.partial.html` linking plots finished so far.
 The normal `<plot-stem>.html` index appears only after all hits complete.
+On Windows, a viewer or file scanner can briefly lock the partial index.
+The dispatcher retries its replacement, then warns and continues plotting if
+that optional status page remains locked. HTML/PNG outputs and request
+checksums still control reuse; a partial-index write failure does not mean a
+SAS job failed.
 Plot checksums use the GWAS inputs, plot configuration, LD cache, and SAS plot
 source contents, so changing only the launcher or dispatcher does not repeat
 finished plots. Changing a scientific plot input does rerender the affected
@@ -3149,6 +3154,12 @@ gnuplot GTF runner prepares the requested hg38 chromosome automatically;
 `DiffGWASDeps/prepare_plink2_1kg_hg38_chr.pl --chr 1 --output-dir cache/plink2_1kg_hg38`
 also prepares it independently. The downloaded genotype files are not
 committed.
+On Cygwin, the preparer passes Windows paths to native `plink2.exe` when
+decompressing `.pgen.zst`. If an older run stopped with `Failed to open
+/cygdrive/.../chrN_hg38.pgen.zst` even though that archive exists, rerun the
+same pipeline command after updating the repository. The existing archive is
+reused, and matching completed local-GTF plots are skipped by the per-locus
+resume checks.
 
 The public real-GWAS test accepts the same reference explicitly:
 

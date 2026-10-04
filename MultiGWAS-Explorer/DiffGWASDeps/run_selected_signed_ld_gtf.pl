@@ -123,6 +123,7 @@ my $partial_path = File::Spec->catpath($volume, $dir, "${output_stem}.partial.ht
 my %status = map { $_ => 'pending' } @targets;
 my $request_id = md5_hex($render_request);
 my $failure = '';
+my %status_write_warning;
 write_progress();
 for my $snp (@targets) {
     (my $safe_snp = $snp) =~ s/[^A-Za-z0-9._-]/_/g;
@@ -226,13 +227,25 @@ sub write_progress {
         failure => $failure,
         loci => [ map { { snp => $_, status => $status{$_} } } @targets ],
     };
-    atomic_write($progress_path, JSON::PP->new->canonical(1)->pretty(1)->encode($report));
+    write_status_file($progress_path, JSON::PP->new->canonical(1)->pretty(1)->encode($report));
     if ($complete < @targets && @links) {
-        atomic_write($partial_path, plot_index_html(\@links));
+        write_status_file($partial_path, plot_index_html(\@links));
     }
     # The full index is a completion signal; keep it only when every locus
     # belongs to the current request and has verified output files.
     unlink $opt{output_html} if @targets > 1 && $complete < @targets && -e $opt{output_html};
+}
+
+sub write_status_file {
+    my ($path, $contents) = @_;
+    if (eval { atomic_write($path, $contents); 1 }) {
+        delete $status_write_warning{$path};
+        return 1;
+    }
+    my $error = $@ || 'unknown write error';
+    warn "[signed-LD] Could not refresh optional status file $path: $error"
+        unless $status_write_warning{$path}++;
+    return 0;
 }
 
 sub plot_index_html {
@@ -247,7 +260,16 @@ sub atomic_write {
     my ($path, $contents) = @_;
     my $tmp = "$path.tmp.$$";
     open my $out, '>', $tmp or die "Write $tmp: $!\n";
-    print {$out} $contents;
+    print {$out} $contents or die "Write $tmp: $!\n";
     close $out or die "Close $tmp: $!\n";
-    rename $tmp, $path or die "Rename $tmp to $path: $!\n";
+    my $error = '';
+    for my $attempt (1 .. 15) {
+        return if rename $tmp, $path;
+        $error = "$!";
+        last unless $^O =~ /^(?:cygwin|MSWin32)$/i
+            && ($!{EBUSY} || $!{EACCES} || $!{EPERM});
+        select undef, undef, undef, 0.2 if $attempt < 15;
+    }
+    unlink $tmp or warn "Cannot remove failed status write $tmp: $!\n";
+    die "Rename $tmp to $path: $error\n";
 }
