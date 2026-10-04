@@ -238,6 +238,14 @@ Before running a workflow, identify:
    archive cannot be opened, update `prepare_plink2_1kg_hg38_chr.pl` and rerun
    the same command. The preparer reuses the downloaded archive and the
    signed-LD dispatcher skips completed loci whose request checksums match.
+   For X loci, normalize a manifest's chromosome 23 to `X` when choosing the
+   hg38 PLINK2 fileset (`chrX_hg38.pgen/.pvar.zst/.psam`). The tabix GWAS
+   window can contain `CHR=X`; convert its chromosome field to numeric 23 in
+   the compact single-locus SAS upload before target lookup, GTF joins, or
+   plotting. Keep the indexed source unchanged so completed autosome plots
+   remain reusable. If LD fails for a missing `chr23_hg38.psam`, check the
+   runner's panel name. If SAS `%SYSEVALF` fails after showing `CHR=.`, check
+   the uploaded wide-table chromosome before debugging the gene-track macro.
    In a multi-hit signed-LD run, upload and verify shared SAS plotting macros
    with the first locus that actually renders. Reuse those remote files for
    later loci in the same run, skipping repeated include-source preflight;

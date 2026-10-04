@@ -3160,6 +3160,13 @@ decompressing `.pgen.zst`. If an older run stopped with `Failed to open
 same pipeline command after updating the repository. The existing archive is
 reused, and matching completed local-GTF plots are skipped by the per-locus
 resume checks.
+For chromosome X loci, indexed GWAS rows may retain `CHR=X` while the
+plotting macros and GTF subset use numeric chromosome `23`. The single-locus
+SAS upload converts X to 23 before plotting, and the local LD runner selects the
+`chrX_hg38` PLINK2 panel even when a locus manifest reports 23. A `.psam`
+error against `chr23_hg38` or missing numeric `CHR` values in a SAS log
+indicates an older checkout; update it and rerun the same command to resume
+the unfinished loci.
 
 The public real-GWAS test accepts the same reference explicitly:
 

@@ -407,6 +407,7 @@ LOCAL_GTF_SUBSET="${WORKDIR}/local_gtf_subset_${SAFE_TARGET_SNP}_${stamp}.tsv"
 LOCAL_GTF_SUBSET_GZ="${LOCAL_GTF_SUBSET}.gz"
 LOCAL_GTF_SUBSET_CACHE_MANAGED=0
 LOCAL_LD_AUGMENTED_GZ=""
+LOCAL_SAS_NUMERIC_CHR_GZ=""
 REMOTE_GTF_BASENAME="$(basename "${LOCAL_GTF_SUBSET_GZ}")"
 PNG_OUT=""
 RAW_HTML_OUT=""
@@ -418,6 +419,9 @@ cleanup_local_artifacts() {
   rm -f "${RUN_SAS_RENDERED}" "${IMPORT_BLOCK_RENDERED}" "${GTF_IMPORT_BLOCK_RENDERED}" || true
   if [[ "${CLEAN_LOCAL_AUTOGEN}" == "1" && -n "${LOCAL_LD_AUGMENTED_GZ}" ]]; then
     rm -f "${LOCAL_LD_AUGMENTED_GZ}" || true
+  fi
+  if [[ "${CLEAN_LOCAL_AUTOGEN}" == "1" && -n "${LOCAL_SAS_NUMERIC_CHR_GZ}" ]]; then
+    rm -f "${LOCAL_SAS_NUMERIC_CHR_GZ}" || true
   fi
   if [[ "${CLEAN_LOCAL_AUTOGEN}" == "1" && "${LOCAL_GTF_SUBSET_CACHE_MANAGED}" != "1" ]]; then
     rm -f "${LOCAL_GTF_SUBSET}" "${LOCAL_GTF_SUBSET_GZ}" || true
@@ -1008,6 +1012,10 @@ if [[ "${ld_display_mode_normalized}" == "heatmap" || "${ld_display_mode_normali
   case "${REFERENCE_BUILD}" in
     hg38)
       ld_chr="${TARGET_CHR#chr}"
+      ld_chr="${ld_chr#CHR}"
+      case "${ld_chr}" in
+        23|x|X) ld_chr="X" ;;
+      esac
       ld_panel_dir="${WORKDIR}/cache/plink2_1kg_hg38"
       ld_plink2="${TOP_HIT_LD_PLINK2:-${WORKDIR}/cache/plink2_bin/plink2.exe}"
       ld_window_kb="${TOP_HIT_LD_WINDOW_KB:-1000}"
@@ -1098,6 +1106,19 @@ if [[ -n "${GTF_LD_R2_CACHE}" ]]; then
   DATA_GZ="${LOCAL_LD_AUGMENTED_GZ}"
   REMOTE_DATA_BASENAME="$(basename "${DATA_GZ}")"
 fi
+
+# The indexed GWAS source may label chromosome X as text, but the SAS plotting
+# macros join GWAS and GTF rows on numeric chromosome 23. Convert only this
+# per-locus upload; leave the indexed source and all autosome caches intact.
+case "${TARGET_CHR#chr}" in
+  23|X|x)
+    LOCAL_SAS_NUMERIC_CHR_GZ="${WORKDIR}/single_snp_sas_chr23_${SAFE_TARGET_SNP}_${stamp}.tsv.gz"
+    perl "${DEPS_DIR}/normalize_wide_chr_for_sas.pl" \
+      --input "${DATA_GZ}" --output "${LOCAL_SAS_NUMERIC_CHR_GZ}"
+    DATA_GZ="${LOCAL_SAS_NUMERIC_CHR_GZ}"
+    REMOTE_DATA_BASENAME="$(basename "${DATA_GZ}")"
+    ;;
+esac
 
 if [[ -n "${SINGLE_SNP_TOP_HITS_CSV_BASENAME}" ]]; then
   SINGLE_SNP_TOP_HITS_CSV_OUT="${WORKDIR}/${SINGLE_SNP_TOP_HITS_CSV_BASENAME}"
