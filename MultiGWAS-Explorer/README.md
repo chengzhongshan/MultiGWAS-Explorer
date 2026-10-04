@@ -2589,7 +2589,15 @@ request receives a stable `*_targets_<digest>.html` index. These names keep
 the completed automatic top-hit HTML index intact. For one-shot SAS ODA
 downloads, the `Pipeline SAS connection lifecycle` block identifies the
 subprocess ID, action, result, closure reason, and next local validation step;
-normal closure after a download is not a plot failure.
+normal closure after a download is not a plot failure. For a one-shot `--codes`
+submission such as `proc print data=sashelp.class;run;`, SASPy's `SAS Connection
+terminated` line means the pipeline called `endsas()` after capturing the
+response. The lifecycle block now names that trigger and reports whether the
+shutdown call returned normally, plus counts of `ERROR` and `WARNING` lines in
+the returned SAS log. A normal shutdown is not evidence that SAS stopped the
+job. If the returned SAS log contains `ERROR` lines, the lifecycle result
+reports that separately from connection shutdown; inspect the saved SAS log
+and status file for the program failure.
 
 When two or more explicit target SNPs have overlapping SNP-centered windows on
 the same chromosome, the SAS local-GTF runner now merges them into one displayed

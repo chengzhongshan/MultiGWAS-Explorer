@@ -2973,6 +2973,10 @@ sub _report_one_shot_connection_lifecycle {
     print "  action: " . ($life->{action} // $default_action) . "\n";
     print "  result: " . ($life->{result} // 'unknown') . "\n";
     print "  closure reason: " . ($life->{closure_reason} // 'one-shot action completed') . "\n";
+    print "  shutdown outcome: $life->{shutdown_outcome}\n"
+        if defined($life->{shutdown_outcome}) && length($life->{shutdown_outcome});
+    print "  SAS log: $life->{sas_log_summary}\n"
+        if defined($life->{sas_log_summary}) && length($life->{sas_log_summary});
     print "  next step: $life->{next_step}\n"
         if defined($life->{next_step}) && length($life->{next_step});
 }
@@ -3010,9 +3014,12 @@ def _endsas_safely(session_obj, action, result, next_step=''):
         sess = getattr(session_obj, '_session', None)
         if sess is not None:
             sess.endsas()
+            return 'SASPy endsas() returned without exception'
+        return 'no session object was available for SASPy endsas()'
     except Exception as exc:
         sys.stderr.write(f'WARNING: SAS connection cleanup raised {type(exc).__name__}: {exc}\n')
         sys.stderr.flush()
+        return f'SASPy endsas() raised {type(exc).__name__}: {exc}'
 
 if __name__ == '__main__':
     code_path = sys.argv[1]
@@ -3044,20 +3051,36 @@ if __name__ == '__main__':
         close_result = 'success' if payload.get('status') == 'ok' else 'failure'
         session = getattr(session_obj, '_session', None)
         subprocess_id = _saspy_subprocess_id(session_obj) if session is not None else _LAST_SASPY_SUBPROCESS_ID
-        _endsas_safely(
+        shutdown_outcome = _endsas_safely(
             session_obj,
             'SAS code submission (including macro bootstrap when required)',
             close_result,
             'No further SAS connection is expected for this one-shot run.',
         )
         if subprocess_id != 'unknown':
+            sas_log = str(payload.get('log') or '')
+            log_errors = sum(1 for line in sas_log.splitlines() if line.lstrip().startswith(('ERROR:', 'ERROR ')))
+            log_warnings = sum(1 for line in sas_log.splitlines() if line.lstrip().startswith('WARNING:'))
+            lifecycle_result = close_result
+            next_step = 'No further SAS connection is expected for this one-shot run.'
+            if close_result == 'success' and log_errors:
+                lifecycle_result = f'SAS submit returned with {log_errors} ERROR line{"s" if log_errors != 1 else ""} in its log'
+                next_step = 'Inspect the saved SAS log; the program reported errors even though the connection closed normally.'
+            if session is None:
+                closure_reason = 'the helper ended without a session object; this cleanup call could not close the SASPy connection.'
+            elif close_result == 'success':
+                closure_reason = 'the pipeline intentionally called SASPy endsas() after capturing the one-shot SAS submit response; the connection was no longer needed.'
+            else:
+                closure_reason = 'the pipeline attempted SASPy endsas() during cleanup after the one-shot SAS submit failed; inspect the saved SAS error and log.'
             payload['connection_lifecycle'] = {
                 'subprocess_id': subprocess_id,
                 'mode': 'one-shot',
                 'action': 'SAS code submission (including macro bootstrap when required)',
-                'result': close_result,
-                'closure_reason': 'this action is complete and no persistent session was requested.',
-                'next_step': 'No further SAS connection is expected for this one-shot run.',
+                'result': lifecycle_result,
+                'closure_reason': closure_reason,
+                'shutdown_outcome': shutdown_outcome,
+                'sas_log_summary': f'{log_errors} ERROR lines; {log_warnings} WARNING lines; {len(str(payload.get("lst") or ""))} listing characters',
+                'next_step': next_step,
             }
         with open(result_path, 'w', encoding='utf-8') as fh:
             json.dump(payload, fh, ensure_ascii=False)
@@ -3139,9 +3162,12 @@ def _endsas_safely(session_obj, action, result, next_step=''):
         sess = getattr(session_obj, '_session', None)
         if sess is not None:
             sess.endsas()
+            return 'SASPy endsas() returned without exception'
+        return 'no session object was available for SASPy endsas()'
     except Exception as exc:
         sys.stderr.write(f'WARNING: SAS connection cleanup raised {type(exc).__name__}: {exc}\n')
         sys.stderr.flush()
+        return f'SASPy endsas() raised {type(exc).__name__}: {exc}'
 
 def _action_dispatch(action, payload):
     session_obj = None
@@ -3243,14 +3269,21 @@ if __name__ == '__main__':
         next_step = str(action_args.get('connection_next_step') or '')
         session = getattr(session_obj, '_session', None)
         subprocess_id = _saspy_subprocess_id(session_obj) if session is not None else _LAST_SASPY_SUBPROCESS_ID
-        _endsas_safely(session_obj, action_label, close_result, next_step)
+        shutdown_outcome = _endsas_safely(session_obj, action_label, close_result, next_step)
         if subprocess_id != 'unknown':
+            if session is None:
+                closure_reason = 'the helper ended without a session object; this cleanup call could not close the SASPy connection.'
+            elif close_result == 'success':
+                closure_reason = 'the pipeline intentionally called SASPy endsas() after the one-shot file action completed; the connection was no longer needed.'
+            else:
+                closure_reason = 'the pipeline attempted SASPy endsas() during cleanup after the one-shot file action failed; inspect the reported error.'
             payload['connection_lifecycle'] = {
                 'subprocess_id': subprocess_id,
                 'mode': 'one-shot',
                 'action': action_label,
                 'result': close_result,
-                'closure_reason': 'this action is complete and no persistent session was requested.',
+                'closure_reason': closure_reason,
+                'shutdown_outcome': shutdown_outcome,
                 'next_step': next_step,
             }
         with open(result_path, 'w', encoding='utf-8') as fh:

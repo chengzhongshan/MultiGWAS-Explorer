@@ -14,6 +14,8 @@ die "Missing structured SAS connection lifecycle output\n"
     unless $runner =~ /Pipeline SAS connection lifecycle:/
         && $runner =~ /subprocess id:/
         && $runner =~ /closure reason:/
+        && $runner =~ /shutdown outcome:/
+        && $runner =~ /SAS log:/
         && $runner =~ /next step:/;
 
 my $handoffs = () = $runner =~ /payload\['connection_lifecycle'\]\s*=/g;
@@ -30,6 +32,9 @@ die "Remote helper reuse metadata lookup drops connection lifecycle context\n"
     unless $runner =~ /\$self->fileinfo\(\s*\$remote_path,\s*\{\s*connection_purpose => \$opts->\{connection_purpose\},\s*connection_next_step => \$opts->\{connection_next_step\}/s;
 
 die "One-shot submit cleanup does not identify its action\n"
-    unless $runner =~ /SAS code submission \(including macro bootstrap when required\)/;
+    unless $runner =~ /SAS code submission \(including macro bootstrap when required\)/
+        && $runner =~ /intentionally called SASPy endsas\(\) after capturing the one-shot SAS submit response/
+        && $runner =~ /sas_log_summary/
+        && $runner =~ /SAS submit returned with \{log_errors\} ERROR line/;
 
 print "SAS ODA connection lifecycle diagnostics: PASS\n";

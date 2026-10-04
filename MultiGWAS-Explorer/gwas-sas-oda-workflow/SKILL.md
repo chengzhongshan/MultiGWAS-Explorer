@@ -312,7 +312,14 @@ Before running a workflow, identify:
    A one-shot bulk-download connection should print its subprocess ID, action,
    result, closure reason, and next validation step on the same output stream
    as SASPy's termination line. Normal connection closure after a completed
-   transfer does not indicate a SAS plot failure.
+   transfer does not indicate a SAS plot failure. For a one-shot `--codes`
+   submission, explain that the pipeline calls SASPy `endsas()` after it has
+   captured the response; show the shutdown outcome and SAS log error/warning
+   counts. Do not infer a remote SAS failure solely from SASPy's normal
+   `SAS Connection terminated` message. If submission fails, inspect the
+   saved SAS log and status file for the actual failure. Distinguish a
+   successfully closed SASPy connection from `ERROR` lines in the SAS program
+   log; the submit may return a response even when the SAS program fails.
    When many genes overlap one local locus, keep the overall figure size fixed
    and instead let the pipeline slightly increase the lower gene-track share by
    auto-tuning the SAS `pct4neg_y` parameter.
