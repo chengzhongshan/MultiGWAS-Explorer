@@ -2583,6 +2583,13 @@ target/top-hit CSV and uses that file as the authoritative region source for
 GTF extraction. It does not run the genome-wide common-association verifier for
 that request. This ordering prevents a one-locus request from scanning an
 unrelated large verifier table.
+An explicit `--target-snps rs2564978` local-GTF run writes a separate
+`*_SAS_local_top_hits_with_gtf_target_rs2564978.html` and PNG. A multi-target
+request receives a stable `*_targets_<digest>.html` index. These names keep
+the completed automatic top-hit HTML index intact. For one-shot SAS ODA
+downloads, the `Pipeline SAS connection lifecycle` block identifies the
+subprocess ID, action, result, closure reason, and next local validation step;
+normal closure after a download is not a plot failure.
 
 When two or more explicit target SNPs have overlapping SNP-centered windows on
 the same chromosome, the SAS local-GTF runner now merges them into one displayed

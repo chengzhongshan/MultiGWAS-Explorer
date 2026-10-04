@@ -16,8 +16,11 @@ die "Missing structured SAS connection lifecycle output\n"
         && $runner =~ /closure reason:/
         && $runner =~ /next step:/;
 
-my $close_calls = () = $runner =~ /_print_one_shot_connection_close\(session_obj, action, result, next_step\)/g;
-die "Expected lifecycle output in both one-shot cleanup paths\n" unless $close_calls == 2;
+my $handoffs = () = $runner =~ /payload\['connection_lifecycle'\]\s*=/g;
+die "Expected one-shot SAS submission and file-action lifecycle handoffs\n" unless $handoffs == 2;
+my $parent_reports = () = $runner =~ /_report_one_shot_connection_lifecycle\(\$result,/g;
+die "Expected both lifecycle handoffs to be reported by the parent Perl process\n"
+    unless $parent_reports == 2;
 
 die "Macro helper upload does not explain the expected follow-up connection\n"
     unless $runner =~ /connection_purpose => 'macro bootstrap helper upload\/reuse check'/

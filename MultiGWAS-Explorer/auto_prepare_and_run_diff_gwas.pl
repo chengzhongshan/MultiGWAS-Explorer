@@ -3404,6 +3404,22 @@ sub build_runner_config {
         $output_html_basename = append_variant_to_filename($output_html_basename,
             'order_' . join('_', @{$local_gtf_priority}));
     }
+    # Explicit target plots must never replace the completed top-hit index.
+    # Give a single target a readable name and a target set a stable digest.
+    my $requested_target_list = length($target_snps_override)
+        ? $target_snps_override : cfg_or($spec, 'target_snps', '');
+    my @requested_targets = grep { length } map { trim($_) }
+        split /,/, $requested_target_list;
+    if (@requested_targets) {
+        my $target_variant;
+        if (@requested_targets == 1) {
+            (my $safe_target = $requested_targets[0]) =~ s/[^A-Za-z0-9._-]/_/g;
+            $target_variant = 'target_' . $safe_target;
+        } else {
+            $target_variant = 'targets_' . substr(md5_hex(join("\0", @requested_targets)), 0, 12);
+        }
+        $output_html_basename = append_variant_to_filename($output_html_basename, $target_variant);
+    }
 
     my $forest_default_hit_class = $top_hit_mode eq 'common_association'
         ? 'COMMON'

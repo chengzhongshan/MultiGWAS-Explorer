@@ -307,6 +307,12 @@ Before running a workflow, identify:
    not proof that 5 Mb is a universal SAS ODA limit. For a single-locus check,
    use `--step plot_local_gtf` with `--target-snps rs145760339`,
    `--local-gtf-window-bp 1e6`, and `--no-gnuplot-fallback-on-sas-failure`.
+   Explicit target requests must have target-specific HTML/PNG names; never
+   overwrite the completed automatic top-hit index with a one-locus plot.
+   A one-shot bulk-download connection should print its subprocess ID, action,
+   result, closure reason, and next validation step on the same output stream
+   as SASPy's termination line. Normal connection closure after a completed
+   transfer does not indicate a SAS plot failure.
    When many genes overlap one local locus, keep the overall figure size fixed
    and instead let the pipeline slightly increase the lower gene-track share by
    auto-tuning the SAS `pct4neg_y` parameter.

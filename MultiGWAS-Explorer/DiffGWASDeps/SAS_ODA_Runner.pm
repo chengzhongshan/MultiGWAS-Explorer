@@ -419,11 +419,15 @@ def _submit_with_heartbeat(sess, sas_code, label="SAS ODA job"):
 def _env_truthy(value):
     return str(value or '').strip().lower() in ('1', 'true', 'yes', 'y', 'on')
 
+_LAST_SASPY_SUBPROCESS_ID = 'unknown'
+
 def get_session(session_obj):
+    global _LAST_SASPY_SUBPROCESS_ID
     if session_obj is None or not hasattr(session_obj, '_session'):
         session_obj = type('SessionWrapper', (), {})()
         session_obj._session = _open_sas_session()
         session_obj._macros_loaded = False
+        _LAST_SASPY_SUBPROCESS_ID = _saspy_subprocess_id(session_obj)
 
     return session_obj._session, session_obj
 
@@ -434,22 +438,6 @@ def _saspy_subprocess_id(session_obj):
     if hasattr(pid_obj, 'pid'):
         pid_obj = pid_obj.pid
     return str(pid_obj) if pid_obj not in (None, '') else 'unknown'
-
-def _print_one_shot_connection_close(session_obj, action, result, next_step=''):
-    if getattr(session_obj, '_session', None) is None:
-        return
-    lines = [
-        'Pipeline SAS connection lifecycle:',
-        f'  subprocess id: {_saspy_subprocess_id(session_obj)}',
-        '  mode: one-shot',
-        f'  action: {action}',
-        f'  result: {result}',
-        '  closure reason: this action is complete and no persistent session was requested.',
-    ]
-    if next_step:
-        lines.append(f'  next step: {next_step}')
-    sys.stderr.write('\n'.join(lines) + '\n')
-    sys.stderr.flush()
 
 def ensure_macros_loaded(session_obj):
     session, session_obj = get_session(session_obj)
@@ -2975,6 +2963,20 @@ sub _normalize_python_action_args {
     return \%normalized;
 }
 
+sub _report_one_shot_connection_lifecycle {
+    my ($result, $default_action) = @_;
+    return unless ref($result) eq 'HASH' && ref($result->{connection_lifecycle}) eq 'HASH';
+    my $life = $result->{connection_lifecycle};
+    print "Pipeline SAS connection lifecycle:\n";
+    print "  subprocess id: " . ($life->{subprocess_id} // 'unknown') . "\n";
+    print "  mode: " . ($life->{mode} // 'one-shot') . "\n";
+    print "  action: " . ($life->{action} // $default_action) . "\n";
+    print "  result: " . ($life->{result} // 'unknown') . "\n";
+    print "  closure reason: " . ($life->{closure_reason} // 'one-shot action completed') . "\n";
+    print "  next step: $life->{next_step}\n"
+        if defined($life->{next_step}) && length($life->{next_step});
+}
+
 sub _run_nonpersistent_sas_logic_via_python {
     my ($sas_code) = @_;
 
@@ -3007,7 +3009,6 @@ def _endsas_safely(session_obj, action, result, next_step=''):
     try:
         sess = getattr(session_obj, '_session', None)
         if sess is not None:
-            _print_one_shot_connection_close(session_obj, action, result, next_step)
             sess.endsas()
     except Exception as exc:
         sys.stderr.write(f'WARNING: SAS connection cleanup raised {type(exc).__name__}: {exc}\n')
@@ -3041,12 +3042,23 @@ if __name__ == '__main__':
         payload['error'] = f"{type(exc).__name__}: {exc}\n{traceback.format_exc()}"
     finally:
         close_result = 'success' if payload.get('status') == 'ok' else 'failure'
+        session = getattr(session_obj, '_session', None)
+        subprocess_id = _saspy_subprocess_id(session_obj) if session is not None else _LAST_SASPY_SUBPROCESS_ID
         _endsas_safely(
             session_obj,
             'SAS code submission (including macro bootstrap when required)',
             close_result,
             'No further SAS connection is expected for this one-shot run.',
         )
+        if subprocess_id != 'unknown':
+            payload['connection_lifecycle'] = {
+                'subprocess_id': subprocess_id,
+                'mode': 'one-shot',
+                'action': 'SAS code submission (including macro bootstrap when required)',
+                'result': close_result,
+                'closure_reason': 'this action is complete and no persistent session was requested.',
+                'next_step': 'No further SAS connection is expected for this one-shot run.',
+            }
         with open(result_path, 'w', encoding='utf-8') as fh:
             json.dump(payload, fh, ensure_ascii=False)
 END_NONPERSISTENT_PY
@@ -3091,6 +3103,8 @@ END_NONPERSISTENT_PY
     unlink $json_path if defined $json_path && -e $json_path;
     unlink $py_path   if defined $py_path   && -e $py_path;
 
+    _report_one_shot_connection_lifecycle($result, 'SAS code submission');
+
     if (($exit_code != 0 || $signal != 0) && (!ref($result) || ($result->{status} // '') ne 'ok')) {
         my $detail = $result->{error} // 'unknown inline SAS Python helper failure';
         $detail .= " (exit=$exit_code, signal=$signal)";
@@ -3124,7 +3138,6 @@ def _endsas_safely(session_obj, action, result, next_step=''):
     try:
         sess = getattr(session_obj, '_session', None)
         if sess is not None:
-            _print_one_shot_connection_close(session_obj, action, result, next_step)
             sess.endsas()
     except Exception as exc:
         sys.stderr.write(f'WARNING: SAS connection cleanup raised {type(exc).__name__}: {exc}\n')
@@ -3228,7 +3241,18 @@ if __name__ == '__main__':
         close_result = 'success' if payload.get('status') == 'ok' else 'failure'
         action_label = str(action_args.get('connection_purpose') or action.replace('_', ' '))
         next_step = str(action_args.get('connection_next_step') or '')
+        session = getattr(session_obj, '_session', None)
+        subprocess_id = _saspy_subprocess_id(session_obj) if session is not None else _LAST_SASPY_SUBPROCESS_ID
         _endsas_safely(session_obj, action_label, close_result, next_step)
+        if subprocess_id != 'unknown':
+            payload['connection_lifecycle'] = {
+                'subprocess_id': subprocess_id,
+                'mode': 'one-shot',
+                'action': action_label,
+                'result': close_result,
+                'closure_reason': 'this action is complete and no persistent session was requested.',
+                'next_step': next_step,
+            }
         with open(result_path, 'w', encoding='utf-8') as fh:
             json.dump(payload, fh, ensure_ascii=False)
 END_NONPERSISTENT_ACTION_PY
@@ -3272,6 +3296,8 @@ END_NONPERSISTENT_ACTION_PY
     unlink $args_path if defined $args_path && -e $args_path;
     unlink $json_path if defined $json_path && -e $json_path;
     unlink $py_path   if defined $py_path   && -e $py_path;
+
+    _report_one_shot_connection_lifecycle($result, $action);
 
     if (($exit_code != 0 || $signal != 0) && (!ref($result) || ($result->{status} // '') ne 'ok')) {
         my $detail = $result->{error} // 'unknown nonpersistent Python action failure';

@@ -3379,6 +3379,8 @@ if (@download_files) {
                 uploads => [],
                 downloads => \@items,
                 archive_transfers => $archive_transfers ? 1 : 0,
+                connection_purpose => 'bulk download of SAS ODA result files',
+                connection_next_step => 'validate the downloaded local files; no persistent SAS session remains',
             });
         },
     );
