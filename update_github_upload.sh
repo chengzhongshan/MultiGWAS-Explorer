@@ -10,8 +10,9 @@ usage() {
 Usage: bash update_github_upload.sh [--dry-run] [--pull-only] ["commit message"]
 
 Fetches GitHub updates, commits eligible local source/documentation edits,
-merges remote changes, and pushes the combined history. Run with no local
-edits to download updates from another computer. Never force-pushes.
+merges remote changes (including divergent histories), and pushes the combined
+history. Run with no local edits to download updates from another computer.
+Never force-pushes.
 --pull-only downloads/merges updates without committing or pushing local edits.
 --dry-run previews using the last fetched remote state; it does not contact
 GitHub or change your files, branches, or real Git index.
@@ -130,7 +131,7 @@ integrate_remote_changes() {
     saved_oid="$(git rev-parse refs/stash)"
     echo "Saved local tracked edits in stash $saved_oid."
   fi
-  if ! git -c merge.autoStash=false merge --ff --no-edit "$remote_ref"; then
+  if ! git -c merge.autoStash=false merge --no-edit "$remote_ref"; then
     echo 'Synchronization stopped before pushing. Git could not merge the remote changes.' >&2
     if git rev-parse --verify -q MERGE_HEAD >/dev/null; then
       echo "Review 'git status', resolve conflicts, and run 'git add <resolved files>' followed by 'git commit'." >&2
