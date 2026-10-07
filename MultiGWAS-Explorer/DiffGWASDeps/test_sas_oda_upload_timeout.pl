@@ -10,6 +10,16 @@ my @wrappers = qw(
   run_sas_oda_local_top_hits_manhattan_download_png.sh
   run_sas_oda_local_top_hits_with_gtf_download_html.sh
 );
+my @bash_candidates = grep { defined($_) && length($_) } (
+    $ENV{BASH},
+    '/bin/bash',
+    '/usr/bin/bash',
+    ($^O eq 'MSWin32' && $ENV{ProgramFiles}
+        ? File::Spec->catfile($ENV{ProgramFiles}, 'Git', 'bin', 'bash.exe')
+        : ()),
+);
+my ($bash) = grep { -f $_ } @bash_candidates;
+$bash //= 'bash';
 my $tmp = tempdir('sas_oda_upload_timeout_XXXXXX', TMPDIR => 1, CLEANUP => 1);
 my $data = File::Spec->catfile($tmp, 'large subset.tsv.gz');
 open my $data_fh, '>', $data or die "Cannot create $data: $!\n";
@@ -45,7 +55,7 @@ ODA_DATA_UPLOAD_TIMEOUT_SECONDS=900
 test "\$(oda_upload_timeout_for_file "\$1")" = 900
 SHELL
     close $out or die "Cannot close $test_script: $!\n";
-    is(system('/usr/bin/bash', $test_script, $data), 0,
+    is(system($bash, $test_script, $data), 0,
         "$wrapper gives the 118 MB upload enough time and honors an explicit override");
 }
 
