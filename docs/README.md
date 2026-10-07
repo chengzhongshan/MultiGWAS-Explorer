@@ -9,9 +9,9 @@ gene-track plots, and forest plots.
 For the full project guide, advanced troubleshooting, and validation notes,
 see [MultiGWAS-Explorer/README.md](../MultiGWAS-Explorer/README.md).
 
-## Reviewer-driven scientific revision
+## GWAS QC
 
-The 2026 reviewer revision adds conservative allele harmonization, raw-P-value
+The GWAS QC adds conservative allele harmonization, raw-P-value
 inference, MAF-aware lead filtering, and greedy HaploReg LD clumping as the
 default top-hit method. Physical distance is retained only as an explicit
 legacy method or a labeled fallback when an LD query is unresolved. The
