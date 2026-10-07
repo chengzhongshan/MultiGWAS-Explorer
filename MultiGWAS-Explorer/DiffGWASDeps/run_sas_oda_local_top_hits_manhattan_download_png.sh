@@ -373,6 +373,37 @@ run_oda_helper_with_timeout() {
   "${ODA_PERL[@]}" "$@"
 }
 
+oda_upload_timeout_for_file() {
+  local local_path="$1"
+  local configured_timeout="${ODA_DATA_UPLOAD_TIMEOUT_SECONDS:-0}"
+  local base_seconds="${ODA_UPLOAD_TIMEOUT_BASE_SECONDS:-300}"
+  local per_mb_seconds="${ODA_UPLOAD_TIMEOUT_SECONDS_PER_MB:-10}"
+  local size_bytes size_mb computed_timeout
+  if [[ "${configured_timeout}" =~ ^[0-9]+$ && "${configured_timeout}" -gt 0 ]]; then
+    printf '%s\n' "${configured_timeout}"
+    return 0
+  fi
+  [[ "${base_seconds}" =~ ^[0-9]+$ ]] || base_seconds=300
+  [[ "${per_mb_seconds}" =~ ^[0-9]+$ ]] || per_mb_seconds=10
+  size_bytes="$(wc -c < "${local_path}" | tr -d '[:space:]')"
+  [[ "${size_bytes}" =~ ^[0-9]+$ ]] || size_bytes=0
+  size_mb=$(( (size_bytes + 1048575) / 1048576 ))
+  computed_timeout=$(( base_seconds + size_mb * per_mb_seconds ))
+  if (( computed_timeout < ODA_HELPER_TIMEOUT_SECONDS )); then
+    computed_timeout="${ODA_HELPER_TIMEOUT_SECONDS}"
+  fi
+  printf '%s\n' "${computed_timeout}"
+}
+
+run_oda_upload_helper() {
+  local local_path="$1"
+  shift
+  local upload_timeout
+  upload_timeout="$(oda_upload_timeout_for_file "${local_path}")"
+  echo "[upload] Allowing up to ${upload_timeout}s for $(basename "${local_path}") based on its byte size."
+  run_oda_helper_with_timeout "${upload_timeout}" "${ODA_HELPER_TIMEOUT_GRACE_SECONDS}" "$@"
+}
+
 oda_upload_many() {
   local output_prefix="$1"
   shift
@@ -587,7 +618,9 @@ upload_data_with_integrity_check() {
 
   upload_attempt=1
   while [[ "${upload_attempt}" -le "${max_upload_attempts}" ]]; do
-    run_oda_helper --upload-file "${DATA_GZ}" --output-prefix "upload_local_hits_subset_${stamp}_try${upload_attempt}"
+    run_oda_upload_helper "${DATA_GZ}" \
+      --upload-file "${DATA_GZ}" \
+      --output-prefix "upload_local_hits_subset_${stamp}_try${upload_attempt}"
 
     verify_attempt=1
     while [[ "${verify_attempt}" -le "${max_verify_attempts}" ]]; do

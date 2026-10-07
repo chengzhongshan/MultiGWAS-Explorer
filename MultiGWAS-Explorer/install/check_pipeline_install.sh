@@ -102,6 +102,7 @@ perl -I DiffGWASDeps -MSAS_ODA_Runner -e "print qq{SAS_ODA_Runner ok\n};"
 perl -MIO::Socket::SSL -MNet::SSLeay -MHTTP::Tiny -e 'my ($ok, $why) = HTTP::Tiny->can_ssl; die "Perl HTTPS unavailable: $why\n" unless $ok; print "Perl HTTPS support ok\n";'
 perl DiffGWASDeps/test_sas_oda_debug_macro_guard.pl >/dev/null
 perl DiffGWASDeps/test_sas_oda_connection_lifecycle.pl >/dev/null
+perl DiffGWASDeps/test_sas_oda_upload_timeout.pl >/dev/null
 perl -I DiffGWASDeps -c auto_prepare_and_run_diff_gwas.pl >/dev/null
 perl -c auto_prepare_and_run_diff_gwas_with_gnuplot.pl >/dev/null
 perl -I DiffGWASDeps -c server.pl >/dev/null

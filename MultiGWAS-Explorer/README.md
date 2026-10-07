@@ -2809,6 +2809,12 @@ Shared wrapper controls:
 
 - `ODA_HELPER_TIMEOUT_SECONDS`
 - `ODA_HELPER_TIMEOUT_GRACE_SECONDS`
+- `ODA_DATA_UPLOAD_TIMEOUT_SECONDS` overrides the timeout for a large GWAS
+  upload. When it is unset, the local Manhattan and local-GTF wrappers compute
+  a size-aware timeout as `ODA_UPLOAD_TIMEOUT_BASE_SECONDS` (default 300)
+  plus `ODA_UPLOAD_TIMEOUT_SECONDS_PER_MB` (default 10) for every MiB. This
+  prevents the Cygwin 300-second metadata timeout from terminating a healthy
+  large SAS ODA upload near completion.
 
 Stage-specific submit controls:
 
