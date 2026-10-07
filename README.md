@@ -12,7 +12,7 @@ with Perl scripts for preprocessing and workflow automation.
 - Compare sex-, population-, or dataset-stratified GWAS summary statistics.
 - Prepare coordinate-sorted, indexed tables and pairwise differential effects.
 - Plot common-association signals, differential signals, or selected inquiry SNPs.
-- Run from the command line or through the Perl MCP interface.
+- Run from the command line or through the Perl MCP interface with different AI agents.
 
 ## Install
 
@@ -29,37 +29,6 @@ It includes prerequisites, commands, container setup, SAS configuration, and
 troubleshooting links. Installation commands run from the inner pipeline
 directory shown above.
 
-## Synchronize your local copy and GitHub repository
-
-From the outer clone directory (the one containing `.git`), download updates
-made on another computer:
-
-```bash
-./update_github_upload.sh --pull-only
-```
-
-To download updates and upload your local source changes:
-
-```bash
-./update_github_upload.sh --dry-run
-./update_github_upload.sh "Describe the pipeline change"
-```
-
-The script stages tracked edits and new source or documentation files. It
-excludes SAS ODA and gnuplot run results, even if they were staged earlier;
-the local files remain available. The preview does not change the Git index
-or contact GitHub; its remote comparison uses the last fetched state. A normal
-run fetches GitHub even when there are no new local edits. It commits eligible
-local edits, fast-forwards or merges updates from other computers, and pushes
-the combined history without force-pushing. `--pull-only` does not commit or
-push your local edits. Existing local commits are preserved in both modes.
-
-When a merge requires a clean working tree, tracked edits are temporarily
-saved in a Git stash and restored afterward, including their staging state.
-Large untracked or ignored GWAS inputs and run files stay on disk. If changes
-conflict, the script stops before pushing, retains any saved edits, and prints
-recovery instructions. Resolve the conflicts, then rerun the script.
-
 ## Try a local example
 
 After installing:
@@ -71,41 +40,6 @@ bash install/run_plotting_example.sh
 
 Open `example-output/example.png`. This synthetic example needs no GWAS
 download or SAS account.
-
-## SAS ODA local-GTF plots and large windows
-
-The SAS ODA local-GTF path renders through one HTML5 destination at 150 DPI by
-default. It skips the standalone `%OpenSVG_Printer` destination, which previously made
-a second 300-DPI bitmap. The runner extracts the PNG embedded in the SAS HTML
-and saves a separate PNG plus a compact HTML page. This avoids a duplicate
-render while retaining every SNP in the selected local window. The `P < 0.05`
-subset rule applies to genome-wide Manhattan plots, not local-GTF plots.
-
-If SAS ODA ends with `No SAS process attached`, inspect the run's
-`output.run.status.json` and `output.html.info.txt` before rerunning. A remote
-session termination without a SAS log does not establish whether Java memory,
-SAS `WORK`, or the ODA service caused it. Use the smallest local half-window
-that contains the requested locus; for example, from the inner pipeline
-directory:
-
-```bash
-perl auto_prepare_and_run_diff_gwas.pl \
-  --spec configs/your_spec.json --step plot_local_gtf \
-  --target-snps rs12028518 --local-gtf-window-bp 2650000 --force
-```
-
-For the AOA `rs12028518` example, half-windows of 1–5 Mb, including 4.5 Mb,
-completed in SAS ODA. One 10 Mb attempt (69,807 variants) lost its remote
-session without a diagnostic SAS log; the pipeline produced its full-window
-gnuplot fallback. New specs default the local-GTF half-window to 5 Mb. Above
-5 Mb the pipeline warns about possible failure. SAS ODA
-helper exit 73 means explicit space exhaustion; helper exit 74 means remote
-session termination without a confirmed server-side cause. See the
-[local-GTF troubleshooting details](MultiGWAS-Explorer/README.md#sas-oda-local-gtf-rendering-and-session-loss).
-
-Successful SAS ODA plot runs now remove their timestamped local helper folders
-after saving the final plot. Set `KEEP_LOCAL_ODA_ARTIFACTS=1` to keep those logs
-for a successful debugging run; failed-run logs remain available.
 
 ## Test with public GWAS data
 
