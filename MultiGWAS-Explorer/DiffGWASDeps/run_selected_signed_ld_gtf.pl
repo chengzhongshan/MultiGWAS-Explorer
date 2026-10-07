@@ -34,6 +34,8 @@ die "Missing SAS runner: $opt{single_runner}\n" unless -f $opt{single_runner};
 my @targets;
 my %seen;
 my %target_location;
+my %target_p;
+my $explicit_targets = length($opt{target_snps} // '') ? 1 : 0;
 if (length($opt{targets_csv} // '')) {
     open my $fh, '<', $opt{targets_csv} or die "Open $opt{targets_csv}: $!\n";
     my $header = <$fh> // die "Empty selected-hit CSV: $opt{targets_csv}\n";
@@ -42,6 +44,9 @@ if (length($opt{targets_csv} // '')) {
     my $sep = index($header, "\t") >= 0 ? "\t" : ',';
     my @header = split /\Q$sep\E/, $header, -1;
     my %idx = map { $header[$_] => $_ } 0 .. $#header;
+    my %idx_lc = map { lc($header[$_]) => $_ } 0 .. $#header;
+    my ($p_column) = grep { exists $idx_lc{$_} }
+        qw(common_assoc_p focus_signal p top_p min_p p_value);
     die "Selected-hit CSV needs SNP, CHR, and BP columns\n"
         unless exists $idx{SNP} && exists $idx{CHR} && exists $idx{BP};
     while (my $line = <$fh>) {
@@ -51,16 +56,25 @@ if (length($opt{targets_csv} // '')) {
         my @fields = split /\Q$sep\E/, $line, -1;
         my $snp = $fields[$idx{SNP}] // '';
         $snp =~ s/^"|"$//g;
-        add_target($snp, $fields[$idx{CHR}], $fields[$idx{BP}]);
+        add_target($snp, $fields[$idx{CHR}], $fields[$idx{BP}],
+            defined($p_column) ? $fields[$idx_lc{$p_column}] : undef);
     }
     close $fh;
 } else {
     add_target($_) for split /,/, $opt{target_snps};
 }
 sub add_target {
-    my ($snp, $chr, $bp) = @_;
+    my ($snp, $chr, $bp, $p) = @_;
     $snp =~ s/^\s+|\s+$//g;
     die "Unsafe selected SNP: $snp\n" unless $snp =~ /^[A-Za-z0-9_.:-]+$/;
+    if (defined $p) {
+        $p =~ s/^"|"$//g;
+        if ($p =~ /^\s*(?:\d+(?:\.\d*)?|\.\d+)(?:[Ee][+-]?\d+)?\s*$/
+            && $p >= 0 && $p <= 1) {
+            $target_p{lc $snp} = 0 + $p
+                if !exists($target_p{lc $snp}) || $p < $target_p{lc $snp};
+        }
+    }
     return if $seen{lc $snp}++;
     push @targets, $snp;
     if (defined($chr) && defined($bp) && $bp =~ /^\d+(?:\.\d+)?$/) {
@@ -95,13 +109,18 @@ resolve_target_locations_from_prior_plot_csvs($opt{output_html}, \@targets, \%ta
 resolve_target_locations_from_ld_caches($runner_config, \@targets, \%target_location);
 resolve_missing_target_locations($runner_config, \@targets, \%target_location);
 write_target_location_cache($coordinate_cache, \@targets, \%target_location);
-my @loci = build_overlapping_loci(\@targets, \%target_location, $opt{window_bp});
+my $requested_ld_reference = $explicit_targets
+    ? ($runner_config->{GTF_LD_REFERENCE_SNP} || $runner_config->{LOCAL_LD_REFERENCE_SNP} || '') : '';
+my @loci = build_overlapping_loci(\@targets, \%target_location,
+    $opt{window_bp}, \%target_p, $explicit_targets, $requested_ld_reference);
 my @locus_ids = map { $_->{id} } @loci;
 my %locus_by_id = map { $_->{id} => $_ } @loci;
 my $merged_target_count = scalar(@targets) - scalar(@loci);
 print "[signed-LD] Grouped " . scalar(@targets) . " target SNP(s) into "
     . scalar(@loci) . " non-overlapping genomic locus/loci using a +/-$opt{window_bp}-bp window.\n";
-print "[signed-LD] Merged $merged_target_count nearby target SNP(s), retaining every requested SNP as a plot label.\n"
+print "[signed-LD] Merged $merged_target_count nearby target SNP(s), "
+    . ($explicit_targets ? 'retaining every requested SNP as a plot label.'
+                         : 'labeling only the smallest-P lead in each region.') . "\n"
     if $merged_target_count;
 my %render_config = map { $_ => $runner_config->{$_} }
     grep { $_ ne 'GTF_LD_R2_CACHE_BY_SNP'
@@ -132,7 +151,7 @@ my %plot_source_hashes = map {
     $_ => $digest;
 } @plot_sources;
 my $render_request = JSON::PP->new->canonical(1)->encode({
-    version => 3, config => \%render_config,
+    version => 4, config => \%render_config,
     data => file_signature($runner_config->{DATA_GZ}),
     source_long => file_signature($runner_config->{SOURCE_LONG_GZ}),
     plot_sources => \%plot_source_hashes,
@@ -154,7 +173,7 @@ my %status_write_warning;
 write_progress();
 for my $locus (@loci) {
     my $snp = $locus->{reference};
-    my @label_snps = @{ $locus->{targets} };
+    my @label_snps = $explicit_targets ? @{ $locus->{targets} } : ($snp);
     my $label_text = join(',', @label_snps);
     my $plot_window_bp = $locus->{plot_window_bp};
     my $locus_id = $locus->{id};
@@ -195,6 +214,10 @@ for my $locus (@loci) {
     $ENV{SINGLE_SNP_ALLOW_GENERIC_OUTPUT_BASENAME} = 1;
     $ENV{SINGLE_SNP_TOP_HITS_CSV_BASENAME} = $target_csv;
     $ENV{GTF_LABEL_SNPS} = $label_text;
+    if ($explicit_targets && @label_snps > 1
+        && lc($runner_config->{GTF_LABEL_LAYOUT} || 'auto') eq 'auto') {
+        $ENV{GTF_LABEL_LAYOUT} = 'vertical';
+    }
     $ENV{GTF_LD_DISPLAY_MODE} = lc $opt{mode};
     $ENV{GTF_LD_R2_CACHE} = $ld_cache;
     $ENV{GTF_LD_REFERENCE_SNP} = $snp;
@@ -398,7 +421,7 @@ sub local_path {
 }
 
 sub build_overlapping_loci {
-    my ($targets, $locations, $window_text) = @_;
+    my ($targets, $locations, $window_text, $pvalues, $explicit, $reference_override) = @_;
     my $window = 0 + $window_text;
     die "--window-bp must be a positive number\n" unless $window > 0;
     my %input_order = map { lc($targets->[$_]) => $_ } 0 .. $#$targets;
@@ -429,6 +452,19 @@ sub build_overlapping_loci {
     for my $group (@groups) {
         my @members = sort { $a->{input_order} <=> $b->{input_order} } @{ $group->{members} };
         my $reference = $members[0];
+        if ($explicit && length($reference_override // '')) {
+            my ($matching_reference) = grep {
+                lc($_->{snp}) eq lc($reference_override)
+            } @members;
+            $reference = $matching_reference if $matching_reference;
+        } elsif (!$explicit) {
+            ($reference) = sort {
+                (exists($pvalues->{lc $a->{snp}}) ? 0 : 1)
+                    <=> (exists($pvalues->{lc $b->{snp}}) ? 0 : 1)
+                || ($pvalues->{lc $a->{snp}} // 1) <=> ($pvalues->{lc $b->{snp}} // 1)
+                || $a->{input_order} <=> $b->{input_order}
+            } @members;
+        }
         my $plot_window = $window;
         if (defined $reference->{bp}) {
             for my $member (@members) {

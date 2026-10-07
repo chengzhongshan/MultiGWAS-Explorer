@@ -1437,6 +1437,10 @@ run;
    select &fc2distant_close_labels*0.1*(&max_x-&min_x+1)/count(*) into: sep4tgt_pos
    from _xtag_;
    %spaceAdjust(data=&_tgt_pos_, out=_xtag1_, goal=COL:, sep=&sep4tgt_pos, newvar4adjnum=newpos); 
+   /* _xtag1_ follows genomic-position order, so align rows before merging. */
+   proc sort data=_xtag_;
+   by pos;
+   run;
    data _xtag_;
    merge _xtag_(drop=newpos) _xtag1_(keep=newpos);
    run;
@@ -1491,12 +1495,16 @@ run;
    from _xtag_;
    select count(*) into: n_marker_labels trimmed
    from _xtag_;
+   select max(lengthn(strip(&var4label_scatterplot_dots)))
+     into: _max_marker_label_chars trimmed
+   from _xtag_;
    
    %put Your marker positions are as follows:;
    %put &markers_pos;
    %put Total marker labels requested on the top are: &n_marker_labels;
 
 %if %sysevalf(%superq(n_marker_labels)=,boolean) %then %let n_marker_labels=0;
+%if %sysevalf(%superq(_max_marker_label_chars)=,boolean) %then %let _max_marker_label_chars=0;
    %let _scatter_track_count=&totsc;
    %if %sysevalf(%superq(_scatter_track_count)=,boolean) %then %let _scatter_track_count=1;
    %if %sysevalf(&_scatter_track_count<1) %then %let _scatter_track_count=1;
@@ -1586,6 +1594,17 @@ run;
    %else %if %sysevalf(&_auto_yaxis_offset4max>&yaxis_offset4max) %then %do;
       %put NOTE: Auto-increasing yaxis_offset4max from &yaxis_offset4max to &_auto_yaxis_offset4max with scale-aware top-label headroom (visible frac=&_desired_visible_top_frac).;
       %let yaxis_offset4max=&_auto_yaxis_offset4max;
+   %end;
+
+   /* Fit vertical labels to the longest requested marker. Font size is in
+      points while track_height is a layout dimension; raster DPI must not
+      change the fraction of the plot reserved for a label. */
+   %if (&text_rotate_angle>=60 and &n_marker_labels>=1) %then %do;
+      %let _vertical_label_frac=%sysevalf(((&_max_marker_label_chars*0.62+1)*&effective_font_size4textlabels*96/72+2*&effective_yoffset4textlabels+8)/(&track_height*0.75));
+      %if %sysevalf(&_vertical_label_frac<0.04) %then %let _vertical_label_frac=0.04;
+      %if %sysevalf(&_vertical_label_frac>0.45) %then %let _vertical_label_frac=0.45;
+      %let yaxis_offset4max=&_vertical_label_frac;
+      %put NOTE: Vertical SNP-label headroom fitted to &_max_marker_label_chars characters: offsetmax=&yaxis_offset4max.;
    %end;
 
    %put NOTE: Effective top-label settings: rotate=&text_rotate_angle font_size=&effective_font_size4textlabels yoffset=&effective_yoffset4textlabels yaxis_offset4max=&yaxis_offset4max avg_signal_span_per_track=&_avg_signal_span_per_track fc2distant_close_labels=&fc2distant_close_labels pct2adj4dencluster=&pct2adj4dencluster make_even_pos=&make_even_pos.;

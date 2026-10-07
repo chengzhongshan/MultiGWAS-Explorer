@@ -23,6 +23,7 @@ set -euo pipefail
 [[ "${GTF_LD_DISPLAY_MODE}" == "heatmap" ]]
 [[ "${GTF_LD_REFERENCE_SNP}" == "${TARGET_SNP}" ]]
 printf '%s\t%s\t%s\t%s\n' "${TARGET_SNP}" "${LOCAL_WINDOW_BP}" "${GTF_LD_HEATMAP_LEGEND_TITLE}" "${GTF_LABEL_SNPS}" >> "${WORKDIR}/calls.tsv"
+printf '%s\t%s\n' "${TARGET_SNP}" "${GTF_LABEL_LAYOUT:-auto}" >> "${WORKDIR}/layout_calls.tsv"
 printf '%s\t%s\n' "${TARGET_SNP}" "${GTF_LD_R2_CACHE}" >> "${WORKDIR}/cache_calls.tsv"
 printf '<html><img src="%s.png"></html>\n' "${TARGET_SNP}" > "${WORKDIR}/${OUTPUT_HTML_BASENAME}"
 printf 'PNG:%s\n' "${TARGET_SNP}" > "${WORKDIR}/${OUTPUT_HTML_BASENAME%.html}.png"
@@ -105,6 +106,48 @@ like($calls[-1], qr/^rsNearA\t200000\t.*\trsNearA,rsNearB\s*$/,
     'merged locus uses the first lead as LD reference, expands its window, and labels both SNPs');
 ok(-s $nearby_html, 'merged locus keeps the requested final HTML name');
 ok(!-e "$dir/nearby_rsNearB.html", 'no redundant second local-GTF plot is created');
+
+my $auto_nearby_csv = "$dir/auto_nearby.tsv";
+open $fh, '>', $auto_nearby_csv or die $!;
+print {$fh} "SNP\tCHR\tBP\tcommon_assoc_p\n";
+print {$fh} "rsNearA\t6\t27500000\t1e-6\n";
+print {$fh} "rsNearB\t6\t27600000\t1e-10\n";
+close $fh;
+open $calls_fh, '<', "$dir/calls.tsv" or die $!;
+@calls = <$calls_fh>;
+close $calls_fh;
+$calls_before = scalar @calls;
+is(system($^X, $dispatcher, '--targets-csv', $auto_nearby_csv,
+    '--runner-config', $config, '--output-html', "$dir/auto_nearby.html",
+    '--single-runner', $runner, '--window-bp', 100000), 0,
+    'automatic overlapping leads share one plot');
+open $calls_fh, '<', "$dir/calls.tsv" or die $!;
+@calls = <$calls_fh>;
+close $calls_fh;
+is(scalar(@calls), $calls_before + 1, 'automatic region is rendered once');
+like($calls[-1], qr/^rsNearB\t200000\t.*\trsNearB\s*$/,
+    'automatic region labels and uses only its smallest-P lead');
+
+open $calls_fh, '<', "$dir/layout_calls.tsv" or die $!;
+my @layout_calls = <$calls_fh>;
+close $calls_fh;
+like($layout_calls[-2], qr/^rsNearA\tvertical\s*$/,
+    'explicit nearby targets default to vertical labels');
+like($layout_calls[-1], qr/^rsNearB\tauto\s*$/,
+    'automatic single-lead label retains automatic layout');
+
+open $cfg, '>', $config or die $!;
+print {$cfg} encode_json({ DATA_GZ => $wide, GTF_LD_REFERENCE_SNP => 'rsNearB' }), "\n";
+close $cfg;
+is(system($^X, $dispatcher, '--target-snps', 'rsNearA,rsNearB',
+    '--runner-config', $config, '--output-html', "$dir/nearby_override.html",
+    '--single-runner', $runner, '--window-bp', 100000), 0,
+    'explicit LD lead override is accepted');
+open $calls_fh, '<', "$dir/calls.tsv" or die $!;
+@calls = <$calls_fh>;
+close $calls_fh;
+like($calls[-1], qr/^rsNearB\t200000\t.*\trsNearA,rsNearB\s*$/,
+    'explicit LD lead override changes the reference but keeps all labels');
 
 my $prior_html = "$dir/prior.html";
 for my $prior ([rsPriorA => 21, 42841988], [rsPriorB => 21, 42858367]) {

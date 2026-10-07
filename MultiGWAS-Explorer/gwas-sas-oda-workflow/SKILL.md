@@ -277,6 +277,16 @@ Before running a workflow, identify:
    SNPs on both sides of the lead; a zero exit code alone is insufficient.
    A fix to the genomic selection or plotting macro changes the scientific
    request checksum, so previously completed plots may need regeneration.
+   In signed-LD local GTF plots, distinguish automatically selected top hits
+   from explicit `--target-snps`. When selected lead windows overlap, use the
+   lead with the smallest available association P as the region's sole label
+   and LD reference. For explicit targets, label every target in the shared
+   region, default to the first input target as the LD reference, and honor an
+   explicit `--local-ld-reference-snp` override. Use vertical labels with
+   genomic-position spacing for multiple explicit targets. Fit the top
+   headroom to the longest vertical label and the plot design height; raster
+   DPI must not inflate the layout headroom. Keep the adjusted label positions
+   paired with the genomic positions when merging SAS datasets.
    In this project, `--local-gtf-window-bp` now controls both the extracted GTF
    half-window and the displayed local GTF plot half-window.
    Default that half-window to 1 Mb for newly generated runs and direct
@@ -378,9 +388,10 @@ Before running a workflow, identify:
    `GTF_LABEL_SNPS` can supply additional comma-separated rsIDs to label inside
    that same locus. Prefer this path when several inquiry SNPs fall in one
    shared window and you want one centered local-GTF figure instead of one
-   locus per target. When the label list contains three or fewer rsIDs, the
-   default `auto_rotate2zero=1` path now keeps those top labels horizontal in
-   the local-GTF headroom.
+   locus per target. The older batched macro can use `auto_rotate2zero=1` to
+   keep up to three labels horizontal. The single-SNP signed-LD runner uses
+   vertical spacing for multiple explicit targets and disables that rotation
+   override so nearby rsIDs remain distinct.
    The single-SNP extractor manifest now also reports whether the target row
    survived and which prefix blocks were present or missing. Use that manifest
    before blaming a sparse locus: a target row can still be valid for local GTF

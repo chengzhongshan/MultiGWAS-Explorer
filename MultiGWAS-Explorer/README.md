@@ -2931,10 +2931,10 @@ The higher-level automation wrapper still supports the batched local-GTF path
 through `--target-snps rs123` plus
 `--local-gtf-label-snps rs123,rs456,rs789`.
 
-When `GTF_LABEL_SNPS` contains three or fewer rsIDs, the local GTF top labels
-are now kept horizontal within the top headroom by the default
-`auto_rotate2zero=1` path. Larger label sets still fall back to the rotated
-layout to avoid crowding.
+The older batched GTF macro can keep three or fewer labels horizontal with
+`auto_rotate2zero=1`. The single-SNP signed-LD runner instead uses vertical
+labels for multiple explicit targets, even when there are only two or three,
+to keep nearby rsIDs separate.
 
 The direct single-SNP extractor now also records target-row diagnostics in the
 emitted manifest, including whether the target row survived and which prefix
@@ -3080,8 +3080,9 @@ Important caveats:
 
 - `Yoffset4textlabels` is also auto-tuned internally, so in very small label
   sets manual changes may appear weaker than expected.
-- with `auto_rotate2zero=1`, one to three top SNP labels now stay horizontal in
-  the reserved headroom; four or more labels still use the rotated layout.
+- with `auto_rotate2zero=1` in the older batched macro, one to three top SNP
+  labels stay horizontal; the single-SNP signed-LD runner uses `0` so its
+  chosen vertical layout is preserved.
 - if one to three top SNP labels still do not sit in the middle of the
   headroom, the lower-level fallback is to edit the small-label branch inside
   `Lattice_gscatter_over_bed_track.sas` near the `1000/&track_height` ratio
@@ -3144,8 +3145,14 @@ then clear the reference name. A value in that union no longer answers the
 question "LD to which variant?" and can silently change the scientific meaning
 of the color scale. The SAS automation therefore runs the single-target GTF
 runner once per non-overlapping locus when heatmap mode and direct PLINK2 LD
-are used. Nearby targets are labels in the same plot; the first lead is the
-sole LD reference for that merged locus. Separate loci retain their own LD
+are used. For an explicit `--target-snps` request, nearby targets are all
+labeled in the same plot, with vertical labels spaced by genomic position.
+The first input target is the LD reference unless `--local-ld-reference-snp`
+names another target in that locus. The top headroom scales with the longest
+vertical label, so short rsIDs do not reserve excess space. For automatically
+selected genomewide top hits, a merged region labels only its lead with the
+smallest available association P value; that lead is also its LD reference.
+Separate loci retain their own LD
 cache, reference label, signed colorbar, and adjacent gene track.
 
 This command is the real-data regression check for the overlapping

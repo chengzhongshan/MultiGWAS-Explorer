@@ -17,6 +17,8 @@ This script draws a local Manhattan plot with gene tracks for a single target SN
 %let local_window_bp=__LOCAL_WINDOW_BP__;
 %let reference_chromosome_lengths=__REFERENCE_CHROMOSOME_LENGTHS__;
 %let gtf_label_snps=__GTF_LABEL_SNPS__;
+%let gtf_label_text_rotate_angle=__GTF_LABEL_TEXT_ROTATE_ANGLE__;
+%let gtf_ld_reference_snp=__GTF_LD_REFERENCE_SNP__;
 %let gtf_ld_snps=__GTF_LD_SNPS__;
 %let gtf_ld_display_mode=__GTF_LD_DISPLAY_MODE__;
 %let gtf_ld_r2_values=__GTF_LD_R2_VALUES__;
@@ -285,6 +287,9 @@ quit;
   makedotheatmap=1,
   makeheatmapdotintooneline=0,
   SNPs2label_scatterplot_dots=&gtf_label_snps,
+  text_rotate_angle=&gtf_label_text_rotate_angle,
+  auto_rotate2zero=0,
+  LD_reference_snp=&gtf_ld_reference_snp,
   LD_SNPs2mark_scatterplot_dots=&gtf_ld_snps,
   LD_display_mode=&gtf_ld_display_mode,
   LD_r2_values=&gtf_ld_r2_values,
