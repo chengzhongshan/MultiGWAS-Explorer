@@ -1716,6 +1716,13 @@ perl auto_prepare_and_run_diff_gwas.pl \
   --step plot_local_gtf
 ```
 
+For a plot-only rerun, the generated `*.merged_plotwide.manifest.tsv` is
+optional when the existing `*.merged_plotwide.tsv.gz` is present and its header
+contains the required GWAS columns. The pipeline warns and uses that verified
+header, avoiding a full wide-table conversion just to replace a removed
+manifest. Rerun `--step extract_wide_subset` only when the wide table itself
+needs rebuilding; that step recreates both files.
+
 ## SAS ODA Wrapper Utilities
 
 The low-level SAS ODA helper:

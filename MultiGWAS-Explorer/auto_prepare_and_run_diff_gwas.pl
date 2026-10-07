@@ -3791,12 +3791,19 @@ sub resolve_oda_helper_unix {
 
 sub validate_generated_files {
     my ($generated, $pair_info) = @_;
-    for my $path ($generated->{wide_output}, $generated->{wide_manifest}, $generated->{runner_config}, $generated->{preset_config}) {
+    for my $path ($generated->{wide_output}, $generated->{runner_config}, $generated->{preset_config}) {
         die "Expected generated file missing or empty: $path\n" unless defined $path && -s cygpath_to_win($path);
     }
     assert_wide_output_matches_pairs($generated->{wide_output}, $pair_info);
-    assert_not_single_snp_manifest($generated->{wide_manifest});
-    assert_wide_manifest_matches_pairs($generated->{wide_manifest}, $pair_info);
+    my $manifest = $generated->{wide_manifest} || '';
+    if (length($manifest) && -s cygpath_to_win($manifest)) {
+        assert_not_single_snp_manifest($manifest);
+        assert_wide_manifest_matches_pairs($manifest, $pair_info);
+    } else {
+        print STDERR "[warn] Wide subset manifest $manifest is missing or empty; "
+          . "using the verified wide-output header for this plotting step. "
+          . "If the wide table itself needs rebuilding, --step extract_wide_subset recreates both files.\n";
+    }
 }
 
 sub validate_local_target_plot_files {
@@ -3813,9 +3820,7 @@ sub validate_local_target_plot_files {
     }
 
     my $wide = $generated->{wide_output} || '';
-    my $manifest = $generated->{wide_manifest} || '';
-    if (length($wide) && length($manifest)
-        && -s cygpath_to_win($wide) && -s cygpath_to_win($manifest)) {
+    if (length($wide) && -s cygpath_to_win($wide)) {
         validate_generated_files($generated, $pair_info);
         return;
     }
