@@ -1019,15 +1019,17 @@ fi
 mkdir -p "${WORKDIR}/cache"
 SAS_ODA_PIPELINE_LOCK_FILE="${SAS_ODA_PIPELINE_LOCK_FILE:-${WORKDIR}/cache/sas_oda_pipeline.lock}"
 echo "[lock] Waiting for exclusive SAS ODA pipeline access: ${SAS_ODA_PIPELINE_LOCK_FILE}"
-if command -v flock >/dev/null 2>&1; then
+pipeline_uname="$(uname -s 2>/dev/null || printf 'unknown')"
+if [[ "${pipeline_uname}" != CYGWIN* ]] && command -v flock >/dev/null 2>&1; then
   exec 9>"${SAS_ODA_PIPELINE_LOCK_FILE}"
   flock -w "${SAS_ODA_PIPELINE_LOCK_TIMEOUT_SECONDS:-14400}" 9 || {
     echo "ERROR: Timed out waiting for the SAS ODA pipeline lock." >&2
     exit 1
   }
 else
-  # macOS ships Bash 3.2 without the Linux flock utility.  An atomic mkdir
-  # provides the same cross-process exclusion for the local ODA runner.
+  # macOS lacks flock, and Cygwin child processes can inherit a flock file
+  # descriptor after a timed-out helper exits.  An atomic directory cannot be
+  # inherited by SASPy/Java and is safely reclaimed using the owning PID.
   SAS_ODA_PIPELINE_LOCK_DIR="${SAS_ODA_PIPELINE_LOCK_FILE}.d"
   lock_waited=0
   lock_timeout="${SAS_ODA_PIPELINE_LOCK_TIMEOUT_SECONDS:-14400}"

@@ -4,6 +4,8 @@ use warnings;
 use FindBin qw($Bin);
 use File::Temp qw(tempdir);
 use File::Spec;
+use IO::Compress::Gzip qw(gzip $GzipError);
+use JSON::PP qw(encode_json);
 use Test::More;
 
 my $dir = tempdir('signed_ld_dispatch_XXXXXX', TMPDIR => 1, CLEANUP => 1);
@@ -20,7 +22,7 @@ set -euo pipefail
 [[ -z "${DATA_GZ+x}" && -z "${REMOTE_DATA_BASENAME+x}" ]]
 [[ "${GTF_LD_DISPLAY_MODE}" == "heatmap" ]]
 [[ "${GTF_LD_REFERENCE_SNP}" == "${TARGET_SNP}" ]]
-printf '%s\t%s\t%s\n' "${TARGET_SNP}" "${LOCAL_WINDOW_BP}" "${GTF_LD_HEATMAP_LEGEND_TITLE}" >> "${WORKDIR}/calls.tsv"
+printf '%s\t%s\t%s\t%s\n' "${TARGET_SNP}" "${LOCAL_WINDOW_BP}" "${GTF_LD_HEATMAP_LEGEND_TITLE}" "${GTF_LABEL_SNPS}" >> "${WORKDIR}/calls.tsv"
 printf '%s\t%s\n' "${TARGET_SNP}" "${GTF_LD_R2_CACHE}" >> "${WORKDIR}/cache_calls.tsv"
 printf '<html><img src="%s.png"></html>\n' "${TARGET_SNP}" > "${WORKDIR}/${OUTPUT_HTML_BASENAME}"
 printf 'PNG:%s\n' "${TARGET_SNP}" > "${WORKDIR}/${OUTPUT_HTML_BASENAME%.html}.png"
@@ -79,5 +81,61 @@ my @cache_calls = <$cache_fh>;
 close $cache_fh;
 is($cache_calls[-2], "rs75453394\t$cache\n", 'explicit first SNP receives its own LD cache');
 is($cache_calls[-1], "rsOther\t\n", 'explicit second SNP does not inherit first LD cache');
+
+my $wide = "$dir/nearby.tsv.gz";
+my $wide_text = "CHR\tBP\tSNP\tP\n6\t27500000\trsNearA\t1e-9\n6\t27600000\trsNearB\t2e-9\n";
+gzip(\$wide_text => $wide) or die "gzip $wide: $GzipError\n";
+open $cfg, '>', $config or die $!;
+print {$cfg} encode_json({ DATA_GZ => $wide }), "\n";
+close $cfg;
+my $nearby_html = "$dir/nearby.html";
+open $calls_fh, '<', "$dir/calls.tsv" or die $!;
+@calls = <$calls_fh>;
+close $calls_fh;
+my $calls_before = scalar @calls;
+is(system($^X, $dispatcher, '--target-snps', 'rsNearA,rsNearB',
+    '--runner-config', $config, '--output-html', $nearby_html,
+    '--single-runner', $runner, '--window-bp', 100000), 0,
+    'explicit nearby targets are resolved from the GWAS table and merged');
+open $calls_fh, '<', "$dir/calls.tsv" or die $!;
+@calls = <$calls_fh>;
+close $calls_fh;
+is(scalar(@calls), $calls_before + 1, 'overlapping target windows invoke the SAS runner once');
+like($calls[-1], qr/^rsNearA\t200000\t.*\trsNearA,rsNearB\s*$/,
+    'merged locus uses the first lead as LD reference, expands its window, and labels both SNPs');
+ok(-s $nearby_html, 'merged locus keeps the requested final HTML name');
+ok(!-e "$dir/nearby_rsNearB.html", 'no redundant second local-GTF plot is created');
+
+my $prior_html = "$dir/prior.html";
+for my $prior ([rsPriorA => 21, 42841988], [rsPriorB => 21, 42858367]) {
+    my $prior_csv = "$dir/prior_$prior->[0]_top_hit.csv";
+    open my $prior_fh, '>', $prior_csv or die $!;
+    print {$prior_fh} "SNP,CHR,BP\n$prior->[0],$prior->[1],$prior->[2]\n";
+    close $prior_fh;
+}
+open $cfg, '>', $config or die $!;
+print {$cfg} "{}\n";
+close $cfg;
+open $calls_fh, '<', "$dir/calls.tsv" or die $!;
+@calls = <$calls_fh>;
+close $calls_fh;
+$calls_before = scalar @calls;
+is(system($^X, $dispatcher, '--target-snps', 'rsPriorA,rsPriorB',
+    '--runner-config', $config, '--output-html', $prior_html,
+    '--single-runner', $runner, '--window-bp', 650000), 0,
+    'coordinates from completed per-target CSVs avoid a genome-wide rsID scan');
+open $calls_fh, '<', "$dir/calls.tsv" or die $!;
+@calls = <$calls_fh>;
+close $calls_fh;
+is(scalar(@calls), $calls_before + 1, 'prior nearby target CSVs merge into one resumed locus');
+like($calls[-1], qr/^rsPriorA\t666379\t.*\trsPriorA,rsPriorB\s*$/,
+    'prior coordinates produce the expected expanded shared window');
+
+my $auto_path = "$Bin/../auto_prepare_and_run_diff_gwas.pl";
+open my $auto_fh, '<', $auto_path or die $!;
+my $auto_source = do { local $/; <$auto_fh> };
+close $auto_fh;
+like($auto_source, qr/--targets-csv "\$common_ld_artifacts\{leads\}"/,
+    'automatic signed-LD plots consume the PLINK2 LD-pruned lead table');
 
 done_testing();

@@ -7,6 +7,7 @@ use Fcntl qw(:flock);
 use Digest::MD5 qw(md5_hex);
 use Digest::SHA qw(sha256_hex);
 use JSON::PP qw(decode_json);
+use IO::Uncompress::Gunzip qw($GunzipError);
 
 my %opt = (mode => 'heatmap', population => 'EUR', window_bp => '1e6');
 GetOptions(
@@ -32,12 +33,14 @@ die "Missing SAS runner: $opt{single_runner}\n" unless -f $opt{single_runner};
 
 my @targets;
 my %seen;
+my %target_location;
 if (length($opt{targets_csv} // '')) {
     open my $fh, '<', $opt{targets_csv} or die "Open $opt{targets_csv}: $!\n";
     my $header = <$fh> // die "Empty selected-hit CSV: $opt{targets_csv}\n";
     chomp $header;
     $header =~ s/\r$//;
-    my @header = split /,/, $header, -1;
+    my $sep = index($header, "\t") >= 0 ? "\t" : ',';
+    my @header = split /\Q$sep\E/, $header, -1;
     my %idx = map { $header[$_] => $_ } 0 .. $#header;
     die "Selected-hit CSV needs SNP, CHR, and BP columns\n"
         unless exists $idx{SNP} && exists $idx{CHR} && exists $idx{BP};
@@ -45,25 +48,29 @@ if (length($opt{targets_csv} // '')) {
         chomp $line;
         $line =~ s/\r$//;
         next unless length $line;
-        my @fields = split /,/, $line, -1;
+        my @fields = split /\Q$sep\E/, $line, -1;
         my $snp = $fields[$idx{SNP}] // '';
         $snp =~ s/^"|"$//g;
-        add_target($snp);
+        add_target($snp, $fields[$idx{CHR}], $fields[$idx{BP}]);
     }
     close $fh;
 } else {
     add_target($_) for split /,/, $opt{target_snps};
 }
 sub add_target {
-    my ($snp) = @_;
+    my ($snp, $chr, $bp) = @_;
     $snp =~ s/^\s+|\s+$//g;
     die "Unsafe selected SNP: $snp\n" unless $snp =~ /^[A-Za-z0-9_.:-]+$/;
     return if $seen{lc $snp}++;
     push @targets, $snp;
+    if (defined($chr) && defined($bp) && $bp =~ /^\d+(?:\.\d+)?$/) {
+        $chr =~ s/^"|"$//g;
+        $chr =~ s/^chr//i;
+        $chr = 23 if uc($chr) eq 'X';
+        $target_location{lc $snp} = { chr => $chr, bp => 0 + $bp } if length $chr;
+    }
 }
 die "No selected SNPs\n" unless @targets;
-print "[signed-LD] Rendering " . scalar(@targets)
-    . " listed loci separately; the list is not proof of LD-independent leads.\n";
 
 my ($volume, $dir, $base) = File::Spec->splitpath($opt{output_html});
 die "Output HTML must end in .html: $opt{output_html}\n" unless $base =~ /\.html$/i;
@@ -75,11 +82,27 @@ flock($lock_fh, LOCK_EX | LOCK_NB)
     or die "Another signed-LD dispatcher is already using $opt{output_html}; wait for it to finish before resuming\n";
 open my $config_fh, '<', $opt{runner_config}
     or die "Cannot read $opt{runner_config}: $!\n";
-local $/;
-my $runner_config = decode_json(<$config_fh>);
+my $runner_config = do {
+    local $/;
+    decode_json(<$config_fh>);
+};
 close $config_fh;
 die "Runner configuration must be a JSON object\n"
     unless ref($runner_config) eq 'HASH';
+my $coordinate_cache = "$opt{output_html}.target_coordinates.tsv";
+load_target_locations_from_tables([$coordinate_cache], \@targets, \%target_location);
+resolve_target_locations_from_prior_plot_csvs($opt{output_html}, \@targets, \%target_location);
+resolve_target_locations_from_ld_caches($runner_config, \@targets, \%target_location);
+resolve_missing_target_locations($runner_config, \@targets, \%target_location);
+write_target_location_cache($coordinate_cache, \@targets, \%target_location);
+my @loci = build_overlapping_loci(\@targets, \%target_location, $opt{window_bp});
+my @locus_ids = map { $_->{id} } @loci;
+my %locus_by_id = map { $_->{id} => $_ } @loci;
+my $merged_target_count = scalar(@targets) - scalar(@loci);
+print "[signed-LD] Grouped " . scalar(@targets) . " target SNP(s) into "
+    . scalar(@loci) . " non-overlapping genomic locus/loci using a +/-$opt{window_bp}-bp window.\n";
+print "[signed-LD] Merged $merged_target_count nearby target SNP(s), retaining every requested SNP as a plot label.\n"
+    if $merged_target_count;
 my %render_config = map { $_ => $runner_config->{$_} }
     grep { $_ ne 'GTF_LD_R2_CACHE_BY_SNP'
         && /^(?:GTF_|LOCAL_|DISPLAY_GWAS|GROUP_TRACKS$|PAIR_DEFS$|DATA_GZ$|SOURCE_LONG_GZ$|SOURCE_MODE$|EXTRACTOR_CONFIG_JSON$|REFERENCE_BUILD$)/ }
@@ -109,25 +132,34 @@ my %plot_source_hashes = map {
     $_ => $digest;
 } @plot_sources;
 my $render_request = JSON::PP->new->canonical(1)->encode({
-    version => 2, config => \%render_config,
+    version => 3, config => \%render_config,
     data => file_signature($runner_config->{DATA_GZ}),
     source_long => file_signature($runner_config->{SOURCE_LONG_GZ}),
     plot_sources => \%plot_source_hashes,
     window_bp => $opt{window_bp}, population => uc($opt{population}),
     mode => lc($opt{mode}),
+    loci => [ map {
+        +{ reference => $_->{reference}, targets => $_->{targets},
+           chr => $_->{chr}, bp => $_->{bp}, plot_window_bp => $_->{plot_window_bp} }
+    } @loci ],
 });
 my @links;
 my $shared_macros_ready = 0;
 my $progress_path = File::Spec->catpath($volume, $dir, "${output_stem}.progress.json");
 my $partial_path = File::Spec->catpath($volume, $dir, "${output_stem}.partial.html");
-my %status = map { $_ => 'pending' } @targets;
+my %status = map { $_ => 'pending' } @locus_ids;
 my $request_id = md5_hex($render_request);
 my $failure = '';
 my %status_write_warning;
 write_progress();
-for my $snp (@targets) {
+for my $locus (@loci) {
+    my $snp = $locus->{reference};
+    my @label_snps = @{ $locus->{targets} };
+    my $label_text = join(',', @label_snps);
+    my $plot_window_bp = $locus->{plot_window_bp};
+    my $locus_id = $locus->{id};
     (my $safe_snp = $snp) =~ s/[^A-Za-z0-9._-]/_/g;
-    my $target_html = @targets == 1 ? $base : "${output_stem}_${safe_snp}.html";
+    my $target_html = @loci == 1 ? $base : "${output_stem}_${safe_snp}.html";
     my $target_csv = "${output_stem}_${safe_snp}_top_hit.csv";
     my $target_path = File::Spec->catpath($volume, $dir, $target_html);
     (my $target_png = $target_path) =~ s/\.html$/.png/i;
@@ -135,7 +167,7 @@ for my $snp (@targets) {
     my $ld_cache = $runner_config->{GTF_LD_R2_CACHE_BY_SNP}{lc $snp}
         // $runner_config->{GTF_LD_R2_CACHE_BY_SNP}{$snp}
         // '';
-    my $request_key = md5_hex(join("\0", $render_request, $snp,
+    my $request_key = md5_hex(join("\0", $render_request, $snp, $label_text, $plot_window_bp,
         JSON::PP->new->canonical(1)->encode(file_signature($ld_cache))));
     if (-s $target_path && -s $target_png && -s $request_file) {
         open my $request_fh, '<', $request_file or die "Cannot read $request_file: $!\n";
@@ -144,31 +176,31 @@ for my $snp (@targets) {
         $saved =~ s/\s+\z//;
         if ($saved eq $request_key) {
             print "[signed-LD] Reusing completed plot for $snp\n";
-            push @links, [$snp, $target_html];
-            $status{$snp} = 'complete';
+            push @links, [$label_text, $target_html];
+            $status{$locus_id} = 'complete';
             write_progress();
             next;
         }
     }
     # A failed rerender must never leave an old matching sidecar behind.
     unlink $request_file if -e $request_file;
-    $status{$snp} = 'running';
+    $status{$locus_id} = 'running';
     write_progress();
     local %ENV = %ENV;
     delete @ENV{qw(DATA_GZ REMOTE_DATA_BASENAME)};
     $ENV{RUNNER_CONFIG_JSON} = $opt{runner_config};
     $ENV{TARGET_SNP} = $snp;
-    $ENV{LOCAL_WINDOW_BP} = $opt{window_bp};
+    $ENV{LOCAL_WINDOW_BP} = $plot_window_bp;
     $ENV{OUTPUT_HTML_BASENAME} = $target_html;
     $ENV{SINGLE_SNP_ALLOW_GENERIC_OUTPUT_BASENAME} = 1;
     $ENV{SINGLE_SNP_TOP_HITS_CSV_BASENAME} = $target_csv;
-    $ENV{GTF_LABEL_SNPS} = $snp;
+    $ENV{GTF_LABEL_SNPS} = $label_text;
     $ENV{GTF_LD_DISPLAY_MODE} = lc $opt{mode};
     $ENV{GTF_LD_R2_CACHE} = $ld_cache;
     $ENV{GTF_LD_REFERENCE_SNP} = $snp;
     $ENV{GTF_LD_HEATMAP_LEGEND_TITLE} =
         "Signed LD r2 to $snp (" . uc($opt{population}) . ", 1000G Phase 3 / PLINK2)";
-    $ENV{OPEN_RESULT} = 0 if @targets > 1;
+    $ENV{OPEN_RESULT} = 0 if @loci > 1;
     $ENV{CLEAN_ODA_MACROS} = 0;
     # The first successful locus uploads and checks the shared macro files.
     # Later loci keep using those remote files while uploading only their
@@ -180,21 +212,22 @@ for my $snp (@targets) {
     # target-specific inputs must be removed after each successful locus.
     $ENV{KEEP_REMOTE_PLOT_DATA} = 0;
     $ENV{CLEAN_ODA_INPUT} = 1;
-    print "[signed-LD] Rendering $snp with its own PLINK2 LD reference\n";
+    print "[signed-LD] Rendering locus labels [$label_text] with PLINK2 LD reference $snp"
+        . ($plot_window_bp != 0 + $opt{window_bp} ? " and expanded half-window $plot_window_bp bp" : '') . "\n";
     my $rc = system('/bin/bash', $opt{single_runner});
     if ($rc != 0 || !-s $target_path || !-s $target_png) {
         my $exit_code = $rc == -1 ? 1 : ($rc >> 8 || 1);
         $failure = "Signed-LD SAS runner failed for $snp (exit $exit_code)";
         $failure .= '; missing HTML or PNG' if $rc == 0;
-        $status{$snp} = 'failed';
+        $status{$locus_id} = 'failed';
         write_progress();
         print STDERR "[signed-LD] $failure. Re-run the same pipeline command to resume remaining loci. Progress: $progress_path\n";
         exit $exit_code;
     }
     $shared_macros_ready = 1;
     atomic_write($request_file, "$request_key\n");
-    push @links, [$snp, $target_html];
-    $status{$snp} = 'complete';
+    push @links, [$label_text, $target_html];
+    $status{$locus_id} = 'complete';
     write_progress();
 }
 
@@ -211,6 +244,222 @@ sub file_signature {
     return { path => $path, size => $stat[7], mtime => $stat[9] };
 }
 
+sub resolve_missing_target_locations {
+    my ($config, $targets, $locations) = @_;
+    my %missing = map { lc($_) => $_ } grep { !exists $locations->{lc $_} } @$targets;
+    return unless %missing;
+    for my $candidate ($config->{DATA_GZ}, $config->{SOURCE_LONG_GZ}) {
+        next unless defined($candidate) && length($candidate);
+        my $path = local_path($candidate);
+        next unless -s $path;
+        my $fh;
+        if ($path =~ /\.gz$/i) {
+            $fh = IO::Uncompress::Gunzip->new($path);
+            next unless $fh;
+        } else {
+            open $fh, '<', $path or next;
+        }
+        my $header = <$fh> // '';
+        $header =~ s/[\r\n]+\z//;
+        my $sep = index($header, "\t") >= 0 ? "\t" : ',';
+        my @h = split /\Q$sep\E/, $header, -1;
+        my %idx = map { uc($h[$_]) => $_ } 0 .. $#h;
+        unless (exists($idx{SNP}) && exists($idx{CHR}) && exists($idx{BP})) {
+            close $fh;
+            next;
+        }
+        while (my $line = <$fh>) {
+            $line =~ s/[\r\n]+\z//;
+            my @f = split /\Q$sep\E/, $line, -1;
+            my $key = lc($f[$idx{SNP}] // '');
+            next unless exists $missing{$key};
+            my ($chr, $bp) = @f[$idx{CHR}, $idx{BP}];
+            next unless defined($chr) && defined($bp) && $bp =~ /^\d+(?:\.\d+)?$/;
+            $chr =~ s/^chr//i;
+            $chr = 23 if uc($chr) eq 'X';
+            next unless length $chr;
+            $locations->{$key} = { chr => $chr, bp => 0 + $bp };
+            delete $missing{$key};
+            last unless %missing;
+        }
+        close $fh;
+        last unless %missing;
+    }
+    warn "[signed-LD] Coordinates were not found for " . join(', ', values %missing)
+        . "; those targets will remain separate loci.\n" if %missing;
+}
+
+sub resolve_target_locations_from_ld_caches {
+    my ($config, $targets, $locations) = @_;
+    my %wanted = map { lc($_) => 1 } grep { !exists $locations->{lc $_} } @$targets;
+    return unless %wanted;
+    my @caches;
+    if (ref($config->{GTF_LD_R2_CACHE_BY_SNP}) eq 'HASH') {
+        push @caches, values %{ $config->{GTF_LD_R2_CACHE_BY_SNP} };
+    }
+    push @caches, $config->{GTF_LD_R2_CACHE}, $config->{LOCAL_LD_CACHE_TSV};
+    my %seen_cache;
+    for my $cache (grep { defined($_) && length($_) && !$seen_cache{$_}++ } @caches) {
+        my $path = local_path($cache);
+        next unless -s $path;
+        open my $fh, '<', $path or next;
+        my $header = <$fh> // '';
+        $header =~ s/[\r\n]+\z//;
+        my @h = split /\t/, $header, -1;
+        my %idx = map { lc($h[$_]) => $_ } 0 .. $#h;
+        unless (exists($idx{query_snp}) && exists($idx{query_chr}) && exists($idx{query_bp})) {
+            close $fh;
+            next;
+        }
+        while (my $line = <$fh>) {
+            $line =~ s/[\r\n]+\z//;
+            my @f = split /\t/, $line, -1;
+            my $key = lc($f[$idx{query_snp}] // '');
+            next unless $wanted{$key};
+            my ($chr, $bp) = @f[$idx{query_chr}, $idx{query_bp}];
+            next unless defined($chr) && length($chr) && defined($bp) && $bp =~ /^\d+(?:\.\d+)?$/;
+            $chr =~ s/^chr//i;
+            $chr = 23 if uc($chr) eq 'X';
+            $locations->{$key} = { chr => $chr, bp => 0 + $bp };
+            delete $wanted{$key};
+            last unless %wanted;
+        }
+        close $fh;
+        last unless %wanted;
+    }
+}
+
+sub resolve_target_locations_from_prior_plot_csvs {
+    my ($output_html, $targets, $locations) = @_;
+    return unless grep { !exists $locations->{lc $_} } @$targets;
+    my ($volume, $dir, $base) = File::Spec->splitpath($output_html);
+    $base =~ s/\.html$//i;
+    my $prefix = File::Spec->catpath($volume, $dir, $base);
+    my @tables = glob("${prefix}_*_top_hit.csv");
+    load_target_locations_from_tables(\@tables, $targets, $locations);
+}
+
+sub load_target_locations_from_tables {
+    my ($tables, $targets, $locations) = @_;
+    my %wanted = map { lc($_) => 1 } grep { !exists $locations->{lc $_} } @$targets;
+    return unless %wanted;
+    for my $path (@$tables) {
+        next unless defined($path) && -s $path;
+        open my $fh, '<', $path or next;
+        my $header = <$fh> // '';
+        $header =~ s/[\r\n]+\z//;
+        my $sep = index($header, "\t") >= 0 ? "\t" : ',';
+        my @h = split /\Q$sep\E/, $header, -1;
+        my %idx = map { uc($h[$_]) => $_ } 0 .. $#h;
+        unless (exists($idx{SNP}) && exists($idx{CHR}) && exists($idx{BP})) {
+            close $fh;
+            next;
+        }
+        while (my $line = <$fh>) {
+            $line =~ s/[\r\n]+\z//;
+            my @f = split /\Q$sep\E/, $line, -1;
+            my $key = lc($f[$idx{SNP}] // '');
+            next unless $wanted{$key};
+            my ($chr, $bp) = @f[$idx{CHR}, $idx{BP}];
+            next unless defined($chr) && length($chr) && defined($bp) && $bp =~ /^\d+(?:\.\d+)?$/;
+            $chr =~ s/^chr//i;
+            $chr = 23 if uc($chr) eq 'X';
+            $locations->{$key} = { chr => $chr, bp => 0 + $bp };
+            delete $wanted{$key};
+            last unless %wanted;
+        }
+        close $fh;
+        last unless %wanted;
+    }
+}
+
+sub write_target_location_cache {
+    my ($path, $targets, $locations) = @_;
+    my @known = grep { exists $locations->{lc $_} } @$targets;
+    return unless @known;
+    my $contents = "SNP\tCHR\tBP\n" . join('', map {
+        my $loc = $locations->{lc $_};
+        join("\t", $_, $loc->{chr}, $loc->{bp}) . "\n";
+    } @known);
+    eval { atomic_write($path, $contents); 1 }
+        or warn "[signed-LD] Could not persist target-coordinate cache $path: " . ($@ || 'unknown error');
+}
+
+sub local_path {
+    my ($path) = @_;
+    return $path unless $^O eq 'cygwin' && $path =~ m{^([A-Za-z]):[/\\](.*)$};
+    my ($drive, $rest) = (lc($1), $2);
+    $rest =~ s{\\}{/}g;
+    for my $prefix ("/mnt/$drive", "/cygdrive/$drive") {
+        my $candidate = "$prefix/$rest";
+        return $candidate if -e $candidate;
+    }
+    return $path;
+}
+
+sub build_overlapping_loci {
+    my ($targets, $locations, $window_text) = @_;
+    my $window = 0 + $window_text;
+    die "--window-bp must be a positive number\n" unless $window > 0;
+    my %input_order = map { lc($targets->[$_]) => $_ } 0 .. $#$targets;
+    my @located = map {
+        +{ snp => $_, %{ $locations->{lc $_} }, input_order => $input_order{lc $_} }
+    } grep { exists $locations->{lc $_} } @$targets;
+    @located = sort {
+        chromosome_sort_key($a->{chr}) cmp chromosome_sort_key($b->{chr})
+            || $a->{bp} <=> $b->{bp} || $a->{input_order} <=> $b->{input_order}
+    } @located;
+    my @groups;
+    for my $row (@located) {
+        my $start = $row->{bp} - $window;
+        my $end = $row->{bp} + $window;
+        if (!@groups || normalize_chr($groups[-1]{chr}) ne normalize_chr($row->{chr})
+            || $start > $groups[-1]{window_end}) {
+            push @groups, { chr => $row->{chr}, window_end => $end, members => [] };
+        }
+        push @{ $groups[-1]{members} }, $row;
+        $groups[-1]{window_end} = $end if $end > $groups[-1]{window_end};
+    }
+    for my $snp (@$targets) {
+        next if exists $locations->{lc $snp};
+        push @groups, { chr => '', members => [ { snp => $snp,
+            input_order => $input_order{lc $snp} } ] };
+    }
+    my @loci;
+    for my $group (@groups) {
+        my @members = sort { $a->{input_order} <=> $b->{input_order} } @{ $group->{members} };
+        my $reference = $members[0];
+        my $plot_window = $window;
+        if (defined $reference->{bp}) {
+            for my $member (@members) {
+                next unless defined $member->{bp};
+                my $required = abs($member->{bp} - $reference->{bp}) + $window;
+                $plot_window = $required if $required > $plot_window;
+            }
+        }
+        push @loci, {
+            id => lc($reference->{snp}), reference => $reference->{snp},
+            targets => [ map { $_->{snp} } @members ], chr => ($reference->{chr} // ''),
+            bp => ($reference->{bp} // ''), plot_window_bp => int($plot_window + 0.5),
+            first_order => $reference->{input_order},
+        };
+    }
+    return sort { $a->{first_order} <=> $b->{first_order} } @loci;
+}
+
+sub normalize_chr {
+    my ($chr) = @_;
+    $chr = '' unless defined $chr;
+    $chr =~ s/^chr//i;
+    return uc($chr) eq 'X' ? '23' : uc($chr);
+}
+
+sub chromosome_sort_key {
+    my ($chr) = @_;
+    $chr = normalize_chr($chr);
+    return $chr =~ /^\d+$/ ? sprintf('0%04d', $chr) : "1$chr";
+}
+
 if (@links > 1) {
     atomic_write($opt{output_html}, plot_index_html(\@links));
     print "[signed-LD] Wrote plot index: $opt{output_html}\n";
@@ -219,21 +468,24 @@ unlink $partial_path if -e $partial_path;
 write_progress();
 
 sub write_progress {
-    my $complete = scalar grep { $status{$_} eq 'complete' } @targets;
+    my $complete = scalar grep { $status{$_} eq 'complete' } @locus_ids;
     my $report = {
         version => 1, request_id => $request_id, output_html => $opt{output_html},
-        total => scalar(@targets), complete => $complete,
-        remaining => scalar(@targets) - $complete,
+        total => scalar(@loci), complete => $complete,
+        remaining => scalar(@loci) - $complete,
         failure => $failure,
-        loci => [ map { { snp => $_, status => $status{$_} } } @targets ],
+        loci => [ map {
+            my $locus = $locus_by_id{$_};
+            +{ snp => $locus->{reference}, targets => $locus->{targets}, status => $status{$_} }
+        } @locus_ids ],
     };
     write_status_file($progress_path, JSON::PP->new->canonical(1)->pretty(1)->encode($report));
-    if ($complete < @targets && @links) {
+    if ($complete < @loci && @links) {
         write_status_file($partial_path, plot_index_html(\@links));
     }
     # The full index is a completion signal; keep it only when every locus
     # belongs to the current request and has verified output files.
-    unlink $opt{output_html} if @targets > 1 && $complete < @targets && -e $opt{output_html};
+    unlink $opt{output_html} if @loci > 1 && $complete < @loci && -e $opt{output_html};
 }
 
 sub write_status_file {

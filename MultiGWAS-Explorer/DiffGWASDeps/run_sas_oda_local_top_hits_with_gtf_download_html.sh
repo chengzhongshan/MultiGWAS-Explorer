@@ -48,6 +48,7 @@ TOP_HIT_LD_QUERY_FAILURE_ACTION="${TOP_HIT_LD_QUERY_FAILURE_ACTION:-DISTANCE}"
 TOP_HIT_LD_CACHE_TSV="${TOP_HIT_LD_CACHE_TSV:-}"
 TOP_HIT_LD_CACHE_MIN_R2="${TOP_HIT_LD_CACHE_MIN_R2:-0.2}"
 TOP_HIT_LD_CACHE_MISS_ACTION="${TOP_HIT_LD_CACHE_MISS_ACTION:-WEB}"
+TOP_HIT_LD_LEADS_TSV="${TOP_HIT_LD_LEADS_TSV:-}"
 TOP_HIT_MAF_THRESHOLD="${TOP_HIT_MAF_THRESHOLD:-0.01}"
 TOP_HIT_GNOMAD_FREQ_FILE="${TOP_HIT_GNOMAD_FREQ_FILE:-}"
 TOP_HIT_GNOMAD_POP_MAP="${TOP_HIT_GNOMAD_POP_MAP:-}"
@@ -1512,12 +1513,17 @@ dispatch_selected_signed_ld_gtf() {
   [[ -z "${TARGET_SNP_LIST}" ]] || return 1
   [[ "${GTF_LD_DISPLAY_MODE_NORMALIZED}" == "heatmap" || "${GTF_LD_DISPLAY_MODE_NORMALIZED}" == "both" ]] || return 1
   [[ "${LOCAL_SAS_DEBUG_ONLY}" != "1" && "${ODA_TRANSFER_MANIFEST_ONLY:-0}" != "1" ]] || return 1
-  [[ -s "${CSV_OUT}" ]] || {
-    echo "ERROR: Signed-LD local GTF plots require a selected-hit CSV: ${CSV_OUT}" >&2
+  local selected_hits="${CSV_OUT}"
+  if [[ -n "${TOP_HIT_LD_LEADS_TSV}" ]]; then
+    selected_hits="${TOP_HIT_LD_LEADS_TSV}"
+    echo "[prep] Using precomputed PLINK2/1000 Genomes LD-pruned leads for local-GTF dispatch: ${selected_hits}"
+  fi
+  [[ -s "${selected_hits}" ]] || {
+    echo "ERROR: Signed-LD local GTF plots require an existing selected-hit table: ${selected_hits}" >&2
     exit 1
   }
   perl "${DEPS_DIR}/run_selected_signed_ld_gtf.pl" \
-    --targets-csv "${CSV_OUT}" \
+    --targets-csv "${selected_hits}" \
     --runner-config "${RUNNER_CONFIG_JSON}" \
     --output-html "${HTML_OUT}" \
     --single-runner "${DEPS_DIR}/run_sas_oda_single_snp_with_gtf_download_html.sh" \

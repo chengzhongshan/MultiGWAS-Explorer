@@ -1813,16 +1813,24 @@ sub resolve_local_include_path {
     my ($path) = @_;
     return '' unless defined $path && length $path;
     return $path if -e $path;
+    my $base = basename($path);
+    my $script_dir = dirname(abs_path(__FILE__));
     my @candidates = (
         File::Spec->catfile(getcwd(), $path),
         File::Spec->catfile($macro_dir || './', $path),
-        File::Spec->catfile(dirname(abs_path(__FILE__)), $path),
+        File::Spec->catfile($script_dir, $path),
+        # Plot wrappers submit remote paths such as ~/Macro.sas while the
+        # version-controlled source lives in DiffGWASDeps.  Resolve these
+        # predictable locations before considering a recursive search of a
+        # working directory that may contain millions of GWAS files.
+        File::Spec->catfile(getcwd(), 'DiffGWASDeps', $base),
+        File::Spec->catfile($script_dir, 'DiffGWASDeps', $base),
+        File::Spec->catfile($macro_dir || './', 'DiffGWASDeps', $base),
     );
     for my $candidate (@candidates) {
         next unless defined $candidate && length $candidate;
         return $candidate if -e $candidate;
     }
-    my $base = basename($path);
     if (defined $base && length $base && $base ne $path) {
         my @roots = grep { defined $_ && length $_ && -d $_ } (
             getcwd(),

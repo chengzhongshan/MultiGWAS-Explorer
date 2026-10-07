@@ -1856,6 +1856,9 @@ submissions that contain `%include` and switches into a safer debug path:
   parent script, so failures can be isolated to the included SAS file itself
 - it runs a local preflight scan for likely compile blockers such as unmatched
   `/* */` comment structure or unterminated quotes
+- for remote paths such as `~/SNP_Local_Manhattan_With_GTF.sas`, it checks the
+  project `DiffGWASDeps/` directory directly before any recursive fallback;
+  this prevents a small syntax check from walking a large GWAS results tree
 - it records line-numbered source context for suspicious lines in
   `output.html.info.txt`
 - it attempts remote `PROC PRINTTO` log capture for the included file
@@ -2410,15 +2413,15 @@ For large windows, the local top-hit GTF path now pre-extracts the requested
 Gencode region locally and uploads only that subset to SAS ODA. This avoids the
 older failure mode where SAS `WORK` had to materialize an oversized GTF table
 for the selected locus window.
-For automatic signed-LD heatmaps from a merged wide table, the runner now
-dispatches each locally listed hit directly to the single-SNP runner before
-building any union of all hit windows. Each SAS ODA job uploads only its own
-tabix-extracted GWAS window and GTF subset; successful per-hit jobs remove
-their remote inputs. A candidate list produced with distance pruning disabled
-is not itself evidence that the hits are LD-independent. A rerun reuses the
-locally selected candidate CSV only when its request key and source file still
-match, and reuses each completed per-locus PNG/HTML only when its request key
-matches. Older results without a key are generated once more.
+For automatic signed-LD heatmaps from a merged wide table, the runner first
+finishes the `prepare_top_hit_ld` stage and dispatches only the lead table
+selected by PLINK2 with 1000 Genomes Phase 3. It never treats the unpruned
+MAF/significance candidate list as independent loci. Lead windows that overlap
+are grouped into one locus before SAS ODA is called. Each SAS ODA job uploads
+only its tabix-extracted GWAS window and GTF subset; successful per-locus jobs
+remove their remote inputs. A rerun reuses each completed per-locus PNG/HTML
+only when its request key matches. Older results without a key are generated
+once more.
 For a multi-hit signed-LD run, the first locus that actually needs SAS ODA
 uploads and verifies the five shared plotting macros. Later loci in that run
 reuse those remote files without resending or rescanning them; each still
@@ -2464,7 +2467,8 @@ The local GTF wrapper is also more resilient for long SAS ODA runs:
   raw SAS HTML is a recovery input and the final `.sasraw.html` sidecar is
   removed
 
-For signed-LD local GTF top hits, the pipeline submits one SNP per SAS ODA job.
+For signed-LD local GTF top hits, the pipeline submits one merged genomic locus
+per SAS ODA job. Non-overlapping lead loci remain separate and resumable.
 Each successful HTML/PNG pair receives a request checksum. If ODA disconnects,
 rerun the same command; the dispatcher verifies completed plots, skips those
 SNPs, and starts with the first unfinished hit. It writes
@@ -2603,7 +2607,10 @@ When two or more explicit target SNPs have overlapping SNP-centered windows on
 the same chromosome, the SAS local-GTF runner now merges them into one displayed
 locus and labels every requested rsID in that plot. For example, with a `1e6`
 half-window, `rs2070788` (chr21:42841988) and `rs383510` (chr21:42858367) are
-rendered together rather than as two nearly identical figures. A previously
+rendered together rather than as two nearly identical figures. The first
+requested or most-significant lead remains the named LD reference, and the
+displayed half-window expands enough to contain the union of all member SNP
+windows. A previously
 generated target CSV is reused only after its SNPs, coordinates, optional gene
 overrides, and freshness relative to the compact GWAS subset are validated.
 
@@ -2815,6 +2822,12 @@ Shared wrapper controls:
   plus `ODA_UPLOAD_TIMEOUT_SECONDS_PER_MB` (default 10) for every MiB. This
   prevents the Cygwin 300-second metadata timeout from terminating a healthy
   large SAS ODA upload near completion.
+
+On Cygwin, the local Manhattan wrapper uses an atomic directory lock instead
+of `flock`. A timed-out SASPy/Java descendant can inherit an open `flock` file
+descriptor and keep the pipeline locked after the wrapper exits. The directory
+lock records its owning PID, cannot be inherited as a descriptor, and removes
+itself on normal exit; a later run also reclaims it when the owner is gone.
 
 Stage-specific submit controls:
 
@@ -3123,9 +3136,10 @@ Do not merge LD rows calculated from several query SNPs into one heatmap and
 then clear the reference name. A value in that union no longer answers the
 question "LD to which variant?" and can silently change the scientific meaning
 of the color scale. The SAS automation therefore runs the single-target GTF
-runner once per requested SNP when heatmap mode and direct PLINK2 LD are used.
-Each output has its own LD cache, reference label, signed colorbar, and adjacent
-gene track.
+runner once per non-overlapping locus when heatmap mode and direct PLINK2 LD
+are used. Nearby targets are labels in the same plot; the first lead is the
+sole LD reference for that merged locus. Separate loci retain their own LD
+cache, reference label, signed colorbar, and adjacent gene track.
 
 This command is the real-data regression check for the overlapping
 `rs2070788`/`rs383510` locus:
@@ -3140,13 +3154,15 @@ perl auto_prepare_and_run_diff_gwas.pl \
   --local-ld-r2-threshold 0.2
 ```
 
-The expected run produces one SAS PNG for each target. Each uploaded GWAS
-subset must contain numeric `LD_R2`; its reference row must have `LD_R2=1`;
-and each PNG must show a signed colorbar titled for its own target, with limits
-`-1` and `1`. Run the focused Perl contract test before submission:
+The expected run produces one SAS PNG containing both labeled targets because
+their 1 Mb windows overlap. The uploaded GWAS subset must contain numeric
+`LD_R2`; the `rs2070788` reference row must have `LD_R2=1`; and the PNG must
+show a signed colorbar titled for that reference, with limits `-1` and `1`.
+Run the focused Perl contract and dispatch tests before submission:
 
 ```bash
 perl DiffGWASDeps/test_ld_heatmap_contract.pl
+perl install/test_auto_signed_ld_gtf_dispatch.pl
 ```
 
 For complete window-wide LD, use the repository helper

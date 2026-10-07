@@ -126,7 +126,7 @@ if ($report =~ /\.zst\z/) {
 
 sub parse_report {
     my ($fh, $out_path, $ref, $threshold, $quiet_output) = @_;
-    my ($header, %idx, %best);
+    my ($header, %idx, %best, %proxy_location, $query_chr, $query_bp);
     while (my $line = <$fh>) {
         chomp $line;
         next unless length $line;
@@ -142,6 +142,10 @@ sub parse_report {
         my $a = value(\@f, \%idx, qw(id_a variant_id_a));
         my $b = value(\@f, \%idx, qw(id_b variant_id_b));
         my $r2 = value(\@f, \%idx, qw(r2 phased_r2 unphased_r2));
+        my $chr_a = value(\@f, \%idx, qw(chrom_a chr_a));
+        my $bp_a = value(\@f, \%idx, qw(pos_a bp_a));
+        my $chr_b = value(\@f, \%idx, qw(chrom_b chr_b));
+        my $bp_b = value(\@f, \%idx, qw(pos_b bp_b));
         $a = $f[2] if !defined($a) && @f >= 7;
         $b = $f[5] if !defined($b) && @f >= 7;
         $r2 = $f[6] if !defined($r2) && @f >= 7;
@@ -157,17 +161,27 @@ sub parse_report {
         my $a_is_ref = grep { lc($_) eq lc($ref) } @a_ids;
         my $b_is_ref = grep { lc($_) eq lc($ref) } @b_ids;
         my @proxies = $a_is_ref ? @b_ids : ($b_is_ref ? @a_ids : ());
+        if ($a_is_ref) {
+            ($query_chr, $query_bp) = ($chr_a, $bp_a)
+                if !defined($query_chr) && defined($chr_a) && defined($bp_a);
+        } elsif ($b_is_ref) {
+            ($query_chr, $query_bp) = ($chr_b, $bp_b)
+                if !defined($query_chr) && defined($chr_b) && defined($bp_b);
+        }
         for my $proxy (@proxies) {
             next if lc($proxy) eq lc($ref);
-            $best{$proxy} = 0 + $r2
-                if !exists($best{$proxy}) || $r2 > $best{$proxy};
+            if (!exists($best{$proxy}) || $r2 > $best{$proxy}) {
+                $best{$proxy} = 0 + $r2;
+                $proxy_location{$proxy} = $a_is_ref
+                    ? [$chr_b, $bp_b] : [$chr_a, $bp_a];
+            }
         }
     }
     if (defined $out_path) {
         make_path(dirname($out_path)) unless -d dirname($out_path);
     }
     open my $out, '>', $out_path or die "Cannot write $out_path: $!\n" if defined $out_path;
-    print {$out} join("\t", qw(query_snp proxy_snp ld_population proxy_r2 source reference_panel reference_build ld_method)), "\n" if $out;
+    print {$out} join("\t", qw(query_snp proxy_snp query_chr query_bp proxy_chr proxy_bp ld_population proxy_r2 source reference_panel reference_build ld_method)), "\n" if $out;
     if (!$quiet_output) {
         print "LD_SNPS\t", join(',', sort { $best{$b} <=> $best{$a} || $a cmp $b } keys %best), "\n";
         print "LD_R2_PAIRS\t", join(',', map { $_ . ':' . sprintf('%.6g', $best{$_}) } sort { $best{$b} <=> $best{$a} || $a cmp $b } keys %best), "\n";
@@ -176,10 +190,17 @@ sub parse_report {
     print "LD_ESTIMABILITY\t", (keys(%best) ? 'ESTIMABLE' : 'NOT_ESTIMABLE'), "\n";
     if ($out) {
         my $population_label = population_label($populations, $keep);
-        print {$out} join("\t", $ref, $ref, $population_label, 1, 'PLINK2_1KG_DIRECT', '1000_GENOMES_PHASE_3', $reference_build, ($phased ? 'PLINK2_R2_PHASED' : 'PLINK2_R2_UNPHASED')), "\n"
+        print {$out} join("\t", $ref, $ref, ($query_chr // ''), ($query_bp // ''),
+            ($query_chr // ''), ($query_bp // ''), $population_label, 1,
+            'PLINK2_1KG_DIRECT', '1000_GENOMES_PHASE_3', $reference_build,
+            ($phased ? 'PLINK2_R2_PHASED' : 'PLINK2_R2_UNPHASED')), "\n"
             if keys %best;
         for my $proxy (keys %best) {
-            print {$out} join("\t", $ref, $proxy, $population_label, $best{$proxy}, 'PLINK2_1KG_DIRECT', '1000_GENOMES_PHASE_3', $reference_build, ($phased ? 'PLINK2_R2_PHASED' : 'PLINK2_R2_UNPHASED')), "\n";
+            my ($proxy_chr, $proxy_bp) = @{ $proxy_location{$proxy} || [] };
+            print {$out} join("\t", $ref, $proxy, ($query_chr // ''), ($query_bp // ''),
+                ($proxy_chr // ''), ($proxy_bp // ''), $population_label, $best{$proxy},
+                'PLINK2_1KG_DIRECT', '1000_GENOMES_PHASE_3', $reference_build,
+                ($phased ? 'PLINK2_R2_PHASED' : 'PLINK2_R2_UNPHASED')), "\n";
         }
         close $out;
     }

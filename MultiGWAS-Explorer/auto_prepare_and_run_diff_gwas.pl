@@ -851,6 +851,11 @@ my $runner_cfg = build_runner_config(
 
 $runner_cfg->{GTF_LD_R2_CACHE_BY_SNP} = { %local_ld_cache_by_snp }
     if %local_ld_cache_by_snp;
+if (%common_ld_artifacts) {
+    $runner_cfg->{TOP_HIT_LD_LEADS_TSV} = $common_ld_artifacts{leads};
+    $runner_cfg->{TOP_HIT_LD_AUDIT_LOCAL_TSV} = $common_ld_artifacts{audit};
+    $runner_cfg->{TOP_HIT_LD_REFERENCE_STATUS_TSV} = $common_ld_artifacts{status};
+}
 write_json_if_defined($generated->{merge_config}, $merge_cfg) if $merge_cfg;
 write_json_if_defined($generated->{diff_config}, $diff_cfg) if $diff_cfg;
 write_json_if_defined($generated->{preset_config}, $preset_cfg);
@@ -954,6 +959,16 @@ my $signed_ld_dispatch = !$local_sas_only
     && !@target_gtf_snps
     && $source_mode eq 'merged_gwas_table'
     && ($runner_cfg->{TOP_HIT_MODE} // '') =~ /^(?:common_association|common_and_differential)$/;
+if ($signed_ld_dispatch && %common_ld_artifacts) {
+    my $output_html = $runner_cfg->{OUTPUT_HTML_BASENAME}
+      || "${project_tag}_SAS_local_top_hits_with_gtf.html";
+    my $single_window = $runner_cfg->{LOCAL_GTF_WINDOW_BP} || '1e6';
+    my $legend_population = uc(trim($local_ld_population_override || 'EUR'));
+    $local_gtf_command = qq{"$bash_path" -lc 'cd "$workdir" && RUNNER_CONFIG_JSON="$generated->{runner_config}" SESSION_ID="$runner_session" OPEN_RESULT="$open_result" perl "$deps_dir/run_selected_signed_ld_gtf.pl" --targets-csv "$common_ld_artifacts{leads}" --runner-config "$generated->{runner_config}" --output-html "$workdir/$output_html" --single-runner "$deps_dir/run_sas_oda_single_snp_with_gtf_download_html.sh" --window-bp "$single_window" --population "$legend_population" --mode "$local_ld_display_mode"'};
+    @local_gtf_outputs = ("$Bin/$output_html");
+    $local_gtf_description = 'Run signed-LD GTF plots for PLINK2 LD-pruned lead loci';
+    print "[info] Automatic local-GTF plotting will use the PLINK2/1000 Genomes LD-pruned lead table: $common_ld_artifacts{leads}\n";
+}
 if (length($single_target_gtf_snp) && !$local_sas_only) {
     my $single_window = $runner_cfg->{LOCAL_GTF_WINDOW_BP} || '1e6';
     my $single_html = $runner_cfg->{OUTPUT_HTML_BASENAME} || "${project_tag}_SAS_local_top_hits_with_gtf.html";
@@ -978,8 +993,8 @@ elsif ($target_gtf_snp_count > 1
     $local_gtf_command = qq{"$bash_path" -lc 'cd "$workdir" && RUNNER_CONFIG_JSON="$generated->{runner_config}" SESSION_ID="$runner_session" OPEN_RESULT="$open_result" perl "$deps_dir/run_selected_signed_ld_gtf.pl" --target-snps "$target_list" --runner-config "$generated->{runner_config}" --output-html "$workdir/$output_html" --single-runner "$deps_dir/run_sas_oda_single_snp_with_gtf_download_html.sh" --window-bp "$single_window" --population "$legend_population" --mode heatmap'};
     @local_gtf_outputs = ("$Bin/$output_html");
     $signed_ld_dispatch = 1;
-    $local_gtf_description = 'Run one signed-LD GTF-backed SAS ODA plot per target';
-    print "[info] Using per-target SAS ODA local-GTF runners so each of $target_gtf_snp_count loci has its own signed-LD cache and colorbar.\n";
+    $local_gtf_description = 'Group overlapping targets and run one signed-LD SAS ODA local-GTF plot per locus';
+    print "[info] Grouping $target_gtf_snp_count target SNPs by overlapping windows before SAS ODA local-GTF rendering; each locus has one LD reference and colorbar.\n";
 }
 elsif ($target_gtf_snp_count > 1) {
     print "[info] Using multi-target SAS ODA local-GTF runner for $target_gtf_snp_count target SNPs; overlapping SNP-centered windows will share one locus plot.\n";
