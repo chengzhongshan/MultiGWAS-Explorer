@@ -9,26 +9,6 @@ gene-track plots, and forest plots.
 For the full project guide, advanced troubleshooting, and validation notes,
 see [MultiGWAS-Explorer/README.md](../MultiGWAS-Explorer/README.md).
 
-## GWAS QC
-
-The GWAS QC adds conservative allele harmonization, raw-P-value
-inference, MAF-aware lead filtering, and greedy HaploReg LD clumping as the
-default top-hit method. Physical distance is retained only as an explicit
-legacy method or a labeled fallback when an LD query is unresolved. The
-repository also contains executable GWAMA 2.2.2 and EasyStrata 8.6 comparison
-commands, full-source QC scripts, LD audit tables, and the deterministic MCP
-interface evaluation.
-
-```bash
-cd MultiGWAS-Explorer
-bash benchmark/run_differential_gwas_revision_benchmarks.sh show-inputs
-bash benchmark/run_differential_gwas_revision_benchmarks.sh validate-results
-```
-
-See [benchmark/README.md](../MultiGWAS-Explorer/benchmark/README.md). The interface
-timing used exact JSON-RPC tool calls—not free-form prompts—and its complete
-request records are published under `benchmark/agent_interface/`.
-
 ## Main Scripts
 
 - `auto_prepare_and_run_diff_gwas.pl`
