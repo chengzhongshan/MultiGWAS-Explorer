@@ -107,9 +107,8 @@ Click any figure to open its full-resolution PNG.
 
 Clone the repository and open
 [`examples/public-scz-sex/results.html`](MultiGWAS-Explorer/examples/public-scz-sex/results.html)
-for the standalone gallery and SHA-256 manifest. The
-[example record](MultiGWAS-Explorer/examples/public-scz-sex/README.md) includes
-the validation scope and checksums.
+for the standalone gallery. The
+[example record](MultiGWAS-Explorer/examples/public-scz-sex/README.md).
 
 See the [test results and limitations](MultiGWAS-Explorer/install/PUBLIC_GWAS_RESULTS.md)
 and [platform installation checks](https://github.com/chengzhongshan/MultiGWAS-Explorer/actions/workflows/installation.yml).
