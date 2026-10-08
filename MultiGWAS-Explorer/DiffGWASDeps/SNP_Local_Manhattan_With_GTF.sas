@@ -189,6 +189,10 @@ LD_display_mode=none, /*none, markers, heatmap, or both. LD display is opt-in.*/
 LD_heatmap_colormodel=CXF7FBFF CX6BAED6 CX54278F, /*Retained for legacy marker-overlay mode.*/
 LD_heatmap_legend_title=%str(LD r2),
 text_rotate_angle=90, /*Angle to rotate text labels for these selected dots by users*/
+label_position_overrides=, /*Optional SNP=BP list computed before SAS to avoid label collisions.*/
+font_size4textlabels=10, /*Actual text size used by the Perl label planner and SAS renderer.*/
+label_headroom_frac=,
+label_center_offset=,
 auto_rotate2zero=1, /*supply value 1 when there are <=3 text labels and you want them kept horizontal in the top headroom*/
 pct2adj4dencluster=2,/*Input value can be ranging from 0.0001 to 10 or even higher value!
 For SNP labels on the top, please try to use this parameter, which only works when 
@@ -518,6 +522,10 @@ ld_heatmap_var=&effective_ld_heatmap_var,
 ld_heatmap_colormodel=&LD_heatmap_colormodel,
 ld_heatmap_legend_title=&LD_heatmap_legend_title,
 text_rotate_angle=&text_rotate_angle, /*Angle to rotate text labels for these selected dots by users*/
+label_position_overrides=&label_position_overrides,
+font_size4textlabels=&font_size4textlabels,
+label_headroom_frac=&label_headroom_frac,
+label_center_offset=&label_center_offset,
 auto_rotate2zero=&auto_rotate2zero, /*supply value 1 when there are <=3 text labels and you want them kept horizontal in the top headroom*/
 pct2adj4dencluster=&pct2adj4dencluster,/*For SNP labels on the top, please try to use this parameter, which only works when there are less than or equal to 4 top SNPs
 and SNPs within a cluster are overlapped with each other or overlapped with elements from other SNP cluster, so it is feasible to 

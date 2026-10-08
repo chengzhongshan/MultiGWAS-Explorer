@@ -16,6 +16,10 @@ CALLER_OUTPUT_HTML_BASENAME="${OUTPUT_HTML_BASENAME-__UNSET__}"
 CALLER_LOCAL_WINDOW_BP="${LOCAL_WINDOW_BP-__UNSET__}"
 CALLER_GTF_LABEL_SNPS="${GTF_LABEL_SNPS-__UNSET__}"
 CALLER_GTF_LABEL_LAYOUT="${GTF_LABEL_LAYOUT-__UNSET__}"
+CALLER_GTF_LABEL_POSITIONS="${GTF_LABEL_POSITIONS-__UNSET__}"
+CALLER_GTF_LABEL_FONT_SIZE="${GTF_LABEL_FONT_SIZE-__UNSET__}"
+CALLER_GTF_LABEL_HEADROOM_FRAC="${GTF_LABEL_HEADROOM_FRAC-__UNSET__}"
+CALLER_GTF_LABEL_CENTER_OFFSET="${GTF_LABEL_CENTER_OFFSET-__UNSET__}"
 CALLER_GTF_LD_SNPS="${GTF_LD_SNPS-__UNSET__}"
 CALLER_GTF_LD_DISPLAY_MODE="${GTF_LD_DISPLAY_MODE-__UNSET__}"
 CALLER_GTF_LD_R2_VALUES="${GTF_LD_R2_VALUES-__UNSET__}"
@@ -44,6 +48,18 @@ if [[ "${CALLER_GTF_LABEL_SNPS}" != "__UNSET__" ]]; then
 fi
 if [[ "${CALLER_GTF_LABEL_LAYOUT}" != "__UNSET__" ]]; then
   GTF_LABEL_LAYOUT="${CALLER_GTF_LABEL_LAYOUT}"
+fi
+if [[ "${CALLER_GTF_LABEL_POSITIONS}" != "__UNSET__" ]]; then
+  GTF_LABEL_POSITIONS="${CALLER_GTF_LABEL_POSITIONS}"
+fi
+if [[ "${CALLER_GTF_LABEL_FONT_SIZE}" != "__UNSET__" ]]; then
+  GTF_LABEL_FONT_SIZE="${CALLER_GTF_LABEL_FONT_SIZE}"
+fi
+if [[ "${CALLER_GTF_LABEL_HEADROOM_FRAC}" != "__UNSET__" ]]; then
+  GTF_LABEL_HEADROOM_FRAC="${CALLER_GTF_LABEL_HEADROOM_FRAC}"
+fi
+if [[ "${CALLER_GTF_LABEL_CENTER_OFFSET}" != "__UNSET__" ]]; then
+  GTF_LABEL_CENTER_OFFSET="${CALLER_GTF_LABEL_CENTER_OFFSET}"
 fi
 if [[ "${CALLER_GTF_LD_SNPS}" != "__UNSET__" ]]; then
   GTF_LD_SNPS="${CALLER_GTF_LD_SNPS}"
@@ -106,6 +122,10 @@ LOCAL_WINDOW_BP="${LOCAL_WINDOW_BP:-1e6}"
 GTF_LABEL_SNPS="${GTF_LABEL_SNPS:-${TARGET_SNP}}"
 GTF_LABEL_SNPS="${GTF_LABEL_SNPS//,/ }"
 GTF_LABEL_LAYOUT="${GTF_LABEL_LAYOUT:-auto}"
+GTF_LABEL_POSITIONS="${GTF_LABEL_POSITIONS:-}"
+GTF_LABEL_FONT_SIZE="${GTF_LABEL_FONT_SIZE:-10}"
+GTF_LABEL_HEADROOM_FRAC="${GTF_LABEL_HEADROOM_FRAC:-}"
+GTF_LABEL_CENTER_OFFSET="${GTF_LABEL_CENTER_OFFSET:-}"
 read -r -a _gtf_label_array <<< "${GTF_LABEL_SNPS}"
 case "$(printf '%s' "${GTF_LABEL_LAYOUT}" | tr '[:upper:]' '[:lower:]')" in
   auto)
@@ -189,6 +209,7 @@ GTF_LOCAL_DSD="${GTF_LOCAL_DSD:-${DEFAULT_GTF_LOCAL_DSD}}"
 GTF_GZ_URL="${GTF_GZ_URL:-${DEFAULT_GTF_GZ_URL}}"
 SNP_LOCAL_MACRO_SAS="${SNP_LOCAL_MACRO_SAS:-${DEPS_DIR}/SNP_Local_Manhattan_With_GTF.sas}"
 PATCHED_LATTICE_MACRO_SAS="${PATCHED_LATTICE_MACRO_SAS:-${DEPS_DIR}/Lattice_gscatter_over_bed_track.sas}"
+GTF_LABEL_SAS_PLANNER="${GTF_LABEL_SAS_PLANNER:-${DEPS_DIR}/Plan_Local_GTF_Target_Labels.sas}"
 MAP_GRP_ASSOC_MACRO_SAS="${MAP_GRP_ASSOC_MACRO_SAS:-${DEPS_DIR}/map_grp_assoc2gene4covidsexgwas.sas}"
 MULT_GSCATTER_GENE_MACRO_SAS="${MULT_GSCATTER_GENE_MACRO_SAS:-${DEPS_DIR}/Multgscatter_with_gene_exons.sas}"
 ADJ_CLOSE_GENE_GRP_MACRO_SAS="${ADJ_CLOSE_GENE_GRP_MACRO_SAS:-${DEPS_DIR}/adj_grpnum4close_gene_bed_regs.sas}"
@@ -1305,6 +1326,11 @@ perl "${RENDER_SAS_HELPER}" \
   --replace "REFERENCE_CHROMOSOME_LENGTHS=${REFERENCE_CHROMOSOME_LENGTHS}" \
   --replace "GTF_LABEL_SNPS=${GTF_LABEL_SNPS}" \
   --replace "GTF_LABEL_TEXT_ROTATE_ANGLE=${GTF_LABEL_TEXT_ROTATE_ANGLE}" \
+  --replace "GTF_LABEL_POSITIONS=${GTF_LABEL_POSITIONS}" \
+  --replace "GTF_LABEL_FONT_SIZE=${GTF_LABEL_FONT_SIZE}" \
+  --replace "GTF_LABEL_LAYOUT=${GTF_LABEL_LAYOUT}" \
+  --replace "GTF_LABEL_HEADROOM_FRAC=${GTF_LABEL_HEADROOM_FRAC}" \
+  --replace "GTF_LABEL_CENTER_OFFSET=${GTF_LABEL_CENTER_OFFSET}" \
   --replace "GTF_LD_REFERENCE_SNP=${GTF_LD_REFERENCE_SNP}" \
   --replace "GTF_LD_SNPS=${GTF_LD_SNPS}" \
   --replace "GTF_LD_DISPLAY_MODE=${GTF_LD_DISPLAY_MODE}" \
@@ -1352,6 +1378,7 @@ upload_support_args=(--upload-file "${LOCAL_GTF_SUBSET_GZ}" --upload-file "${DAT
 if [[ "${SINGLE_SNP_REUSE_SHARED_MACROS}" == "1" ]]; then
   echo "[1/6] Reusing shared SAS macros verified by an earlier locus; uploading only this SNP's GWAS and GTF subsets."
 else
+  upload_support_args=(--upload-file "${GTF_LABEL_SAS_PLANNER}" "${upload_support_args[@]}")
   upload_support_args=(--upload-file "${PATCHED_LATTICE_MACRO_SAS}" "${upload_support_args[@]}")
   if [[ -f "${MAP_GRP_ASSOC_MACRO_SAS}" ]]; then
     upload_support_args=(--upload-file "${MAP_GRP_ASSOC_MACRO_SAS}" "${upload_support_args[@]}")
@@ -1509,6 +1536,7 @@ cleanup_remote_generated_outputs
 if [[ "${CLEAN_ODA_MACROS}" == "1" ]]; then
   echo "[cleanup] Queueing uploaded SAS helper files for SAS ODA cleanup..."
   queue_oda_delete "$(basename "${PATCHED_LATTICE_MACRO_SAS}")"
+  queue_oda_delete "$(basename "${GTF_LABEL_SAS_PLANNER}")"
   queue_oda_delete "${RENDERED_SAS_BASENAME}"
   if [[ -f "${MAP_GRP_ASSOC_MACRO_SAS}" ]]; then
     queue_oda_delete "$(basename "${MAP_GRP_ASSOC_MACRO_SAS}")"

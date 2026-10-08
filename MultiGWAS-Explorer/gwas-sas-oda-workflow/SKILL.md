@@ -282,11 +282,20 @@ Before running a workflow, identify:
    lead with the smallest available association P as the region's sole label
    and LD reference. For explicit targets, label every target in the shared
    region, default to the first input target as the LD reference, and honor an
-   explicit `--local-ld-reference-snp` override. Use vertical labels with
-   genomic-position spacing for multiple explicit targets. Fit the top
-   headroom to the longest vertical label and the plot design height; raster
-   DPI must not inflate the layout headroom. Keep the adjusted label positions
-   paired with the genomic positions when merging SAS datasets.
+   explicit `--local-ld-reference-snp` override. For multiple explicit targets,
+   run the Perl local-GTF label planner before SAS submission. It estimates
+   label widths at the configured font size, balances horizontal displacement,
+   and selects vertical text only when horizontal labels cannot fit without
+   large leader-line shifts. Pass its chosen angle and adjusted label positions
+   to SAS; keep GWAS/LD marker coordinates at their true genomic positions.
+   Pass its font-aware top headroom and text-height-relative center offset too.
+   If Perl planning fails or target coordinates are unavailable locally, invoke
+   `Plan_Local_GTF_Target_Labels.sas` against the compact imported locus in
+   SAS ODA before drawing. `GTF_LABEL_PLAN_BACKEND=sas` forces that fallback
+   for a regression check.
+   Fit vertical top headroom to the longest label and design height; raster
+   DPI must not inflate layout headroom. Keep adjusted labels paired with their
+   genomic positions when merging SAS datasets.
    In this project, `--local-gtf-window-bp` now controls both the extracted GTF
    half-window and the displayed local GTF plot half-window.
    Default that half-window to 1 Mb for newly generated runs and direct
@@ -390,8 +399,8 @@ Before running a workflow, identify:
    shared window and you want one centered local-GTF figure instead of one
    locus per target. The older batched macro can use `auto_rotate2zero=1` to
    keep up to three labels horizontal. The single-SNP signed-LD runner uses
-   vertical spacing for multiple explicit targets and disables that rotation
-   override so nearby rsIDs remain distinct.
+   the Perl-planned orientation for multiple explicit targets and disables
+   SAS's count-only rotation override so nearby rsIDs remain distinct.
    The single-SNP extractor manifest now also reports whether the target row
    survived and which prefix blocks were present or missing. Use that manifest
    before blaming a sparse locus: a target row can still be valid for local GTF

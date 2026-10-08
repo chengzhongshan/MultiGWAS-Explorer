@@ -125,6 +125,7 @@ my $emit_local_sas_scripts = 0;
 my $local_sas_only = 0;
 my $local_gtf_label_snps_override = '';
 my $local_gtf_label_layout_override = '';
+my $local_gtf_label_font_size_override;
 my $local_gtf_yaxis_offset4max_override = '';
 my $local_gtf_yoffset4textlabels_override = '';
 my $local_ld_snps_override = '';
@@ -248,6 +249,7 @@ GetOptions(
     'local-sas-only!' => \$local_sas_only,
     'local-gtf-label-snps=s' => \$local_gtf_label_snps_override,
     'local-gtf-label-layout=s' => \$local_gtf_label_layout_override,
+    'local-gtf-label-font-size=f' => \$local_gtf_label_font_size_override,
     'local-gtf-yaxis-offset4max=s' => \$local_gtf_yaxis_offset4max_override,
     'local-gtf-yoffset4textlabels=s' => \$local_gtf_yoffset4textlabels_override,
     'local-ld-snps=s' => \$local_ld_snps_override,
@@ -839,6 +841,7 @@ my $runner_cfg = build_runner_config(
     local_ld_r2_values_override => $local_ld_r2_values_override,
     local_ld_heatmap_colors => $local_ld_heatmap_colors,
     local_gtf_label_layout_override => $local_gtf_label_layout_override,
+    local_gtf_label_font_size_override => $local_gtf_label_font_size_override,
     local_gtf_yaxis_offset4max_override => $local_gtf_yaxis_offset4max_override,
     local_gtf_yoffset4textlabels_override => $local_gtf_yoffset4textlabels_override,
     get_common_associations => $effective_get_common_associations,
@@ -3229,6 +3232,7 @@ sub build_runner_config {
     my $local_ld_r2_values_override = $args{local_ld_r2_values_override} // '';
     my $local_ld_heatmap_colors = $args{local_ld_heatmap_colors} // 'CXF7FBFF CX6BAED6 CX54278F';
     my $local_gtf_label_layout_override = $args{local_gtf_label_layout_override} // '';
+    my $local_gtf_label_font_size_override = $args{local_gtf_label_font_size_override};
     my $local_gtf_yaxis_offset4max_override = $args{local_gtf_yaxis_offset4max_override} // '';
     my $local_gtf_yoffset4textlabels_override = $args{local_gtf_yoffset4textlabels_override} // '';
     my $get_common_associations = $args{get_common_associations} ? 1 : 0;
@@ -3643,6 +3647,11 @@ sub build_runner_config {
             length($local_gtf_label_layout_override)
               ? $local_gtf_label_layout_override
               : cfg_or($spec, 'local_gtf_label_layout', 'auto')
+        ),
+        GTF_LABEL_FONT_SIZE => (
+            defined($local_gtf_label_font_size_override)
+              ? $local_gtf_label_font_size_override
+              : cfg_or($spec, 'local_gtf_label_font_size', 10)
         ),
         FOREST_TRACK_IDS => join('|', map { $_->{id} } @forest_tracks),
         FOREST_TRACK_LABELS => join('|', map { $_->{label} } @forest_tracks),
@@ -4911,7 +4920,10 @@ Options:
                        Label these SNP names on top of the local GTF figure.
                        Default behavior labels the target/top-hit SNPs.
   --local-gtf-label-layout MODE
-                       local GTF top-label layout: auto|vertical|horizontal.
+                       Local GTF top-label layout: auto|vertical|horizontal.
+                       Auto uses font-aware Perl spacing to avoid overlap.
+  --local-gtf-label-font-size N
+                       SNP top-label font size in points (default: 10).
   --local-gtf-window-bp BP
                        Override the genomic half-window used only for the local
                        GTF plot stage (default: 1e6). Values above 5e6 warn
@@ -5073,7 +5085,9 @@ sub full_help {
         $text .= "  - use --local-gtf-label-snps rs1,rs2,... when you want to label extra or\n";
         $text .= "    specific SNP names on top of the local GTF plot window\n";
     $text .= "  - use --local-gtf-label-layout vertical or --local-gtf-label-layout horizontal\n";
-    $text .= "    to choose how those top SNP labels are drawn; auto keeps the macro-driven default\n";
+    $text .= "    to override the font-aware automatic label planner\n";
+    $text .= "  - use --local-gtf-label-font-size N to set the font used by both the\n";
+    $text .= "    collision planner and the SAS top labels (default 10 pt)\n";
     $text .= "  - use --local-gtf-yaxis-offset4max N when you want to set the starting\n";
     $text .= "    top headroom fraction for local GTF plots; this is the parameter that\n";
     $text .= "    controls single-SNP top headroom after the macro overrides\n";

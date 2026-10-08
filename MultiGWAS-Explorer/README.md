@@ -2932,9 +2932,20 @@ through `--target-snps rs123` plus
 `--local-gtf-label-snps rs123,rs456,rs789`.
 
 The older batched GTF macro can keep three or fewer labels horizontal with
-`auto_rotate2zero=1`. The single-SNP signed-LD runner instead uses vertical
-labels for multiple explicit targets, even when there are only two or three,
-to keep nearby rsIDs separate.
+`auto_rotate2zero=1`. For signed-LD target plots, `plan_local_gtf_labels.pl`
+estimates the width of every rsID at the configured font size, spreads labels
+within the visible locus, and keeps them horizontal only when they fit without
+large leader-line shifts. Otherwise it plans vertical labels. It passes the
+adjusted label positions to SAS; the GWAS and LD marker coordinates stay at
+their true genomic positions. Use `--local-gtf-label-layout horizontal` or
+`vertical` to override the automatic choice, and
+`--local-gtf-label-font-size 12` (or spec key
+`local_gtf_label_font_size`) when changing the label font. The planner also
+sets the top headroom from the chosen text height and centers labels within
+that space. If Perl cannot plan a locus, the uploaded
+`Plan_Local_GTF_Target_Labels.sas` macro makes the same decision from the
+compact GWAS rows in SAS ODA. To exercise that fallback deliberately during
+debugging, set `GTF_LABEL_PLAN_BACKEND=sas` for one run.
 
 The direct single-SNP extractor now also records target-row diagnostics in the
 emitted manifest, including whether the target row survived and which prefix
@@ -3146,7 +3157,8 @@ question "LD to which variant?" and can silently change the scientific meaning
 of the color scale. The SAS automation therefore runs the single-target GTF
 runner once per non-overlapping locus when heatmap mode and direct PLINK2 LD
 are used. For an explicit `--target-snps` request, nearby targets are all
-labeled in the same plot, with vertical labels spaced by genomic position.
+labeled in the same plot. A Perl layout planner adjusts their label positions
+and selects horizontal or vertical text according to label widths and spacing.
 The first input target is the LD reference unless `--local-ld-reference-snp`
 names another target in that locus. The top headroom scales with the longest
 vertical label, so short rsIDs do not reserve excess space. For automatically

@@ -31,6 +31,7 @@ cache/plink2_tmp/
 cache/pgc_scz_sex_public/
 /cache/
 /run_single_snp_with_gtf_*/
+/local_gtf_label_planner_smoke*/
 /upload_*/
 /\.autogen_*/
 /configs/auto_*_diff_merged_*
@@ -57,6 +58,8 @@ cache/pgc_scz_sex_public/
 /sas_inline_result_*.json
 /sas_inline_runner_*.py
 /sas_submit_worker_result_*.json
+/*.html.target_coordinates.tsv
+/*.html.request.md5.tmp.*
 
 # Reviewer-benchmark reruns and large downloadable HaploReg intermediates.
 benchmark/reproduction/

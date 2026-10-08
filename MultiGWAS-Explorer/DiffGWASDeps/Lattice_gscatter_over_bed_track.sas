@@ -156,6 +156,9 @@ reflinecolor4selecteddots=gray,/*asign color for the vertical reference lines fo
 snp_line_split_ratio=0.99,/*split the vertical reference lines into two parts based on the ratio, with the 
 smaller part drawn from the end of point of the larger part to the adjusted position of each snp!*/
 text_rotate_angle=90, /*Angle to rotate text labels for these selected dots by users*/
+label_position_overrides=, /*Optional space-delimited SNP=BP labels placed by the local Perl planner.*/
+label_headroom_frac=, /*Planned y-axis top offset for the actual label height.*/
+label_center_offset=, /*GTL POSITIONOFFSETY in units of the text height.*/
 auto_rotate2zero=0, /*supply value 1 when there are <=3 text labels and you want them kept horizontal in the top headroom*/
 adj_spaces_among_top_snps=1,/*Provide value 1 to adjust spaces among top SNP labels; otherwise, give value 0 to not 
 adjust top SNPs labels if these labels are rotated 90 degree, which is helpful when the space adjusted labels are not pretty*/
@@ -1445,6 +1448,24 @@ run;
    merge _xtag_(drop=newpos) _xtag1_(keep=newpos);
    run;
    %end;
+   /* Preserve the planner's label centers after the legacy SAS spacing pass.
+      Only label coordinates change; GWAS marker and LD positions stay intact. */
+   %if %length(%superq(label_position_overrides))>0 %then %do;
+   data _xtag_;
+   set _xtag_;
+   length _planned_token $256 _planned_snp $128;
+   do _planned_i=1 to countw(symget('label_position_overrides'), ' ');
+      _planned_token=scan(symget('label_position_overrides'), _planned_i, ' ');
+      _planned_snp=scan(_planned_token, 1, '=');
+      if upcase(strip(&var4label_scatterplot_dots))=upcase(_planned_snp) then do;
+         _planned_bp=input(scan(_planned_token, 2, '='), best32.);
+         if not missing(_planned_bp) then newpos=_planned_bp;
+         leave;
+      end;
+   end;
+   drop _planned_token _planned_snp _planned_i _planned_bp;
+   run;
+   %end;
 /*   %abort 255;*/
  
    *******************************************************************************************************;
@@ -1656,6 +1677,11 @@ where &var4label_scatterplot_dots^="";
 	%let yaxis_offset4max=%sysevalf(0.04*500/&track_height);
 	%let yaxis_offset4min=%sysevalf(0.02*500/&track_height);/*This will reduce the lower offset of y-axis*/
     %put NOTE: Small top-label horizontal tuning: n_marker_labels=&n_marker_labels yaxis_offset4max=&yaxis_offset4max yaxis_offset4min=&yaxis_offset4min effective_yoffset4textlabels=&effective_yoffset4textlabels track_height=&track_height.;
+%end;
+%if %length(%superq(label_headroom_frac))>0 and %length(%superq(label_center_offset))>0 %then %do;
+    %let yaxis_offset4max=&label_headroom_frac;
+    %let effective_yoffset4textlabels=&label_center_offset;
+    %put NOTE: Planned top-label headroom=&yaxis_offset4max center_offset=&effective_yoffset4textlabels.;
 %end;
 %end;
 

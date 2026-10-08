@@ -18,6 +18,11 @@ This script draws a local Manhattan plot with gene tracks for a single target SN
 %let reference_chromosome_lengths=__REFERENCE_CHROMOSOME_LENGTHS__;
 %let gtf_label_snps=__GTF_LABEL_SNPS__;
 %let gtf_label_text_rotate_angle=__GTF_LABEL_TEXT_ROTATE_ANGLE__;
+%let gtf_label_positions=__GTF_LABEL_POSITIONS__;
+%let gtf_label_font_size=__GTF_LABEL_FONT_SIZE__;
+%let gtf_label_layout_request=__GTF_LABEL_LAYOUT__;
+%let gtf_label_headroom_frac=__GTF_LABEL_HEADROOM_FRAC__;
+%let gtf_label_center_offset=__GTF_LABEL_CENTER_OFFSET__;
 %let gtf_ld_reference_snp=__GTF_LD_REFERENCE_SNP__;
 %let gtf_ld_snps=__GTF_LD_SNPS__;
 %let gtf_ld_display_mode=__GTF_LD_DISPLAY_MODE__;
@@ -67,6 +72,7 @@ ods graphics on / outputfmt=png;
 %include "~/map_grp_assoc2gene4covidsexgwas.sas";
 %include "~/SNP_Local_Manhattan_With_GTF.sas";
 %include "~/Lattice_gscatter_over_bed_track.sas";
+%include "~/Plan_Local_GTF_Target_Labels.sas";
 
 __GTF_IMPORT_BLOCK__
 
@@ -258,6 +264,23 @@ proc sql;
   order by CHR, BP;
 quit;
 
+/* Perl normally supplies the chosen positions. Replan within SAS ODA when
+   Perl could not resolve coordinates or its planner was unavailable. */
+%if %length(%superq(gtf_label_positions))=0 %then %do;
+  %Plan_Local_GTF_Target_Labels(
+    wide_dsd=&target_local_dsd,
+    label_snps=&gtf_label_snps,
+    center_bp=&target_bp,
+    window_bp=&effective_gtf_dist2snp,
+    design_width=&gtf_design_width,
+    font_size=&gtf_label_font_size,
+    requested_layout=&gtf_label_layout_request,
+    design_height=&gtf_design_height,
+    out_headroom=gtf_label_headroom_frac,
+    out_center_offset=gtf_label_center_offset
+  );
+%end;
+
 %SNP_Local_Manhattan_With_GTF(
   gwas_dsd=&target_local_dsd,
   chr_var=CHR,
@@ -289,6 +312,10 @@ quit;
   SNPs2label_scatterplot_dots=&gtf_label_snps,
   text_rotate_angle=&gtf_label_text_rotate_angle,
   auto_rotate2zero=0,
+  label_position_overrides=&gtf_label_positions,
+  font_size4textlabels=&gtf_label_font_size,
+  label_headroom_frac=&gtf_label_headroom_frac,
+  label_center_offset=&gtf_label_center_offset,
   LD_reference_snp=&gtf_ld_reference_snp,
   LD_SNPs2mark_scatterplot_dots=&gtf_ld_snps,
   LD_display_mode=&gtf_ld_display_mode,

@@ -127,7 +127,13 @@ my %render_config = map { $_ => $runner_config->{$_} }
         && /^(?:GTF_|LOCAL_|DISPLAY_GWAS|GROUP_TRACKS$|PAIR_DEFS$|DATA_GZ$|SOURCE_LONG_GZ$|SOURCE_MODE$|EXTRACTOR_CONFIG_JSON$|REFERENCE_BUILD$)/ }
     keys %$runner_config;
 my $deps_dir = File::Spec->catpath((File::Spec->splitpath(__FILE__))[0,1], '');
+my $perl_planner = File::Spec->catfile($deps_dir, 'plan_local_gtf_labels.pl');
+my $perl_planner_available = eval { require $perl_planner; 1 };
+warn "[signed-LD] Perl label planner unavailable ($@); SAS ODA will plan labels.\n"
+    unless $perl_planner_available;
 my @plot_sources = qw(
+    plan_local_gtf_labels.pl
+    Plan_Local_GTF_Target_Labels.sas
     run_sas_oda_single_snp_with_gtf.sas
     SNP_Local_Manhattan_With_GTF.sas
     Lattice_gscatter_over_bed_track.sas
@@ -144,10 +150,15 @@ my @plot_sources = qw(
 );
 my %plot_source_hashes = map {
     my $path = File::Spec->catfile($deps_dir, $_);
-    open my $source, '<:raw', $path or die "Cannot read plot source $path: $!\n";
-    local $/;
-    my $digest = sha256_hex(<$source>);
-    close $source;
+    my $digest;
+    if (!-f $path && $_ eq 'plan_local_gtf_labels.pl') {
+        $digest = sha256_hex('SAS fallback: Perl planner unavailable');
+    } else {
+        open my $source, '<:raw', $path or die "Cannot read plot source $path: $!\n";
+        local $/;
+        $digest = sha256_hex(<$source>);
+        close $source;
+    }
     $_ => $digest;
 } @plot_sources;
 my $render_request = JSON::PP->new->canonical(1)->encode({
@@ -176,6 +187,27 @@ for my $locus (@loci) {
     my @label_snps = $explicit_targets ? @{ $locus->{targets} } : ($snp);
     my $label_text = join(',', @label_snps);
     my $plot_window_bp = $locus->{plot_window_bp};
+    my $label_plan;
+    if ($perl_planner_available && lc($ENV{GTF_LABEL_PLAN_BACKEND} || '') ne 'sas') {
+        $label_plan = eval { LocalGTFLabelPlanner::plan(
+            targets => [map { +{ snp => $_,
+                bp => exists($target_location{lc $_})
+                    ? $target_location{lc $_}{bp} : undef } } @label_snps],
+            reference_bp => $locus->{bp}, window_bp => $plot_window_bp,
+            design_width => $runner_config->{GTF_DESIGN_WIDTH} || 950,
+            design_height => $runner_config->{GTF_DESIGN_HEIGHT} || 1000,
+            font_size => $runner_config->{GTF_LABEL_FONT_SIZE} || 10,
+            layout => $runner_config->{GTF_LABEL_LAYOUT} || 'auto',
+        ) };
+        warn "[signed-LD] Perl label planning failed ($@); SAS ODA will plan labels.\n"
+            if $@;
+    }
+    $label_plan ||= {
+        layout => $runner_config->{GTF_LABEL_LAYOUT} || 'auto',
+        positions => '', headroom_frac => '', center_offset => '',
+        font_size => $runner_config->{GTF_LABEL_FONT_SIZE} || 10,
+        reason => 'sas_fallback',
+    };
     my $locus_id = $locus->{id};
     (my $safe_snp = $snp) =~ s/[^A-Za-z0-9._-]/_/g;
     my $target_html = @loci == 1 ? $base : "${output_stem}_${safe_snp}.html";
@@ -187,6 +219,8 @@ for my $locus (@loci) {
         // $runner_config->{GTF_LD_R2_CACHE_BY_SNP}{$snp}
         // '';
     my $request_key = md5_hex(join("\0", $render_request, $snp, $label_text, $plot_window_bp,
+        $label_plan->{layout}, $label_plan->{positions}, $label_plan->{font_size},
+        $label_plan->{headroom_frac}, $label_plan->{center_offset},
         JSON::PP->new->canonical(1)->encode(file_signature($ld_cache))));
     if (-s $target_path && -s $target_png && -s $request_file) {
         open my $request_fh, '<', $request_file or die "Cannot read $request_file: $!\n";
@@ -214,10 +248,11 @@ for my $locus (@loci) {
     $ENV{SINGLE_SNP_ALLOW_GENERIC_OUTPUT_BASENAME} = 1;
     $ENV{SINGLE_SNP_TOP_HITS_CSV_BASENAME} = $target_csv;
     $ENV{GTF_LABEL_SNPS} = $label_text;
-    if ($explicit_targets && @label_snps > 1
-        && lc($runner_config->{GTF_LABEL_LAYOUT} || 'auto') eq 'auto') {
-        $ENV{GTF_LABEL_LAYOUT} = 'vertical';
-    }
+    $ENV{GTF_LABEL_LAYOUT} = $label_plan->{layout};
+    $ENV{GTF_LABEL_POSITIONS} = $label_plan->{positions};
+    $ENV{GTF_LABEL_FONT_SIZE} = $label_plan->{font_size};
+    $ENV{GTF_LABEL_HEADROOM_FRAC} = $label_plan->{headroom_frac};
+    $ENV{GTF_LABEL_CENTER_OFFSET} = $label_plan->{center_offset};
     $ENV{GTF_LD_DISPLAY_MODE} = lc $opt{mode};
     $ENV{GTF_LD_R2_CACHE} = $ld_cache;
     $ENV{GTF_LD_REFERENCE_SNP} = $snp;
@@ -235,7 +270,7 @@ for my $locus (@loci) {
     # target-specific inputs must be removed after each successful locus.
     $ENV{KEEP_REMOTE_PLOT_DATA} = 0;
     $ENV{CLEAN_ODA_INPUT} = 1;
-    print "[signed-LD] Rendering locus labels [$label_text] with PLINK2 LD reference $snp"
+    print "[signed-LD] Rendering locus labels [$label_text] with $label_plan->{layout} layout ($label_plan->{reason}) and PLINK2 LD reference $snp"
         . ($plot_window_bp != 0 + $opt{window_bp} ? " and expanded half-window $plot_window_bp bp" : '') . "\n";
     my $rc = system('/bin/bash', $opt{single_runner});
     if ($rc != 0 || !-s $target_path || !-s $target_png) {

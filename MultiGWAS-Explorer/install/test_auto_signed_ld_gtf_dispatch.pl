@@ -23,7 +23,8 @@ set -euo pipefail
 [[ "${GTF_LD_DISPLAY_MODE}" == "heatmap" ]]
 [[ "${GTF_LD_REFERENCE_SNP}" == "${TARGET_SNP}" ]]
 printf '%s\t%s\t%s\t%s\n' "${TARGET_SNP}" "${LOCAL_WINDOW_BP}" "${GTF_LD_HEATMAP_LEGEND_TITLE}" "${GTF_LABEL_SNPS}" >> "${WORKDIR}/calls.tsv"
-printf '%s\t%s\n' "${TARGET_SNP}" "${GTF_LABEL_LAYOUT:-auto}" >> "${WORKDIR}/layout_calls.tsv"
+printf '%s\t%s\t%s\t%s\n' "${TARGET_SNP}" "${GTF_LABEL_LAYOUT:-auto}" "${GTF_LABEL_POSITIONS:-}" "${GTF_LABEL_FONT_SIZE:-}" >> "${WORKDIR}/layout_calls.tsv"
+printf '%s\t%s\t%s\n' "${TARGET_SNP}" "${GTF_LABEL_HEADROOM_FRAC:-}" "${GTF_LABEL_CENTER_OFFSET:-}" >> "${WORKDIR}/headroom_calls.tsv"
 printf '%s\t%s\n' "${TARGET_SNP}" "${GTF_LD_R2_CACHE}" >> "${WORKDIR}/cache_calls.tsv"
 printf '<html><img src="%s.png"></html>\n' "${TARGET_SNP}" > "${WORKDIR}/${OUTPUT_HTML_BASENAME}"
 printf 'PNG:%s\n' "${TARGET_SNP}" > "${WORKDIR}/${OUTPUT_HTML_BASENAME%.html}.png"
@@ -131,10 +132,28 @@ like($calls[-1], qr/^rsNearB\t200000\t.*\trsNearB\s*$/,
 open $calls_fh, '<', "$dir/layout_calls.tsv" or die $!;
 my @layout_calls = <$calls_fh>;
 close $calls_fh;
-like($layout_calls[-2], qr/^rsNearA\tvertical\s*$/,
-    'explicit nearby targets default to vertical labels');
-like($layout_calls[-1], qr/^rsNearB\tauto\s*$/,
-    'automatic single-lead label retains automatic layout');
+like($layout_calls[-2], qr/^rsNearA\thorizontal\trsNearA=\d+ rsNearB=\d+\t10\s*$/,
+    'explicit nearby targets use planned horizontal positions when they fit');
+like($layout_calls[-1], qr/^rsNearB\thorizontal\trsNearB=\d+\t10\s*$/,
+    'automatic single lead receives a centered horizontal label');
+open $calls_fh, '<', "$dir/headroom_calls.tsv" or die $!;
+my @headroom_calls = <$calls_fh>;
+close $calls_fh;
+like($headroom_calls[-2], qr/^rsNearA\t0\.\d+\t0\.\d+\s*$/,
+    'explicit locus receives planned height and centering');
+
+{
+    local $ENV{GTF_LABEL_PLAN_BACKEND} = 'sas';
+    is(system($^X, $dispatcher, '--target-snps', 'rsNearA,rsNearB',
+        '--runner-config', $config, '--output-html', "$dir/nearby_sas_fallback.html",
+        '--single-runner', $runner, '--window-bp', 100000), 0,
+        'SAS fallback can be selected when Perl planning is unavailable');
+}
+open $calls_fh, '<', "$dir/layout_calls.tsv" or die $!;
+@layout_calls = <$calls_fh>;
+close $calls_fh;
+like($layout_calls[-1], qr/^rsNearA\tauto\t\t10\s*$/,
+    'fallback leaves positions empty for the SAS macro to plan');
 
 open $cfg, '>', $config or die $!;
 print {$cfg} encode_json({ DATA_GZ => $wide, GTF_LD_REFERENCE_SNP => 'rsNearB' }), "\n";
