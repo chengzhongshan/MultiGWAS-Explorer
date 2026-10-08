@@ -145,10 +145,13 @@ sub plan {
         : 2 * (sort { $b <=> $a } @horizontal_half)[0];
     my $headroom_px = $text_height + ($font * 96 / 72 * 0.8 > 12
         ? $font * 96 / 72 * 0.8 : 12);
-    my $headroom_frac = $headroom_px / ($height * 0.75);
-    $headroom_frac = 0.035 if $headroom_frac < 0.035;
+    # The GTL plot uses the full design height when converting offsetmax to
+    # visible headroom. Dividing by a smaller nominal area over-reserves space,
+    # especially for rotated labels.
+    my $headroom_frac = $headroom_px / $height;
+    $headroom_frac = 0.025 if $headroom_frac < 0.025;
     $headroom_frac = 0.45 if $headroom_frac > 0.45;
-    my $center_offset = $headroom_frac * $height * 0.75 / (2 * $text_height);
+    my $center_offset = $headroom_frac * $height / (2 * $text_height);
     return { layout => $chosen,
         positions => join(' ', map { "$_->{snp}=$_->{bp}" } @positions),
         font_size => $font, reason => $reason,

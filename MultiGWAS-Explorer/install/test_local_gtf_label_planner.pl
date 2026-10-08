@@ -13,7 +13,7 @@ my $plan = LocalGTFLabelPlanner::plan(targets => \@nearby,
     reference_bp => 1_000_000, window_bp => 1_000_000,
     design_width => 950, font_size => 10);
 is($plan->{layout}, 'horizontal', 'two nearby rsIDs fit after balanced displacement');
-ok($plan->{headroom_frac} > 0.03 && $plan->{center_offset} > 0,
+ok($plan->{headroom_frac} >= 0.025 && $plan->{center_offset} > 0,
     'horizontal labels receive height and centering parameters');
 my @adjusted = map { (split /=/, $_, 2)[1] } split / /, $plan->{positions};
 ok($adjusted[0] < 1_000_000 && $adjusted[1] > 1_000_100,
@@ -32,6 +32,21 @@ $plan = LocalGTFLabelPlanner::plan(targets => \@crowded,
     design_width => 950, font_size => 10);
 is($plan->{layout}, 'vertical', 'crowded long labels rotate');
 is(scalar(split / /, $plan->{positions}), 8, 'every crowded target receives a position');
+
+my @cd55_targets = (
+    { snp => 'rs2802216', bp => 207_394_658 },
+    { snp => 'rs200078770', bp => 207_394_677 },
+    { snp => 'rs4303075', bp => 207_394_678 },
+    { snp => 'rs11117664', bp => 207_394_689 },
+);
+$plan = LocalGTFLabelPlanner::plan(targets => \@cd55_targets,
+    reference_bp => 207_394_658, window_bp => 1_000_031,
+    design_width => 950, design_height => 1000, font_size => 10);
+is($plan->{layout}, 'vertical', 'four CD55-region targets within 31 bp rotate');
+is(scalar(split / /, $plan->{positions}), 4,
+    'four CD55-region targets all retain labels');
+ok($plan->{headroom_frac} > 0.1 && $plan->{headroom_frac} < 0.13,
+    'four rotated labels reserve a fitted headroom rather than excess space');
 
 my @medium = map { +{ snp => "rs12345$_", bp => 1_000_000 + $_ * 120_000 } } 1 .. 5;
 my $small = LocalGTFLabelPlanner::plan(targets => \@medium,

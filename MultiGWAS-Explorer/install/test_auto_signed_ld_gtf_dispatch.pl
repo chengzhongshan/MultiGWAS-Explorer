@@ -50,6 +50,7 @@ my $index_html = do { local $/; <$index_fh> };
 close $index_fh;
 like($index_html, qr/selected_rs75453394\.html/, 'index links to first locus plot');
 like($index_html, qr/selected_rsOther\.html/, 'index links to second locus plot');
+like($index_html, qr/chr9:121741165/, 'index identifies the first plot by genomic location');
 open my $calls_fh, '<', "$dir/calls.tsv" or die $!;
 my @calls = <$calls_fh>;
 close $calls_fh;

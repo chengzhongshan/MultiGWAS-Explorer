@@ -289,6 +289,10 @@ Before running a workflow, identify:
    large leader-line shifts. Pass its chosen angle and adjusted label positions
    to SAS; keep GWAS/LD marker coordinates at their true genomic positions.
    Pass its font-aware top headroom and text-height-relative center offset too.
+   Size headroom against the full SAS design height; using only an assumed
+   plot-area fraction left excess blank space above four nearby rotated labels.
+   For requests spanning separate chromosomes or nonoverlapping windows, list
+   each plot's chromosome and target-coordinate range in the result index.
    If Perl planning fails or target coordinates are unavailable locally, invoke
    `Plan_Local_GTF_Target_Labels.sas` against the compact imported locus in
    SAS ODA before drawing. `GTF_LABEL_PLAN_BACKEND=sas` forces that fallback

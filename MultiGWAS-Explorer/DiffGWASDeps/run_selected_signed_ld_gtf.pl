@@ -229,7 +229,7 @@ for my $locus (@loci) {
         $saved =~ s/\s+\z//;
         if ($saved eq $request_key) {
             print "[signed-LD] Reusing completed plot for $snp\n";
-            push @links, [$label_text, $target_html];
+            push @links, [$label_text, $target_html, locus_region($locus)];
             $status{$locus_id} = 'complete';
             write_progress();
             next;
@@ -284,7 +284,7 @@ for my $locus (@loci) {
     }
     $shared_macros_ready = 1;
     atomic_write($request_file, "$request_key\n");
-    push @links, [$label_text, $target_html];
+    push @links, [$label_text, $target_html, locus_region($locus)];
     $status{$locus_id} = 'complete';
     write_progress();
 }
@@ -525,6 +525,18 @@ sub normalize_chr {
     return uc($chr) eq 'X' ? '23' : uc($chr);
 }
 
+sub locus_region {
+    my ($locus) = @_;
+    my $chr = $locus->{chr} // '';
+    return '' unless length $chr;
+    my @bp = sort { $a <=> $b } map { $target_location{lc $_}{bp} }
+        grep { exists $target_location{lc $_} } @{ $locus->{targets} };
+    return '' unless @bp;
+    $chr = 'X' if normalize_chr($chr) eq '23';
+    return 'chr' . $chr . ':' . $bp[0]
+        . (@bp > 1 && $bp[-1] != $bp[0] ? '-' . $bp[-1] : '');
+}
+
 sub chromosome_sort_key {
     my ($chr) = @_;
     $chr = normalize_chr($chr);
@@ -574,9 +586,25 @@ sub write_status_file {
 sub plot_index_html {
     my ($links) = @_;
     my $html = '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Signed-LD local GTF plots</title></head><body>' . "\n";
-    $html .= '<h1>Signed-LD local GTF plots</h1><ul>' . "\n";
-    $html .= '<li><a href="' . $_->[1] . '">' . $_->[0] . '</a></li>' . "\n" for @$links;
+    $html .= '<h1>Signed-LD local GTF plots</h1>' . "\n";
+    $html .= '<p>Targets in separate genomic regions have separate plots.</p>' . "\n";
+    $html .= '<ul>' . "\n";
+    for my $link (@$links) {
+        my $label = (length($link->[2] // '') ? "$link->[2] | " : '') . $link->[0];
+        $html .= '<li><a href="' . html_escape($link->[1]) . '">'
+            . html_escape($label) . '</a></li>' . "\n";
+    }
     return $html . '</ul></body></html>' . "\n";
+}
+
+sub html_escape {
+    my ($text) = @_;
+    $text //= '';
+    $text =~ s/&/&amp;/g;
+    $text =~ s/</&lt;/g;
+    $text =~ s/>/&gt;/g;
+    $text =~ s/"/&quot;/g;
+    return $text;
 }
 
 sub atomic_write {

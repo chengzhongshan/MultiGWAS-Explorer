@@ -2613,13 +2613,17 @@ and status file for the program failure.
 When two or more explicit target SNPs have overlapping SNP-centered windows on
 the same chromosome, the SAS local-GTF runner now merges them into one displayed
 locus and labels every requested rsID in that plot. For example, with a `1e6`
-half-window, `rs2070788` (chr21:42841988) and `rs383510` (chr21:42858367) are
+half-window, `rs2070788` (chr21:41470061) and `rs383510` (chr21:41486440) are
 rendered together rather than as two nearly identical figures. The first
 requested or most-significant lead remains the named LD reference, and the
 displayed half-window expands enough to contain the union of all member SNP
 windows. A previously
 generated target CSV is reused only after its SNPs, coordinates, optional gene
 overrides, and freshness relative to the compact GWAS subset are validated.
+Targets on different chromosomes or in nonoverlapping windows produce separate
+plots. Their index lists the chromosome and target-coordinate range beside
+each plot link, so a figure with two labels is identifiable within a larger
+four-target request.
 
 High-LD marker overlays are disabled by default because dense proxies can
 obscure association points in a wide locus. Enable them only when requested:
@@ -2675,8 +2679,8 @@ perl auto_prepare_and_run_diff_gwas.pl \
 ```
 
 Set `--local-ld-display-mode none` to disable the SAS heatmap explicitly.
-With multiple target SNPs, SAS creates a separate indexed local window, LD
-reference, and signed colorbar for each target.
+With targets in multiple nonoverlapping loci, SAS creates a separate indexed
+local window, LD reference, and signed colorbar for each locus.
 
 For an explicit LocusZoom-like LD view in SAS ODA, request
 `--local-ld-display-mode heatmap`.
@@ -2942,7 +2946,8 @@ their true genomic positions. Use `--local-gtf-label-layout horizontal` or
 `--local-gtf-label-font-size 12` (or spec key
 `local_gtf_label_font_size`) when changing the label font. The planner also
 sets the top headroom from the chosen text height and centers labels within
-that space. If Perl cannot plan a locus, the uploaded
+that space. Four CD55-region targets within 31 bp, for example, rotate and
+share one fitted headroom. If Perl cannot plan a locus, the uploaded
 `Plan_Local_GTF_Target_Labels.sas` macro makes the same decision from the
 compact GWAS rows in SAS ODA. To exercise that fallback deliberately during
 debugging, set `GTF_LABEL_PLAN_BACKEND=sas` for one run.

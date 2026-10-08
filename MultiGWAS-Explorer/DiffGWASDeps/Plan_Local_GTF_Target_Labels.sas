@@ -153,8 +153,8 @@
       end;
     end;
     _headroom_px=_text_height+max(12,_font*96/72*0.8);
-    _headroom=max(0.035,min(0.45,_headroom_px/(&design_height*0.75)));
-    _center_offset=_headroom*&design_height*0.75/(2*_text_height);
+    _headroom=max(0.025,min(0.45,_headroom_px/&design_height));
+    _center_offset=_headroom*&design_height/(2*_text_height);
     call symputx("&out_angle",_angle,'g');
     call symputx("&out_positions",_positions,'g');
     call symputx("&out_headroom",_headroom,'g');
