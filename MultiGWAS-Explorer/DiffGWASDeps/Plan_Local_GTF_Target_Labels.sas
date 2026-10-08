@@ -81,7 +81,6 @@
       _x[_i]=_left+(_bp[_i]-_xmin)/_span*_plot_width;
     end;
     _request=lowcase("&requested_layout");
-    _shift_limit=min(90,0.12*_plot_width);
     _chosen=0;
     do _mode=1 to 2 while(_chosen=0);
       if _mode=1 then _gap=_font*96/72*0.7+6;
@@ -131,12 +130,7 @@
           _centers[_i]=_base+_separation[_i];
         end;
       end;
-      _max_shift=0;
-      do _i=1 to _nlabels;
-        _max_shift=max(_max_shift,abs(_centers[_i]-_x[_i]));
-      end;
       if _mode=1 and _request='vertical' then continue;
-      if _mode=1 and _request='auto' and _max_shift>_shift_limit then continue;
       _chosen=_mode;
     end;
     _positions='';

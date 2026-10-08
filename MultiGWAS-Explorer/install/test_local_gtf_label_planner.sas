@@ -78,8 +78,73 @@ run;
   out_headroom=smoke_headroom,
   out_center_offset=smoke_offset
 );
-%if &smoke_angle ne 90 or %sysfunc(countw(%superq(smoke_positions),%str( ))) ne 4
-    or %sysevalf(&smoke_headroom<0.1) or %sysevalf(&smoke_headroom>0.13) %then %do;
+%if &smoke_angle ne 0 or %sysfunc(countw(%superq(smoke_positions),%str( ))) ne 4
+    or %sysevalf(&smoke_headroom>=0.05) %then %do;
   %put ERROR: SAS four-target local-GTF label planner smoke test failed.;
+  %abort 255;
+%end;
+
+data work.gtf_label_chr21_smoke;
+  length SNP $20;
+  input SNP $ BP;
+datalines;
+rs2070788 41470061
+rs383510 41486440
+rs462687 41425130
+rs429442 41489405
+;
+run;
+
+%Plan_Local_GTF_Target_Labels(
+  wide_dsd=work.gtf_label_chr21_smoke,
+  label_snps=rs2070788 rs383510 rs462687 rs429442,
+  center_bp=41470061,
+  window_bp=1044931,
+  design_width=950,
+  design_height=1000,
+  font_size=10,
+  out_angle=smoke_angle,
+  out_positions=smoke_positions,
+  out_headroom=smoke_headroom,
+  out_center_offset=smoke_offset
+);
+%if &smoke_angle ne 0 or %sysfunc(countw(%superq(smoke_positions),%str( ))) ne 4
+    or %sysevalf(&smoke_headroom>=0.05) %then %do;
+  %put ERROR: SAS four-target chr21 horizontal-label smoke test failed.;
+  %abort 255;
+%end;
+
+data work.gtf_label_crowded_smoke;
+  length SNP $20;
+  input SNP $ BP;
+datalines;
+rs1234567891 207394650
+rs1234567892 207394651
+rs1234567893 207394652
+rs1234567894 207394653
+rs1234567895 207394654
+rs1234567896 207394655
+rs1234567897 207394656
+rs1234567898 207394657
+;
+run;
+
+%Plan_Local_GTF_Target_Labels(
+  wide_dsd=work.gtf_label_crowded_smoke,
+  label_snps=rs1234567891 rs1234567892 rs1234567893 rs1234567894
+             rs1234567895 rs1234567896 rs1234567897 rs1234567898,
+  center_bp=207394650,
+  window_bp=1000000,
+  design_width=950,
+  design_height=1000,
+  font_size=10,
+  out_angle=smoke_angle,
+  out_positions=smoke_positions,
+  out_headroom=smoke_headroom,
+  out_center_offset=smoke_offset
+);
+%if &smoke_angle ne 90 or %sysfunc(countw(%superq(smoke_positions),%str( ))) ne 8
+    or %sysevalf(&smoke_headroom<=0.1) %then %do;
+  %put ERROR: SAS width-limited vertical-label smoke test failed.;
   %abort 255;
 %end;

@@ -261,7 +261,9 @@ Before running a workflow, identify:
    hit and a partial HTML index while work remains. On ODA exit 74 or another
    failure, rerun the same command; do not repeat verified hits. Do not mark
    the full HTML index or parent plotting stage complete until all requested
-   hits finish. Only the first fresh hit of a new invocation establishes
+   hits finish. The outer automation must not write its own request key to a
+   dispatcher's per-locus marker: with one locus, the HTML basenames coincide
+   and that overwrite defeats resume. Only the first fresh hit of a new invocation establishes
    shared remote macro readiness. Keep the checksum tied to scientific inputs
    and SAS plotting sources, not launcher timestamps or dispatcher edits.
    A Windows lock on the optional partial index or progress JSON must not stop
@@ -284,13 +286,16 @@ Before running a workflow, identify:
    region, default to the first input target as the LD reference, and honor an
    explicit `--local-ld-reference-snp` override. For multiple explicit targets,
    run the Perl local-GTF label planner before SAS submission. It estimates
-   label widths at the configured font size, balances horizontal displacement,
-   and selects vertical text only when horizontal labels cannot fit without
-   large leader-line shifts. Pass its chosen angle and adjusted label positions
+   label widths at the configured font size, balances horizontal displacement
+   in finite blocks, and selects vertical text only when the total horizontal
+   widths and gaps cannot fit. Do not reject a feasible horizontal layout just
+   because leader lines are long: the four-target chr21
+   `rs2070788,rs383510,rs462687,rs429442` case fits horizontally. Match this
+   decision in the SAS fallback. Pass its chosen angle and adjusted label positions
    to SAS; keep GWAS/LD marker coordinates at their true genomic positions.
    Pass its font-aware top headroom and text-height-relative center offset too.
    Size headroom against the full SAS design height; using only an assumed
-   plot-area fraction left excess blank space above four nearby rotated labels.
+   plot-area fraction left excess blank space above rotated labels.
    For requests spanning separate chromosomes or nonoverlapping windows, list
    each plot's chromosome and target-coordinate range in the result index.
    If Perl planning fails or target coordinates are unavailable locally, invoke

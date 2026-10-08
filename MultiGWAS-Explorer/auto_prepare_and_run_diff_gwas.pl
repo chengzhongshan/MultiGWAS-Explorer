@@ -1129,8 +1129,12 @@ if (!$skip_plots) {
         description => $local_gtf_description,
         command     => $local_gtf_command,
         outputs     => ($local_sas_only || $signed_ld_dispatch) ? [] : \@local_gtf_outputs,
-        cache_key   => $local_sas_only ? '' : $local_gtf_request_key,
-        cache_file  => $local_sas_only ? '' : $local_gtf_request_cache_file,
+        # The signed-LD dispatcher owns per-locus request markers. Its output
+        # list is intentionally empty so it can resume unfinished loci; a
+        # parent marker would overwrite the single-locus marker when their
+        # HTML basenames coincide.
+        cache_key   => ($local_sas_only || $signed_ld_dispatch) ? '' : $local_gtf_request_key,
+        cache_file  => ($local_sas_only || $signed_ld_dispatch) ? '' : $local_gtf_request_cache_file,
         enabled     => $wanted{local_gtf} ? 1 : 0,
       },
       {
@@ -1209,7 +1213,9 @@ for my $step (@step_defs) {
             validate_generated_files($generated, $pair_info);
         }
     }
-    if (!$local_sas_only && $step->{name} =~ /^plot_(?:manhattan|local_manhattan|local_gtf)$/) {
+    if (!$local_sas_only
+        && !($signed_ld_dispatch && $step->{name} eq 'plot_local_gtf')
+        && $step->{name} =~ /^plot_(?:manhattan|local_manhattan|local_gtf)$/) {
         my $cache_input = ($explicit_target_local_plot_fast_path
                 && $step->{name} =~ /^plot_local_(?:manhattan|gtf)$/)
             ? ($runner_cfg->{SOURCE_LONG_GZ} || $generated->{stdized_output} || '')

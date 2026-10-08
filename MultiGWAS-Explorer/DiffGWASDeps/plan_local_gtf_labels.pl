@@ -117,16 +117,14 @@ sub plan {
             $max_horizontal_shift = $shift if $shift > $max_horizontal_shift;
         }
     }
-    # Large leader-line shifts can make a horizontal label appear to annotate
-    # another SNP. Rotate when the bounded solution needs too much movement.
-    my $shift_limit = 0.12 * $plot_width;
-    $shift_limit = 90 if $shift_limit > 90;
+    # As in a minimum-separation space adjustment, keep moving overlapping
+    # labels as balanced blocks until they fit. Marker-to-label leader lines
+    # preserve identity, so displacement alone must not force rotation.
     my $chosen = $layout eq 'auto'
-        ? ($horizontal && $max_horizontal_shift <= $shift_limit
-            ? 'horizontal' : 'vertical') : $layout;
+        ? ($horizontal ? 'horizontal' : 'vertical') : $layout;
     my $centers = $horizontal;
     my $reason = $chosen eq 'horizontal' ? 'horizontal_labels_fit' :
-        (!$horizontal ? 'horizontal_width_exceeds_canvas' : 'horizontal_shift_too_large');
+        (!$horizontal ? 'horizontal_width_exceeds_canvas' : 'explicit_vertical');
     if ($chosen eq 'vertical') {
         my @vertical_half = map { $font * 96 / 72 * 0.72 } @items;
         $centers = place_centers(\@items, \@vertical_half, $left, $right, 5);

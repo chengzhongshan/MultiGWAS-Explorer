@@ -2492,6 +2492,9 @@ source contents, so changing only the launcher or dispatcher does not repeat
 finished plots. Changing a scientific plot input does rerender the affected
 request. Older plots without a matching checksum are generated once under this
 scheme. Explicit multiple-SNP signed-LD requests use the same resume path.
+The outer automation leaves signed-LD request markers to the per-locus
+dispatcher; writing a second parent key beside a single-locus HTML would
+overwrite the matching key and rerender that locus on every run.
 Within one invocation, shared SAS macros are uploaded and checked for the
 first fresh hit, then reused for later hits; after a disconnect or a new
 invocation, the first fresh hit verifies them again.
@@ -2939,15 +2942,21 @@ The older batched GTF macro can keep three or fewer labels horizontal with
 `auto_rotate2zero=1`. For signed-LD target plots, `plan_local_gtf_labels.pl`
 estimates the width of every rsID at the configured font size, spreads labels
 within the visible locus, and keeps them horizontal only when they fit without
-large leader-line shifts. Otherwise it plans vertical labels. It passes the
-adjusted label positions to SAS; the GWAS and LD marker coordinates stay at
-their true genomic positions. Use `--local-gtf-label-layout horizontal` or
+overlap after spacing. It uses balanced block adjustments, similar to
+`my_spaceAdjust`, and restores each adjusted position to its SNP by name.
+It plans vertical labels only when the total horizontal text width and gaps
+cannot fit. It passes the adjusted label positions to SAS; the GWAS and LD
+marker coordinates stay at their true genomic positions. The four chr21 targets
+`rs2070788,rs383510,rs462687,rs429442` stay horizontal even though their
+labels need long leader lines; eight long labels that exceed the available
+width rotate. Use `--local-gtf-label-layout horizontal` or
 `vertical` to override the automatic choice, and
 `--local-gtf-label-font-size 12` (or spec key
 `local_gtf_label_font_size`) when changing the label font. The planner also
 sets the top headroom from the chosen text height and centers labels within
-that space. Four CD55-region targets within 31 bp, for example, rotate and
-share one fitted headroom. If Perl cannot plan a locus, the uploaded
+that space. Four CD55-region targets within 31 bp also fit horizontally after
+spacing; longer or more numerous labels rotate when their combined width
+exceeds the plot. If Perl cannot plan a locus, the uploaded
 `Plan_Local_GTF_Target_Labels.sas` macro makes the same decision from the
 compact GWAS rows in SAS ODA. To exercise that fallback deliberately during
 debugging, set `GTF_LABEL_PLAN_BACKEND=sas` for one run.
