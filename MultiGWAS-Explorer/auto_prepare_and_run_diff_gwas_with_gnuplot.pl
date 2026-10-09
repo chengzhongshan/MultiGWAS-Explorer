@@ -1996,7 +1996,12 @@ sub plot_local_series {
             '--reference-build', ($runner->{REFERENCE_BUILD} // ''),
             '--pcols', join(',', @{ $args{pcols} }),
             '--labels', join('|', @{ $args{labels} }),
-            '--title', sprintf('%s: %s (%s:%s)', $args{html_title}, $locus_title_snps, $hit->{CHR}, $hit->{BP}),
+            '--title', sprintf('%s (%s colors): %s (%s:%s)',
+                $args{html_title},
+                (($args{ld_display_mode} || '') =~ /^(?:heatmap|both)$/
+                    ? 'signed LD r2 x sign(Z)'
+                    : (@{ $args{zcols} || [] } ? 'Z score' : 'chromosome')),
+                $locus_title_snps, $hit->{CHR}, $hit->{BP}),
             '--width', ($args{width} || 1500),
             '--height', $args{height},
             '--gnuplot', $args{gnuplot},
@@ -2567,12 +2572,14 @@ sub render_combined_local_manhattan_gtf_batch {
 
     my $max_lane = 0;
     my $combined_signed_r2 = 1;
+    my $combined_zscore = 1;
     my ($combined_ld_population, $combined_ld_reference_panel);
     for my $i (0 .. $#items) {
         my $item = $items[$i];
         my $manifest = read_manifest_tsv($item->{manifest});
         $combined_signed_r2 = 0
             unless ($manifest->{signed_r2_coloring} || 0) == 1;
+        $combined_zscore = 0 unless length($manifest->{zcols} || '');
         $combined_ld_population ||= $manifest->{ld_population} || '';
         $combined_ld_reference_panel ||= $manifest->{ld_reference_panel} || '';
         my $target_bp = $manifest->{BP} || $manifest->{bp} || $manifest->{TARGET_BP} || $manifest->{target_bp} || $item->{bp};
@@ -2668,11 +2675,14 @@ sub render_combined_local_manhattan_gtf_batch {
     my $ymin = -$gene_height;
     my $xmax = $n;
     my $title = $args{title} || 'Local top hits Manhattan Plot';
+    $title .= $combined_signed_r2 ? ' (signed LD r2 x sign(Z) colors)'
+           : $combined_zscore ? ' (Z score colors)'
+           : ' (chromosome colors)';
     my $sig_y = $args{sig_y};
     $sig_y = safe_neglog10_text('1e-6') unless defined $sig_y;
 
     open my $gp, '>', $gp_file or die "Cannot write $gp_file: $!\n";
-    print {$gp} "set terminal png noenhanced size 2200,1780\n";
+    print {$gp} "set terminal png noenhanced size 2200,1500\n";
     print {$gp} "set output '" . escape_gp($args{output_png}) . "'\n";
     print {$gp} "set datafile separator '\\t'\n";
     print {$gp} "set title \"" . escape_gp($title) . "\"\n";
@@ -2683,7 +2693,7 @@ sub render_combined_local_manhattan_gtf_batch {
     print {$gp} "set border 3\n";
     print {$gp} "set lmargin 8\n";
     print {$gp} "set rmargin 3\n";
-    print {$gp} "set bmargin 13\n";
+    print {$gp} "set bmargin 4\n";
     print {$gp} "unset key\n";
     print {$gp} "set tics out nomirror\n";
     print {$gp} "set grid ytics lc rgb '#dddddd' dt 2\n";
@@ -2777,6 +2787,13 @@ sub render_combined_local_manhattan_gtf_batch {
         print {$gp} "set cblabel '" . escape_gp($cblabel) . "'\n";
         print {$gp} "set colorbox vertical user origin 0.94,0.12 size 0.02,0.76\n";
         print {$gp} "set palette defined (-1 '#63d67f', -0.5 '#63d8d2', 0 '#ffbf00', 0.5 '#ff5b00', 1 '#df1f2d')\n";
+    }
+    elsif ($combined_zscore) {
+        print {$gp} "set cbrange [-8:8]\n";
+        print {$gp} "set cbtics ('-8' -8, '0' 0, '8' 8)\n";
+        print {$gp} "set cblabel 'Z score'\n";
+        print {$gp} "set colorbox vertical user origin 0.94,0.12 size 0.02,0.76\n";
+        print {$gp} "set palette defined (-8 '#63d67f', -4 '#63d8d2', 0 '#ffbf00', 4 '#ff5b00', 8 '#df1f2d')\n";
     }
     else {
         print {$gp} "set palette maxcolors 12 defined (1 '#1f77b4', 2 '#ff7f0e', 3 '#2ca02c', 4 '#d62728', 5 '#9467bd', 6 '#8c564b', 7 '#e377c2', 8 '#7f7f7f', 9 '#bcbd22', 10 '#17becf', 11 '#3366cc', 12 '#dd4477')\n";

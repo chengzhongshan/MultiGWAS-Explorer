@@ -211,7 +211,7 @@ adjust top SNPs labels if these labels are rotated 90 degree, which is helpful w
 verbose=0 /*Not print any notes in SAS log*/
 );
 
-%local effective_ld_marker_var effective_ld_heatmap_var effective_heatmap_legend_title _chrom_end_for_window;
+%local effective_ld_marker_var effective_ld_heatmap_var effective_heatmap_legend_title effective_plot_title _chrom_end_for_window;
 %let effective_ld_marker_var=;
 %let effective_ld_heatmap_var=;
 %let effective_heatmap_legend_title=&heatmap_legend_title;
@@ -408,7 +408,11 @@ run;
      );
   %end;
 /*  %abort 255;*/
-  title "Local Manhattan plot for target SNP &qsnp";
+  %if &effective_signed_r2=1 %then
+    %let effective_plot_title=Signed LD r2 x sign(Z score): &qsnp;
+  %else
+    %let effective_plot_title=Z-score-colored local Manhattan: &qsnp;
+  title "&effective_plot_title";
   %map_grp_assoc2gene4covidsexgwas(
 focus_on_transcript=&focus_on_transcript,/*This will generate a subset exon GTF data set by 
 replacing gene variable with ensembl transcript variable and removing rows 
@@ -536,6 +540,7 @@ Yoffset4textlabels=&Yoffset4textlabels, /*Move up the text labels for target SNP
 the default value 2.5 fold works for most cases*/
 scatter_yaxis_label=&scatter_yaxis_label, /*Visible y-axis title for the stacked association tracks*/
 heatmap_legend_title=&effective_heatmap_legend_title, /*Visible title for the continuous colorbar when heatmap coloring is enabled*/
+plot_title=&effective_plot_title,
 adj_spaces_among_top_snps=&adj_spaces_among_top_snps /*Provide value 1 to adjust spaces among top SNP labels; otherwise, give value 0 to not 
 adjust top SNPs labels if these labels are rotated 90 degree, which is helpful when the space adjusted labels are not pretty*/ 
   ); 

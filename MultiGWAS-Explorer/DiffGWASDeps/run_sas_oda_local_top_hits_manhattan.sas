@@ -270,7 +270,7 @@ quit;
   %_find_first_column(lib=&_gtf_lib,mem=&_gtf_mem,outvar=gtf_chr_var,candidates=chr seqname chromosome chrom chr_raw);
   %_find_first_column(lib=&_gtf_lib,mem=&_gtf_mem,outvar=gtf_start_var,candidates=start st bp1 txstart);
   %_find_first_column(lib=&_gtf_lib,mem=&_gtf_mem,outvar=gtf_end_var,candidates=end en bp2 txend);
-  %_find_first_column(lib=&_gtf_lib,mem=&_gtf_mem,outvar=gtf_gene_var,candidates=gene gene_name gene_symbol symbol name2 name gene_id transcript_name transcript_id);
+  %_find_first_column(lib=&_gtf_lib,mem=&_gtf_mem,outvar=gtf_gene_var,candidates=genesymbol gene_name gene_symbol symbol name2 name gene gene_id transcript_name transcript_id);
   %_find_first_column(lib=&_gtf_lib,mem=&_gtf_mem,outvar=gtf_feature_var,candidates=feature type);
 
   %if %superq(gtf_chr_var)= or %superq(gtf_start_var)= or %superq(gtf_end_var)= or %superq(gtf_gene_var)= %then %do;
@@ -423,11 +423,16 @@ run;
 
 %_load_requested_target_snps(outdsd=requested_target_snps);
 %if %sysevalf(&requested_target_snps_loaded,boolean) %then %do;
+/* The locally prepared inquiry CSV already carries GENCODE gene names.
+   Retain it for annotation while target-SNP selection stays explicit. */
+%_load_req_top_hits_csv(outdsd=requested_top_hits_csv);
 %let requested_top_hits_loaded=0;
+%if not %sysfunc(exist(work.requested_top_hits_csv)) %then %do;
 data requested_top_hits_csv;
   length CHR 8 BP 8 SNP $128 hit_order 8 gene $256 snp_gene $128;
   stop;
 run;
+%end;
 %end;
 %else %do;
 %_load_req_top_hits_csv(outdsd=requested_top_hits_csv);
@@ -628,18 +633,38 @@ quit;
 %mend;
 
 %macro _prepare_top_hit_gene_map;
+%local _n_unannotated_targets;
 %if %sysevalf(&requested_target_snps_loaded,boolean) %then %do;
-  /* Explicit target-SNP runs use TARGET_SNP_GENE_MAP below.  Avoid making
-     their success depend on optional HaploReg or GTF network lookups. */
+  /* The locally annotated inquiry CSV is sufficient when every target has a
+     gene. Query GTF only for targets still lacking a gene label. */
   data snps2genes_clean;
     length rsid $40 gene $256;
     stop;
   run;
-
-  data snps2genes_gtf_fallback;
-    length rsid $40 gtf_gene $256;
-    stop;
-  run;
+  proc sql noprint;
+    select count(*) into: _n_unannotated_targets trimmed
+    from top_hit4diffp_raw as a
+    left join requested_top_hits_csv as r
+      on a.CHR=r.CHR and a.BP=r.BP
+     and upcase(strip(a.SNP))=upcase(strip(r.SNP))
+    left join requested_target_snp_genes as u
+      on upcase(strip(a.SNP))=upcase(strip(u.SNP))
+    where missing(u.gene) and missing(r.gene);
+  quit;
+  %if %sysevalf(&_n_unannotated_targets>0) %then %do;
+    %_ensure_effective_gtf_dsd(top_hits_dsd=top_hit4diffp_raw);
+    %_prepare_gtf_gene_fallback(
+      top_hits_dsd=top_hit4diffp_raw,
+      gtf_dsd=&effective_gtf_dsd,
+      outdsd=snps2genes_gtf_fallback
+    );
+  %end;
+  %else %do;
+    data snps2genes_gtf_fallback;
+      length rsid $40 gtf_gene $256;
+      stop;
+    run;
+  %end;
 %end;
 %else %if %sysevalf(&requested_top_hits_loaded,boolean) %then %do;
   data snps2genes_clean;
@@ -657,10 +682,14 @@ quit;
     by rsid;
   run;
 
-  data snps2genes_gtf_fallback;
-    length rsid $40 gtf_gene $256;
-    stop;
-  run;
+  /* Candidate CSVs often contain gene=NA. Resolve those loci against the
+     same region-limited GTF used for automatically selected top hits. */
+  %_ensure_effective_gtf_dsd(top_hits_dsd=top_hit4diffp_raw);
+  %_prepare_gtf_gene_fallback(
+    top_hits_dsd=top_hit4diffp_raw,
+    gtf_dsd=&effective_gtf_dsd,
+    outdsd=snps2genes_gtf_fallback
+  );
 %end;
 %else %do;
   %_build_haploreg_gene_map;
@@ -687,7 +716,7 @@ proc sql;
            when not missing(c.gtf_gene) then 'GTF'
            else 'NA'
          end as gene_source length=16,
-         coalescec(r.snp_gene, catx(':', a.SNP, coalescec(u.gene, r.gene, b.gene, c.gtf_gene, 'NA'))) as snp_gene length=128
+         catx(':', a.SNP, coalescec(u.gene, r.gene, b.gene, c.gtf_gene, 'NA')) as snp_gene length=128
   from top_hit4diffp_raw as a
   left join requested_target_snp_genes as u
     on upcase(strip(a.SNP))=upcase(strip(u.SNP))
@@ -935,6 +964,7 @@ run;
       flip1stGWAS_signal=0,
       rm_signals_with_logP_lt=0,
       outputfigname=&batch_output_prefix,
+      plot_title=Combined local Manhattan: -log10(P) by chromosome color,
       Use_scaled_pos=1,
       sep_chr_grp=1,
       gwas_sortedby_numchrpos=1,

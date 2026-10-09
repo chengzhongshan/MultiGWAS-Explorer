@@ -41,11 +41,22 @@ download() {
   if [[ "$FORCE" != 1 && -s "$dest" ]]; then echo "[reuse] $dest"; return; fi
   echo "[download] $dest"
   if command -v curl.exe >/dev/null 2>&1; then
-    curl.exe -L --fail --retry 3 --retry-delay 3 -o "$dest" "$url"
+    local curl_dest="$dest"
+    if command -v cygpath >/dev/null 2>&1; then
+      curl_dest="$(cygpath -m "$dest")"
+    fi
+    curl.exe -L --fail --retry 3 --retry-delay 3 -o "$curl_dest" "$url"
   elif command -v curl >/dev/null 2>&1; then
     curl -L --fail --retry 3 --retry-delay 3 -o "$dest" "$url"
   else
     echo 'ERROR: curl is required to download the PLINK2 reference.' >&2; exit 1
+  fi
+}
+plink_path() {
+  if [[ "$PLINK2_BIN" == *.exe ]] && command -v cygpath >/dev/null 2>&1; then
+    cygpath -m "$1"
+  else
+    printf '%s\n' "$1"
   fi
 }
 download "$pgen_url" "${prefix}.pgen.zst"
@@ -53,7 +64,7 @@ download "$pvar_url" "${prefix}.pvar.zst"
 download "$psam_url" "${prefix}.psam"
 if [[ ! -s "${prefix}.pgen" ]]; then
   echo "[prepare] Decompressing ${prefix}.pgen.zst"
-  "$PLINK2_BIN" --zst-decompress "${prefix}.pgen.zst" "${prefix}.pgen"
+  "$PLINK2_BIN" --zst-decompress "$(plink_path "${prefix}.pgen.zst")" "$(plink_path "${prefix}.pgen")"
 fi
 [[ -s "${prefix}.pgen" && -s "${prefix}.pvar.zst" && -s "${prefix}.psam" ]] || {
   echo "ERROR: Prepared PLINK2 fileset is incomplete: ${prefix}" >&2; exit 1;
@@ -62,7 +73,7 @@ if [[ "$MAKE_BED" == 1 ]]; then
   bed_prefix="${prefix}_biallelic"
   if [[ "$FORCE" == 1 || ! -s "${bed_prefix}.bed" || ! -s "${bed_prefix}.bim" || ! -s "${bed_prefix}.fam" ]]; then
     echo "[prepare] Creating biallelic ACGT PLINK BED fileset: ${bed_prefix}"
-    "$PLINK2_BIN" --pfile "$prefix" vzs --snps-only just-acgt --max-alleles 2 --make-bed --out "$bed_prefix"
+    "$PLINK2_BIN" --pfile "$(plink_path "$prefix")" vzs --snps-only just-acgt --max-alleles 2 --make-bed --out "$(plink_path "$bed_prefix")"
   fi
   echo "PLINK2_1KG_BFILE=${bed_prefix}"
 fi

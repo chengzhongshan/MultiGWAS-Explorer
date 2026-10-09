@@ -66,6 +66,7 @@ Yoffset4textlabels=3.5, /*Move up the text labels for target SNPs in specific fo
 the default value 2.5 fold works for most cases*/
 scatter_yaxis_label=%str(-log10%(P%)),/*Visible y-axis title for the stacked association tracks*/
 heatmap_legend_title=%str(Z score),/*Visible title for the continuous colorbar when heatmap coloring is enabled*/
+plot_title=,/*Optional visible title naming the plotted color metric.*/
 xaxis_offset4min=0.02, /*provide 0-1 value or auto  to offset the min of the xaxis*/
 xaxis_offset4max=0.02, /*provide 0-1 value or auto to offset the max of the xaxis*/
 shift_text_yval=-0.2, /*in terms of gene track labels, add positive or negative vale, ranging from 0 to 1, 
@@ -509,6 +510,7 @@ in the same size and color*/
       Yoffset4textlabels=&Yoffset4textlabels, /*Move up the text labels for target SNPs in specific fold; 
 the default value 2.5 fold works for most cases*/
       heatmap_legend_title=&heatmap_legend_title, /*Visible title for the continuous colorbar when heatmap coloring is enabled*/
+      plot_title=&plot_title,
       xaxis_offset4min=&xaxis_offset4min, /*provide 0-1 value or auto  to offset the min of the xaxis*/
     xaxis_offset4max=&xaxis_offset4max, /*provide 0-1 value or auto to offset the max of the xaxis*/
 

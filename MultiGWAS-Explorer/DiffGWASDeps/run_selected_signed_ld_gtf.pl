@@ -137,6 +137,7 @@ my @plot_sources = qw(
     run_sas_oda_single_snp_with_gtf.sas
     SNP_Local_Manhattan_With_GTF.sas
     Lattice_gscatter_over_bed_track.sas
+    rank4grps.sas
     map_grp_assoc2gene4covidsexgwas.sas
     Multgscatter_with_gene_exons.sas
     adj_grpnum4close_gene_bed_regs.sas
@@ -257,7 +258,7 @@ for my $locus (@loci) {
     $ENV{GTF_LD_R2_CACHE} = $ld_cache;
     $ENV{GTF_LD_REFERENCE_SNP} = $snp;
     $ENV{GTF_LD_HEATMAP_LEGEND_TITLE} =
-        "Signed LD r2 to $snp (" . uc($opt{population}) . ", 1000G Phase 3 / PLINK2)";
+        "Signed LD r2 x sign(Z) to $snp (" . uc($opt{population}) . ", 1000G Phase 3 / PLINK2)";
     $ENV{OPEN_RESULT} = 0 if @loci > 1;
     $ENV{CLEAN_ODA_MACROS} = 0;
     # The first successful locus uploads and checks the shared macro files.

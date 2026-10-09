@@ -48,6 +48,7 @@ If left empty, the default unique colors included in the macro will be used!*/
 gwas_sortedby_numchrpos=0, /*Ideally the input GWAS dsdin should be sorted by numchr and pos;
 if the GWAS dsdin is not, the macro will sort it accordingly but will require more memory and disk space*/
 outputfigname=Manhattan, /*a prefix used to label the output figure*/
+plot_title=, /*Optional visible title for the plotted statistic and color encoding.*/
 angle4xaxis_label=40, /*Adjust the angle of xaxis group labels*/
 Use_scaled_pos=1, /*Default is to draw manhattan plot with fake positions by group in even distance;
 Provide value 1 to draw the plot in scaled and uneven distance relative to its real position values!
@@ -685,8 +686,13 @@ goptions reset=all ftext="Albany AMT" htext=&fontsize gunit=pct
          dev=png xpixels=&fig_width ypixels=&fig_height gsfname=gout gsfmode=replace;
 
  
-* Clear placeholder titles so SAS/GRAPH uses the PNG width for the plot itself.
-title1;
+/* Clear inherited titles and draw a requested title with a compact font. */
+%if %length(%superq(plot_title))>0 %then %do;
+  title1 h=1.3 "&plot_title";
+%end;
+%else %do;
+  title1;
+%end;
 title2;
 title3;
 footnote1;

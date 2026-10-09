@@ -46,7 +46,12 @@ for my $f (@files) {
   my @curl = ('curl','--fail','--location','--retry','3');
   push @curl, '--insecure'
     if ($ENV{PIPELINE_CURL_INSECURE} // '') =~ /^(?:1|true|yes|y|on)$/i;
-  system(@curl,'--output',$path,$url)==0
+  # Windows curl.exe does not understand Cygwin's /cygdrive path. Native
+  # Windows paths also work with Cygwin curl, so use one destination spelling.
+  my $curl_path = $path;
+  $curl_path = uc($1) . ':/' . $2
+    if $^O eq 'cygwin' && $path =~ m{^/cygdrive/([a-z])/(.*)$}i;
+  system(@curl,'--output',$curl_path,$url)==0
     or die "Download failed: $url\n";
   $downloaded=1;
  }
@@ -60,6 +65,7 @@ for my $f (@files) {
 }
 my $spec={
  source_mode=>'raw_pgc_vcf_sumstats',project_tag=>'PUBLIC_SCZ_EUR_SEX',
+ local_html_title=>'Schizophrenia GWAS by sex (European ancestry)',
  artifact_stem=>'public_scz_eur_sex',input_dir=>$input,output_dir=>$output,
  workdir=>abs_path("$Bin/.."),configs_dir=>"$output/configs",cygwin_bash=>'/bin/bash',reference_build=>'hg19',
  exclude_strand_ambiguous=>1,max_eaf_abs_diff=>0.2,threshold=>0.05,rho=>0,
@@ -69,12 +75,13 @@ my $spec={
  local_ld_population=>'EUR',local_ld_display_mode=>'heatmap',local_ld_r2_threshold=>0.1,
  top_hit_ld_query_failure_action=>'KEEP',top_hit_max_loci=>3,
  local_window_bp=>500000,local_gtf_window_bp=>500000,
+ local_manhattan_xgrp_y_pos=>-3.4,local_manhattan_yoffset_top=>14,
  open_result=>0,clean_oda_input=>1,keep_remote_plot_data=>0,
  groups=>[{tag=>'EUR_FEMALE',files=>[$files[0][0],$files[1][0]]},
            {tag=>'EUR_MALE',files=>[$files[2][0],$files[3][0]]}],
  pairs=>[{pair_tag=>'EUR_FEMALE_vs_MALE',group1=>'EUR_FEMALE',
           group2=>'EUR_MALE',prefix=>'EUR',label=>'EUR female vs male',
-          gtf_label=>'EUR_FEMALE_vs_MALE'}],
+          gtf_label=>'EUR_female_vs_male_differential_P'}],
 };
 if (defined($plink2_1kg_pfile) || defined($plink2)) {
  die "Provide both --plink2-1kg-pfile and --plink2\n"

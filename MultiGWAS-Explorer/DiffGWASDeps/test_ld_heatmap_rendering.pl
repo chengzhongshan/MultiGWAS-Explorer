@@ -163,4 +163,24 @@ die "Local Manhattan manifest did not record signed-R2 mode without GTF\n"
         && $manhattan_manifest_text =~ /^has_gtf\t0$/m
         && $manhattan_manifest_text =~ /^signed_r2_coloring\t1$/m;
 
+my $zscore_prefix = File::Spec->catfile($tmp, 'local_manhattan_zscore');
+system($^X, $renderer, '--data', $gz, '--snp', 'rs100',
+    '--out-prefix', $zscore_prefix, '--window-bp', 100,
+    '--pcols', 'EUR_P', '--zcols', 'EUR_Z', '--labels', 'EUR',
+    '--gnuplot', $gnuplot, '--ld-display-mode', 'none') == 0
+    or die "Local Manhattan Z-score renderer failed\n";
+open my $z_gp, '<:raw', "$zscore_prefix.gp" or die $!;
+my $z_gp_text = do { local $/; <$z_gp> };
+close $z_gp;
+die "Association-only local Manhattan did not show its Z-score colorbar\n"
+    unless $z_gp_text =~ /set cbrange \[-8:8\]/
+        && $z_gp_text =~ /set cblabel 'Z score'/
+        && $z_gp_text =~ /using 1:2:7 with points/;
+open my $z_manifest, '<:raw', "$zscore_prefix.manifest.tsv" or die $!;
+my $z_manifest_text = do { local $/; <$z_manifest> };
+close $z_manifest;
+die "Z-score local Manhattan was mislabeled as signed LD\n"
+    unless $z_manifest_text =~ /^signed_r2_coloring\t0$/m
+        && $z_manifest_text =~ /^has_gtf\t0$/m;
+
 print "Optional LD heatmap rendering for local Manhattan/GTF: PASS\n";

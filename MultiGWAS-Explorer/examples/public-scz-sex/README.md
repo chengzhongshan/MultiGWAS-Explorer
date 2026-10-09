@@ -5,7 +5,7 @@ end-to-end validation with the public PGC European female and male
 schizophrenia summary statistics (GRCh37/hg19). It is a software validation
 record rather than a claim about biological significance.
 
-Open `results.html` after cloning the repository. It contains 11 gnuplot and 11
+Open `results.html` after cloning the repository. It contains 11 gnuplot and 7
 SAS OnDemand for Academics images: genome-wide Manhattan, local Manhattan,
 local gene-track, and forest plots. `results_gallery_manifest.json` records the
 SHA-256 checksum of each copied image.
@@ -19,10 +19,13 @@ SHA-256 checksum of each copied image.
   standard errors, Z scores, and two-sided P values were recalculated.
 - All four plot families decoded successfully for both backends.
 - Inquiry targets were `rs2232429`, `rs185665940`, and `rs62604261`.
-- Gnuplot local Manhattan and GTF heatmaps use phased EUR 1000 Genomes Phase 3
-  threshold-0 LD caches. Their complete sidecars contain 18,917, 15,367, and
-  7,519 non-reference R² values; both plot families display `R² × sign(Z)`
-  from -1 to 1, while the 0.1 cutoff controls marker symbols only.
+- The October 2026 gallery update uses Z-score colors for gnuplot local
+  Manhattan panels and signed `R² × sign(Z)` colors for local GTF panels.
+  The latter use phased EUR 1000 Genomes Phase 3 threshold-0 LD caches
+  with 18,917, 15,367, and 7,519 non-reference R² values; the 0.1 cutoff
+  controls marker symbols only. SAS local Manhattan panels use chromosome
+  colors, while SAS GTF panels use signed LD colors. Plot captions and
+  figure titles identify the color metric.
 
 The machine-readable row counts and targets are in `numeric_validation.json`
 and `targets.txt`. See the

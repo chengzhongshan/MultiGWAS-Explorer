@@ -44,6 +44,9 @@ cache/pgc_scz_sex_public/
 /run_sas_oda_single_snp_with_gtf.*.sas
 /run_sas_oda_local_top_hits_manhattan.*.sas
 /run_sas_oda_local_top_hits_with_gtf.*.sas
+/auto_manhattan_sort.*.sas
+/auto_wide_import_manhattan.*.sas
+/run_sas_oda_manhattan4diffgwas.*.sas
 /single_snp_ld_augmented_*.tsv.gz
 /target_snp_augmented_*.tsv.gz
 /*_top_hits_*.csv

@@ -665,6 +665,8 @@ die "--local-ld-display-mode must be none, markers, heatmap, or both\n"
 $local_ld_display_mode = 'markers'
     if $local_ld_display_mode eq 'none' && $highlight_high_ld_snps;
 $highlight_high_ld_snps = 1 if $local_ld_display_mode ne 'none';
+my $local_ld_cache_min_r2 = $local_ld_display_mode =~ /^(?:heatmap|both)$/
+    ? 0 : $local_ld_r2_threshold_override;
 $local_ld_marker_symbol = lc(trim($local_ld_marker_symbol || 'star'));
 die "--local-ld-marker-symbol must be star, plus, cross, circle, square, triangle, or diamond\n"
     unless $local_ld_marker_symbol =~ /^(?:star|plus|cross|circle|square|triangle|diamond)$/;
@@ -693,7 +695,7 @@ if ($highlight_high_ld_snps
             my ($direct_cache, $direct_ok) = resolve_plink2_ld_cache_for_plot(
                 query_snp   => $local_ld_reference_snp,
                 populations => $local_ld_population_override,
-                min_r2     => $local_ld_r2_threshold_override,
+                min_r2     => $local_ld_cache_min_r2,
                 window_kb  => cfg_or($spec, 'local_ld_window_kb', cfg_or($spec, 'top_hit_ld_window_kb', 1000)),
                 pfile      => $top_hit_ld_pfile,
                 bfile      => $top_hit_ld_bfile,
@@ -714,7 +716,7 @@ if ($highlight_high_ld_snps
     }
     $local_ld_cache_by_snp{lc $local_ld_reference_snp} = $local_ld_cache
         if length($local_ld_reference_snp) && length($local_ld_cache);
-    if ($local_ld_display_mode eq 'heatmap'
+    if ($local_ld_display_mode =~ /^(?:heatmap|both)$/
         && $top_hit_ld_source eq 'PLINK2_1KG'
         && lc(trim($reference_build_profile->{build} || '')) !~ /^(?:hg38|grch38)$/
         && @configured_target_snps > 1) {
@@ -723,7 +725,7 @@ if ($highlight_high_ld_snps
             my ($target_cache, $target_ok) = resolve_plink2_ld_cache_for_plot(
                 query_snp   => $query_snp,
                 populations => $local_ld_population_override,
-                min_r2      => $local_ld_r2_threshold_override,
+                min_r2      => $local_ld_cache_min_r2,
                 window_kb   => cfg_or($spec, 'local_ld_window_kb', cfg_or($spec, 'top_hit_ld_window_kb', 1000)),
                 pfile       => $top_hit_ld_pfile,
                 bfile       => $top_hit_ld_bfile,
@@ -2757,7 +2759,7 @@ sub build_display_track_catalog {
                 betavar => "${id}_BETA",
                 sevar => "${id}_SE",
                 manhattan_label => "$label fixed-effect association P",
-                gtf_label => $id,
+                gtf_label => safe_name("$label fixed-effect association P"),
             };
             push @catalog, $entry;
             add_display_track_aliases(\%lookup, $entry,
@@ -3636,8 +3638,8 @@ sub build_runner_config {
         GTF_LD_HEATMAP_COLORS => $local_ld_heatmap_colors,
         GTF_LD_HEATMAP_LEGEND_TITLE => (
             length($local_ld_reference_snp)
-              ? "Signed LD r2 to $local_ld_reference_snp ($local_ld_population_label, 1000G Phase 3 / PLINK2)"
-              : "Signed LD r2 ($local_ld_population_label, 1000G Phase 3 / PLINK2)"
+              ? "Signed LD r2 x sign(Z) to $local_ld_reference_snp ($local_ld_population_label, 1000G Phase 3 / PLINK2)"
+              : "Signed LD r2 x sign(Z) ($local_ld_population_label, 1000G Phase 3 / PLINK2)"
         ),
         HIGHLIGHT_HIGH_LD_SNPS => $highlight_high_ld_snps,
         LOCAL_LD_CACHE_TSV => (

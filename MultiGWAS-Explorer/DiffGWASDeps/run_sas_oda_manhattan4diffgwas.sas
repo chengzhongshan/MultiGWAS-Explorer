@@ -46,6 +46,7 @@ __MANHATTAN_SORT_BLOCK__
   flip1stGWAS_signal=0,
   rm_signals_with_logP_lt=0.5,
   outputfigname=__OUTPUT_PREFIX__,
+  plot_title=Genome-wide Manhattan: -log10(P) by chromosome color,
   Use_scaled_pos=1,
   sep_chr_grp=0,
   gwas_sortedby_numchrpos=1

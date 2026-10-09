@@ -55,7 +55,7 @@ open my $calls_fh, '<', "$dir/calls.tsv" or die $!;
 my @calls = <$calls_fh>;
 close $calls_fh;
 is(scalar @calls, 2, 'each selected locus has its own LD calculation');
-like($calls[0], qr/^rs75453394\t500000\tSigned LD r2 to rs75453394/, 'first locus uses its own signed-LD legend');
+like($calls[0], qr/^rs75453394\t500000\tSigned LD r2 x sign\(Z\) to rs75453394/, 'first locus uses its own signed-LD legend');
 
 open $fh, '>', $csv or die $!;
 print {$fh} "hit_order,panel_index,CHR,BP,SNP,gene\n1,1,9,121741165,rs75453394,DAB2IP\n";

@@ -209,6 +209,7 @@ GTF_LOCAL_DSD="${GTF_LOCAL_DSD:-${DEFAULT_GTF_LOCAL_DSD}}"
 GTF_GZ_URL="${GTF_GZ_URL:-${DEFAULT_GTF_GZ_URL}}"
 SNP_LOCAL_MACRO_SAS="${SNP_LOCAL_MACRO_SAS:-${DEPS_DIR}/SNP_Local_Manhattan_With_GTF.sas}"
 PATCHED_LATTICE_MACRO_SAS="${PATCHED_LATTICE_MACRO_SAS:-${DEPS_DIR}/Lattice_gscatter_over_bed_track.sas}"
+RANK4GRPS_MACRO_SAS="${RANK4GRPS_MACRO_SAS:-${DEPS_DIR}/rank4grps.sas}"
 GTF_LABEL_SAS_PLANNER="${GTF_LABEL_SAS_PLANNER:-${DEPS_DIR}/Plan_Local_GTF_Target_Labels.sas}"
 MAP_GRP_ASSOC_MACRO_SAS="${MAP_GRP_ASSOC_MACRO_SAS:-${DEPS_DIR}/map_grp_assoc2gene4covidsexgwas.sas}"
 MULT_GSCATTER_GENE_MACRO_SAS="${MULT_GSCATTER_GENE_MACRO_SAS:-${DEPS_DIR}/Multgscatter_with_gene_exons.sas}"
@@ -1378,6 +1379,7 @@ upload_support_args=(--upload-file "${LOCAL_GTF_SUBSET_GZ}" --upload-file "${DAT
 if [[ "${SINGLE_SNP_REUSE_SHARED_MACROS}" == "1" ]]; then
   echo "[1/6] Reusing shared SAS macros verified by an earlier locus; uploading only this SNP's GWAS and GTF subsets."
 else
+  upload_support_args=(--upload-file "${RANK4GRPS_MACRO_SAS}" "${upload_support_args[@]}")
   upload_support_args=(--upload-file "${GTF_LABEL_SAS_PLANNER}" "${upload_support_args[@]}")
   upload_support_args=(--upload-file "${PATCHED_LATTICE_MACRO_SAS}" "${upload_support_args[@]}")
   if [[ -f "${MAP_GRP_ASSOC_MACRO_SAS}" ]]; then
@@ -1536,6 +1538,7 @@ cleanup_remote_generated_outputs
 if [[ "${CLEAN_ODA_MACROS}" == "1" ]]; then
   echo "[cleanup] Queueing uploaded SAS helper files for SAS ODA cleanup..."
   queue_oda_delete "$(basename "${PATCHED_LATTICE_MACRO_SAS}")"
+  queue_oda_delete "$(basename "${RANK4GRPS_MACRO_SAS}")"
   queue_oda_delete "$(basename "${GTF_LABEL_SAS_PLANNER}")"
   queue_oda_delete "${RENDERED_SAS_BASENAME}"
   if [[ -f "${MAP_GRP_ASSOC_MACRO_SAS}" ]]; then

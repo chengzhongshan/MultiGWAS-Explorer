@@ -147,6 +147,7 @@ Yoffset4textlabels=3.5, /*Move up the text labels for target SNPs in specific fo
 the default value 2.5 fold works for most cases*/
 scatter_yaxis_label=%str(-log10%(P%)),/*Visible y-axis title for the stacked association tracks*/
 heatmap_legend_title=%str(Z score),/*Visible title for the continuous colorbar when heatmap coloring is enabled*/
+plot_title=,/*Optional visible title naming the color metric.*/
 adj_spaces_among_top_snps=1 /*Provide value 1 to adjust spaces among top SNP labels; otherwise, give value 0 to not 
 adjust top SNPs labels if these labels are rotated 90 degree, which is helpful when the space adjusted labels are not pretty*/ 
 );
@@ -401,6 +402,7 @@ Yoffset4textlabels=&Yoffset4textlabels, /*Move up the text labels for target SNP
 the default value 2.5 fold works for most cases*/
 scatter_yaxis_label=&scatter_yaxis_label, /*Visible y-axis title for the stacked association tracks*/
 heatmap_legend_title=&heatmap_legend_title, /*Visible title for the continuous colorbar when heatmap coloring is enabled*/
+plot_title=&plot_title,
 shift_text_yval=&shift_text_yval, /*in terms of gene track labels, add positive or negative vale, ranging from 0 to 1, 
                       to liftup or lower text labels on the y axis; the default value is -0.2 to put gene lable under gene tracks;
                       Change it with the macro var pct4neg_y!*/

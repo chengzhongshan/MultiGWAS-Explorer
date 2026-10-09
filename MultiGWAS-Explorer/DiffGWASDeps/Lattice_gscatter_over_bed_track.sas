@@ -102,6 +102,7 @@ heatmap_max_pos_val=8,/*Maximum postive value for the heatmap_var when it is not
 change this to customize the max value for colorbar in heatmap*/
 heatmap_legend_title=%str(Z score),/*Visible title for the heatmap colorbar legend; update this when the scatter colors
 are driven by a different effect metric such as beta or odds ratio*/
+plot_title=,/*Optional visible title identifying the plotted color metric.*/
 
 /*Alternative color scheme for categorical color response variable! Please keep it in default
 value if you don't want to use it for your quantitative color response variable*/
@@ -1854,6 +1855,9 @@ begingraph / designwidth=&track_width designheight=&track_height
              dataContrastColors=( &dataContrastCols )  ATTRPRIORITY=color
         %end;
         ;
+ %if %length(%superq(plot_title))>0 %then %do;
+   entrytitle "&plot_title";
+ %end;
  
  /*Define colors for dots by group in the scatter plot*/
  %if &lattice_subgrp_var ne %then %do;     

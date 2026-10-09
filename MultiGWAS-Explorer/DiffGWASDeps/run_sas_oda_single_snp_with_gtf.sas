@@ -72,6 +72,7 @@ ods graphics on / outputfmt=png;
 %include "~/map_grp_assoc2gene4covidsexgwas.sas";
 %include "~/SNP_Local_Manhattan_With_GTF.sas";
 %include "~/Lattice_gscatter_over_bed_track.sas";
+%include "~/rank4grps.sas";
 %include "~/Plan_Local_GTF_Target_Labels.sas";
 
 __GTF_IMPORT_BLOCK__
