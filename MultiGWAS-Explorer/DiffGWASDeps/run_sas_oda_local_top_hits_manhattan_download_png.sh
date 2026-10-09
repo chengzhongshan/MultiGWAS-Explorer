@@ -694,8 +694,45 @@ stable_hash_text() {
   perl -MDigest::MD5=md5_hex -e 'print md5_hex(join("\0", @ARGV));' "$@"
 }
 
+compact_merged_target_windows() {
+  [[ "${SOURCE_MODE:-}" == "merged_gwas_table" && -n "${TARGET_SNP_LIST}" ]] || return 0
+  [[ -s "${DATA_GZ}" ]] || { echo "ERROR: Merged wide table is missing: ${DATA_GZ}" >&2; return 1; }
+  if ! generate_requested_top_hits_csv_locally || [[ ! -s "${REQUESTED_CSV_OUT}" ]]; then
+    echo "ERROR: Cannot locate the requested SNPs for a compact merged-wide local Manhattan input." >&2
+    return 1
+  fi
+  LOCAL_TOP_HITS_CSV_PREGENERATED=1
+  mkdir -p "${LOCAL_MH_REUSE_CACHE_DIR}/loci"
+  local native_source indexed_hash indexed_wide compact_key compact_wide
+  native_source="${DATA_GZ}"
+  if command -v cygpath >/dev/null 2>&1; then
+    native_source="$(cygpath -m "${DATA_GZ}")"
+  fi
+  indexed_hash="$(perl -MDigest::SHA=sha1_hex -e 'print substr(sha1_hex($ARGV[0]),0,12)' "${native_source}")"
+  indexed_wide="${WORKDIR}/cache/gnuplot_wide_index/$(basename "${DATA_GZ}").${indexed_hash}.bgz"
+  compact_key="$(stable_hash_text "${native_source}" "$(perl -e 'my @s=stat($ARGV[0]); die $! unless @s; print "$s[7]:$s[9]"' "${DATA_GZ}")" "${TARGET_SNP_LIST}" "${LOCAL_WINDOW_BP}" "sas-numeric-chr-v1" "$(perl -MDigest::MD5 -e 'open my $fh, q{<:raw}, $ARGV[0] or die $!; print Digest::MD5->new->addfile($fh)->hexdigest' "${REQUESTED_CSV_OUT}")")"
+  compact_wide="${LOCAL_MH_REUSE_CACHE_DIR}/target_windows_${SAFE_PROJECT_TAG}_${compact_key}.tsv.gz"
+  if [[ ! -s "${compact_wide}" ]]; then
+    echo "[prep] Extracting requested merged-wide local Manhattan windows with tabix..."
+    perl "${DEPS_DIR}/gnuplot/index_merged_wide_tabix.pl" --input "${DATA_GZ}" --output "${indexed_wide}"
+    perl "${DEPS_DIR}/gnuplot/extract_merged_locus_wide_batch.pl" \
+      --input "${DATA_GZ}" --indexed-input "${indexed_wide}" \
+      --output-dir "${LOCAL_MH_REUSE_CACHE_DIR}/loci" \
+      --window-bp "${LOCAL_WINDOW_BP}" --reference-build "${REFERENCE_BUILD}" \
+      --targets-csv "${REQUESTED_CSV_OUT}" --combined-output "${compact_wide}" \
+      --combined-numeric-chr
+  else
+    echo "[prep] Reusing compact merged-wide target windows: ${compact_wide}"
+  fi
+  [[ -s "${compact_wide}" ]] || { echo "ERROR: Compact local Manhattan input is missing: ${compact_wide}" >&2; return 1; }
+  DATA_GZ="${compact_wide}"
+  REMOTE_DATA_BASENAME="$(basename "${compact_wide}")"
+  echo "[prep] SAS local Manhattan will upload only the requested full SNP windows: ${DATA_GZ}"
+}
+
 augment_data_gz_with_target_snp_windows() {
   [[ -n "${TARGET_SNP_LIST}" ]] || return 0
+  [[ "${SOURCE_MODE:-}" == "merged_gwas_table" ]] && return 0
 
   if [[ -z "${SOURCE_LONG_GZ:-}" || ! -s "${SOURCE_LONG_GZ}" ]]; then
     echo "WARNING: TARGET_SNP_LIST was provided, but SOURCE_LONG_GZ is unavailable for building a compact local Manhattan subset." >&2
@@ -830,6 +867,7 @@ augment_data_gz_with_target_snp_windows() {
 }
 
 SAFE_PROJECT_TAG="$(printf '%s' "${PROJECT_TAG}" | tr -c 'A-Za-z0-9._-' '_')"
+compact_merged_target_windows
 augment_data_gz_with_target_snp_windows
 
 perl "${SCHEMA_INCLUDE_HELPER}" \
@@ -989,7 +1027,7 @@ cat > "${GET_GTF_MACRO_UPLOAD}" <<'EOF'
 EOF
 perl -0pi -e 's/__GET_GTF_MACRO_NAME__/\Q'"${GET_GTF_MACRO_NAME}"'\E/g' "${GET_GTF_MACRO_UPLOAD}"
 
-if ! generate_requested_top_hits_csv_locally; then
+if [[ "${LOCAL_TOP_HITS_CSV_PREGENERATED:-0}" != "1" ]] && ! generate_requested_top_hits_csv_locally; then
   echo "WARNING: Local MAF-aware top-hit CSV generation did not succeed. The SAS script will fall back to its internal top-hit selection." >&2
 fi
 
@@ -1150,14 +1188,20 @@ while :; do
 done
 
 echo "[4/5] Downloading PNG and small HTML wrapper..."
-oda_download_many \
-  "download_local_hits_manhattan_support_${stamp}" \
-  --download-file "~/${LOCAL_OUTPUT_PREFIX}.html" \
-  --download-local-path "${HTML_OUT}" \
-  --download-file "~/${LOCAL_TOP_HITS_CSV_BASENAME}" \
-  --download-local-path "${CSV_OUT}" \
-  --download-file "~/${TOP_HIT_LD_AUDIT_BASENAME}" \
-  --download-local-path "${LD_AUDIT_OUT}" || true
+support_download_args=(
+  --download-file "~/${LOCAL_OUTPUT_PREFIX}.html"
+  --download-local-path "${HTML_OUT}"
+  --download-file "~/${LOCAL_TOP_HITS_CSV_BASENAME}"
+  --download-local-path "${CSV_OUT}"
+)
+# Explicit target SNPs bypass LD clumping, so SAS does not create an LD audit.
+if [[ -z "${TARGET_SNP_LIST}" ]]; then
+  support_download_args+=(
+    --download-file "~/${TOP_HIT_LD_AUDIT_BASENAME}"
+    --download-local-path "${LD_AUDIT_OUT}"
+  )
+fi
+oda_download_many "download_local_hits_manhattan_support_${stamp}" "${support_download_args[@]}" || true
 
 remote_pngs="$(
   run_oda_helper \

@@ -5,6 +5,8 @@ For platform setup and practical examples, see the
 and reviewer-related validation notes are in its
 [revision section](../docs/README.md#reviewer-driven-scientific-revision).
 For a shorter overview, return to the [project homepage](../README.md).
+For the AOA rerun failure modes and verification commands, see
+[README4Debugging.md](README4Debugging.md).
 
 This repository combines a Perl MCP server, GWAS preprocessing utilities, and
 SAS OnDemand for Academics plotting wrappers into one workflow for differential

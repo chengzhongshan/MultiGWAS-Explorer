@@ -5,6 +5,10 @@ description: "Reusable scientific workflow for GWAS summary statistics: merge se
 
 # GWAS SAS ODA Workflow
 
+For the tested AOA failure cases, compact tabix local inputs, SAS session
+termination diagnostics, and output verification, consult
+[`README4Debugging.md`](../README4Debugging.md) before rerunning a large job.
+
 ## Strategy
 
 Use this skill as the workflow brain. Keep MCP tools small and reliable.
@@ -12,6 +16,13 @@ Use this skill as the workflow brain. Keep MCP tools small and reliable.
 - Put scientific orchestration, file naming, validation, and decision rules in this skill and project scripts.
 - Put atomic capabilities in the Perl MCP server: run Cygwin bash/Perl, run/upload/download/delete/list SAS ODA files, inspect directories, and optionally wrap bgzip/tabix.
 - Do not put one-off cohort-specific GWAS logic into `server.pl`; keep that logic in versioned Perl/SAS/Bash scripts.
+- When a local Manhattan track is blank, count nonmissing values in that
+  track's source P column within the exact locus window. A different track's
+  missing P values must not gate the row before plotting; merged-wide allele
+  rows can have meta P and differential P on separate rows.
+- Before trusting SAS local Manhattan output, check chromosome-X input is
+  numeric `23`, verify one lead entry per requested SNP, and inspect the
+  downloaded panels and their SNP, gene, and chromosome labels.
 
 ## Required Context
 

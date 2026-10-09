@@ -16,6 +16,7 @@ my $table = join("\n",
     "1\t900\trsFar\t0.001\t0.3",
     "1\t120\trsNearby\t0.9\t0.2",
     "2\t200\trsB\t0.7\t0.4",
+    "X\t300\trsX\t0.6\t0.5",
 ) . "\n";
 gzip \$table => $input or die $GzipError;
 my $status = system($^X,
@@ -83,6 +84,23 @@ is_deeply(\@combined_rows, [sort(
     "1\t120\trsNearby\t0.9\t0.2",
     "2\t200\trsB\t0.7\t0.4",
 )], 'combined upload keeps full locus rows and de-duplicates overlapping windows');
+
+my $sas_combined = "$dir/sas_local_windows.tsv.gz";
+is(system($^X,
+    "$Bin/../DiffGWASDeps/gnuplot/extract_merged_locus_wide_batch.pl",
+    '--input', $input, '--indexed-input', $indexed,
+    '--output-dir', $dir, '--window-bp', '50',
+    '--target', encode_json({snp => 'rsX', chr => '23', bp => 300}),
+    '--combined-output', $sas_combined, '--combined-numeric-chr'), 0,
+    'SAS combined input is extracted for a chromosome X lead');
+my $sas_combined_text = '';
+gunzip $sas_combined => \$sas_combined_text or die $GunzipError;
+like($sas_combined_text, qr/^23\t300\trsX\t0\.6\t0\.5$/m,
+    'SAS combined input encodes X as numeric chromosome 23');
+my $x_locus = '';
+gunzip "$dir/gnuplot_locus_rsX_window_50.wide.tsv.gz" => \$x_locus or die $GunzipError;
+like($x_locus, qr/^X\t300\trsX\t0\.6\t0\.5$/m,
+    'gnuplot locus preserves the source chromosome label');
 
 my $sas_locus_dir = "$dir/sas locus";
 my $sas_cache_dir = "$dir/sas index";

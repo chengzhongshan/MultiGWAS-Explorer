@@ -536,8 +536,22 @@ proc sql;
   order by b.hit_order, a.CHR, a.BP, a.SNP
   ;
 quit;
+/* A merged-wide table can contain several allele rows with the same rsID.
+   Keep one lead row per requested SNP, preferring its smallest focus P. The
+   full scz_mh data still supplies every SNP in each plotted window. */
 data top_hit4diffp_raw;
   set top_hit4diffp_raw;
+  _target_sort_p=input(vvaluex("&top_hit_focus_pvar"),best32.);
+  if missing(_target_sort_p) then _target_sort_p=1;
+run;
+proc sort data=top_hit4diffp_raw;
+  by requested_hit_order _target_sort_p;
+run;
+data top_hit4diffp_raw;
+  set top_hit4diffp_raw;
+  by requested_hit_order;
+  if not first.requested_hit_order then delete;
+  drop _target_sort_p;
   length INDEPENDENCE_METHOD $24;
   INDEPENDENCE_METHOD='USER_TARGET';
 run;
@@ -729,15 +743,27 @@ proc sql;
   left join snps2genes_gtf_fallback as c
     on a.SNP=c.rsid
   ;
+quit;
 
+/* Render SNP, gene, and chromosome as adjacent vertical group labels. */
+data top_hit4diffp;
+  set top_hit4diffp;
+  length chr_label $8;
+  if CHR=23 then chr_label='chrX';
+  else if CHR=24 then chr_label='chrY';
+  else chr_label=cats('chr',strip(put(CHR,best32.)));
+  snp_gene=catx(':',SNP,coalescec(gene,'NA'),chr_label);
+run;
+
+proc sql;
   create table top_local_signals as
-  select a.*, catx(':', b.SNP, coalescec(b.gene,'NA')) as snp_gene length=128
+  select a.*, b.snp_gene as snp_gene length=128
   from scz_mh as a, top_hit4diffp as b
   where a.CHR=b.CHR
     and a.BP between (b.BP-&local_window_bp) and (b.BP+&local_window_bp)
   ;
 
-  select catx(':', SNP, coalescec(gene,'NA')) into: snp_gene_label separated by ' '
+  select snp_gene into: snp_gene_label separated by ' '
   from top_hit4diffp
   order by coalesce(requested_hit_order, 999999999), CHR, BP;
 quit;
@@ -753,7 +779,7 @@ proc sql;
     from top_local_signals
   ) as a
   inner join (
-    select catx(':', SNP, coalescec(gene,'NA')) as snp_gene length=128,
+    select snp_gene,
            CHR,
            BP,
            requested_hit_order

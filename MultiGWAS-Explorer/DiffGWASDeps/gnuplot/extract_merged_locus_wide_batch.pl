@@ -15,6 +15,7 @@ use IO::Compress::Gzip qw($GzipError);
 use IO::Uncompress::Gunzip qw($GunzipError);
 
 my ($input, $indexed_input, $tabix_bin, $output_dir, $window_bp, $targets_csv, $combined_output, $reference_build) = ('') x 8;
+my $combined_numeric_chr = 0;
 my @target_args;
 GetOptions(
     'input=s'      => \$input,
@@ -26,6 +27,7 @@ GetOptions(
     'target=s@'    => \@target_args,
     'targets-csv=s' => \$targets_csv,
     'combined-output=s' => \$combined_output,
+    'combined-numeric-chr!' => \$combined_numeric_chr,
 ) or die "Invalid locus extraction options\n";
 die "--input, --output-dir, --window-bp, and --target or --targets-csv are required\n"
     unless length($input) && length($output_dir) && length($window_bp)
@@ -123,8 +125,12 @@ my $record = sub {
     for my $target (@$target_list) {
         next if $bp < $target->{start} || $bp > $target->{end};
         if ($combined && !$combined_seen{$line}++) {
-            print {$combined} $line;
-            print {$combined} "\n" unless $line =~ /\n$/;
+            my $combined_line = $line;
+            # SAS numeric CHR import treats literal X/Y as missing. Keep locus
+            # files unchanged for gnuplot, but normalize the combined SAS input.
+            $combined_line =~ s/^[^\t]*/$chr/ if $combined_numeric_chr;
+            print {$combined} $combined_line;
+            print {$combined} "\n" unless $combined_line =~ /\n$/;
             $combined_rows++;
         }
         print { $target->{out} } $line;

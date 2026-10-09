@@ -377,7 +377,11 @@ reset_1st_value_as_one=1
 
 
 data manhattan;
-set manhattan(where=(&P_var^=.));
+set manhattan;
+/* Keep a SNP when any displayed GWAS track has a P value. In merged-wide
+   tables, meta and differential values can occupy distinct allele rows;
+   filtering on the primary track alone silently empties the other track. */
+if n(of &P_var &Other_P_vars)=0 then delete;
 %if (&logP=1) %then %do;
 logp=-log10(&P_var);
 %end;
@@ -626,7 +630,7 @@ retain str_len_diff 0;
 set anno;
 text0=trim(left(text));
 if prxmatch("/[^&snp_gene_splitter]+:[^&snp_gene_splitter]+/",text) and function='label' then do;
-	  do ti=1 to 2;
+	  do ti=1 to min(3,countw(text0,"&snp_gene_splitter"));
 		 text=scan(text0,ti,"&snp_gene_splitter");
 		 str_len_diff=length(scan(text0,1,"&snp_gene_splitter"));
 
@@ -645,7 +649,7 @@ if prxmatch("/[^&snp_gene_splitter]+:[^&snp_gene_splitter]+/",text) and function
 		 *one cell below location centeral aligned;
 		 %end;
 
-		 else do;
+		 else if ti=2 then do;
             %if &angle4xaxis_label=90 %then %do;
              position='E';
              y=&xgrp_y_pos;
@@ -665,6 +669,23 @@ if prxmatch("/[^&snp_gene_splitter]+:[^&snp_gene_splitter]+/",text) and function
 			if str_len_diff>0 then do;
 			  *text=resolve('%AddSpaces4str(str='||text||',add2end=1,nspaces='|| str_len_diff ||',char4space=-)');
 			end;
+		 end;
+		 else do;
+            *Third component, when supplied, is the chromosome name.
+             Place it to the right of the vertical gene symbol.;
+			%if &angle4xaxis_label=90 %then %do;
+            position='E';
+            y=&xgrp_y_pos;
+            hsys='3';
+            size=max(1,&fontsize*0.66);
+            *Convert the gene-label font height to fake-position units so
+             the chromosome label has its own column to the right.;
+            x=x+1.3*&maxbp*max(1,&fontsize*0.72)*&fig_height/(100*&fig_width);
+			%end;
+			%else %do;
+            position='+';
+			%end;
+            style='Albany AMT';
 		 end;
 		 output;
 	  end;

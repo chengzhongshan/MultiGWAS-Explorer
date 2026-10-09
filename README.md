@@ -28,6 +28,8 @@ Choose your platform in the [installation and usage guide](docs/README.md#instal
 It includes prerequisites, commands, container setup, SAS configuration, and
 troubleshooting links. Installation commands run from the inner pipeline
 directory shown above.
+For reproducible AOA run diagnostics and scientific checks, see the
+[debugging guide](MultiGWAS-Explorer/README4Debugging.md).
 
 ## Try a local example
 
