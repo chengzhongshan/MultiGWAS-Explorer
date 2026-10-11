@@ -689,11 +689,8 @@ sub write_gnuplot {
             print {$gp} "plot " . join(', ', @plots) . "\n";
         }
         else {
-            my @palette = sas_chr_palette();
-            print {$gp} "set palette maxcolors " . scalar(@palette) . " defined (" .
-                join(', ', map { sprintf('%d "%s"', $_ + 1, $palette[$_]) } 0 .. $#palette) . ")\n";
             print {$gp} "unset colorbox\n";
-            my @plots = ("'" . escape_gp($args{plot_tsv}) . "' using 1:2:(\$3+1) with points pt 7 ps 0.72 lc palette");
+            my @plots = ("'" . escape_gp($args{plot_tsv}) . "' using 1:2 with points pt 7 ps 0.72 lc rgb '" . escape_gp($chr_color) . "'");
             push @plots, @ld_layers;
             print {$gp} "plot " . join(', ', @plots) . "\n";
         }

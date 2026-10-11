@@ -304,8 +304,9 @@ sub write_gnuplot {
     print {$gp} "set xtics (" . join(', ', @xtics) . ")\n";
     print {$gp} "set ytics (" . join(', ', @ytics) . ")\n";
     print {$gp} "set mytics 2\n";
-    print {$gp} "set palette maxcolors 24 defined (";
     my @colors = sas_chr_palette();
+    print {$gp} "set cbrange [1:" . scalar(@colors) . "]\n";
+    print {$gp} "set palette maxcolors " . scalar(@colors) . " defined (";
     print {$gp} join(', ', map { sprintf('%d "%s"', $_ + 1, $colors[$_]) } 0 .. $#colors) . ")\n";
     print {$gp} "unset colorbox\n";
 

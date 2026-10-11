@@ -874,7 +874,7 @@ run;
 %put NOTE: n_hit_batches=&n_hit_batches;
 
 %macro render_local_hit_batches;
-  %local batch_idx start_idx end_idx batch_snp_gene_label batch_output_prefix batch_count batch_dsdin;
+  %local batch_idx start_idx end_idx batch_snp_gene_label batch_output_prefix batch_count batch_dsdin batch_chr_colors;
   %local local_xgrp_y_pos local_yoffset_setting local_gwas_label_y_frac;
   %local local_angle4xaxis_label local_fontsize local_y_axis_label_size local_y_axis_value_size;
   %do batch_idx=1 %to &n_hit_batches;
@@ -887,9 +887,21 @@ run;
       where hit_order between &start_idx and &end_idx
       order by hit_order;
     quit;
+    /* GPLOT assigns symbol1, symbol2, ... to the ordered local groups.
+       Choose each symbol from its actual chromosome, not its panel slot. */
+    data _batch_chr_colors;
+      set top_hit_groups(where=(hit_order >= &start_idx and hit_order <= &end_idx)) end=last;
+      length colors $4096 color $8;
+      retain colors '';
+      color=scan('cx0072bd cxd95319 cxedb120 cx7e2f8e cx77ac30 cx4dbeee cxa2142f',
+                 mod(CHR-1,7)+1, ' ');
+      colors=catx(' ',colors,color);
+      if last then call symputx('batch_chr_colors',colors,'L');
+    run;
     %put NOTE: batch_idx=&batch_idx start_idx=&start_idx end_idx=&end_idx;
     %put NOTE: batch_count=&batch_count local_n_gwas_tracks=&local_n_gwas_tracks;
     %put NOTE: batch_snp_gene_label=&batch_snp_gene_label;
+    %put NOTE: batch_chr_colors=&batch_chr_colors;
 
     %if &batch_idx=1 %then %let batch_output_prefix=__OUTPUT_PREFIX__;
     %else %let batch_output_prefix=__OUTPUT_PREFIX___part&batch_idx;
@@ -954,13 +966,16 @@ run;
 
     proc sql;
       create table &batch_dsdin as
-      select a.*
+      select a.*, b.hit_order
       from top_local_signals as a
       inner join top_hit_groups as b
         on a.snp_gene=b.snp_gene
       where b.hit_order between &start_idx and &end_idx
       ;
     quit;
+    proc sort data=&batch_dsdin;
+      by hit_order BP;
+    run;
     %put NOTE: batch_output_prefix=&batch_output_prefix;
     %put NOTE: batch_dsdin=&batch_dsdin;
 
@@ -974,6 +989,7 @@ run;
       gwas_thrsd=7.30103,
       thrsd_line_color=gray,
       dotsize=1,
+      uniq_colors=&batch_chr_colors,
       _logP_topval=8,
       y_axix_step=2,
       fig_width=__MANHATTAN_FIG_WIDTH__,

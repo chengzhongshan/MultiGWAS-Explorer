@@ -82,7 +82,7 @@ sub caption {
     my $suffix=$snp ? " ($snp)" : '';
     $suffix .= " (exported panel $1)" if $name =~ /_part(\d+)\.png\z/;
     return "$backend: Genome-wide Manhattan" if $family eq 'manhattan';
-    return "$backend: Local Manhattan, ".($backend eq 'gnuplot' ? 'Z-score colors' : 'chromosome colors').$suffix
+    return "$backend: Local Manhattan, ".($backend eq 'gnuplot' ? 'Z-score colors' : 'chromosome colors matched to genome-wide').$suffix
       if $family eq 'local_manhattan';
     return "$backend: Local Manhattan and gene tracks, signed LD r^2 x sign(Z)".$suffix
       if $family eq 'local_gtf';

@@ -148,8 +148,18 @@ and removes its successful temporary SAS ODA files afterward.
    Verify the final HTML links resolve to nonempty files; open representative
    PNGs to inspect SNP/gene/chromosome labels, genes, signed-LD colorbar, and
    window boundaries.
+   For chromosome-colored Manhattan plots, compare the same chromosome in the
+   genome-wide and combined local panels, including later local batches and
+   chrX. The seven-color palette repeats by chromosome number (chr1 blue,
+   chr2 orange, ..., chrX orange), not by local panel position. Z-score and
+   signed-LD plots encode a different metric and should keep their colorbars.
 4. Keep the failed SAS diagnostic folders until the failure is explained. Clean
    only successful temporary folders after all output files have been checked.
+
+When a PowerShell-launched Cygwin run prints Windows `TIMEOUT /?` syntax errors
+before uploading the genome-wide subset, check which `timeout` executable the
+shell found. The genome-wide uploader uses `/usr/bin/timeout` explicitly so it
+cannot accidentally invoke `C:\WINDOWS\system32\timeout.exe`.
 
 The scientific rule is to preserve every SNP inside a local window, but to use
 the nominal-significance subset for the genome-wide Manhattan plot. The

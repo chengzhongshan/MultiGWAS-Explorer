@@ -88,7 +88,7 @@
       "backend": "SAS ODA",
       "copy": "figures/sas/PUBLIC_SCZ_EUR_SEX_SAS_local_top_hits_manhattan.png",
       "family": "local_manhattan",
-      "sha256": "fad43c26e88b00977aeba6f98d135e6efee9880feb24e2d0a9091b1f997ae5a3",
+      "sha256": "5792d2d1a753d010b5919b7e55fb0b33683e8a837e496910338aa9a3743cc4ac",
       "source": "pipeline-root/PUBLIC_SCZ_EUR_SEX_SAS_local_top_hits_manhattan.png"
     },
     {

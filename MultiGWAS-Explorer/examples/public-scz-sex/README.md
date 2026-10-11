@@ -26,6 +26,9 @@ SHA-256 checksum of each copied image.
   controls marker symbols only. SAS local Manhattan panels use chromosome
   colors, while SAS GTF panels use signed LD colors. Plot captions and
   figure titles identify the color metric.
+- The October 2026 SAS local Manhattan refresh assigns every locus the same
+  chromosome color as the genome-wide SAS panel, including chromosome X. The
+  genome-wide figure was rerendered and matched the existing gallery checksum.
 
 The machine-readable row counts and targets are in `numeric_validation.json`
 and `targets.txt`. See the

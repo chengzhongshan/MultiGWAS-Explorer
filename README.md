@@ -74,7 +74,7 @@ portable-Cygwin validation of the sex-stratified schizophrenia GWAS. Inquiry
 targets are `rs2232429` (common association), `rs185665940` (autosomal
 differential signal), and `rs62604261` (chromosome-X differential signal).
 
-The local Manhattan panels show -log10(P) by Z-score color in gnuplot and by chromosome color in SAS. Gene-track panels use signed LD r² × sign(Z) from the EUR 1000 Genomes Phase 3 reference. Each figure opens at full resolution when clicked.
+The local Manhattan panels show -log10(P) by Z-score color in gnuplot and by chromosome color in SAS. In SAS, a chromosome retains its genome-wide color across every local panel. Gene-track panels use signed LD r² × sign(Z) from the EUR 1000 Genomes Phase 3 reference. Each figure opens at full resolution when clicked.
 
 #### SAS OnDemand for Academics outputs
 
@@ -82,9 +82,9 @@ The local Manhattan panels show -log10(P) by Z-score color in gnuplot and by chr
 
 <a href="MultiGWAS-Explorer/examples/public-scz-sex/figures/sas/PUBLIC_SCZ_EUR_SEX_SAS_manhattan.png"><img src="MultiGWAS-Explorer/examples/public-scz-sex/figures/sas/PUBLIC_SCZ_EUR_SEX_SAS_manhattan.png" alt="Genome-wide Manhattan: chromosome-colored association P" width="1100"></a>
 
-**Local Manhattan: chromosome colors**
+**Local Manhattan: chromosome colors match the genome-wide plot**
 
-<a href="MultiGWAS-Explorer/examples/public-scz-sex/figures/sas/PUBLIC_SCZ_EUR_SEX_SAS_local_top_hits_manhattan.png"><img src="MultiGWAS-Explorer/examples/public-scz-sex/figures/sas/PUBLIC_SCZ_EUR_SEX_SAS_local_top_hits_manhattan.png" alt="Local Manhattan: chromosome colors" width="1000"></a>
+<a href="MultiGWAS-Explorer/examples/public-scz-sex/figures/sas/PUBLIC_SCZ_EUR_SEX_SAS_local_top_hits_manhattan.png"><img src="MultiGWAS-Explorer/examples/public-scz-sex/figures/sas/PUBLIC_SCZ_EUR_SEX_SAS_local_top_hits_manhattan.png" alt="Local Manhattan: chromosome colors match the genome-wide plot" width="1000"></a>
 
 **Local Manhattan with gene tracks: LD r² × sign(Z) — rs2232429**
 

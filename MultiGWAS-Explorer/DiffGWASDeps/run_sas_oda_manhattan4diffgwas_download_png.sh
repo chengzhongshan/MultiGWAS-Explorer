@@ -290,8 +290,10 @@ upload_data_with_integrity_check() {
   local upload_cmd local_size remote_size
   local_size="$(wc -c < "${DATA_GZ}" | tr -d '[:space:]')"
   upload_cmd=("${ODA_PERL[@]}" --upload-file "${DATA_GZ}" --output-prefix "upload_manhattan_subset_${stamp}")
-  if command -v timeout >/dev/null 2>&1; then
-    timeout "${ODA_UPLOAD_TIMEOUT_SECONDS:-7200}" "${upload_cmd[@]}"
+  # A PowerShell-launched Cygwin shell can resolve bare "timeout" to Windows
+  # system32/timeout.exe, whose syntax is incompatible with GNU timeout.
+  if [[ -x /usr/bin/timeout ]]; then
+    /usr/bin/timeout "${ODA_UPLOAD_TIMEOUT_SECONDS:-7200}" "${upload_cmd[@]}"
   else
     "${upload_cmd[@]}"
   fi

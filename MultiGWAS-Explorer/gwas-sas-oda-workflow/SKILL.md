@@ -590,6 +590,12 @@ For a new project, copy/adapt the script templates in this skill's `scripts/` fo
 - For custom genome-wide Manhattan subsets, visually verify that the x-axis
   starts with `chr1` and does not contain a phantom pre-`chr1` block caused by
   unsorted rows or `CHR='X'` being imported as numeric missing `.` in SAS.
+- Compare chromosome-colored genome-wide and combined local Manhattan panels:
+  each chromosome must retain the same palette color across local batches.
+  Build SAS GPLOT symbol colors from actual chromosome values in displayed
+  group order, since symbol numbering restarts for each panel and can shift
+  when chromosomes are absent. Check chrX/23 explicitly. Do not apply this
+  check to local Z-score or signed-LD plots, whose colors encode those metrics.
 - For local GTF reruns, also verify the SAS log reports a non-zero exon count.
 - Keep LD rendering disabled unless the request explicitly asks for it. For an
   LD heatmap, preserve numeric HaploReg r2 values, use a sequential palette and
@@ -643,6 +649,9 @@ For a new project, copy/adapt the script templates in this skill's `scripts/` fo
   `--file` over inline `--code` for anything larger than the trivial
   `%put HELLO_FROM_ODA;` probe because shell quoting can silently truncate the
   SAS payload before submit.
+- In Cygwin upload runners, call `/usr/bin/timeout` explicitly. A bare
+  `timeout` can resolve to Windows `system32/timeout.exe` when PowerShell's
+  PATH is inherited, causing `TIMEOUT /?` syntax errors before SAS runs.
 
 ## References
 

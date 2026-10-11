@@ -124,7 +124,7 @@ is($sas_manifest{access_mode}, 'TABIX', 'SAS GTF locus records indexed access');
 is(system(@sas_locus_cmd), 0, 'SAS GTF indexed locus is reusable');
 
 SKIP: {
-    skip 'gnuplot is unavailable', 3 if system('gnuplot', '--version') != 0;
+    skip 'gnuplot is unavailable', 8 if system('gnuplot', '--version') != 0;
     my $prefix = "$dir/local_rsA";
     my $plot_status = system($^X,
         "$Bin/../DiffGWASDeps/gnuplot/pdl_gnuplot_local_locus.pl",
@@ -139,5 +139,35 @@ SKIP: {
     close $pmf;
     is($plot_manifest{rows_in_window}, 2,
         'local Manhattan includes both nonsignificant SNPs');
+
+    my $gtf = "$dir/chrX_genes.tsv";
+    open my $gf, '>', $gtf or die $!;
+    print {$gf} "chr\tgenesymbol\tgene\tst\ten\ttype\nX\tXGENE\tXGENE\t295\t305\tgene\n";
+    close $gf;
+    my $x_prefix = "$dir/local_rsX_with_genes";
+    is(system($^X, "$Bin/../DiffGWASDeps/gnuplot/pdl_gnuplot_local_locus.pl",
+        '--data', "$dir/gnuplot_locus_rsX_window_50.wide.tsv.gz",
+        '--snp', 'rsX', '--out-prefix', $x_prefix,
+        '--window-bp', '50', '--pcols', 'P', '--gtf', $gtf,
+        '--width', '600', '--height', '400'), 0,
+        'chrX gene-track Manhattan renders in chromosome-color mode');
+    open my $xgp, '<', "$x_prefix.gp" or die $!;
+    my $xgp_text = do { local $/; <$xgp> };
+    close $xgp;
+    like($xgp_text, qr/using 1:2 with points pt 7 ps 0\.72 lc rgb '#d95319'/,
+        'chrX local points use the genome-wide chrX orange');
+    ok(-s "$x_prefix.png", 'chrX local gene-track PNG is nonempty');
+
+    my $genome_prefix = "$dir/genome_colors";
+    is(system($^X, "$Bin/../DiffGWASDeps/gnuplot/pdl_gnuplot_manhattan.pl",
+        '--data', $input, '--out-prefix', $genome_prefix,
+        '--pcols', 'P', '--min-logp', '0', '--thin-mod', '1',
+        '--no-remove-x-chr', '--width', '600', '--height', '400'), 0,
+        'genome-wide Manhattan renders chromosomes including X');
+    open my $gpt, '<', "$genome_prefix.plot.tsv" or die $!;
+    my $gpt_text = do { local $/; <$gpt> };
+    close $gpt;
+    like($gpt_text, qr/^\S+\t\S+\t\d+\tX\t300\t\S+\t2$/m,
+        'genome-wide chrX data uses the same orange palette index');
 }
 done_testing();
