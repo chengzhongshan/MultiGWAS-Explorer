@@ -80,33 +80,33 @@ The local Manhattan panels show -log10(P) by Z-score color in gnuplot and by chr
 
 **Genome-wide Manhattan: chromosome-colored association P**
 
-<a href="MultiGWAS-Explorer/examples/public-scz-sex/figures/sas/PUBLIC_SCZ_EUR_SEX_SAS_manhattan.png"><img src="MultiGWAS-Explorer/examples/public-scz-sex/figures/sas/PUBLIC_SCZ_EUR_SEX_SAS_manhattan.png" alt="Genome-wide Manhattan: chromosome-colored association P" width="1100"></a>
+<a href="https://raw.githubusercontent.com/chengzhongshan/MultiGWAS-Explorer/main/MultiGWAS-Explorer/examples/public-scz-sex/figures/sas/PUBLIC_SCZ_EUR_SEX_SAS_manhattan.png"><img src="MultiGWAS-Explorer/examples/public-scz-sex/figures/sas/PUBLIC_SCZ_EUR_SEX_SAS_manhattan.png" alt="Genome-wide Manhattan: chromosome-colored association P" width="1100"></a>
 
 **Local Manhattan: chromosome colors match the genome-wide plot**
 
-<a href="MultiGWAS-Explorer/examples/public-scz-sex/figures/sas/PUBLIC_SCZ_EUR_SEX_SAS_local_top_hits_manhattan.png"><img src="MultiGWAS-Explorer/examples/public-scz-sex/figures/sas/PUBLIC_SCZ_EUR_SEX_SAS_local_top_hits_manhattan.png" alt="Local Manhattan: chromosome colors match the genome-wide plot" width="1000"></a>
+<a href="https://raw.githubusercontent.com/chengzhongshan/MultiGWAS-Explorer/main/MultiGWAS-Explorer/examples/public-scz-sex/figures/sas/PUBLIC_SCZ_EUR_SEX_SAS_local_top_hits_manhattan.png"><img src="MultiGWAS-Explorer/examples/public-scz-sex/figures/sas/PUBLIC_SCZ_EUR_SEX_SAS_local_top_hits_manhattan.png" alt="Local Manhattan: chromosome colors match the genome-wide plot" width="1000"></a>
 
 **Local Manhattan with gene tracks: LD r² × sign(Z) — rs2232429**
 
-<a href="MultiGWAS-Explorer/examples/public-scz-sex/figures/sas/PUBLIC_SCZ_EUR_SEX_SAS_local_top_hits_with_gtf_rs2232429.png"><img src="MultiGWAS-Explorer/examples/public-scz-sex/figures/sas/PUBLIC_SCZ_EUR_SEX_SAS_local_top_hits_with_gtf_rs2232429.png" alt="Local Manhattan with gene tracks: LD r² × sign(Z) — rs2232429" width="760"></a>
+<a href="https://raw.githubusercontent.com/chengzhongshan/MultiGWAS-Explorer/main/MultiGWAS-Explorer/examples/public-scz-sex/figures/sas/PUBLIC_SCZ_EUR_SEX_SAS_local_top_hits_with_gtf_rs2232429.png"><img src="MultiGWAS-Explorer/examples/public-scz-sex/figures/sas/PUBLIC_SCZ_EUR_SEX_SAS_local_top_hits_with_gtf_rs2232429.png" alt="Local Manhattan with gene tracks: LD r² × sign(Z) — rs2232429" width="760"></a>
 
 <details><summary>View the remaining 4 SAS ODA figures</summary>
 
 **Local Manhattan with gene tracks: LD r² × sign(Z) — rs185665940**
 
-<a href="MultiGWAS-Explorer/examples/public-scz-sex/figures/sas/PUBLIC_SCZ_EUR_SEX_SAS_local_top_hits_with_gtf_rs185665940.png"><img src="MultiGWAS-Explorer/examples/public-scz-sex/figures/sas/PUBLIC_SCZ_EUR_SEX_SAS_local_top_hits_with_gtf_rs185665940.png" alt="Local Manhattan with gene tracks: LD r² × sign(Z) — rs185665940" width="760"></a>
+<a href="https://raw.githubusercontent.com/chengzhongshan/MultiGWAS-Explorer/main/MultiGWAS-Explorer/examples/public-scz-sex/figures/sas/PUBLIC_SCZ_EUR_SEX_SAS_local_top_hits_with_gtf_rs185665940.png"><img src="MultiGWAS-Explorer/examples/public-scz-sex/figures/sas/PUBLIC_SCZ_EUR_SEX_SAS_local_top_hits_with_gtf_rs185665940.png" alt="Local Manhattan with gene tracks: LD r² × sign(Z) — rs185665940" width="760"></a>
 
 **Local Manhattan with gene tracks: LD r² × sign(Z) — rs62604261**
 
-<a href="MultiGWAS-Explorer/examples/public-scz-sex/figures/sas/PUBLIC_SCZ_EUR_SEX_SAS_local_top_hits_with_gtf_rs62604261.png"><img src="MultiGWAS-Explorer/examples/public-scz-sex/figures/sas/PUBLIC_SCZ_EUR_SEX_SAS_local_top_hits_with_gtf_rs62604261.png" alt="Local Manhattan with gene tracks: LD r² × sign(Z) — rs62604261" width="760"></a>
+<a href="https://raw.githubusercontent.com/chengzhongshan/MultiGWAS-Explorer/main/MultiGWAS-Explorer/examples/public-scz-sex/figures/sas/PUBLIC_SCZ_EUR_SEX_SAS_local_top_hits_with_gtf_rs62604261.png"><img src="MultiGWAS-Explorer/examples/public-scz-sex/figures/sas/PUBLIC_SCZ_EUR_SEX_SAS_local_top_hits_with_gtf_rs62604261.png" alt="Local Manhattan with gene tracks: LD r² × sign(Z) — rs62604261" width="760"></a>
 
 **Forest plot: female**
 
-<a href="MultiGWAS-Explorer/examples/public-scz-sex/figures/sas/PUBLIC_SCZ_EUR_SEX_SAS_top_hits_forest_EUR_FEMALE.png"><img src="MultiGWAS-Explorer/examples/public-scz-sex/figures/sas/PUBLIC_SCZ_EUR_SEX_SAS_top_hits_forest_EUR_FEMALE.png" alt="Forest plot: female" width="800"></a>
+<a href="https://raw.githubusercontent.com/chengzhongshan/MultiGWAS-Explorer/main/MultiGWAS-Explorer/examples/public-scz-sex/figures/sas/PUBLIC_SCZ_EUR_SEX_SAS_top_hits_forest_EUR_FEMALE.png"><img src="MultiGWAS-Explorer/examples/public-scz-sex/figures/sas/PUBLIC_SCZ_EUR_SEX_SAS_top_hits_forest_EUR_FEMALE.png" alt="Forest plot: female" width="800"></a>
 
 **Forest plot: male**
 
-<a href="MultiGWAS-Explorer/examples/public-scz-sex/figures/sas/PUBLIC_SCZ_EUR_SEX_SAS_top_hits_forest_EUR_MALE.png"><img src="MultiGWAS-Explorer/examples/public-scz-sex/figures/sas/PUBLIC_SCZ_EUR_SEX_SAS_top_hits_forest_EUR_MALE.png" alt="Forest plot: male" width="800"></a>
+<a href="https://raw.githubusercontent.com/chengzhongshan/MultiGWAS-Explorer/main/MultiGWAS-Explorer/examples/public-scz-sex/figures/sas/PUBLIC_SCZ_EUR_SEX_SAS_top_hits_forest_EUR_MALE.png"><img src="MultiGWAS-Explorer/examples/public-scz-sex/figures/sas/PUBLIC_SCZ_EUR_SEX_SAS_top_hits_forest_EUR_MALE.png" alt="Forest plot: male" width="800"></a>
 
 </details>
 
@@ -114,49 +114,49 @@ The local Manhattan panels show -log10(P) by Z-score color in gnuplot and by chr
 
 **Genome-wide Manhattan: chromosome-colored association P**
 
-<a href="MultiGWAS-Explorer/examples/public-scz-sex/figures/gnuplot/PUBLIC_SCZ_EUR_SEX_GNUPLOT_manhattan.png"><img src="MultiGWAS-Explorer/examples/public-scz-sex/figures/gnuplot/PUBLIC_SCZ_EUR_SEX_GNUPLOT_manhattan.png" alt="Genome-wide Manhattan: chromosome-colored association P" width="1100"></a>
+<a href="https://raw.githubusercontent.com/chengzhongshan/MultiGWAS-Explorer/main/MultiGWAS-Explorer/examples/public-scz-sex/figures/gnuplot/PUBLIC_SCZ_EUR_SEX_GNUPLOT_manhattan.png"><img src="MultiGWAS-Explorer/examples/public-scz-sex/figures/gnuplot/PUBLIC_SCZ_EUR_SEX_GNUPLOT_manhattan.png" alt="Genome-wide Manhattan: chromosome-colored association P" width="1100"></a>
 
 **Local Manhattan: Z-score colors**
 
-<a href="MultiGWAS-Explorer/examples/public-scz-sex/figures/gnuplot/PUBLIC_SCZ_EUR_SEX_GNUPLOT_local_top_hits_manhattan.png"><img src="MultiGWAS-Explorer/examples/public-scz-sex/figures/gnuplot/PUBLIC_SCZ_EUR_SEX_GNUPLOT_local_top_hits_manhattan.png" alt="Local Manhattan: Z-score colors" width="1000"></a>
+<a href="https://raw.githubusercontent.com/chengzhongshan/MultiGWAS-Explorer/main/MultiGWAS-Explorer/examples/public-scz-sex/figures/gnuplot/PUBLIC_SCZ_EUR_SEX_GNUPLOT_local_top_hits_manhattan.png"><img src="MultiGWAS-Explorer/examples/public-scz-sex/figures/gnuplot/PUBLIC_SCZ_EUR_SEX_GNUPLOT_local_top_hits_manhattan.png" alt="Local Manhattan: Z-score colors" width="1000"></a>
 
 **Local Manhattan with gene tracks: LD r² × sign(Z) — rs2232429**
 
-<a href="MultiGWAS-Explorer/examples/public-scz-sex/figures/gnuplot/PUBLIC_SCZ_EUR_SEX_GNUPLOT_local_top_hits_with_gtf_rs2232429.png"><img src="MultiGWAS-Explorer/examples/public-scz-sex/figures/gnuplot/PUBLIC_SCZ_EUR_SEX_GNUPLOT_local_top_hits_with_gtf_rs2232429.png" alt="Local Manhattan with gene tracks: LD r² × sign(Z) — rs2232429" width="760"></a>
+<a href="https://raw.githubusercontent.com/chengzhongshan/MultiGWAS-Explorer/main/MultiGWAS-Explorer/examples/public-scz-sex/figures/gnuplot/PUBLIC_SCZ_EUR_SEX_GNUPLOT_local_top_hits_with_gtf_rs2232429.png"><img src="MultiGWAS-Explorer/examples/public-scz-sex/figures/gnuplot/PUBLIC_SCZ_EUR_SEX_GNUPLOT_local_top_hits_with_gtf_rs2232429.png" alt="Local Manhattan with gene tracks: LD r² × sign(Z) — rs2232429" width="760"></a>
 
 <details><summary>View the remaining 8 gnuplot figures</summary>
 
 **Local Manhattan: Z-score colors — rs185665940**
 
-<a href="MultiGWAS-Explorer/examples/public-scz-sex/figures/gnuplot/PUBLIC_SCZ_EUR_SEX_GNUPLOT_local_top_hits_manhattan_rs185665940.png"><img src="MultiGWAS-Explorer/examples/public-scz-sex/figures/gnuplot/PUBLIC_SCZ_EUR_SEX_GNUPLOT_local_top_hits_manhattan_rs185665940.png" alt="Local Manhattan: Z-score colors — rs185665940" width="1000"></a>
+<a href="https://raw.githubusercontent.com/chengzhongshan/MultiGWAS-Explorer/main/MultiGWAS-Explorer/examples/public-scz-sex/figures/gnuplot/PUBLIC_SCZ_EUR_SEX_GNUPLOT_local_top_hits_manhattan_rs185665940.png"><img src="MultiGWAS-Explorer/examples/public-scz-sex/figures/gnuplot/PUBLIC_SCZ_EUR_SEX_GNUPLOT_local_top_hits_manhattan_rs185665940.png" alt="Local Manhattan: Z-score colors — rs185665940" width="1000"></a>
 
 **Local Manhattan: Z-score colors — rs2232429**
 
-<a href="MultiGWAS-Explorer/examples/public-scz-sex/figures/gnuplot/PUBLIC_SCZ_EUR_SEX_GNUPLOT_local_top_hits_manhattan_rs2232429.png"><img src="MultiGWAS-Explorer/examples/public-scz-sex/figures/gnuplot/PUBLIC_SCZ_EUR_SEX_GNUPLOT_local_top_hits_manhattan_rs2232429.png" alt="Local Manhattan: Z-score colors — rs2232429" width="1000"></a>
+<a href="https://raw.githubusercontent.com/chengzhongshan/MultiGWAS-Explorer/main/MultiGWAS-Explorer/examples/public-scz-sex/figures/gnuplot/PUBLIC_SCZ_EUR_SEX_GNUPLOT_local_top_hits_manhattan_rs2232429.png"><img src="MultiGWAS-Explorer/examples/public-scz-sex/figures/gnuplot/PUBLIC_SCZ_EUR_SEX_GNUPLOT_local_top_hits_manhattan_rs2232429.png" alt="Local Manhattan: Z-score colors — rs2232429" width="1000"></a>
 
 **Local Manhattan: Z-score colors — rs62604261**
 
-<a href="MultiGWAS-Explorer/examples/public-scz-sex/figures/gnuplot/PUBLIC_SCZ_EUR_SEX_GNUPLOT_local_top_hits_manhattan_rs62604261.png"><img src="MultiGWAS-Explorer/examples/public-scz-sex/figures/gnuplot/PUBLIC_SCZ_EUR_SEX_GNUPLOT_local_top_hits_manhattan_rs62604261.png" alt="Local Manhattan: Z-score colors — rs62604261" width="1000"></a>
+<a href="https://raw.githubusercontent.com/chengzhongshan/MultiGWAS-Explorer/main/MultiGWAS-Explorer/examples/public-scz-sex/figures/gnuplot/PUBLIC_SCZ_EUR_SEX_GNUPLOT_local_top_hits_manhattan_rs62604261.png"><img src="MultiGWAS-Explorer/examples/public-scz-sex/figures/gnuplot/PUBLIC_SCZ_EUR_SEX_GNUPLOT_local_top_hits_manhattan_rs62604261.png" alt="Local Manhattan: Z-score colors — rs62604261" width="1000"></a>
 
 **Local Manhattan with gene tracks: LD r² × sign(Z) — rs185665940**
 
-<a href="MultiGWAS-Explorer/examples/public-scz-sex/figures/gnuplot/PUBLIC_SCZ_EUR_SEX_GNUPLOT_local_top_hits_with_gtf_rs185665940.png"><img src="MultiGWAS-Explorer/examples/public-scz-sex/figures/gnuplot/PUBLIC_SCZ_EUR_SEX_GNUPLOT_local_top_hits_with_gtf_rs185665940.png" alt="Local Manhattan with gene tracks: LD r² × sign(Z) — rs185665940" width="760"></a>
+<a href="https://raw.githubusercontent.com/chengzhongshan/MultiGWAS-Explorer/main/MultiGWAS-Explorer/examples/public-scz-sex/figures/gnuplot/PUBLIC_SCZ_EUR_SEX_GNUPLOT_local_top_hits_with_gtf_rs185665940.png"><img src="MultiGWAS-Explorer/examples/public-scz-sex/figures/gnuplot/PUBLIC_SCZ_EUR_SEX_GNUPLOT_local_top_hits_with_gtf_rs185665940.png" alt="Local Manhattan with gene tracks: LD r² × sign(Z) — rs185665940" width="760"></a>
 
 **Local Manhattan with gene tracks: LD r² × sign(Z) — rs62604261**
 
-<a href="MultiGWAS-Explorer/examples/public-scz-sex/figures/gnuplot/PUBLIC_SCZ_EUR_SEX_GNUPLOT_local_top_hits_with_gtf_rs62604261.png"><img src="MultiGWAS-Explorer/examples/public-scz-sex/figures/gnuplot/PUBLIC_SCZ_EUR_SEX_GNUPLOT_local_top_hits_with_gtf_rs62604261.png" alt="Local Manhattan with gene tracks: LD r² × sign(Z) — rs62604261" width="760"></a>
+<a href="https://raw.githubusercontent.com/chengzhongshan/MultiGWAS-Explorer/main/MultiGWAS-Explorer/examples/public-scz-sex/figures/gnuplot/PUBLIC_SCZ_EUR_SEX_GNUPLOT_local_top_hits_with_gtf_rs62604261.png"><img src="MultiGWAS-Explorer/examples/public-scz-sex/figures/gnuplot/PUBLIC_SCZ_EUR_SEX_GNUPLOT_local_top_hits_with_gtf_rs62604261.png" alt="Local Manhattan with gene tracks: LD r² × sign(Z) — rs62604261" width="760"></a>
 
 **Forest plot: female**
 
-<a href="MultiGWAS-Explorer/examples/public-scz-sex/figures/gnuplot/PUBLIC_SCZ_EUR_SEX_GNUPLOT_top_hits_forest_EUR_FEMALE.png"><img src="MultiGWAS-Explorer/examples/public-scz-sex/figures/gnuplot/PUBLIC_SCZ_EUR_SEX_GNUPLOT_top_hits_forest_EUR_FEMALE.png" alt="Forest plot: female" width="800"></a>
+<a href="https://raw.githubusercontent.com/chengzhongshan/MultiGWAS-Explorer/main/MultiGWAS-Explorer/examples/public-scz-sex/figures/gnuplot/PUBLIC_SCZ_EUR_SEX_GNUPLOT_top_hits_forest_EUR_FEMALE.png"><img src="MultiGWAS-Explorer/examples/public-scz-sex/figures/gnuplot/PUBLIC_SCZ_EUR_SEX_GNUPLOT_top_hits_forest_EUR_FEMALE.png" alt="Forest plot: female" width="800"></a>
 
 **Forest plot: male**
 
-<a href="MultiGWAS-Explorer/examples/public-scz-sex/figures/gnuplot/PUBLIC_SCZ_EUR_SEX_GNUPLOT_top_hits_forest_EUR_MALE.png"><img src="MultiGWAS-Explorer/examples/public-scz-sex/figures/gnuplot/PUBLIC_SCZ_EUR_SEX_GNUPLOT_top_hits_forest_EUR_MALE.png" alt="Forest plot: male" width="800"></a>
+<a href="https://raw.githubusercontent.com/chengzhongshan/MultiGWAS-Explorer/main/MultiGWAS-Explorer/examples/public-scz-sex/figures/gnuplot/PUBLIC_SCZ_EUR_SEX_GNUPLOT_top_hits_forest_EUR_MALE.png"><img src="MultiGWAS-Explorer/examples/public-scz-sex/figures/gnuplot/PUBLIC_SCZ_EUR_SEX_GNUPLOT_top_hits_forest_EUR_MALE.png" alt="Forest plot: male" width="800"></a>
 
 **Forest plot: combined**
 
-<a href="MultiGWAS-Explorer/examples/public-scz-sex/figures/gnuplot/PUBLIC_SCZ_EUR_SEX_GNUPLOT_top_hits_forest_combined.png"><img src="MultiGWAS-Explorer/examples/public-scz-sex/figures/gnuplot/PUBLIC_SCZ_EUR_SEX_GNUPLOT_top_hits_forest_combined.png" alt="Forest plot: combined" width="800"></a>
+<a href="https://raw.githubusercontent.com/chengzhongshan/MultiGWAS-Explorer/main/MultiGWAS-Explorer/examples/public-scz-sex/figures/gnuplot/PUBLIC_SCZ_EUR_SEX_GNUPLOT_top_hits_forest_combined.png"><img src="MultiGWAS-Explorer/examples/public-scz-sex/figures/gnuplot/PUBLIC_SCZ_EUR_SEX_GNUPLOT_top_hits_forest_combined.png" alt="Forest plot: combined" width="800"></a>
 
 </details>
 
