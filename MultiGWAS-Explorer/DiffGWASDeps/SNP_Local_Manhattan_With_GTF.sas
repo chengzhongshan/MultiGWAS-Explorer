@@ -189,6 +189,10 @@ LD_display_mode=none, /*none, markers, heatmap, or both. LD display is opt-in.*/
 LD_heatmap_colormodel=CXF7FBFF CX6BAED6 CX54278F, /*Retained for legacy marker-overlay mode.*/
 LD_heatmap_legend_title=%str(LD r2),
 text_rotate_angle=90, /*Angle to rotate text labels for these selected dots by users*/
+label_position_overrides=, /*Optional SNP=BP list computed before SAS to avoid label collisions.*/
+font_size4textlabels=10, /*Actual text size used by the Perl label planner and SAS renderer.*/
+label_headroom_frac=,
+label_center_offset=,
 auto_rotate2zero=1, /*supply value 1 when there are <=3 text labels and you want them kept horizontal in the top headroom*/
 pct2adj4dencluster=2,/*Input value can be ranging from 0.0001 to 10 or even higher value!
 For SNP labels on the top, please try to use this parameter, which only works when 
@@ -207,7 +211,7 @@ adjust top SNPs labels if these labels are rotated 90 degree, which is helpful w
 verbose=0 /*Not print any notes in SAS log*/
 );
 
-%local effective_ld_marker_var effective_ld_heatmap_var effective_heatmap_legend_title _chrom_end_for_window;
+%local effective_ld_marker_var effective_ld_heatmap_var effective_heatmap_legend_title effective_plot_title _chrom_end_for_window;
 %let effective_ld_marker_var=;
 %let effective_ld_heatmap_var=;
 %let effective_heatmap_legend_title=&heatmap_legend_title;
@@ -404,7 +408,11 @@ run;
      );
   %end;
 /*  %abort 255;*/
-  title "Local Manhattan plot for target SNP &qsnp";
+  %if &effective_signed_r2=1 %then
+    %let effective_plot_title=Signed LD r2 x sign(Z score): &qsnp;
+  %else
+    %let effective_plot_title=Z-score-colored local Manhattan: &qsnp;
+  title "&effective_plot_title";
   %map_grp_assoc2gene4covidsexgwas(
 focus_on_transcript=&focus_on_transcript,/*This will generate a subset exon GTF data set by 
 replacing gene variable with ensembl transcript variable and removing rows 
@@ -518,6 +526,10 @@ ld_heatmap_var=&effective_ld_heatmap_var,
 ld_heatmap_colormodel=&LD_heatmap_colormodel,
 ld_heatmap_legend_title=&LD_heatmap_legend_title,
 text_rotate_angle=&text_rotate_angle, /*Angle to rotate text labels for these selected dots by users*/
+label_position_overrides=&label_position_overrides,
+font_size4textlabels=&font_size4textlabels,
+label_headroom_frac=&label_headroom_frac,
+label_center_offset=&label_center_offset,
 auto_rotate2zero=&auto_rotate2zero, /*supply value 1 when there are <=3 text labels and you want them kept horizontal in the top headroom*/
 pct2adj4dencluster=&pct2adj4dencluster,/*For SNP labels on the top, please try to use this parameter, which only works when there are less than or equal to 4 top SNPs
 and SNPs within a cluster are overlapped with each other or overlapped with elements from other SNP cluster, so it is feasible to 
@@ -528,6 +540,7 @@ Yoffset4textlabels=&Yoffset4textlabels, /*Move up the text labels for target SNP
 the default value 2.5 fold works for most cases*/
 scatter_yaxis_label=&scatter_yaxis_label, /*Visible y-axis title for the stacked association tracks*/
 heatmap_legend_title=&effective_heatmap_legend_title, /*Visible title for the continuous colorbar when heatmap coloring is enabled*/
+plot_title=&effective_plot_title,
 adj_spaces_among_top_snps=&adj_spaces_among_top_snps /*Provide value 1 to adjust spaces among top SNP labels; otherwise, give value 0 to not 
 adjust top SNPs labels if these labels are rotated 90 degree, which is helpful when the space adjusted labels are not pretty*/ 
   ); 

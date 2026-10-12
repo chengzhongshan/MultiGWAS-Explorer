@@ -102,6 +102,7 @@ heatmap_max_pos_val=8,/*Maximum postive value for the heatmap_var when it is not
 change this to customize the max value for colorbar in heatmap*/
 heatmap_legend_title=%str(Z score),/*Visible title for the heatmap colorbar legend; update this when the scatter colors
 are driven by a different effect metric such as beta or odds ratio*/
+plot_title=,/*Optional visible title identifying the plotted color metric.*/
 
 /*Alternative color scheme for categorical color response variable! Please keep it in default
 value if you don't want to use it for your quantitative color response variable*/
@@ -156,6 +157,9 @@ reflinecolor4selecteddots=gray,/*asign color for the vertical reference lines fo
 snp_line_split_ratio=0.99,/*split the vertical reference lines into two parts based on the ratio, with the 
 smaller part drawn from the end of point of the larger part to the adjusted position of each snp!*/
 text_rotate_angle=90, /*Angle to rotate text labels for these selected dots by users*/
+label_position_overrides=, /*Optional space-delimited SNP=BP labels placed by the local Perl planner.*/
+label_headroom_frac=, /*Planned y-axis top offset for the actual label height.*/
+label_center_offset=, /*GTL POSITIONOFFSETY in units of the text height.*/
 auto_rotate2zero=0, /*supply value 1 when there are <=3 text labels and you want them kept horizontal in the top headroom*/
 adj_spaces_among_top_snps=1,/*Provide value 1 to adjust spaces among top SNP labels; otherwise, give value 0 to not 
 adjust top SNPs labels if these labels are rotated 90 degree, which is helpful when the space adjusted labels are not pretty*/
@@ -1437,8 +1441,30 @@ run;
    select &fc2distant_close_labels*0.1*(&max_x-&min_x+1)/count(*) into: sep4tgt_pos
    from _xtag_;
    %spaceAdjust(data=&_tgt_pos_, out=_xtag1_, goal=COL:, sep=&sep4tgt_pos, newvar4adjnum=newpos); 
+   /* _xtag1_ follows genomic-position order, so align rows before merging. */
+   proc sort data=_xtag_;
+   by pos;
+   run;
    data _xtag_;
    merge _xtag_(drop=newpos) _xtag1_(keep=newpos);
+   run;
+   %end;
+   /* Preserve the planner's label centers after the legacy SAS spacing pass.
+      Only label coordinates change; GWAS marker and LD positions stay intact. */
+   %if %length(%superq(label_position_overrides))>0 %then %do;
+   data _xtag_;
+   set _xtag_;
+   length _planned_token $256 _planned_snp $128;
+   do _planned_i=1 to countw(symget('label_position_overrides'), ' ');
+      _planned_token=scan(symget('label_position_overrides'), _planned_i, ' ');
+      _planned_snp=scan(_planned_token, 1, '=');
+      if upcase(strip(&var4label_scatterplot_dots))=upcase(_planned_snp) then do;
+         _planned_bp=input(scan(_planned_token, 2, '='), best32.);
+         if not missing(_planned_bp) then newpos=_planned_bp;
+         leave;
+      end;
+   end;
+   drop _planned_token _planned_snp _planned_i _planned_bp;
    run;
    %end;
 /*   %abort 255;*/
@@ -1491,12 +1517,16 @@ run;
    from _xtag_;
    select count(*) into: n_marker_labels trimmed
    from _xtag_;
+   select max(lengthn(strip(&var4label_scatterplot_dots)))
+     into: _max_marker_label_chars trimmed
+   from _xtag_;
    
    %put Your marker positions are as follows:;
    %put &markers_pos;
    %put Total marker labels requested on the top are: &n_marker_labels;
 
 %if %sysevalf(%superq(n_marker_labels)=,boolean) %then %let n_marker_labels=0;
+%if %sysevalf(%superq(_max_marker_label_chars)=,boolean) %then %let _max_marker_label_chars=0;
    %let _scatter_track_count=&totsc;
    %if %sysevalf(%superq(_scatter_track_count)=,boolean) %then %let _scatter_track_count=1;
    %if %sysevalf(&_scatter_track_count<1) %then %let _scatter_track_count=1;
@@ -1588,6 +1618,17 @@ run;
       %let yaxis_offset4max=&_auto_yaxis_offset4max;
    %end;
 
+   /* Fit vertical labels to the longest requested marker. Font size is in
+      points while track_height is a layout dimension; raster DPI must not
+      change the fraction of the plot reserved for a label. */
+   %if (&text_rotate_angle>=60 and &n_marker_labels>=1) %then %do;
+      %let _vertical_label_frac=%sysevalf(((&_max_marker_label_chars*0.62+1)*&effective_font_size4textlabels*96/72+2*&effective_yoffset4textlabels+8)/(&track_height*0.75));
+      %if %sysevalf(&_vertical_label_frac<0.04) %then %let _vertical_label_frac=0.04;
+      %if %sysevalf(&_vertical_label_frac>0.45) %then %let _vertical_label_frac=0.45;
+      %let yaxis_offset4max=&_vertical_label_frac;
+      %put NOTE: Vertical SNP-label headroom fitted to &_max_marker_label_chars characters: offsetmax=&yaxis_offset4max.;
+   %end;
+
    %put NOTE: Effective top-label settings: rotate=&text_rotate_angle font_size=&effective_font_size4textlabels yoffset=&effective_yoffset4textlabels yaxis_offset4max=&yaxis_offset4max avg_signal_span_per_track=&_avg_signal_span_per_track fc2distant_close_labels=&fc2distant_close_labels pct2adj4dencluster=&pct2adj4dencluster make_even_pos=&make_even_pos.;
     
 %end;
@@ -1637,6 +1678,11 @@ where &var4label_scatterplot_dots^="";
 	%let yaxis_offset4max=%sysevalf(0.04*500/&track_height);
 	%let yaxis_offset4min=%sysevalf(0.02*500/&track_height);/*This will reduce the lower offset of y-axis*/
     %put NOTE: Small top-label horizontal tuning: n_marker_labels=&n_marker_labels yaxis_offset4max=&yaxis_offset4max yaxis_offset4min=&yaxis_offset4min effective_yoffset4textlabels=&effective_yoffset4textlabels track_height=&track_height.;
+%end;
+%if %length(%superq(label_headroom_frac))>0 and %length(%superq(label_center_offset))>0 %then %do;
+    %let yaxis_offset4max=&label_headroom_frac;
+    %let effective_yoffset4textlabels=&label_center_offset;
+    %put NOTE: Planned top-label headroom=&yaxis_offset4max center_offset=&effective_yoffset4textlabels.;
 %end;
 %end;
 
@@ -1809,6 +1855,9 @@ begingraph / designwidth=&track_width designheight=&track_height
              dataContrastColors=( &dataContrastCols )  ATTRPRIORITY=color
         %end;
         ;
+ %if %length(%superq(plot_title))>0 %then %do;
+   entrytitle "&plot_title";
+ %end;
  
  /*Define colors for dots by group in the scatter plot*/
  %if &lattice_subgrp_var ne %then %do;     

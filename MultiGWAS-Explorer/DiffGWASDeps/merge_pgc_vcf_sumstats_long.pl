@@ -106,7 +106,7 @@ sub process_file {
     }
 
     unless (defined $header) {
-        close $fh;
+        close $fh or die "Failed reading gzip input $path: decompressor exited unsuccessfully\n";
         return { rows => 0, header => '', status => 'EMPTY_OR_UNREADABLE' };
     }
 
@@ -153,7 +153,9 @@ sub process_file {
         last if $limit_rows && $rows >= $limit_rows;
     }
 
-    close $fh;
+    my $closed = close $fh;
+    die "Failed reading gzip input $path: decompressor exited unsuccessfully\n"
+        if !$closed && !$limit_rows;
     return { rows => $rows, header => $header, status => 'OK' };
 }
 
@@ -214,6 +216,9 @@ sub resolve_path {
 sub cygpath_to_win {
     my ($path) = @_;
     return '' unless defined $path;
+    # Both Cygwin gzip and Perl understand /cygdrive paths. Replacing their
+    # slashes made valid public GWAS inputs look empty on Windows.
+    return $path if $^O eq 'cygwin';
     return $path if $path =~ /^[A-Za-z]:[\\\/]/;
     return $path if $^O !~ /^(?:cygwin|MSWin32)$/i;
     if ($path =~ m{^/mnt/([A-Za-z])/(.*)$}) {

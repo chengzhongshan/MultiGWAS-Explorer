@@ -125,6 +125,7 @@ my $emit_local_sas_scripts = 0;
 my $local_sas_only = 0;
 my $local_gtf_label_snps_override = '';
 my $local_gtf_label_layout_override = '';
+my $local_gtf_label_font_size_override;
 my $local_gtf_yaxis_offset4max_override = '';
 my $local_gtf_yoffset4textlabels_override = '';
 my $local_ld_snps_override = '';
@@ -248,6 +249,7 @@ GetOptions(
     'local-sas-only!' => \$local_sas_only,
     'local-gtf-label-snps=s' => \$local_gtf_label_snps_override,
     'local-gtf-label-layout=s' => \$local_gtf_label_layout_override,
+    'local-gtf-label-font-size=f' => \$local_gtf_label_font_size_override,
     'local-gtf-yaxis-offset4max=s' => \$local_gtf_yaxis_offset4max_override,
     'local-gtf-yoffset4textlabels=s' => \$local_gtf_yoffset4textlabels_override,
     'local-ld-snps=s' => \$local_ld_snps_override,
@@ -663,6 +665,8 @@ die "--local-ld-display-mode must be none, markers, heatmap, or both\n"
 $local_ld_display_mode = 'markers'
     if $local_ld_display_mode eq 'none' && $highlight_high_ld_snps;
 $highlight_high_ld_snps = 1 if $local_ld_display_mode ne 'none';
+my $local_ld_cache_min_r2 = $local_ld_display_mode =~ /^(?:heatmap|both)$/
+    ? 0 : $local_ld_r2_threshold_override;
 $local_ld_marker_symbol = lc(trim($local_ld_marker_symbol || 'star'));
 die "--local-ld-marker-symbol must be star, plus, cross, circle, square, triangle, or diamond\n"
     unless $local_ld_marker_symbol =~ /^(?:star|plus|cross|circle|square|triangle|diamond)$/;
@@ -691,7 +695,7 @@ if ($highlight_high_ld_snps
             my ($direct_cache, $direct_ok) = resolve_plink2_ld_cache_for_plot(
                 query_snp   => $local_ld_reference_snp,
                 populations => $local_ld_population_override,
-                min_r2     => $local_ld_r2_threshold_override,
+                min_r2     => $local_ld_cache_min_r2,
                 window_kb  => cfg_or($spec, 'local_ld_window_kb', cfg_or($spec, 'top_hit_ld_window_kb', 1000)),
                 pfile      => $top_hit_ld_pfile,
                 bfile      => $top_hit_ld_bfile,
@@ -712,7 +716,7 @@ if ($highlight_high_ld_snps
     }
     $local_ld_cache_by_snp{lc $local_ld_reference_snp} = $local_ld_cache
         if length($local_ld_reference_snp) && length($local_ld_cache);
-    if ($local_ld_display_mode eq 'heatmap'
+    if ($local_ld_display_mode =~ /^(?:heatmap|both)$/
         && $top_hit_ld_source eq 'PLINK2_1KG'
         && lc(trim($reference_build_profile->{build} || '')) !~ /^(?:hg38|grch38)$/
         && @configured_target_snps > 1) {
@@ -721,7 +725,7 @@ if ($highlight_high_ld_snps
             my ($target_cache, $target_ok) = resolve_plink2_ld_cache_for_plot(
                 query_snp   => $query_snp,
                 populations => $local_ld_population_override,
-                min_r2      => $local_ld_r2_threshold_override,
+                min_r2      => $local_ld_cache_min_r2,
                 window_kb   => cfg_or($spec, 'local_ld_window_kb', cfg_or($spec, 'top_hit_ld_window_kb', 1000)),
                 pfile       => $top_hit_ld_pfile,
                 bfile       => $top_hit_ld_bfile,
@@ -839,6 +843,7 @@ my $runner_cfg = build_runner_config(
     local_ld_r2_values_override => $local_ld_r2_values_override,
     local_ld_heatmap_colors => $local_ld_heatmap_colors,
     local_gtf_label_layout_override => $local_gtf_label_layout_override,
+    local_gtf_label_font_size_override => $local_gtf_label_font_size_override,
     local_gtf_yaxis_offset4max_override => $local_gtf_yaxis_offset4max_override,
     local_gtf_yoffset4textlabels_override => $local_gtf_yoffset4textlabels_override,
     get_common_associations => $effective_get_common_associations,
@@ -1126,8 +1131,12 @@ if (!$skip_plots) {
         description => $local_gtf_description,
         command     => $local_gtf_command,
         outputs     => ($local_sas_only || $signed_ld_dispatch) ? [] : \@local_gtf_outputs,
-        cache_key   => $local_sas_only ? '' : $local_gtf_request_key,
-        cache_file  => $local_sas_only ? '' : $local_gtf_request_cache_file,
+        # The signed-LD dispatcher owns per-locus request markers. Its output
+        # list is intentionally empty so it can resume unfinished loci; a
+        # parent marker would overwrite the single-locus marker when their
+        # HTML basenames coincide.
+        cache_key   => ($local_sas_only || $signed_ld_dispatch) ? '' : $local_gtf_request_key,
+        cache_file  => ($local_sas_only || $signed_ld_dispatch) ? '' : $local_gtf_request_cache_file,
         enabled     => $wanted{local_gtf} ? 1 : 0,
       },
       {
@@ -1206,7 +1215,9 @@ for my $step (@step_defs) {
             validate_generated_files($generated, $pair_info);
         }
     }
-    if (!$local_sas_only && $step->{name} =~ /^plot_(?:manhattan|local_manhattan|local_gtf)$/) {
+    if (!$local_sas_only
+        && !($signed_ld_dispatch && $step->{name} eq 'plot_local_gtf')
+        && $step->{name} =~ /^plot_(?:manhattan|local_manhattan|local_gtf)$/) {
         my $cache_input = ($explicit_target_local_plot_fast_path
                 && $step->{name} =~ /^plot_local_(?:manhattan|gtf)$/)
             ? ($runner_cfg->{SOURCE_LONG_GZ} || $generated->{stdized_output} || '')
@@ -2748,7 +2759,7 @@ sub build_display_track_catalog {
                 betavar => "${id}_BETA",
                 sevar => "${id}_SE",
                 manhattan_label => "$label fixed-effect association P",
-                gtf_label => $id,
+                gtf_label => safe_name("$label fixed-effect association P"),
             };
             push @catalog, $entry;
             add_display_track_aliases(\%lookup, $entry,
@@ -3229,6 +3240,7 @@ sub build_runner_config {
     my $local_ld_r2_values_override = $args{local_ld_r2_values_override} // '';
     my $local_ld_heatmap_colors = $args{local_ld_heatmap_colors} // 'CXF7FBFF CX6BAED6 CX54278F';
     my $local_gtf_label_layout_override = $args{local_gtf_label_layout_override} // '';
+    my $local_gtf_label_font_size_override = $args{local_gtf_label_font_size_override};
     my $local_gtf_yaxis_offset4max_override = $args{local_gtf_yaxis_offset4max_override} // '';
     my $local_gtf_yoffset4textlabels_override = $args{local_gtf_yoffset4textlabels_override} // '';
     my $get_common_associations = $args{get_common_associations} ? 1 : 0;
@@ -3626,8 +3638,8 @@ sub build_runner_config {
         GTF_LD_HEATMAP_COLORS => $local_ld_heatmap_colors,
         GTF_LD_HEATMAP_LEGEND_TITLE => (
             length($local_ld_reference_snp)
-              ? "Signed LD r2 to $local_ld_reference_snp ($local_ld_population_label, 1000G Phase 3 / PLINK2)"
-              : "Signed LD r2 ($local_ld_population_label, 1000G Phase 3 / PLINK2)"
+              ? "Signed LD r2 x sign(Z) to $local_ld_reference_snp ($local_ld_population_label, 1000G Phase 3 / PLINK2)"
+              : "Signed LD r2 x sign(Z) ($local_ld_population_label, 1000G Phase 3 / PLINK2)"
         ),
         HIGHLIGHT_HIGH_LD_SNPS => $highlight_high_ld_snps,
         LOCAL_LD_CACHE_TSV => (
@@ -3643,6 +3655,11 @@ sub build_runner_config {
             length($local_gtf_label_layout_override)
               ? $local_gtf_label_layout_override
               : cfg_or($spec, 'local_gtf_label_layout', 'auto')
+        ),
+        GTF_LABEL_FONT_SIZE => (
+            defined($local_gtf_label_font_size_override)
+              ? $local_gtf_label_font_size_override
+              : cfg_or($spec, 'local_gtf_label_font_size', 10)
         ),
         FOREST_TRACK_IDS => join('|', map { $_->{id} } @forest_tracks),
         FOREST_TRACK_LABELS => join('|', map { $_->{label} } @forest_tracks),
@@ -3791,12 +3808,19 @@ sub resolve_oda_helper_unix {
 
 sub validate_generated_files {
     my ($generated, $pair_info) = @_;
-    for my $path ($generated->{wide_output}, $generated->{wide_manifest}, $generated->{runner_config}, $generated->{preset_config}) {
+    for my $path ($generated->{wide_output}, $generated->{runner_config}, $generated->{preset_config}) {
         die "Expected generated file missing or empty: $path\n" unless defined $path && -s cygpath_to_win($path);
     }
     assert_wide_output_matches_pairs($generated->{wide_output}, $pair_info);
-    assert_not_single_snp_manifest($generated->{wide_manifest});
-    assert_wide_manifest_matches_pairs($generated->{wide_manifest}, $pair_info);
+    my $manifest = $generated->{wide_manifest} || '';
+    if (length($manifest) && -s cygpath_to_win($manifest)) {
+        assert_not_single_snp_manifest($manifest);
+        assert_wide_manifest_matches_pairs($manifest, $pair_info);
+    } else {
+        print STDERR "[warn] Wide subset manifest $manifest is missing or empty; "
+          . "using the verified wide-output header for this plotting step. "
+          . "If the wide table itself needs rebuilding, --step extract_wide_subset recreates both files.\n";
+    }
 }
 
 sub validate_local_target_plot_files {
@@ -3813,9 +3837,7 @@ sub validate_local_target_plot_files {
     }
 
     my $wide = $generated->{wide_output} || '';
-    my $manifest = $generated->{wide_manifest} || '';
-    if (length($wide) && length($manifest)
-        && -s cygpath_to_win($wide) && -s cygpath_to_win($manifest)) {
+    if (length($wide) && -s cygpath_to_win($wide)) {
         validate_generated_files($generated, $pair_info);
         return;
     }
@@ -4906,7 +4928,10 @@ Options:
                        Label these SNP names on top of the local GTF figure.
                        Default behavior labels the target/top-hit SNPs.
   --local-gtf-label-layout MODE
-                       local GTF top-label layout: auto|vertical|horizontal.
+                       Local GTF top-label layout: auto|vertical|horizontal.
+                       Auto uses font-aware Perl spacing to avoid overlap.
+  --local-gtf-label-font-size N
+                       SNP top-label font size in points (default: 10).
   --local-gtf-window-bp BP
                        Override the genomic half-window used only for the local
                        GTF plot stage (default: 1e6). Values above 5e6 warn
@@ -5068,7 +5093,9 @@ sub full_help {
         $text .= "  - use --local-gtf-label-snps rs1,rs2,... when you want to label extra or\n";
         $text .= "    specific SNP names on top of the local GTF plot window\n";
     $text .= "  - use --local-gtf-label-layout vertical or --local-gtf-label-layout horizontal\n";
-    $text .= "    to choose how those top SNP labels are drawn; auto keeps the macro-driven default\n";
+    $text .= "    to override the font-aware automatic label planner\n";
+    $text .= "  - use --local-gtf-label-font-size N to set the font used by both the\n";
+    $text .= "    collision planner and the SAS top labels (default 10 pt)\n";
     $text .= "  - use --local-gtf-yaxis-offset4max N when you want to set the starting\n";
     $text .= "    top headroom fraction for local GTF plots; this is the parameter that\n";
     $text .= "    controls single-SNP top headroom after the macro overrides\n";

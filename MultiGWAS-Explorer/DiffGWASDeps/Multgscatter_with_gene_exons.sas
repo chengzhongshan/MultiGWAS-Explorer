@@ -66,6 +66,7 @@ Yoffset4textlabels=3.5, /*Move up the text labels for target SNPs in specific fo
 the default value 2.5 fold works for most cases*/
 scatter_yaxis_label=%str(-log10%(P%)),/*Visible y-axis title for the stacked association tracks*/
 heatmap_legend_title=%str(Z score),/*Visible title for the continuous colorbar when heatmap coloring is enabled*/
+plot_title=,/*Optional visible title naming the plotted color metric.*/
 xaxis_offset4min=0.02, /*provide 0-1 value or auto  to offset the min of the xaxis*/
 xaxis_offset4max=0.02, /*provide 0-1 value or auto to offset the max of the xaxis*/
 shift_text_yval=-0.2, /*in terms of gene track labels, add positive or negative vale, ranging from 0 to 1, 
@@ -146,6 +147,10 @@ ld_heatmap_var=,
 ld_heatmap_colormodel=CXF7FBFF CX6BAED6 CX54278F,
 ld_heatmap_legend_title=%str(LD r2),
 text_rotate_angle=90, /*Angle to rotate text labels for these selected dots by users*/
+label_position_overrides=,
+font_size4textlabels=10,
+label_headroom_frac=,
+label_center_offset=,
 auto_rotate2zero=0, /*supply value 1 when less than 3 text labels, it is good to automatically set the text_rotate_angel=0*/
 pct2adj4dencluster=0.25, /*For SNP labels on the top, please try to use this parameter, which only works when 
 there are less than or equal to 3 top SNPs if track_width <= 500, or 5 top SNPs if track_width between 500 and 800, or 6 top SNPs if 
@@ -505,6 +510,7 @@ in the same size and color*/
       Yoffset4textlabels=&Yoffset4textlabels, /*Move up the text labels for target SNPs in specific fold; 
 the default value 2.5 fold works for most cases*/
       heatmap_legend_title=&heatmap_legend_title, /*Visible title for the continuous colorbar when heatmap coloring is enabled*/
+      plot_title=&plot_title,
       xaxis_offset4min=&xaxis_offset4min, /*provide 0-1 value or auto  to offset the min of the xaxis*/
     xaxis_offset4max=&xaxis_offset4max, /*provide 0-1 value or auto to offset the max of the xaxis*/
 
@@ -579,6 +585,10 @@ scatterplots;*/
  ld_heatmap_colormodel=&ld_heatmap_colormodel,
  ld_heatmap_legend_title=&ld_heatmap_legend_title,
 text_rotate_angle=&text_rotate_angle, /*Angle to rotate text labels for these selected dots by users*/
+label_position_overrides=&label_position_overrides,
+font_size4textlabels=&font_size4textlabels,
+label_headroom_frac=&label_headroom_frac,
+label_center_offset=&label_center_offset,
 auto_rotate2zero=&auto_rotate2zero, /*supply value 1 when less than 3 text labels, it is good to automatically set the text_rotate_angel=0*/
 pct2adj4dencluster=&pct2adj4dencluster,
 adj_spaces_among_top_snps=&adj_spaces_among_top_snps /*Provide value 1 to adjust spaces among top SNP labels; otherwise, give value 0 to not 

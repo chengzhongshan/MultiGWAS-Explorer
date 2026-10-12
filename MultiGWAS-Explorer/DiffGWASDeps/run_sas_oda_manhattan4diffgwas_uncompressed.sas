@@ -16,6 +16,22 @@ proc sort data=scz_mh;
   by CHR BP;
 run;
 
+/* Bind GPLOT symbol colors to chromosome values even if some chromosomes
+   are absent from this genome-wide subset. */
+proc sort data=scz_mh(keep=CHR where=(not missing(CHR)))
+          out=_genome_chr_palette nodupkey;
+  by CHR;
+run;
+data _null_;
+  set _genome_chr_palette end=last;
+  length colors $4096 color $8;
+  retain colors '';
+  color=scan('cx0072bd cxd95319 cxedb120 cx7e2f8e cx77ac30 cx4dbeee cxa2142f',
+             mod(CHR-1,7)+1, ' ');
+  colors=catx(' ',colors,color);
+  if last then call symputx('genome_chr_colors',colors);
+run;
+
 %Manhattan4DiffGWASs(
   dsdin=scz_mh,
   pos_var=BP,
@@ -25,6 +41,7 @@ run;
   logP=1,
   gwas_thrsd=7.30103,
   dotsize=1,
+  uniq_colors=&genome_chr_colors,
   _logP_topval=10,
   y_axix_step=2,
   fig_width=1200,

@@ -18,6 +18,23 @@ __WIDE_IMPORT_BLOCK__
 
 __MANHATTAN_SORT_BLOCK__
 
+/* GPLOT numbers symbols by the chromosomes actually present. Build that
+   symbol list from chromosome values so a missing chromosome does not shift
+   the colors of all subsequent chromosomes. */
+proc sort data=scz_mh(keep=CHR where=(not missing(CHR)))
+          out=_genome_chr_palette nodupkey;
+  by CHR;
+run;
+data _null_;
+  set _genome_chr_palette end=last;
+  length colors $4096 color $8;
+  retain colors '';
+  color=scan('cx0072bd cxd95319 cxedb120 cx7e2f8e cx77ac30 cx4dbeee cxa2142f',
+             mod(CHR-1,7)+1, ' ');
+  colors=catx(' ',colors,color);
+  if last then call symputx('genome_chr_colors',colors);
+run;
+
 /* Font controls for the Manhattan figure.
    Keep comments outside the macro call so SAS does not misparse the
    keyword-argument list. */
@@ -30,6 +47,7 @@ __MANHATTAN_SORT_BLOCK__
   logP=1,
   gwas_thrsd=7.30103,
   dotsize=1,
+  uniq_colors=&genome_chr_colors,
   _logP_topval=10,
   y_axix_step=2,
   fig_width=__MANHATTAN_FIG_WIDTH__,
@@ -46,6 +64,7 @@ __MANHATTAN_SORT_BLOCK__
   flip1stGWAS_signal=0,
   rm_signals_with_logP_lt=0.5,
   outputfigname=__OUTPUT_PREFIX__,
+  plot_title=Genome-wide Manhattan: -log10(P) by chromosome color,
   Use_scaled_pos=1,
   sep_chr_grp=0,
   gwas_sortedby_numchrpos=1

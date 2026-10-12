@@ -5,6 +5,8 @@ For platform setup and practical examples, see the
 and reviewer-related validation notes are in its
 [revision section](../docs/README.md#reviewer-driven-scientific-revision).
 For a shorter overview, return to the [project homepage](../README.md).
+For the AOA rerun failure modes and verification commands, see
+[README4Debugging.md](README4Debugging.md).
 
 This repository combines a Perl MCP server, GWAS preprocessing utilities, and
 SAS OnDemand for Academics plotting wrappers into one workflow for differential
@@ -1716,6 +1718,13 @@ perl auto_prepare_and_run_diff_gwas.pl \
   --step plot_local_gtf
 ```
 
+For a plot-only rerun, the generated `*.merged_plotwide.manifest.tsv` is
+optional when the existing `*.merged_plotwide.tsv.gz` is present and its header
+contains the required GWAS columns. The pipeline warns and uses that verified
+header, avoiding a full wide-table conversion just to replace a removed
+manifest. Rerun `--step extract_wide_subset` only when the wide table itself
+needs rebuilding; that step recreates both files.
+
 ## SAS ODA Wrapper Utilities
 
 The low-level SAS ODA helper:
@@ -2485,6 +2494,9 @@ source contents, so changing only the launcher or dispatcher does not repeat
 finished plots. Changing a scientific plot input does rerender the affected
 request. Older plots without a matching checksum are generated once under this
 scheme. Explicit multiple-SNP signed-LD requests use the same resume path.
+The outer automation leaves signed-LD request markers to the per-locus
+dispatcher; writing a second parent key beside a single-locus HTML would
+overwrite the matching key and rerender that locus on every run.
 Within one invocation, shared SAS macros are uploaded and checked for the
 first fresh hit, then reused for later hits; after a disconnect or a new
 invocation, the first fresh hit verifies them again.
@@ -2606,13 +2618,17 @@ and status file for the program failure.
 When two or more explicit target SNPs have overlapping SNP-centered windows on
 the same chromosome, the SAS local-GTF runner now merges them into one displayed
 locus and labels every requested rsID in that plot. For example, with a `1e6`
-half-window, `rs2070788` (chr21:42841988) and `rs383510` (chr21:42858367) are
+half-window, `rs2070788` (chr21:41470061) and `rs383510` (chr21:41486440) are
 rendered together rather than as two nearly identical figures. The first
 requested or most-significant lead remains the named LD reference, and the
 displayed half-window expands enough to contain the union of all member SNP
 windows. A previously
 generated target CSV is reused only after its SNPs, coordinates, optional gene
 overrides, and freshness relative to the compact GWAS subset are validated.
+Targets on different chromosomes or in nonoverlapping windows produce separate
+plots. Their index lists the chromosome and target-coordinate range beside
+each plot link, so a figure with two labels is identifiable within a larger
+four-target request.
 
 High-LD marker overlays are disabled by default because dense proxies can
 obscure association points in a wide locus. Enable them only when requested:
@@ -2668,8 +2684,8 @@ perl auto_prepare_and_run_diff_gwas.pl \
 ```
 
 Set `--local-ld-display-mode none` to disable the SAS heatmap explicitly.
-With multiple target SNPs, SAS creates a separate indexed local window, LD
-reference, and signed colorbar for each target.
+With targets in multiple nonoverlapping loci, SAS creates a separate indexed
+local window, LD reference, and signed colorbar for each locus.
 
 For an explicit LocusZoom-like LD view in SAS ODA, request
 `--local-ld-display-mode heatmap`.
@@ -2924,10 +2940,28 @@ The higher-level automation wrapper still supports the batched local-GTF path
 through `--target-snps rs123` plus
 `--local-gtf-label-snps rs123,rs456,rs789`.
 
-When `GTF_LABEL_SNPS` contains three or fewer rsIDs, the local GTF top labels
-are now kept horizontal within the top headroom by the default
-`auto_rotate2zero=1` path. Larger label sets still fall back to the rotated
-layout to avoid crowding.
+The older batched GTF macro can keep three or fewer labels horizontal with
+`auto_rotate2zero=1`. For signed-LD target plots, `plan_local_gtf_labels.pl`
+estimates the width of every rsID at the configured font size, spreads labels
+within the visible locus, and keeps them horizontal only when they fit without
+overlap after spacing. It uses balanced block adjustments, similar to
+`my_spaceAdjust`, and restores each adjusted position to its SNP by name.
+It plans vertical labels only when the total horizontal text width and gaps
+cannot fit. It passes the adjusted label positions to SAS; the GWAS and LD
+marker coordinates stay at their true genomic positions. The four chr21 targets
+`rs2070788,rs383510,rs462687,rs429442` stay horizontal even though their
+labels need long leader lines; eight long labels that exceed the available
+width rotate. Use `--local-gtf-label-layout horizontal` or
+`vertical` to override the automatic choice, and
+`--local-gtf-label-font-size 12` (or spec key
+`local_gtf_label_font_size`) when changing the label font. The planner also
+sets the top headroom from the chosen text height and centers labels within
+that space. Four CD55-region targets within 31 bp also fit horizontally after
+spacing; longer or more numerous labels rotate when their combined width
+exceeds the plot. If Perl cannot plan a locus, the uploaded
+`Plan_Local_GTF_Target_Labels.sas` macro makes the same decision from the
+compact GWAS rows in SAS ODA. To exercise that fallback deliberately during
+debugging, set `GTF_LABEL_PLAN_BACKEND=sas` for one run.
 
 The direct single-SNP extractor now also records target-row diagnostics in the
 emitted manifest, including whether the target row survived and which prefix
@@ -3073,8 +3107,9 @@ Important caveats:
 
 - `Yoffset4textlabels` is also auto-tuned internally, so in very small label
   sets manual changes may appear weaker than expected.
-- with `auto_rotate2zero=1`, one to three top SNP labels now stay horizontal in
-  the reserved headroom; four or more labels still use the rotated layout.
+- with `auto_rotate2zero=1` in the older batched macro, one to three top SNP
+  labels stay horizontal; the single-SNP signed-LD runner uses `0` so its
+  chosen vertical layout is preserved.
 - if one to three top SNP labels still do not sit in the middle of the
   headroom, the lower-level fallback is to edit the small-label branch inside
   `Lattice_gscatter_over_bed_track.sas` near the `1000/&track_height` ratio
@@ -3137,8 +3172,15 @@ then clear the reference name. A value in that union no longer answers the
 question "LD to which variant?" and can silently change the scientific meaning
 of the color scale. The SAS automation therefore runs the single-target GTF
 runner once per non-overlapping locus when heatmap mode and direct PLINK2 LD
-are used. Nearby targets are labels in the same plot; the first lead is the
-sole LD reference for that merged locus. Separate loci retain their own LD
+are used. For an explicit `--target-snps` request, nearby targets are all
+labeled in the same plot. A Perl layout planner adjusts their label positions
+and selects horizontal or vertical text according to label widths and spacing.
+The first input target is the LD reference unless `--local-ld-reference-snp`
+names another target in that locus. The top headroom scales with the longest
+vertical label, so short rsIDs do not reserve excess space. For automatically
+selected genomewide top hits, a merged region labels only its lead with the
+smallest available association P value; that lead is also its LD reference.
+Separate loci retain their own LD
 cache, reference label, signed colorbar, and adjacent gene track.
 
 This command is the real-data regression check for the overlapping

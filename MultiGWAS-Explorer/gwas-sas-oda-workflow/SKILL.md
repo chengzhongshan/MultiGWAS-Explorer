@@ -5,6 +5,10 @@ description: "Reusable scientific workflow for GWAS summary statistics: merge se
 
 # GWAS SAS ODA Workflow
 
+For the tested AOA failure cases, compact tabix local inputs, SAS session
+termination diagnostics, and output verification, consult
+[`README4Debugging.md`](../README4Debugging.md) before rerunning a large job.
+
 ## Strategy
 
 Use this skill as the workflow brain. Keep MCP tools small and reliable.
@@ -12,6 +16,13 @@ Use this skill as the workflow brain. Keep MCP tools small and reliable.
 - Put scientific orchestration, file naming, validation, and decision rules in this skill and project scripts.
 - Put atomic capabilities in the Perl MCP server: run Cygwin bash/Perl, run/upload/download/delete/list SAS ODA files, inspect directories, and optionally wrap bgzip/tabix.
 - Do not put one-off cohort-specific GWAS logic into `server.pl`; keep that logic in versioned Perl/SAS/Bash scripts.
+- When a local Manhattan track is blank, count nonmissing values in that
+  track's source P column within the exact locus window. A different track's
+  missing P values must not gate the row before plotting; merged-wide allele
+  rows can have meta P and differential P on separate rows.
+- Before trusting SAS local Manhattan output, check chromosome-X input is
+  numeric `23`, verify one lead entry per requested SNP, and inspect the
+  downloaded panels and their SNP, gene, and chromosome labels.
 
 ## Required Context
 
@@ -261,7 +272,9 @@ Before running a workflow, identify:
    hit and a partial HTML index while work remains. On ODA exit 74 or another
    failure, rerun the same command; do not repeat verified hits. Do not mark
    the full HTML index or parent plotting stage complete until all requested
-   hits finish. Only the first fresh hit of a new invocation establishes
+   hits finish. The outer automation must not write its own request key to a
+   dispatcher's per-locus marker: with one locus, the HTML basenames coincide
+   and that overwrite defeats resume. Only the first fresh hit of a new invocation establishes
    shared remote macro readiness. Keep the checksum tied to scientific inputs
    and SAS plotting sources, not launcher timestamps or dispatcher edits.
    A Windows lock on the optional partial index or progress JSON must not stop
@@ -277,6 +290,32 @@ Before running a workflow, identify:
    SNPs on both sides of the lead; a zero exit code alone is insufficient.
    A fix to the genomic selection or plotting macro changes the scientific
    request checksum, so previously completed plots may need regeneration.
+   In signed-LD local GTF plots, distinguish automatically selected top hits
+   from explicit `--target-snps`. When selected lead windows overlap, use the
+   lead with the smallest available association P as the region's sole label
+   and LD reference. For explicit targets, label every target in the shared
+   region, default to the first input target as the LD reference, and honor an
+   explicit `--local-ld-reference-snp` override. For multiple explicit targets,
+   run the Perl local-GTF label planner before SAS submission. It estimates
+   label widths at the configured font size, balances horizontal displacement
+   in finite blocks, and selects vertical text only when the total horizontal
+   widths and gaps cannot fit. Do not reject a feasible horizontal layout just
+   because leader lines are long: the four-target chr21
+   `rs2070788,rs383510,rs462687,rs429442` case fits horizontally. Match this
+   decision in the SAS fallback. Pass its chosen angle and adjusted label positions
+   to SAS; keep GWAS/LD marker coordinates at their true genomic positions.
+   Pass its font-aware top headroom and text-height-relative center offset too.
+   Size headroom against the full SAS design height; using only an assumed
+   plot-area fraction left excess blank space above rotated labels.
+   For requests spanning separate chromosomes or nonoverlapping windows, list
+   each plot's chromosome and target-coordinate range in the result index.
+   If Perl planning fails or target coordinates are unavailable locally, invoke
+   `Plan_Local_GTF_Target_Labels.sas` against the compact imported locus in
+   SAS ODA before drawing. `GTF_LABEL_PLAN_BACKEND=sas` forces that fallback
+   for a regression check.
+   Fit vertical top headroom to the longest label and design height; raster
+   DPI must not inflate layout headroom. Keep adjusted labels paired with their
+   genomic positions when merging SAS datasets.
    In this project, `--local-gtf-window-bp` now controls both the extracted GTF
    half-window and the displayed local GTF plot half-window.
    Default that half-window to 1 Mb for newly generated runs and direct
@@ -378,9 +417,10 @@ Before running a workflow, identify:
    `GTF_LABEL_SNPS` can supply additional comma-separated rsIDs to label inside
    that same locus. Prefer this path when several inquiry SNPs fall in one
    shared window and you want one centered local-GTF figure instead of one
-   locus per target. When the label list contains three or fewer rsIDs, the
-   default `auto_rotate2zero=1` path now keeps those top labels horizontal in
-   the local-GTF headroom.
+   locus per target. The older batched macro can use `auto_rotate2zero=1` to
+   keep up to three labels horizontal. The single-SNP signed-LD runner uses
+   the Perl-planned orientation for multiple explicit targets and disables
+   SAS's count-only rotation override so nearby rsIDs remain distinct.
    The single-SNP extractor manifest now also reports whether the target row
    survived and which prefix blocks were present or missing. Use that manifest
    before blaming a sparse locus: a target row can still be valid for local GTF
@@ -550,6 +590,12 @@ For a new project, copy/adapt the script templates in this skill's `scripts/` fo
 - For custom genome-wide Manhattan subsets, visually verify that the x-axis
   starts with `chr1` and does not contain a phantom pre-`chr1` block caused by
   unsorted rows or `CHR='X'` being imported as numeric missing `.` in SAS.
+- Compare chromosome-colored genome-wide and combined local Manhattan panels:
+  each chromosome must retain the same palette color across local batches.
+  Build SAS GPLOT symbol colors from actual chromosome values in displayed
+  group order, since symbol numbering restarts for each panel and can shift
+  when chromosomes are absent. Check chrX/23 explicitly. Do not apply this
+  check to local Z-score or signed-LD plots, whose colors encode those metrics.
 - For local GTF reruns, also verify the SAS log reports a non-zero exon count.
 - Keep LD rendering disabled unless the request explicitly asks for it. For an
   LD heatmap, preserve numeric HaploReg r2 values, use a sequential palette and
@@ -603,6 +649,9 @@ For a new project, copy/adapt the script templates in this skill's `scripts/` fo
   `--file` over inline `--code` for anything larger than the trivial
   `%put HELLO_FROM_ODA;` probe because shell quoting can silently truncate the
   SAS payload before submit.
+- In Cygwin upload runners, call `/usr/bin/timeout` explicitly. A bare
+  `timeout` can resolve to Windows `system32/timeout.exe` when PowerShell's
+  PATH is inherited, causing `TIMEOUT /?` syntax errors before SAS runs.
 
 ## References
 

@@ -1,5 +1,16 @@
 # Public sex-stratified GWAS validation (September 2026)
 
+## October 2026 gallery correction
+
+The public example gallery now separates the two local color encodings:
+gnuplot local Manhattan panels show Z scores, whereas local GTF panels show
+phased EUR 1000 Genomes Phase 3 `R² × sign(Z)`. The SAS combined local
+Manhattan panel uses chromosome colors and resolves its inquiry SNP gene
+labels from the region-limited GENCODE GTF; SAS GTF panels identify the
+female-versus-male differential track explicitly. Figure titles and gallery
+captions state the relevant encoding. The September observations below
+describe the earlier version of the gallery.
+
 ## Follow-up correction: complete local-LD color data
 
 The original gnuplot local plots used the high-LD marker threshold as PLINK2's
@@ -40,7 +51,7 @@ pixel-region regression checks visible label text and passed on Windows and
 Ubuntu with the pipeline-installed gnuplot. The earlier PNG-decoding pass
 alone did not establish forest-label correctness.
 
-The completed full run produced 11 SAS PNGs in the results gallery. The gallery
+The completed full run produced 7 curated SAS PNGs in the results gallery. The gallery
 collects both backends under the selected output directory and
 verifies the copied images using SHA-256. The public SAS test also disables
 gnuplot fallback and forces fresh rendering to prevent ambiguous test results.

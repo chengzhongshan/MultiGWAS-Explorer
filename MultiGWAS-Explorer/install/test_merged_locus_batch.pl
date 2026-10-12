@@ -16,6 +16,7 @@ my $table = join("\n",
     "1\t900\trsFar\t0.001\t0.3",
     "1\t120\trsNearby\t0.9\t0.2",
     "2\t200\trsB\t0.7\t0.4",
+    "X\t300\trsX\t0.6\t0.5",
 ) . "\n";
 gzip \$table => $input or die $GzipError;
 my $status = system($^X,
@@ -84,6 +85,23 @@ is_deeply(\@combined_rows, [sort(
     "2\t200\trsB\t0.7\t0.4",
 )], 'combined upload keeps full locus rows and de-duplicates overlapping windows');
 
+my $sas_combined = "$dir/sas_local_windows.tsv.gz";
+is(system($^X,
+    "$Bin/../DiffGWASDeps/gnuplot/extract_merged_locus_wide_batch.pl",
+    '--input', $input, '--indexed-input', $indexed,
+    '--output-dir', $dir, '--window-bp', '50',
+    '--target', encode_json({snp => 'rsX', chr => '23', bp => 300}),
+    '--combined-output', $sas_combined, '--combined-numeric-chr'), 0,
+    'SAS combined input is extracted for a chromosome X lead');
+my $sas_combined_text = '';
+gunzip $sas_combined => \$sas_combined_text or die $GunzipError;
+like($sas_combined_text, qr/^23\t300\trsX\t0\.6\t0\.5$/m,
+    'SAS combined input encodes X as numeric chromosome 23');
+my $x_locus = '';
+gunzip "$dir/gnuplot_locus_rsX_window_50.wide.tsv.gz" => \$x_locus or die $GunzipError;
+like($x_locus, qr/^X\t300\trsX\t0\.6\t0\.5$/m,
+    'gnuplot locus preserves the source chromosome label');
+
 my $sas_locus_dir = "$dir/sas locus";
 my $sas_cache_dir = "$dir/sas index";
 my @sas_locus_cmd = ($^X,
@@ -106,7 +124,7 @@ is($sas_manifest{access_mode}, 'TABIX', 'SAS GTF locus records indexed access');
 is(system(@sas_locus_cmd), 0, 'SAS GTF indexed locus is reusable');
 
 SKIP: {
-    skip 'gnuplot is unavailable', 3 if system('gnuplot', '--version') != 0;
+    skip 'gnuplot is unavailable', 8 if system('gnuplot', '--version') != 0;
     my $prefix = "$dir/local_rsA";
     my $plot_status = system($^X,
         "$Bin/../DiffGWASDeps/gnuplot/pdl_gnuplot_local_locus.pl",
@@ -121,5 +139,35 @@ SKIP: {
     close $pmf;
     is($plot_manifest{rows_in_window}, 2,
         'local Manhattan includes both nonsignificant SNPs');
+
+    my $gtf = "$dir/chrX_genes.tsv";
+    open my $gf, '>', $gtf or die $!;
+    print {$gf} "chr\tgenesymbol\tgene\tst\ten\ttype\nX\tXGENE\tXGENE\t295\t305\tgene\n";
+    close $gf;
+    my $x_prefix = "$dir/local_rsX_with_genes";
+    is(system($^X, "$Bin/../DiffGWASDeps/gnuplot/pdl_gnuplot_local_locus.pl",
+        '--data', "$dir/gnuplot_locus_rsX_window_50.wide.tsv.gz",
+        '--snp', 'rsX', '--out-prefix', $x_prefix,
+        '--window-bp', '50', '--pcols', 'P', '--gtf', $gtf,
+        '--width', '600', '--height', '400'), 0,
+        'chrX gene-track Manhattan renders in chromosome-color mode');
+    open my $xgp, '<', "$x_prefix.gp" or die $!;
+    my $xgp_text = do { local $/; <$xgp> };
+    close $xgp;
+    like($xgp_text, qr/using 1:2 with points pt 7 ps 0\.72 lc rgb '#d95319'/,
+        'chrX local points use the genome-wide chrX orange');
+    ok(-s "$x_prefix.png", 'chrX local gene-track PNG is nonempty');
+
+    my $genome_prefix = "$dir/genome_colors";
+    is(system($^X, "$Bin/../DiffGWASDeps/gnuplot/pdl_gnuplot_manhattan.pl",
+        '--data', $input, '--out-prefix', $genome_prefix,
+        '--pcols', 'P', '--min-logp', '0', '--thin-mod', '1',
+        '--no-remove-x-chr', '--width', '600', '--height', '400'), 0,
+        'genome-wide Manhattan renders chromosomes including X');
+    open my $gpt, '<', "$genome_prefix.plot.tsv" or die $!;
+    my $gpt_text = do { local $/; <$gpt> };
+    close $gpt;
+    like($gpt_text, qr/^\S+\t\S+\t\d+\tX\t300\t\S+\t2$/m,
+        'genome-wide chrX data uses the same orange palette index');
 }
 done_testing();

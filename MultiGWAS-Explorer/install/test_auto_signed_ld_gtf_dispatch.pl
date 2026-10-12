@@ -23,6 +23,8 @@ set -euo pipefail
 [[ "${GTF_LD_DISPLAY_MODE}" == "heatmap" ]]
 [[ "${GTF_LD_REFERENCE_SNP}" == "${TARGET_SNP}" ]]
 printf '%s\t%s\t%s\t%s\n' "${TARGET_SNP}" "${LOCAL_WINDOW_BP}" "${GTF_LD_HEATMAP_LEGEND_TITLE}" "${GTF_LABEL_SNPS}" >> "${WORKDIR}/calls.tsv"
+printf '%s\t%s\t%s\t%s\n' "${TARGET_SNP}" "${GTF_LABEL_LAYOUT:-auto}" "${GTF_LABEL_POSITIONS:-}" "${GTF_LABEL_FONT_SIZE:-}" >> "${WORKDIR}/layout_calls.tsv"
+printf '%s\t%s\t%s\n' "${TARGET_SNP}" "${GTF_LABEL_HEADROOM_FRAC:-}" "${GTF_LABEL_CENTER_OFFSET:-}" >> "${WORKDIR}/headroom_calls.tsv"
 printf '%s\t%s\n' "${TARGET_SNP}" "${GTF_LD_R2_CACHE}" >> "${WORKDIR}/cache_calls.tsv"
 printf '<html><img src="%s.png"></html>\n' "${TARGET_SNP}" > "${WORKDIR}/${OUTPUT_HTML_BASENAME}"
 printf 'PNG:%s\n' "${TARGET_SNP}" > "${WORKDIR}/${OUTPUT_HTML_BASENAME%.html}.png"
@@ -48,11 +50,12 @@ my $index_html = do { local $/; <$index_fh> };
 close $index_fh;
 like($index_html, qr/selected_rs75453394\.html/, 'index links to first locus plot');
 like($index_html, qr/selected_rsOther\.html/, 'index links to second locus plot');
+like($index_html, qr/chr9:121741165/, 'index identifies the first plot by genomic location');
 open my $calls_fh, '<', "$dir/calls.tsv" or die $!;
 my @calls = <$calls_fh>;
 close $calls_fh;
 is(scalar @calls, 2, 'each selected locus has its own LD calculation');
-like($calls[0], qr/^rs75453394\t500000\tSigned LD r2 to rs75453394/, 'first locus uses its own signed-LD legend');
+like($calls[0], qr/^rs75453394\t500000\tSigned LD r2 x sign\(Z\) to rs75453394/, 'first locus uses its own signed-LD legend');
 
 open $fh, '>', $csv or die $!;
 print {$fh} "hit_order,panel_index,CHR,BP,SNP,gene\n1,1,9,121741165,rs75453394,DAB2IP\n";
@@ -105,6 +108,66 @@ like($calls[-1], qr/^rsNearA\t200000\t.*\trsNearA,rsNearB\s*$/,
     'merged locus uses the first lead as LD reference, expands its window, and labels both SNPs');
 ok(-s $nearby_html, 'merged locus keeps the requested final HTML name');
 ok(!-e "$dir/nearby_rsNearB.html", 'no redundant second local-GTF plot is created');
+
+my $auto_nearby_csv = "$dir/auto_nearby.tsv";
+open $fh, '>', $auto_nearby_csv or die $!;
+print {$fh} "SNP\tCHR\tBP\tcommon_assoc_p\n";
+print {$fh} "rsNearA\t6\t27500000\t1e-6\n";
+print {$fh} "rsNearB\t6\t27600000\t1e-10\n";
+close $fh;
+open $calls_fh, '<', "$dir/calls.tsv" or die $!;
+@calls = <$calls_fh>;
+close $calls_fh;
+$calls_before = scalar @calls;
+is(system($^X, $dispatcher, '--targets-csv', $auto_nearby_csv,
+    '--runner-config', $config, '--output-html', "$dir/auto_nearby.html",
+    '--single-runner', $runner, '--window-bp', 100000), 0,
+    'automatic overlapping leads share one plot');
+open $calls_fh, '<', "$dir/calls.tsv" or die $!;
+@calls = <$calls_fh>;
+close $calls_fh;
+is(scalar(@calls), $calls_before + 1, 'automatic region is rendered once');
+like($calls[-1], qr/^rsNearB\t200000\t.*\trsNearB\s*$/,
+    'automatic region labels and uses only its smallest-P lead');
+
+open $calls_fh, '<', "$dir/layout_calls.tsv" or die $!;
+my @layout_calls = <$calls_fh>;
+close $calls_fh;
+like($layout_calls[-2], qr/^rsNearA\thorizontal\trsNearA=\d+ rsNearB=\d+\t10\s*$/,
+    'explicit nearby targets use planned horizontal positions when they fit');
+like($layout_calls[-1], qr/^rsNearB\thorizontal\trsNearB=\d+\t10\s*$/,
+    'automatic single lead receives a centered horizontal label');
+open $calls_fh, '<', "$dir/headroom_calls.tsv" or die $!;
+my @headroom_calls = <$calls_fh>;
+close $calls_fh;
+like($headroom_calls[-2], qr/^rsNearA\t0\.\d+\t0\.\d+\s*$/,
+    'explicit locus receives planned height and centering');
+
+{
+    local $ENV{GTF_LABEL_PLAN_BACKEND} = 'sas';
+    is(system($^X, $dispatcher, '--target-snps', 'rsNearA,rsNearB',
+        '--runner-config', $config, '--output-html', "$dir/nearby_sas_fallback.html",
+        '--single-runner', $runner, '--window-bp', 100000), 0,
+        'SAS fallback can be selected when Perl planning is unavailable');
+}
+open $calls_fh, '<', "$dir/layout_calls.tsv" or die $!;
+@layout_calls = <$calls_fh>;
+close $calls_fh;
+like($layout_calls[-1], qr/^rsNearA\tauto\t\t10\s*$/,
+    'fallback leaves positions empty for the SAS macro to plan');
+
+open $cfg, '>', $config or die $!;
+print {$cfg} encode_json({ DATA_GZ => $wide, GTF_LD_REFERENCE_SNP => 'rsNearB' }), "\n";
+close $cfg;
+is(system($^X, $dispatcher, '--target-snps', 'rsNearA,rsNearB',
+    '--runner-config', $config, '--output-html', "$dir/nearby_override.html",
+    '--single-runner', $runner, '--window-bp', 100000), 0,
+    'explicit LD lead override is accepted');
+open $calls_fh, '<', "$dir/calls.tsv" or die $!;
+@calls = <$calls_fh>;
+close $calls_fh;
+like($calls[-1], qr/^rsNearB\t200000\t.*\trsNearA,rsNearB\s*$/,
+    'explicit LD lead override changes the reference but keeps all labels');
 
 my $prior_html = "$dir/prior.html";
 for my $prior ([rsPriorA => 21, 42841988], [rsPriorB => 21, 42858367]) {

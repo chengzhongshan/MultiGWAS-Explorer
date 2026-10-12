@@ -90,8 +90,11 @@ if ($phase eq 'all' || $phase eq 'plots') {
  die "Invalid target SNP list\n" unless $targets=~/^rs\d+(?:,rs\d+)*$/;
  validate_plink_reference($spec);
  if ($backend eq 'gnuplot' || $backend eq 'both') {
-  run('gnuplot_inquiry',$^X,'auto_prepare_and_run_diff_gwas_with_gnuplot.pl',
-   '--spec',$spec,'--plots','manhattan,local_manhattan,local_gtf,forest',
+  run('gnuplot_zscore',$^X,'auto_prepare_and_run_diff_gwas_with_gnuplot.pl',
+   '--spec',$spec,'--plots','manhattan,local_manhattan,forest',
+   '--target-snps',$targets,'--no-remove-X-chr','--ld-display-mode','none');
+  run('gnuplot_signed_ld_gtf',$^X,'auto_prepare_and_run_diff_gwas_with_gnuplot.pl',
+   '--spec',$spec,'--plots','local_gtf',
    '--target-snps',$targets,'--no-remove-X-chr','--ld-display-mode','heatmap');
   verify_images('GNUPLOT');
   verify_gnuplot_signed_ld($targets);
@@ -164,8 +167,15 @@ sub verify_gnuplot_signed_ld {
   my %metric;
   while (<$fh>) { chomp; s/\r\z//; my ($k,$v)=split /\t/,$_,2; $metric{$k}=$v if defined $v; }
   close $fh;
-  die "$snp did not use heatmap LD display\n" unless ($metric{ld_display_mode}//'') eq 'heatmap';
-  die "$snp $family signed-R2 mode is incorrect\n"
+  if ($family eq 'local_top_hits_manhattan') {
+   die "$snp local Manhattan must use Z-score color, not signed LD\n"
+    unless ($metric{ld_display_mode}//'') eq 'none'
+      && ($metric{signed_r2_coloring}//0)==0
+      && length($metric{zcols}//'');
+   next;
+  }
+  die "$snp GTF plot did not use heatmap LD display\n" unless ($metric{ld_display_mode}//'') eq 'heatmap';
+  die "$snp GTF signed-R2 mode is incorrect\n"
    unless ($metric{signed_r2_coloring}//0)==1;
   die "$snp has no PLINK2 LD proxies in the plotted locus\n" unless ($metric{ld_r2_points}//0)>1;
   die "$snp did not retain the configured high-LD marker threshold\n"
@@ -209,10 +219,10 @@ sub verify_gnuplot_signed_ld {
  die "Missing combined gnuplot local Manhattan script\n" unless @combined_gp==1 && -s $combined_gp[0];
  open my $cg,'<',$combined_gp[0] or die $!;
  my $combined_text=do {local $/;<$cg>}; close $cg;
- die "Combined gnuplot local Manhattan plot is not using signed R2\n"
-  unless $combined_text =~ /set cbrange \[-1:1\]/
-   && $combined_text =~ /Signed LD r\^2 \(r\^2 x sign\(Z\)/;
- print "PASS: gnuplot local Manhattan/GTF panels use complete signed PLINK2 Phase 3 R2 data\n";
+ die "Combined gnuplot local Manhattan plot is not Z-score colored\n"
+  unless $combined_text =~ /set cbrange \[-8:8\]/
+   && $combined_text =~ /Z score/;
+ print "PASS: gnuplot local Manhattan uses Z scores and GTF panels use complete signed PLINK2 Phase 3 R2 data\n";
 }
 sub verify_sas_target_gtf {
  my ($targets)=@_;

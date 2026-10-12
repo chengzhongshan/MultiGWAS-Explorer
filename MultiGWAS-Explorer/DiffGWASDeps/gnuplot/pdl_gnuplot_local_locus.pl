@@ -438,10 +438,9 @@ write_gnuplot(
     ld_heatmap_colors => \@ld_heatmap_colors,
     ld_r2_points    => $ld_r2_points,
     gene_height => $gene_height,
-    # Signed LD is useful in both the local Manhattan-only panel and the
-    # gene-track panel.  Plain local Manhattan plots retain their usual
-    # chromosome colors when no complete LD heatmap is available.
-    use_zcolors => ($use_signed_r2 || ($has_gtf && $has_zcols) ? 1 : 0),
+    # The association-only panel can show its signed Z score even when a GTF
+    # annotation is absent. Signed LD remains an explicit heatmap choice.
+    use_zcolors => ($has_zcols ? 1 : 0),
     use_signed_r2 => $use_signed_r2,
     colorbar_label => infer_effect_metric_label_from_cols(@resolved_zcols),
 );
@@ -690,11 +689,8 @@ sub write_gnuplot {
             print {$gp} "plot " . join(', ', @plots) . "\n";
         }
         else {
-            my @palette = sas_chr_palette();
-            print {$gp} "set palette maxcolors " . scalar(@palette) . " defined (" .
-                join(', ', map { sprintf('%d "%s"', $_ + 1, $palette[$_]) } 0 .. $#palette) . ")\n";
             print {$gp} "unset colorbox\n";
-            my @plots = ("'" . escape_gp($args{plot_tsv}) . "' using 1:2:(\$3+1) with points pt 7 ps 0.72 lc palette");
+            my @plots = ("'" . escape_gp($args{plot_tsv}) . "' using 1:2 with points pt 7 ps 0.72 lc rgb '" . escape_gp($chr_color) . "'");
             push @plots, @ld_layers;
             print {$gp} "plot " . join(', ', @plots) . "\n";
         }
@@ -719,6 +715,15 @@ sub write_gnuplot {
             print {$gp} "set cblabel '" . escape_gp($cblabel) . "'\n";
             print {$gp} "set colorbox vertical user origin 0.94,0.12 size 0.02,0.76\n";
             print {$gp} "set palette defined (-1 '#63d67f', -0.5 '#63d8d2', 0 '#ffbf00', 0.5 '#ff5b00', 1 '#df1f2d')\n";
+            push @plots, "'" . escape_gp($args{plot_tsv})
+                . "' using 1:2:7 with points pt 7 ps 0.9 lc palette";
+        }
+        elsif ($args{use_zcolors}) {
+            print {$gp} "set cbrange [-8:8]\n";
+            print {$gp} "set cbtics ('-8' -8, '0' 0, '8' 8)\n";
+            print {$gp} "set cblabel '" . escape_gp($args{colorbar_label} || 'Z score') . "'\n";
+            print {$gp} "set colorbox vertical user origin 0.94,0.12 size 0.02,0.76\n";
+            print {$gp} "set palette defined (-8 '#63d67f', -4 '#63d8d2', 0 '#ffbf00', 4 '#ff5b00', 8 '#df1f2d')\n";
             push @plots, "'" . escape_gp($args{plot_tsv})
                 . "' using 1:2:7 with points pt 7 ps 0.9 lc palette";
         }

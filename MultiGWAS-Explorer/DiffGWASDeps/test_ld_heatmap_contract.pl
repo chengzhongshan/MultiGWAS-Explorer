@@ -161,6 +161,10 @@ for my $token (
     die "SAS multi-target orchestration is missing its per-target LD contract: $token\n"
         unless index($sas_auto_text, $token) >= 0;
 }
+my $complete_cache_calls = () = $sas_auto_text =~ /min_r2\s*=>\s*\$local_ld_cache_min_r2/g;
+die "SAS signed-LD heatmaps must request complete threshold-0 LD for every explicit target\n"
+    unless $sas_auto_text =~ /my \$local_ld_cache_min_r2 = \$local_ld_display_mode =~ \/\^\(\?:heatmap\|both\)\$\//
+       && $complete_cache_calls >= 2;
 
 my $dispatcher_path = File::Spec->catfile($Bin, 'run_selected_signed_ld_gtf.pl');
 open my $dispatcher_fh, '<:raw', $dispatcher_path or die "Cannot read $dispatcher_path: $!\n";
@@ -171,7 +175,7 @@ for my $token (
     '$ENV{GTF_LD_R2_CACHE} = $ld_cache',
     '$ENV{GTF_LD_REFERENCE_SNP} = $snp',
     '$ENV{GTF_LD_DISPLAY_MODE} = lc $opt{mode}',
-    'Signed LD r2 to $snp',
+    'Signed LD r2 x sign(Z) to $snp',
 ) {
     die "SAS signed-LD dispatcher is missing its per-target LD contract: $token\n"
         unless index($dispatcher_text, $token) >= 0;

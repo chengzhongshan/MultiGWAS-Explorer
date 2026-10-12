@@ -131,6 +131,10 @@ ld_heatmap_var=,
 ld_heatmap_colormodel=CXF7FBFF CX6BAED6 CX54278F,
 ld_heatmap_legend_title=%str(LD r2),
 text_rotate_angle=90, /*Angle to rotate text labels for these selected dots by users*/
+label_position_overrides=,
+font_size4textlabels=10,
+label_headroom_frac=,
+label_center_offset=,
 auto_rotate2zero=0, /*supply value 1 when less than 3 text labels, it is good to automatically set the text_rotate_angel=0*/
 pct2adj4dencluster=0.15,/*For SNP labels on the top, please try to use this parameter, which only works when 
 there are less than or equal to 3 top SNPs if track_width <= 500, or 5 top SNPs if track_width between 500 and 800, or 6 top SNPs if 
@@ -143,6 +147,7 @@ Yoffset4textlabels=3.5, /*Move up the text labels for target SNPs in specific fo
 the default value 2.5 fold works for most cases*/
 scatter_yaxis_label=%str(-log10%(P%)),/*Visible y-axis title for the stacked association tracks*/
 heatmap_legend_title=%str(Z score),/*Visible title for the continuous colorbar when heatmap coloring is enabled*/
+plot_title=,/*Optional visible title naming the color metric.*/
 adj_spaces_among_top_snps=1 /*Provide value 1 to adjust spaces among top SNP labels; otherwise, give value 0 to not 
 adjust top SNPs labels if these labels are rotated 90 degree, which is helpful when the space adjusted labels are not pretty*/ 
 );
@@ -397,6 +402,7 @@ Yoffset4textlabels=&Yoffset4textlabels, /*Move up the text labels for target SNP
 the default value 2.5 fold works for most cases*/
 scatter_yaxis_label=&scatter_yaxis_label, /*Visible y-axis title for the stacked association tracks*/
 heatmap_legend_title=&heatmap_legend_title, /*Visible title for the continuous colorbar when heatmap coloring is enabled*/
+plot_title=&plot_title,
 shift_text_yval=&shift_text_yval, /*in terms of gene track labels, add positive or negative vale, ranging from 0 to 1, 
                       to liftup or lower text labels on the y axis; the default value is -0.2 to put gene lable under gene tracks;
                       Change it with the macro var pct4neg_y!*/
@@ -458,6 +464,10 @@ This would be handy when there are multiple subgrps represented by different y-a
 the y-axis values for these subgrps, the macro can plot them separately in each subtrack!
 */
 text_rotate_angle=&text_rotate_angle, /*Angle to rotate text labels for these selected dots by users*/
+label_position_overrides=&label_position_overrides,
+font_size4textlabels=&font_size4textlabels,
+label_headroom_frac=&label_headroom_frac,
+label_center_offset=&label_center_offset,
 auto_rotate2zero=&auto_rotate2zero, /*supply value 1 when less than 3 text labels, it is good to automatically set the text_rotate_angel=0*/
 pct2adj4dencluster=&pct2adj4dencluster,
 var4label_scatterplot_dots=&var4label_scatterplot_dots, /*Make sure the variable name is not grp, which is a fixed var used by the macro for other purpose;
