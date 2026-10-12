@@ -28,7 +28,8 @@ Choose your platform in the [installation and usage guide](docs/README.md#instal
 It includes prerequisites, commands, container setup, SAS configuration, and
 troubleshooting links. Installation commands run from the inner pipeline
 directory shown above.
-For reproducible AOA run diagnostics and scientific checks, see the
+For reproducible example for running diagnostics and scientific checks, particular about drawing 
+genome-wide/local Manhattan plots, local GTF plot, and forest plot, see the
 [debugging guide](MultiGWAS-Explorer/README4Debugging.md).
 
 ## Try a local example
