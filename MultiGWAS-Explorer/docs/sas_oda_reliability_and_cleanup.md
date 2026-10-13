@@ -205,3 +205,51 @@ HTML is the corresponding 509-byte figure wrapper. The pre-fix PNG was retained
 locally as `*.before_height_fix.png`. The runner downloaded the explicit ODS
 output and completed remote input/output cleanup. Validation artifacts remain
 local and are not required to reproduce this correction.
+
+## Shared SAS preflight corrections from real examples
+
+On October 12, 2026, the shared source-analysis fixes validated through
+MCP4SAS's 90 new example scenarios were applied to the explorer's canonical
+ODA runner. `DiffGWASDeps/SAS_Source_Analysis.pm` now supplies the preflight
+source views. The compatibility CLI continues to delegate to the canonical
+runner, so both names use the corrected checks.
+
+Preflight accepts macro definitions after other statements on the same
+line, raw inline-data records containing apostrophes/comment delimiters,
+quoted comment tokens, and statement comments after semicolons. Commented
+PUT examples and macro-like text do not become compile blockers. Missing
+inline-data terminators and genuine quote/comment/macro errors remain
+detectable. Analysis preserves source locations and does not modify the
+SAS program submitted to ODA.
+
+The following Cygwin regressions passed 45 assertions (8, 24, and 13):
+
+```bash
+export PATH=/usr/bin:$PATH
+perl tests/test_inline_macro_preflight.pl
+perl tests/test_inline_data_preflight.pl
+perl tests/test_comment_quote_preflight.pl
+perl -c run_sas_codes_or_script_in_ODA.pl
+```
+
+The tracked smoke example combines the three quote/comment cases:
+
+```bash
+SAS_ODA_AUTOLOAD_MACROS=0 OPEN_RESULT=0 \
+  perl run_sas_codes_or_files_in_SAS_ODA.pl \
+  --file examples/sas_oda_preflight_smoke.sas \
+  --output-prefix SAS_Output_preflight_smoke \
+  --run-timeout-seconds 180
+```
+
+The real ODA run exited 0, emitted `PREFLIGHT_TOKEN_OK` and
+`PREFLIGHT_VALUE_OK`, retained nonempty HTML, and reported zero SAS ERROR
+and WARNING lines. Its local log is
+`SAS_Output_preflight_smoke/output.html.info.txt`; the generated HTML is
+`SAS_Output_preflight_smoke/sas_res_wsfdc.html`. Artifact names can vary on
+rerun. An additional live check of the quoted-token case also passed.
+
+The canonical runner, source-analysis module, regression tests, smoke
+example, and this documentation were synchronized to the three active
+pipeline copies. Generated PGC configuration overrides, LD caches, and
+runtime results were retained locally and excluded from publication.
