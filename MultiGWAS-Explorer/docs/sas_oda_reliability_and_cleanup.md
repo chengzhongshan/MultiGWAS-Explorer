@@ -306,3 +306,46 @@ HTML and verifying cleanup of the unique apostrophe-containing remote fixture.
 Runtime results, generated configuration overrides and LD caches remain
 local. The shared fixes, tests, smoke example and documentation are
 synchronized to all three active pipeline copies.
+
+## Additional library batch: cases 191–290
+
+A further 100 new examples in MCP4SAS use 49 additional library sources.
+The case catalogue, source hashes, numerical/text oracles, discovery
+failures and full Cygwin commands are documented in
+[the MCP4SAS report, section 11](https://github.com/chengzhongshan/MCP4SAS/blob/main/RealExamples4ImprovingMCP4SAS.md).
+Duplicate validation normalizes generated IDs/whitespace, and the new
+batch rejects unexpected advisory diagnostics in successful jobs.
+The complete final MCP4SAS rerun passed all 100 validations: 97 successful
+jobs and three intentional SAS failures correctly reported.
+
+Cases 191 and 192 exposed unnecessary targeted macro loaders for NRSTR
+literals nested inside BQUOTE and inside double-quoted DATA strings.
+The shared scanner now collects nested macro quote spans and recognizes
+evaluated macro quoting inside double quotes. NRSTR literal calls remain
+masked while genuine nested evaluated calls retain their dependencies.
+Escaped macro quotes also preserve the surrounding SAS string boundary.
+
+The expanded regression suite passed 113 assertions across eight Perl
+test files. A live compatibility run through the public wrapper exited
+0, emitted `LIBRARY_NESTED_QUOTE_OK`, injected no loaders for its literal
+macro names and produced nonempty HTML at
+`SAS_Output_library_nested_quotes/sas_res_8BVcF.html`.
+
+```bash
+export PATH=/usr/bin:$PATH
+prove tests/test_macro_quoting_preflight.pl tests/test_format_name_advisory.pl \
+  tests/test_sas_log_diagnostics.pl tests/test_quoted_filename_upload.pl \
+  DiffGWASDeps/test_sas_oda_mcp.pl \
+  DiffGWASDeps/test_sas_include_preflight_lookup.pl \
+  DiffGWASDeps/test_sas_log_and_labels.pl \
+  DiffGWASDeps/test_sas_oda_upload_timeout.pl
+SAS_ODA_AUTOLOAD_MACROS=0 OPEN_RESULT=0 \
+  perl run_sas_codes_or_files_in_SAS_ODA.pl \
+  --file examples/sas_library_nested_quote_smoke.sas \
+  --output-prefix SAS_Output_library_nested_quotes \
+  --run-timeout-seconds 180
+```
+
+The scanner, regressions, smoke example and documentation are synchronized
+to the three active pipeline copies. Runtime results and generated
+configuration/cache files remain local.
