@@ -445,3 +445,51 @@ perl tests/test_live_deferred_includes.pl --live
 The shared module fixes, unit/live tests and documentation are synchronized
 to all three active pipeline copies. Generated configurations, caches and
 runtime artifacts remain local.
+
+## Validation with another 100 library-derived examples (491–590)
+
+The MCP4SAS catalogue adds 100 distinct examples based on 40 further SAS
+library files, with hashes and duplicate checks against the previous 490.
+Discovery reproduced a dependency defect with multiple quoted local files
+in one `%include` statement: only the first was uploaded, so SAS could not
+open the second. The shared parser now collects each quoted operand,
+including decoded DOSUBL and CALL EXECUTE literals. Comment separators,
+escaped quotes and semicolons within paths are handled; options and later
+statements are not mistaken for dependency paths. Ten focused regressions
+cover these boundaries and inactive literal text.
+
+The new Perl public-wrapper live test creates two uniquely named local SAS
+files, runs their include list directly and through DOSUBL and CALL EXECUTE,
+checks a computed total of 33 and nonempty HTML, and deletes only its two
+remote fixtures. Its owned local output directory is ignored by Git.
+
+```bash
+export PATH=/usr/bin:$PATH
+prove tests/test_macro_quoting_preflight.pl tests/test_format_name_advisory.pl \
+  tests/test_sas_log_diagnostics.pl tests/test_quoted_filename_upload.pl \
+  DiffGWASDeps/test_sas_oda_mcp.pl \
+  DiffGWASDeps/test_sas_include_preflight_lookup.pl \
+  DiffGWASDeps/test_sas_log_and_labels.pl \
+  DiffGWASDeps/test_sas_oda_upload_timeout.pl \
+  tests/test_deferred_macro_literals.pl tests/test_printto_status_guard.pl \
+  tests/test_fileref_name_advisory.pl tests/test_deferred_include_paths.pl \
+  tests/test_include_file_lists.pl
+perl tests/test_live_include_file_lists.pl --live
+```
+
+The offline suite passed **162 assertions across 13 Perl files**. The shared
+parser and Perl unit/live tests are synchronized to all three active
+pipeline copies. The full case catalogue, Cygwin commands, original failures,
+example corrections and final MCP validation evidence are recorded in
+[RealExamples4ImprovingMCP4SAS.md, section 14](https://github.com/chengzhongshan/MCP4SAS/blob/main/RealExamples4ImprovingMCP4SAS.md).
+
+The public-wrapper live test passed all ten assertions in
+`SAS_Output_include_lists_Tgn3QJ`, including removal of its two remote
+fixtures. This supplemental validation is separate from the 100 numbered
+MCP examples.
+
+The final complete MCP run passed **100/100 validations** in
+`SAS_Output_real30_biOUtX`: 98 successful jobs and two expected failures.
+Its four remote include fixtures were deleted successfully. The report
+also retains the discovery run's 94/100 result and distinguishes runner
+repairs from corrected example assertions and SAS syntax assumptions.
