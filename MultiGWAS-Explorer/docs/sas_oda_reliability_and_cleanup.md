@@ -151,3 +151,57 @@ beside MCP4SAS, and the active benchmark runner checkout shown in the IDE.
 The relevant helper implementations are synchronized across those three copies.
 Backup and packaging snapshots were not used as active targets. No remote push
 was performed.
+
+## Real local-GTF comparison: association heights flattened
+
+On October 12, 2026, the rs2070788/rs383510 SAS ODA local-GTF figure
+showed twelve horizontal rows of points, while the gnuplot figure showed
+varying association heights. The SAS runner correctly passed
+`makeheatmapdotintooneline=0`, and the association mapper computed
+`-log10(P)` separately from signed LD colors. However,
+`Lattice_gscatter_over_bed_track.sas` subsequently changed the setting to
+`1` when the number of groups exceeded its default threshold of ten.
+That replaced the association heights with the constant `1.5`.
+
+The automatic compression threshold now defaults to `0` (disabled).
+The threshold condition also requires a positive threshold. This preserves
+the requested association heights for plots with twelve or more tracks.
+Explicit `makeheatmapdotintooneline=1` remains supported; callers can also
+opt into automatic compression with a positive
+`drawdotintooneline_if_totsc_gt` value. Both the main lattice macro and its
+alternate local copy were corrected in all three active pipeline copies.
+
+Reproduce the real validation in Cygwin from the explorer checkout:
+
+```bash
+perl auto_prepare_and_run_diff_gwas.pl \
+  --spec configs/spec_pgc_scz_sex_common_automation.json \
+  --target-snps rs2070788,rs383510 \
+  --plots local_gtf \
+  --ld-display-mode heatmap \
+  --ld-population EUR \
+  --ld-r2-threshold 0 \
+  > sas_gtf_height_fix_validation.log 2>&1
+
+perl DiffGWASDeps/test_selected_signed_ld_gtf.pl
+```
+
+The dispatcher regression passed all 39 assertions, covering locus grouping,
+plot reuse, resume after failure, and status reporting. The dispatcher hashes
+the plotting macro sources, so changing the lattice macro invalidates the
+completed-plot cache without manually deleting the final HTML.
+
+A Perl/Gunzip comparison of the real SAS and gnuplot input tables found 5,413
+overlapping variants and 70,195 nonmissing P-value comparisons across fifteen
+shared P columns, with no differences above 1e-10. This isolates the flat
+association tracks to rendering rather than different association inputs.
+
+The live rerun exited successfully. The final progress report has
+`complete=1`, `remaining=0`, and an empty failure message. The regenerated
+`PGC_SCZ_SAS_local_top_hits_with_gtf_common_targets_e25248ab57b2.png`
+is 374,903 bytes; visual inspection confirmed varying association heights in
+all twelve tracks and retained both SNP labels and the gene track. The final
+HTML is the corresponding 509-byte figure wrapper. The pre-fix PNG was retained
+locally as `*.before_height_fix.png`. The runner downloaded the explicit ODS
+output and completed remote input/output cleanup. Validation artifacts remain
+local and are not required to reproduce this correction.

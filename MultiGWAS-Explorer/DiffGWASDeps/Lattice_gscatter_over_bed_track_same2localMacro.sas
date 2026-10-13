@@ -123,7 +123,7 @@ This would be handy when there are multiple subgrps represented by different y-a
 the y-axis values for these subgrps, the macro can plot them separately in each subtrack!*/
 dot_yvalue4heatmap_at_oneline=1.5,/*When drawing dot in one line for heatmap, sometimes the arbitrary y value assigned to each dot
 may not be optimum, it is advicible to evaluate the initially generated plot and update the value of this macro variable*/
-drawdotintooneline_if_totsc_gt=10,/*When there are too many scatter groups,  let the macro change the macro var makeheatmapdotintooneline=1*/
+drawdotintooneline_if_totsc_gt=0,/*0 disables automatic flattening and preserves makeheatmapdotintooneline=0. A positive threshold explicitly enables compact tracks.*/
 var4label_scatterplot_dots=,/*Make sure the variable name is not grp, which is a fixed var used by the macro for other purpose;
 Whenever  makeheatmapdotintooneline=1 or 0, it is possible to use values of the var4label_scatterplot_dots to
 label specific scatterplot dots based on the customization of the variable predifined by users for the input data set; 
@@ -424,7 +424,7 @@ from (
 select distinct &scatter_grp_var
     from &bed_dsd
 );
-%if &totsc>&drawdotintooneline_if_totsc_gt %then %let makeheatmapdotintooneline=1;
+%if &drawdotintooneline_if_totsc_gt>0 and &totsc>&drawdotintooneline_if_totsc_gt %then %let makeheatmapdotintooneline=1;
 
 %if %eval(&NotDrawScatterPlot=1) %then %do;
    %put The macro will only draw the bottom bed track will will keep negative y values only;
