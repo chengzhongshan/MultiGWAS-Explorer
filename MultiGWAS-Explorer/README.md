@@ -3401,3 +3401,7 @@ Typical outputs include:
 Journal manuscripts, response letters, supplementary tables/files, and
 submission-facing benchmark reports are maintained in the separate submission
 package and are intentionally not versioned in this source repository.
+
+## SAS ODA reliability and cleanup
+
+See [SAS ODA reliability and cleanup](docs/sas_oda_reliability_and_cleanup.md) for automatic scratch cleanup, debug retention, tested fixes, and Perl/Cygwin validation commands.

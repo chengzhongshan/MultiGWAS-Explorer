@@ -64,6 +64,7 @@ BEGIN {
     #select(STDERR); $| = 1;
 }
 use strict;
+use SAS_ODA_MCP;
 use warnings;
 use FindBin qw($Bin);
 use lib "$Bin/DiffGWASDeps";
@@ -697,11 +698,10 @@ $server->tool(
                                    description => 'The RAW, UNMODIFIED SAS code or file path. ' .
                            'IMPORTANT: You must preserve all spaces, newlines, semicolons, and special characters exactly. ' .
                            'Do not perform any text normalization, "cleaning," or whitespace removal.'},
-            output_file   => { type => 'string',
-                               description => 'Optional output file prefix for output files containing SAS log and other useful '.
-                               'information for debugging (optional); default output_file name is "output", '. 
-                               'which will be added with the appendix ".html.info.txt", all the final default output file, "./tmp*/output.html.info.txt", '. 
-                               'will be put into a temporary directory named as "./tmp*", with * respresenting 6 random numbers.' },
+            output_file => { type => 'string', description => 'Optional final diagnostic log path. Default: SAS_Output_ODA_*/output.html.info.txt. Final logs and HTML are retained; worker scratch is removed automatically.' },
+            run_timeout_seconds => {type => 'integer', description => 'Overall SAS ODA worker timeout in seconds.'},
+            archive_transfers => {type => 'string', description => 'Enable ZIP batching for multiple uploads or downloads; default true.'},
+            skip_upload_if_same => {type => 'string', description => 'Reuse verified matching uploads; default true.'},
             upload_file   => {
                                oneOf => [
                                  { type => 'string' },
@@ -760,223 +760,10 @@ $server->tool(
                                description => 'Optional truthy flag to force a SAS ODA credential refresh even when a saved authinfo entry already exists.' },
             pid           => { type => 'integer',
                                description => 'Optional PID to check status of a previous query (when run the tool again with the same sas_codes_or_file)' },
-            tmp_sas_file     => { type => 'string',
-                               description => 'Optional internal use only: temporary SAS file path to store the SAS codes when the input sas codes contain' . 
-                               'special characters that may cause issues with passing the sas codes as a command line argument to the python function. '. 
-                               'The tool will save the sas codes into this temporary sas file and run the query with the temporary sas file, and then ' . 
-                               'delete the temporary sas file after running the query.' }                   
+            tmp_sas_file => {type => 'string', description => 'Legacy argument; generated SAS input is now stored and cleaned in owned worker scratch automatically.'}
         }
     },
-    code => sub ($tool, $args) {
-        cleanup_all_generated_empty_tmpdirs();
-        #1. Debug: Check if the spaces exist the moment Perl gets them
-        #(Using a log file because STDOUT is for the MCP protocol)
-        # open my $log, '>>', 'output.html.info_debug.log';
-        # my $raw_input = $args->{sas_codes_or_file};
-        # print $log "RECEIVED: [$raw_input]\n";
-        # close $log;   
-
-        my $sas_codes_or_file = $args->{sas_codes_or_file} // ' '; # Default to a single space if not provided, to avoid issues with empty input
-        my $tmp_sas_file = $args->{tmp_sas_file}; # This is for storing the temporary sas file path when the sas codes contain special characters;
-        my @uploaders = ref($args->{upload_file}) eq 'ARRAY'
-          ? @{$args->{upload_file}}
-          : (defined $args->{upload_file} ? ($args->{upload_file}) : ());
-        my @downloaders = ref($args->{download_file}) eq 'ARRAY'
-          ? @{$args->{download_file}}
-          : (defined $args->{download_file} ? ($args->{download_file}) : ());
-        my @download_local_paths = ref($args->{download_local_path}) eq 'ARRAY'
-          ? @{$args->{download_local_path}}
-          : (defined $args->{download_local_path} ? ($args->{download_local_path}) : ());
-        my @deleters = ref($args->{delete_file}) eq 'ARRAY'
-          ? @{$args->{delete_file}}
-          : (defined $args->{delete_file} ? ($args->{delete_file}) : ());
-        my @delete_rgxs = ref($args->{delete_file_rgx}) eq 'ARRAY'
-          ? @{$args->{delete_file_rgx}}
-          : (defined $args->{delete_file_rgx} ? ($args->{delete_file_rgx}) : ());
-        my @file_infos = ref($args->{file_info}) eq 'ARRAY'
-          ? @{$args->{file_info}}
-          : (defined $args->{file_info} ? ($args->{file_info}) : ());
-        my $ODADir=$args->{dir4listing};
-        my $delete_dir = $args->{delete_dir};
-        my $persistent_arg = $args->{persistent};
-        my $session_id_arg = $args->{session_id} // 'mysession';
-        my $sas_oda_account = $args->{sas_oda_account} // '';
-        my $sas_oda_password = $args->{sas_oda_password} // '';
-        my $prompt_sas_oda_auth = $args->{prompt_sas_oda_auth} // '';
-        my $use_persistent = 1;
-        if (defined $persistent_arg && $persistent_arg !~ /^(?:1|true|yes|y)$/i) {
-            $use_persistent = 0;
-        }
-        #need to double quote the sas codes when passing to the python function, 
-        #otherwise the special characters and spaces may cause issues with the parsing of the input in the python function;
-        my $sas_codes="";
-        if (-f "$sas_codes_or_file"){
-
-            $sas_codes="--file \'$sas_codes_or_file\'"; 
-            }else{
-            #it would be prone to error if the sas codes contains dobule quotes;
-            #To resolve the issue, we can escape the double quotes in the sas codes before passing it to the python function;
-            $sas_codes = $sas_codes_or_file;
-            if ($sas_codes =~ /("|')/) {#write these codes into a sas file to run it, to avoid the issue caused by escaping the quotes in the sas codes;
-                $tmp_sas_file = "tmp_sas_codes_" . time() . ".sas";
-                open(my $fh, '>', $tmp_sas_file) or die "Could not create temporary SAS file: $!";
-                print $fh $sas_codes;
-                close $fh;
-                $sas_codes="--file \'$tmp_sas_file\'";
-            } else {
-                $sas_codes="--code \'$sas_codes\'";
-            }
-        }
-
-        $sas_codes .= join('', map { " --upload-file " . shell_quote_single($_) } @uploaders) if @uploaders;
-        $sas_codes .= join('', map { " --download-file " . shell_quote_single($_) } @downloaders) if @downloaders;
-        $sas_codes .= join('', map { " --download-local-path " . shell_quote_single($_) } @download_local_paths) if @download_local_paths;
-        $sas_codes .= join('', map { " --delete-file " . shell_quote_single($_) } @deleters) if @deleters;
-        $sas_codes .= join('', map { " --delete-file-rgx " . shell_quote_single($_) } @delete_rgxs) if @delete_rgxs;
-        $sas_codes .= " --delete-dir " . shell_quote_single($delete_dir) if defined $delete_dir && length $delete_dir;
-        $sas_codes .= join('', map { " --file-info " . shell_quote_single($_) } @file_infos) if @file_infos;
-        $sas_codes=$sas_codes. " --dir4listing \'$ODADir\' " if $ODADir; #If there is a ODADir as input, add this argument to listing files in remote ODA directory;
-        
-        #This output filename if provided with the previous pid, the tool will check the status of the previous query
-        #and return the results in this file when the job is finished. If not provided, the tool will save the results 
-        #in a default file named "tmp{timestamp}/haploreg_{query_snp}.tsv" as demonstrated in the later part of the code;
-        my $output_file = $args->{output_file};
-        my $pid_arg = $args->{pid};
-        #Note: it is necessary to define the $out_file variable here to avoid 
-        #the "Use of uninitialized value $out_file in concatenation (.) or 
-        #string at line codes" error when the tool is called for the first time without the pid argument, 
-        #as the $out_file variable is used in the return statement for the initial query status. 
-        #Defining it here with an undefined value allows us to use it in the return statement 
-        #without causing an error, and it will be properly assigned later when checking the PID or starting a new query.
-        my $out_file;
-        my $pid_file;
-        # If checking a previous PID
-        if (defined $pid_arg) {
-            $pid_file = "tmp*/output.html.info.pid";
-            my @pid_files = glob($pid_file);
-            
-            foreach my $pf (@pid_files) {
-                if (-f $pf) {
-                    open(my $pfh, '<', $pf);
-                    my $stored_pid = <$pfh>;
-                    close $pfh;
-                    chomp $stored_pid;
-                    
-                    if ($stored_pid == $pid_arg) {
-                        $out_file = $pf;
-                        #Note: the output file is named "tmp{timestamp}/SAS_ODA_html_output_name.tsv" by default when the query is first 
-                        #run without the output_file argument, and the output file path is saved in the same directory as the pid file. 
-                        #So when checking the status with the pid, we can get the output file path by replacing the ".pid" extension 
-                        #in the pid file name with ".txt". This way, we can ensure that we are checking the correct output file 
-                        #associated with the specific PID.
-                        $out_file =~ s/\.pid$/.txt/;
-                        
-                        my @pids = split(" ", `perl -S GetPIDs.pl`);
-                        chomp @pids;
-                        
-                        if (grep { $_ == $pid_arg } @pids) {
-                            return {
-                                content => [{
-                                    type => "text",
-                                    text => "STATUS: RUNNING (PID $pid_arg)\n" .
-                                           "Output file: $out_file\nAsk the AI agent to check status again in a moment."
-                                }]
-                            };
-                        }
-                        
-                        # Job finished
-                        my $content = "";
-                        if (-f $out_file && open(my $fh, '<', $out_file)) {
-                            local $/;
-                            $content = <$fh>;
-                            close $fh;
-                        }
-                        
-                        unlink $pf;
-                        cleanup_generated_tmpdir_if_empty($pf);
-                        
-                        return {
-                            content => [{
-                                type => "text",
-                                text => "STATUS: COMPLETE (PID $pid_arg)\n\nSAS log for debugging saved to: $out_file\n\n" . $content
-                            }]
-                        };
-                    }
-                }
-            }
-            
-            return {
-                content => [{
-                    type => "text",
-                    text => "ERROR: PID $pid_arg not found or already completed."
-                }]
-            };
-        }
-
-        # Start new query by creating a tmp directory and running the query in the background
-        my $tmpdir = "tmp" . time();
-        unless (-d $tmpdir) {
-            mkdir $tmpdir or die "Failed to create tmp directory: $!";      
-        }
-        # Create a file named "tmp{timestamp}/haploreg_{query_snp}.tsv" for first time query, 
-        #and save the results in this file when the job is finished. If the tool is called again 
-        #with the same query_snp and the pid of the previous job, it will check the status of the 
-        #previous job and return the results in this file when the job is finished;
-        $pid_file = "$tmpdir/output.html.info.pid";
-
-        #Note: the output file is named "tmp{timestamp}/output.html.info.txt" by default 
-        #when the query is first run without the output_file argument, and the output file 
-        #path is saved in the same directory as the pid file.
-        $out_file = $output_file // "$tmpdir/output.html.info.txt";
-        
-        #Note: the temporary sas file is named "tmp_sas_codes_{timestamp}.sas" when the sas codes
-        # contain special characters and need to be saved into a temporary sas file to run the query, 
-        #and the temporary sas file is saved in the same directory as the pid file.
-        $tmp_sas_file = $args->{tmp_sas_file} // "$tmpdir/tmp_sas_file.sas"; # This is for storing the temporary sas file path when the sas codes contain special characters;
-        
-        unless (-f $pid_file) {
-            my $pid = fork();
-            return { content => [{ type => "text", text => "ERROR: Could not fork." }] } unless defined $pid;
-
-            if ($pid == 0) {
-                local $ENV{PIPELINE_SAS_ODA_ACCOUNT} = $sas_oda_account if defined $sas_oda_account && length $sas_oda_account;
-                local $ENV{PIPELINE_SAS_ODA_PASSWORD} = $sas_oda_password if defined $sas_oda_password && length $sas_oda_password;
-                local $ENV{PIPELINE_FORCE_SAS_ODA_AUTH_PROMPT} = 1 if defined $prompt_sas_oda_auth && $prompt_sas_oda_auth =~ /^(?:1|true|yes|y)$/i;
-                my $oda_runner = resolve_repo_script_path('run_sas_codes_or_script_in_ODA.pl');
-                my $cmd = "perl " . shell_quote_single($oda_runner) . " --output-prefix $tmpdir ";
-                $cmd .= "--persistent --session-id " . shell_quote_single($session_id_arg) . " " if $use_persistent;
-                $cmd .= $sas_codes;
-                print STDERR "Executing command in background: $cmd\n";
-                exec "$cmd 2>&1";
-                exit(1);
-            }
-
-            open(my $pfh, '>', $pid_file);
-            print $pfh $pid;
-            close $pfh;
-            # Return initial status with PID and instructions for checking later, avoiding the endless loop of checking by the AI agent, 
-            # which may cause excessive checking and potential issues with the server;
-            # If the sas_codes_or_file contains single/double quotes, the tool will save the sas codes into a temporary sas file;
-            if (-f $tmp_sas_file){
-              return {
-                content => [{
-                    type => "text",
-                    text => "QUERYING: SAS ODA for $sas_codes\nPID: $pid\nOutput file: $out_file\n" .
-                           "Ask the AI agent to check status with: {\"sas_codes\": \"$tmp_sas_file\", \"pid\": $pid}\n" . 
-"The loop should be no more than 3 times with an interval of 30 seconds to avoid excessive checking.\n"
-                }]
-            };
-            }else{
-              return {
-                content => [{
-                    type => "text",
-                    text => "QUERYING: SAS ODA for $sas_codes_or_file\nPID: $pid\nOutput file: $out_file\n" .
-                           "Ask the AI agent to check status with: {\"sas_codes_or_file\": \"$sas_codes_or_file\", \"pid\": $pid}\n" .
-"The loop should be no more than 3 times with an interval of 30 seconds to avoid excessive checking.\n"}]
-        };
-       }
-    }
-  }
+    code => sub ($tool, $args) { return SAS_ODA_MCP::run_sas_oda_tool($args) }
 );
 
 $server->tool(

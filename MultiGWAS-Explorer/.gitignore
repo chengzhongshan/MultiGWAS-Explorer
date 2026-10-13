@@ -122,3 +122,6 @@ Thumbs.db
 # Curated public validation documentation is intentionally versioned.
 !examples/public-scz-sex/results.html
 !examples/public-scz-sex/figures/**/*.png
+
+/.sas_oda_work_*/
+/SAS_Output_ODA_*/

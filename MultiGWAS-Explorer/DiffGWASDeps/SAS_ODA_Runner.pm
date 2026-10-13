@@ -130,6 +130,14 @@ use File::Spec;
 use JSON::PP qw(encode_json decode_json);
 use IO::Socket::INET;
 use IO::Select;
+
+sub _runner_temp_dir {
+    my $worker_temp_dir = $ENV{SAS_ODA_WORKER_TEMP_DIR} // '';
+    return File::Spec->rel2abs($worker_temp_dir)
+      if length($worker_temp_dir) && -d $worker_temp_dir;
+    return getcwd();
+}
+
 my $INLINE_PYTHON_SOURCE = <<'END_PYTHON';
 import saspy
 import json
@@ -2757,6 +2765,13 @@ sub _start_server_if_needed {
         return;
     }
     if ($pid == 0) {
+        # A persistent service outlives the CLI's owned scratch directory.
+        if (length($ENV{SAS_ODA_SESSION_TEMP_DIR} // '')) {
+            $ENV{TMPDIR} = $ENV{SAS_ODA_SESSION_TEMP_DIR};
+        } else {
+            delete $ENV{TMPDIR} if length($ENV{SAS_ODA_WORKER_TEMP_DIR} // '');
+        }
+        delete $ENV{SAS_ODA_WORKER_TEMP_DIR};
         if (defined($site_packages) && length($site_packages) && -d $site_packages) {
             $ENV{PYTHONPATH} = length($ENV{PYTHONPATH} // '')
               ? "$site_packages:$ENV{PYTHONPATH}"
@@ -2984,14 +2999,14 @@ sub _report_one_shot_connection_lifecycle {
 sub _run_nonpersistent_sas_logic_via_python {
     my ($sas_code) = @_;
 
-    my ($codefh, $code_path) = tempfile('sas_inline_code_XXXX', SUFFIX => '.sas', UNLINK => 0, DIR => getcwd());
+    my ($codefh, $code_path) = tempfile('sas_inline_code_XXXX', SUFFIX => '.sas', UNLINK => 0, DIR => _runner_temp_dir());
     print {$codefh} ($sas_code // '');
     close $codefh;
 
-    my ($jsonfh, $json_path) = tempfile('sas_inline_result_XXXX', SUFFIX => '.json', UNLINK => 0, DIR => getcwd());
+    my ($jsonfh, $json_path) = tempfile('sas_inline_result_XXXX', SUFFIX => '.json', UNLINK => 0, DIR => _runner_temp_dir());
     close $jsonfh;
 
-    my ($pyfh, $py_path) = tempfile('sas_inline_runner_XXXX', SUFFIX => '.py', UNLINK => 0, DIR => getcwd());
+    my ($pyfh, $py_path) = tempfile('sas_inline_runner_XXXX', SUFFIX => '.py', UNLINK => 0, DIR => _runner_temp_dir());
     print {$pyfh} $INLINE_PYTHON_SOURCE;
     print {$pyfh} <<'END_NONPERSISTENT_PY';
 
@@ -3146,14 +3161,14 @@ sub _run_nonpersistent_python_action {
     my ($action, $args_ref) = @_;
     $args_ref = _normalize_python_action_args($args_ref);
 
-    my ($argsfh, $args_path) = tempfile('sas_action_args_XXXX', SUFFIX => '.json', UNLINK => 0, DIR => getcwd());
+    my ($argsfh, $args_path) = tempfile('sas_action_args_XXXX', SUFFIX => '.json', UNLINK => 0, DIR => _runner_temp_dir());
     print {$argsfh} encode_json($args_ref);
     close $argsfh;
 
-    my ($jsonfh, $json_path) = tempfile('sas_action_result_XXXX', SUFFIX => '.json', UNLINK => 0, DIR => getcwd());
+    my ($jsonfh, $json_path) = tempfile('sas_action_result_XXXX', SUFFIX => '.json', UNLINK => 0, DIR => _runner_temp_dir());
     close $jsonfh;
 
-    my ($pyfh, $py_path) = tempfile('sas_action_runner_XXXX', SUFFIX => '.py', UNLINK => 0, DIR => getcwd());
+    my ($pyfh, $py_path) = tempfile('sas_action_runner_XXXX', SUFFIX => '.py', UNLINK => 0, DIR => _runner_temp_dir());
     print {$pyfh} $INLINE_PYTHON_SOURCE;
     print {$pyfh} <<'END_NONPERSISTENT_ACTION_PY';
 
@@ -3652,7 +3667,8 @@ sub _process_dependencies {
         }
     }
 
-    my @potential_macros = ($scan_code =~ /%(\w+)/g);
+    # A %name: token declares a macro jump label, not a macro invocation.
+    my @potential_macros = ($scan_code =~ /%([A-Za-z_]\w*)\b(?!\s*:)/g);
     my $header_includes = "";
     my @unresolved_macro_names;
     foreach my $m_name (@potential_macros) {
@@ -3855,7 +3871,7 @@ sub run_code {
     my $htmlfilename="";
     if ($self->{open_html} && $result->[1] && length($result->[1]) > 100) {
         my $fh;
-        ($fh, $htmlfilename) = tempfile(TEMPLATE => 'sas_res_XXXXX', SUFFIX => '.html', UNLINK => 0);
+        ($fh, $htmlfilename) = tempfile(TEMPLATE => 'sas_res_XXXXX', SUFFIX => '.html', UNLINK => 0, DIR => _runner_temp_dir());
         print $fh $result->[1];
         close $fh;
 #        system("cygstart", $htmlfilename);
@@ -4162,7 +4178,7 @@ sub get_sas_home_path {
     my $resp = _run_nonpersistent_python_action('gethome', {});
     return $resp->{value} if $resp && ($resp->{status} // '') eq 'ok';
     return "PYTHON ERROR: " . ($resp->{error} // 'nonpersistent gethome error');
-}   
+}
 
 =head1 DESCRIPTION
 

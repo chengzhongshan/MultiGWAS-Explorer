@@ -25,6 +25,11 @@ USAGE
 
 is_generated_file() {
   local path="$1"
+  case "$path" in
+    SAS_Output*/*|MultiGWAS-Explorer/SAS_Output*/*|\
+    .sas_oda_work_*/*|MultiGWAS-Explorer/.sas_oda_work_*/*)
+      return 0 ;;
+  esac
   # Tracked benchmark fixtures are deliberate source material.
   [[ "$path" == MultiGWAS-Explorer/benchmark/* ]] && return 1
   # Curated, checksum-recorded public validation figures are documentation.
