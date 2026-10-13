@@ -398,3 +398,50 @@ perl tests/test_live_deferred_and_printto.pl --live
 The shared fixes, tests, standalone smoke example and this documentation
 are synchronized to all three active pipeline copies. Generated
 configuration overrides, caches and runtime artifacts remain local.
+
+## Additional library batch: cases 391–490
+
+Another 100 new examples draw on 41 additional library files. The full
+case table, oracles, hashes, observed failures, repairs and Cygwin commands
+are in [MCP4SAS report section 13](https://github.com/chengzhongshan/MCP4SAS/blob/main/RealExamples4ImprovingMCP4SAS.md).
+The final full rerun passed all 100 validations: 98 successful jobs and two
+intentional failures correctly reported. All 41 source hashes, normalized
+duplicate checks against the preceding 390 cases and remote fixture cleanup
+also passed.
+
+Deferred `%include` directives with single-quoted paths were previously
+missed because CALL EXECUTE/DOSUBL strings double the quote delimiters.
+The shared extractor now decodes executable strings recursively and reads
+SAS doubled delimiters within filenames. Dependency-path rewriting keeps
+the correct escaping in direct and deferred source. Execution-context
+detection follows parentheses, handles concatenation and stops treating
+ordinary text after a completed DOSUBL call as executable code.
+
+The new include fixtures use unique names. The harness retains local
+programs and logs, deletes only remote fixtures submitted by the selected
+cases and records cleanup success separately; cleanup failure returns a
+nonzero harness exit. A name-literal fixture's VALIDVARNAME reset was moved
+after its assertions and PRINT, preserving the caller's intended SAS policy.
+
+Offline verification passed 152 assertions across 12 Perl test files.
+The public-wrapper live test passed all seven assertions in
+`SAS_Output_deferred_includes_g6G3xm`: both DOSUBL and CALL EXECUTE loaded a
+single-quoted filename containing an apostrophe and space, produced the
+correct value and nonempty HTML, and deleted only their unique remote fixture.
+
+```bash
+export PATH=/usr/bin:$PATH
+prove tests/test_macro_quoting_preflight.pl tests/test_format_name_advisory.pl \
+  tests/test_sas_log_diagnostics.pl tests/test_quoted_filename_upload.pl \
+  DiffGWASDeps/test_sas_oda_mcp.pl \
+  DiffGWASDeps/test_sas_include_preflight_lookup.pl \
+  DiffGWASDeps/test_sas_log_and_labels.pl \
+  DiffGWASDeps/test_sas_oda_upload_timeout.pl \
+  tests/test_deferred_macro_literals.pl tests/test_printto_status_guard.pl \
+  tests/test_fileref_name_advisory.pl tests/test_deferred_include_paths.pl
+perl tests/test_live_deferred_includes.pl --live
+```
+
+The shared module fixes, unit/live tests and documentation are synchronized
+to all three active pipeline copies. Generated configurations, caches and
+runtime artifacts remain local.
