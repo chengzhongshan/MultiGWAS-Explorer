@@ -253,3 +253,56 @@ The canonical runner, source-analysis module, regression tests, smoke
 example, and this documentation were synchronized to the three active
 pipeline copies. Generated PGC configuration overrides, LD caches, and
 runtime results were retained locally and excluded from publication.
+
+## SAS library validation, October 13, 2026
+
+The shared runner was improved using 100 new library-derived live SAS ODA
+cases in MCP4SAS (IDs 91–190, based on 80 distinct source files). The final
+run passed all 100 validations: 98 successful calculations and two
+intentional failures correctly reported. Source hashes, each calculation,
+initial failures, corrections and Cygwin commands are recorded in
+[the MCP4SAS report](https://github.com/chengzhongshan/MCP4SAS/blob/main/RealExamples4ImprovingMCP4SAS.md).
+
+The companion runner now accepts percent-escaped STR delimiters and BQUOTE
+apostrophes without false preflight failures. Macro dependency scanning
+ignores NRSTR literals and ordinary single-quoted DATA strings while
+retaining evaluated/deferred macro code. PROC FORMAT names ending in
+digits receive advisory warnings; SAS still reports actual validity.
+INPUT flowover and empty-dataset notes are exposed as nonfatal diagnostics,
+including structured status, exit code, log path and diagnostics in the
+MCP completion response.
+
+Active include discovery preserves apostrophes inside double-quoted paths
+and excludes masked literal include text. Filenames containing apostrophes
+are uploaded via a safely named ZIP and extracted to their original names
+with verified byte counts. Both persistent and one-shot upload routing
+use this transfer path. The live include test submits a uniquely named
+file, checks its calculation and HTML, and deletes only that remote fixture.
+
+Run from this repository's script directory in Cygwin:
+
+```bash
+export PATH=/usr/bin:$PATH
+prove tests/test_macro_quoting_preflight.pl tests/test_format_name_advisory.pl \
+  tests/test_sas_log_diagnostics.pl tests/test_quoted_filename_upload.pl \
+  DiffGWASDeps/test_sas_oda_mcp.pl \
+  DiffGWASDeps/test_sas_include_preflight_lookup.pl \
+  DiffGWASDeps/test_sas_log_and_labels.pl \
+  DiffGWASDeps/test_sas_oda_upload_timeout.pl
+SAS_ODA_AUTOLOAD_MACROS=0 OPEN_RESULT=0 \
+  perl run_sas_codes_or_files_in_SAS_ODA.pl \
+  --file examples/sas_library_macro_quote_smoke.sas \
+  --output-prefix SAS_Output_library_macro_quotes \
+  --run-timeout-seconds 180
+perl tests/test_live_include_literal_paths.pl --live
+```
+
+The offline checks passed 105 assertions (97 across the first seven checked
+files and eight upload-routing assertions). The live smoke run exited 0,
+printed `LIBRARY_MACRO_QUOTE_OK` and retained nonempty HTML at
+`SAS_Output_library_macro_quotes/sas_res_4foQ9.html`. Artifact names vary on
+rerun. The live include check also passed all five assertions, retaining its
+HTML and verifying cleanup of the unique apostrophe-containing remote fixture.
+Runtime results, generated configuration overrides and LD caches remain
+local. The shared fixes, tests, smoke example and documentation are
+synchronized to all three active pipeline copies.
