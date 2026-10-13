@@ -349,3 +349,52 @@ SAS_ODA_AUTOLOAD_MACROS=0 OPEN_RESULT=0 \
 The scanner, regressions, smoke example and documentation are synchronized
 to the three active pipeline copies. Runtime results and generated
 configuration/cache files remain local.
+
+## Additional library batch: cases 291–390
+
+A further 100 examples use 42 additional SAS library files. The complete
+catalogue, source hashes, discovery failures, corrections and Cygwin
+commands are recorded in
+[MCP4SAS report section 12](https://github.com/chengzhongshan/MCP4SAS/blob/main/RealExamples4ImprovingMCP4SAS.md).
+The final full rerun passed all 100 validations: 98 successful jobs and two
+intentional SAS failures correctly reported. All 42 source hashes and
+normalized duplicate checks against the preceding 290 examples passed.
+
+The shared runner now analyzes decoded CALL EXECUTE/DOSUBL code literals,
+preserving source offsets and masking nested NRSTR/ordinary quoted DATA
+text while retaining real evaluated dependencies. Explicit PROC PRINTTO
+jobs reset stale SYSCC before execution, restore logging afterwards and
+surface error condition codes of at least 8. This fixes a discovered
+false-success response for a redirected missing-dataset error. The
+redirected file itself is not automatically downloaded; the default log
+contains the condition-code summary. Ordinary submissions are unchanged.
+
+Long literal filerefs now receive a nonfatal preflight advisory, and actual
+uninitialized-variable NOTES appear as structured advisory diagnostics.
+Generated fixture issues involving FILEVAR bounds, implicit NOBS, floating
+precision, IML orientation, SQL syntax and fileref length were corrected.
+The live harness refreshes its next session after timeout/session loss and
+retains the failed job without replaying it.
+
+The companion offline checks passed 141 assertions across 11 Perl files.
+The public-wrapper live checks passed all seven assertions, preserving
+deferred calculations and HTML while correctly failing a real redirected
+error with a SYSCC summary and no generated syntax error. Artifacts are
+retained locally in `SAS_Output_deferred_printto_tdbPRQ`.
+
+```bash
+export PATH=/usr/bin:$PATH
+prove tests/test_macro_quoting_preflight.pl tests/test_format_name_advisory.pl \
+  tests/test_sas_log_diagnostics.pl tests/test_quoted_filename_upload.pl \
+  DiffGWASDeps/test_sas_oda_mcp.pl \
+  DiffGWASDeps/test_sas_include_preflight_lookup.pl \
+  DiffGWASDeps/test_sas_log_and_labels.pl \
+  DiffGWASDeps/test_sas_oda_upload_timeout.pl \
+  tests/test_deferred_macro_literals.pl tests/test_printto_status_guard.pl \
+  tests/test_fileref_name_advisory.pl
+perl tests/test_live_deferred_and_printto.pl --live
+```
+
+The shared fixes, tests, standalone smoke example and this documentation
+are synchronized to all three active pipeline copies. Generated
+configuration overrides, caches and runtime artifacts remain local.
