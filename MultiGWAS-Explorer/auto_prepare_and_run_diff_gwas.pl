@@ -33,7 +33,7 @@ use File::Spec;
 use File::Basename qw(basename dirname);
 use File::Path qw(make_path);
 use File::Temp qw(tempfile);
-use POSIX qw(strftime);
+use POSIX qw(strftime WNOHANG);
 use Time::HiRes qw(time);
 use DiffGWASRawSchema qw(
   normalize_header_name
@@ -60,6 +60,7 @@ my $skip_plots = 0;
 my $plots = 'manhattan,local_manhattan,local_gtf';
 my $force = 0;
 my $force_requested = 0;
+my $step_heartbeat_seconds = 60;
 my @step_args;
 my $from_step = '';
 my $to_step = '';
@@ -110,12 +111,14 @@ my $target_snps_override = '';
 my $target_snp_genes_override = '';
 my $display_gwas_override = '';
 my $exclude_manhattan_tracks_override = '';
+my $exclude_manhattan_track_regex_override = '';
 my $manhattan_track_order_override = '';
 my $exclude_local_manhattan_tracks_override = '';
 my $local_manhattan_track_order_override = '';
 my $exclude_local_gtf_tracks_override = '';
 my $local_gtf_track_order_override = '';
 my $manhattan_differential_p_mode_override = '';
+my $compute_meta_override;
 my $manhattan_all_snps;
 my $include_x_chr;
 my $sas_oda_account_override = '';
@@ -186,6 +189,7 @@ GetOptions(
     'manhattan-all-snps!' => \$manhattan_all_snps,
     'include-x-chr!' => \$include_x_chr,
     'force!'              => \$force,
+    'step-heartbeat-seconds=i' => \$step_heartbeat_seconds,
     'step=s@'             => \@step_args,
     'from-step=s'         => \$from_step,
     'to-step=s'           => \$to_step,
@@ -236,12 +240,14 @@ GetOptions(
     'target-snp-genes=s' => \$target_snp_genes_override,
     'display-gwas|display-tracks=s' => \$display_gwas_override,
     'exclude-manhattan-tracks|manhattan-exclude-tracks=s' => \$exclude_manhattan_tracks_override,
+    'exclude-manhattan-track-regex|manhattan-exclude-track-regex=s' => \$exclude_manhattan_track_regex_override,
     'manhattan-track-order=s' => \$manhattan_track_order_override,
     'exclude-local-manhattan-tracks=s' => \$exclude_local_manhattan_tracks_override,
     'local-manhattan-track-order=s' => \$local_manhattan_track_order_override,
     'exclude-local-gtf-tracks|exclude-gtf-tracks=s' => \$exclude_local_gtf_tracks_override,
     'local-gtf-track-order|gtf-track-order=s' => \$local_gtf_track_order_override,
     'manhattan-differential-p-mode=s' => \$manhattan_differential_p_mode_override,
+    'compute-meta!' => \$compute_meta_override,
     'sas-oda-account=s' => \$sas_oda_account_override,
     'sas-oda-password=s' => \$sas_oda_password_override,
     'prompt-sas-oda-auth!' => \$prompt_sas_oda_auth_override,
@@ -283,6 +289,8 @@ GetOptions(
 ) or die usage();
 
 $force_requested = $force;
+die "--step-heartbeat-seconds must be zero or a positive integer\n"
+    if $step_heartbeat_seconds < 0;
 
 if ($print_spec_example || $print_columns_help) {
     print full_help(
@@ -385,6 +393,8 @@ if (!length $spec_file && (length $gwas_dir || length $input_merged)) {
 
 die "--spec is required (or provide --gwas-dir or --input-merged to generate one)\n" unless length $spec_file;
 my $spec = load_json($spec_file);
+$spec->{compute_meta} = $compute_meta_override ? 1 : 0
+    if defined $compute_meta_override;
 $manhattan_all_snps = defined($manhattan_all_snps)
     ? ($manhattan_all_snps ? 1 : 0)
     : (cfg_or($spec, 'manhattan_all_snps', 0) ? 1 : 0);
@@ -822,6 +832,7 @@ my $runner_cfg = build_runner_config(
     target_snp_genes_override => $target_snp_genes_override,
     display_gwas_override => $display_gwas_override,
     exclude_manhattan_tracks_override => $exclude_manhattan_tracks_override,
+    exclude_manhattan_track_regex_override => $exclude_manhattan_track_regex_override,
     manhattan_track_order_override => $manhattan_track_order_override,
     exclude_local_manhattan_tracks_override => $exclude_local_manhattan_tracks_override,
     local_manhattan_track_order_override => $local_manhattan_track_order_override,
@@ -2640,12 +2651,40 @@ sub build_pair_info {
 sub parse_display_gwas_list {
     my ($raw) = @_;
     return () unless defined $raw && length $raw;
-    $raw =~ s/[|;]/,/g;
-    return grep { length } map {
-        my $token = $_ // '';
-        $token =~ s/^\s+|\s+$//g;
-        $token;
-    } split /,/, $raw;
+    my @tokens;
+    my $buffer = '';
+    my ($in_regex, $escaped) = (0, 0);
+    for my $char (split //, $raw) {
+        if ($in_regex) {
+            $buffer .= $char;
+            if ($escaped) {
+                $escaped = 0;
+            }
+            elsif ($char eq '\\') {
+                $escaped = 1;
+            }
+            elsif ($char eq '/') {
+                $in_regex = 0;
+            }
+            next;
+        }
+        if ($char eq '/' && $buffer !~ /\S/) {
+            $buffer .= $char;
+            $in_regex = 1;
+            next;
+        }
+        if ($char =~ /[,;|]/) {
+            $buffer =~ s/^\s+|\s+$//g;
+            push @tokens, $buffer if length $buffer;
+            $buffer = '';
+            next;
+        }
+        $buffer .= $char;
+    }
+    die "Unterminated track-list regular expression in '$raw'\n" if $in_regex;
+    $buffer =~ s/^\s+|\s+$//g;
+    push @tokens, $buffer if length $buffer;
+    return @tokens;
 }
 
 sub normalize_display_gwas_token {
@@ -2821,6 +2860,17 @@ sub resolve_display_track_selection {
     my @selected;
     my %seen;
     for my $token (@tokens) {
+        if ($token =~ m{^/}) {
+            my $regex = compile_track_name_regex($token, '--display-gwas regex');
+            my @matches = grep { track_matches_name_regex($_, $regex) } @{$catalog};
+            die "--display-gwas regex '$token' did not match any available track\n"
+                unless @matches;
+            for my $entry (@matches) {
+                next if $seen{ $entry->{id} }++;
+                push @selected, { %{$entry} };
+            }
+            next;
+        }
         my $norm = normalize_display_gwas_token($token);
         my $entry = $lookup->{$norm};
         die "Unknown --display-gwas value '$token'. Available values: "
@@ -2842,19 +2892,78 @@ sub resolve_display_track_selection {
     };
 }
 
+sub compile_track_name_regex {
+    my ($raw, $option_name) = @_;
+    $raw = '' unless defined $raw;
+    $raw =~ s/^\s+|\s+$//g;
+    return undef unless length $raw;
+
+    my ($pattern, $flags) = ($raw, '');
+    if ($raw =~ m{^/(.*)/([A-Za-z]*)$}s) {
+        ($pattern, $flags) = ($1, lc($2));
+    }
+    elsif ($raw =~ m{^/}) {
+        die "Malformed $option_name '$raw'. Use PATTERN or /PATTERN/[imsx]\n";
+    }
+    die "Unsupported flags in $option_name '$raw'; allowed flags are i, m, s, and x\n"
+        if $flags =~ /[^imsx]/;
+
+    my $source = length($flags) ? "(?$flags:$pattern)" : $pattern;
+    my $regex = eval { qr/$source/ };
+    if (!$regex) {
+        my $error = $@ || 'unknown regular-expression error';
+        $error =~ s/\s+$//;
+        die "Invalid $option_name '$raw': $error\n";
+    }
+    return $regex;
+}
+
+sub track_matches_name_regex {
+    my ($track, $regex) = @_;
+    return 0 unless ref($track) eq 'HASH' && $regex;
+    for my $key (qw(id pvar manhattan_pvar zvar betavar sevar label manhattan_label gtf_label)) {
+        my $value = $track->{$key};
+        return 1 if defined($value) && length($value) && $value =~ $regex;
+    }
+    return 0;
+}
+
 sub resolve_plot_track_subset {
-    my ($selected, $catalog, $lookup, $exclude_raw, $order_raw, $plot_name) = @_;
+    my ($selected, $catalog, $lookup, $exclude_raw, $exclude_regex_raw,
+        $order_raw, $plot_name) = @_;
     my %excluded;
     for my $token (parse_display_gwas_list($exclude_raw)) {
+        if ($token =~ m{^/}) {
+            my $regex = compile_track_name_regex($token, "$plot_name exclusion regex");
+            my @matches = grep { track_matches_name_regex($_, $regex) } @{$selected};
+            die "$plot_name exclusion regex '$token' did not match any selected track\n"
+                unless @matches;
+            $excluded{$_->{id}} = 1 for @matches;
+            next;
+        }
         my $normalized = normalize_display_gwas_token($token);
         if ($normalized =~ /^(?:DIFF|DIFFERENTIAL|DIFFERENTIAL_P)$/) {
             $excluded{$_->{id}} = 1 for grep { $_->{kind} eq 'std' } @{$selected};
             next;
         }
+        if ($normalized =~ /^(?:META|META_ANALYSIS|META_ANALYSIS_P)$/) {
+            $excluded{$_->{id}} = 1 for grep { $_->{kind} eq 'meta' } @{$selected};
+            next;
+        }
         my $entry = $lookup->{$normalized}
             or die "Unknown $plot_name track '$token'. Available values: "
-                . join(', ', map { $_->{id} } @{$catalog}) . ", DIFFERENTIAL\n";
+                . join(', ', map { $_->{id} } @{$catalog}) . ", DIFFERENTIAL, META\n";
         $excluded{$entry->{id}} = 1;
+    }
+    my $exclude_regex = compile_track_name_regex(
+        $exclude_regex_raw,
+        '--exclude-manhattan-track-regex',
+    );
+    if ($exclude_regex) {
+        my @matches = grep { track_matches_name_regex($_, $exclude_regex) } @{$selected};
+        die "--exclude-manhattan-track-regex '$exclude_regex_raw' did not match any selected $plot_name track\n"
+            unless @matches;
+        $excluded{$_->{id}} = 1 for @matches;
     }
     my @tracks = grep { !$excluded{$_->{id}} } @{$selected};
     die "Track exclusions removed every $plot_name track\n" unless @tracks;
@@ -2864,15 +2973,28 @@ sub resolve_plot_track_subset {
         my %available = map { $_->{id} => $_ } @tracks;
         my %ordered;
         for my $token (parse_display_gwas_list($order_raw)) {
-            my $normalized = normalize_display_gwas_token($token);
-            my @candidates = $normalized =~ /^(?:DIFF|DIFFERENTIAL|DIFFERENTIAL_P)$/
-                ? grep { $_->{kind} eq 'std' } @tracks
-                : do {
+            my @candidates;
+            if ($token =~ m{^/}) {
+                my $regex = compile_track_name_regex($token, "$plot_name order regex");
+                @candidates = grep { track_matches_name_regex($_, $regex) } @tracks;
+                die "$plot_name order regex '$token' did not match any remaining track\n"
+                    unless @candidates;
+            }
+            else {
+                my $normalized = normalize_display_gwas_token($token);
+                if ($normalized =~ /^(?:DIFF|DIFFERENTIAL|DIFFERENTIAL_P)$/) {
+                    @candidates = grep { $_->{kind} eq 'std' } @tracks;
+                }
+                elsif ($normalized =~ /^(?:META|META_ANALYSIS|META_ANALYSIS_P)$/) {
+                    @candidates = grep { $_->{kind} eq 'meta' } @tracks;
+                }
+                else {
                     my $entry = $lookup->{$normalized}
                         or die "Unknown $plot_name order track '$token'. Available values: "
                             . join(', ', map { $_->{id} } @tracks) . "\n";
-                    ($entry);
-                };
+                    @candidates = ($entry);
+                }
+            }
             for my $entry (@candidates) {
                 die "$plot_name track '$token' is excluded or not displayed\n"
                     unless $available{$entry->{id}};
@@ -3207,6 +3329,9 @@ sub build_runner_config {
     my $exclude_manhattan_tracks = length($args{exclude_manhattan_tracks_override} // '')
         ? $args{exclude_manhattan_tracks_override}
         : cfg_or($spec, 'exclude_manhattan_tracks', '');
+    my $exclude_manhattan_track_regex = length($args{exclude_manhattan_track_regex_override} // '')
+        ? $args{exclude_manhattan_track_regex_override}
+        : cfg_or($spec, 'exclude_manhattan_track_regex', '');
     my $manhattan_track_order = length($args{manhattan_track_order_override} // '')
         ? $args{manhattan_track_order_override}
         : cfg_or($spec, 'manhattan_track_order', '');
@@ -3254,16 +3379,19 @@ sub build_runner_config {
     my ($catalog, $track_lookup) = build_display_track_catalog($pair_info, $spec);
     my ($manhattan_tracks, $excluded_manhattan_ids, $priority_order) =
         resolve_plot_track_subset(\@selected_tracks, $catalog, $track_lookup,
-            $exclude_manhattan_tracks, $manhattan_track_order, 'genomewide Manhattan');
+            $exclude_manhattan_tracks, $exclude_manhattan_track_regex,
+            $manhattan_track_order, 'genomewide Manhattan');
     my @manhattan_tracks = @{$manhattan_tracks};
     my @excluded_manhattan_ids = @{$excluded_manhattan_ids};
     my @priority_order = @{$priority_order};
     my ($local_manhattan_tracks, $excluded_local_manhattan_ids, $local_manhattan_priority) =
         resolve_plot_track_subset(\@selected_tracks, $catalog, $track_lookup,
-            $exclude_local_manhattan_tracks, $local_manhattan_track_order, 'local Manhattan');
+            $exclude_local_manhattan_tracks, '',
+            $local_manhattan_track_order, 'local Manhattan');
     my ($local_gtf_tracks, $excluded_local_gtf_ids, $local_gtf_priority) =
         resolve_plot_track_subset(\@selected_tracks, $catalog, $track_lookup,
-            $exclude_local_gtf_tracks, $local_gtf_track_order, 'local GTF');
+            $exclude_local_gtf_tracks, '',
+            $local_gtf_track_order, 'local GTF');
     my @selected_std_tracks = grep { $_->{kind} eq 'std' } @selected_tracks;
     my @selected_group_tracks = grep { $_->{kind} eq 'group' } @selected_tracks;
     my @forest_tracks = @{ build_forest_group_tracks(
@@ -3469,6 +3597,7 @@ sub build_runner_config {
         DISPLAY_GWAS_AVAILABLE => join('|', @{ $selection->{available} || [] }),
         MANHATTAN_GWAS_MODE => (scalar(@manhattan_tracks) == 1 ? 'single' : 'multi'),
         MANHATTAN_EXCLUDED_TRACKS => join(',', @excluded_manhattan_ids),
+        MANHATTAN_EXCLUDE_TRACK_REGEX => $exclude_manhattan_track_regex,
         MANHATTAN_TRACK_ORDER => join(',', map { $_->{id} } @manhattan_tracks),
         MANHATTAN_ORDER_PRIORITY => join(',', @priority_order),
         MANHATTAN_ALL_SNPS => ($args{manhattan_all_snps} ? 1 : 0),
@@ -4022,6 +4151,49 @@ sub format_elapsed_seconds {
     return sprintf('%.1fs', $seconds);
 }
 
+sub run_command_with_heartbeat {
+    my (%args) = @_;
+    my $command = $args{command};
+    my $name = $args{name} || 'step';
+    my $interval = $args{interval} // 0;
+    return system($command) unless $interval > 0;
+
+    my $pid = fork();
+    if (!defined $pid) {
+        warn "[warn] Could not start the $name heartbeat process: $!. Running without periodic updates.\n";
+        return system($command);
+    }
+    if ($pid == 0) {
+        exec($command);
+        warn "Could not execute $name command: $!\n";
+        exit 127;
+    }
+
+    local $| = 1;
+    my $started = time();
+    my $next_heartbeat = $started + $interval;
+    print "[progress] $name is running (child PID $pid); status will be printed every ${interval}s.\n";
+    while (1) {
+        my $waited = waitpid($pid, WNOHANG);
+        if ($waited == $pid) {
+            my $status = $?;
+            return $status;
+        }
+        return -1 if $waited == -1;
+
+        my $now = time();
+        if ($now >= $next_heartbeat) {
+            print "[progress] $name is still running; elapsed "
+                . format_elapsed_seconds($now - $started) . ".\n";
+            $next_heartbeat += $interval while $next_heartbeat <= $now;
+        }
+        my $pause = $next_heartbeat - $now;
+        $pause = 1 if $pause > 1;
+        $pause = 0.05 if $pause < 0.05;
+        select undef, undef, undef, $pause;
+    }
+}
+
 sub plot_cache_config {
     my ($step_name, $runner) = @_;
     return $runner unless $step_name eq 'plot_manhattan'
@@ -4098,7 +4270,11 @@ sub run_step {
     my ($stderr_fh, $stderr_path) = tempfile('auto_prepare_step_stderr_XXXX', SUFFIX => '.log', TMPDIR => 1);
     close $stderr_fh;
     my $wrapped_command = qq{$command 2>"$stderr_path"};
-    my $rc = system($wrapped_command);
+    my $rc = run_command_with_heartbeat(
+        command  => $wrapped_command,
+        name     => $name,
+        interval => $step_heartbeat_seconds,
+    );
     if ($rc != 0) {
         my $exit_code = $rc == -1 ? -1 : ($rc >> 8);
         my $stderr_text = '';
@@ -4786,14 +4962,21 @@ Options:
                         instead of the default any-displayed-GWAS P < 0.05 filter.
   --include-x-chr       Include chromosome X / 23 in genomewide Manhattan.
                         Default: X / 23 excluded; --manhattan-all-snps does not change this.
+  --[no-]compute-meta   Enable or disable fixed-effect meta-analysis calculation.
   --exclude-manhattan-tracks LIST  Remove comma-separated genomewide scatter tracks.
+  --exclude-manhattan-track-regex PATTERN
+                        Remove genomewide tracks matching a Perl regular expression.
   --manhattan-track-order LIST     Put listed genomewide tracks first, bottom to top.
   --exclude-local-manhattan-tracks LIST  Remove local Manhattan scatter tracks.
   --local-manhattan-track-order LIST     Put listed local Manhattan tracks first, bottom to top.
   --exclude-local-gtf-tracks LIST        Remove local GTF scatter tracks.
   --local-gtf-track-order LIST           Put listed local GTF tracks first, bottom to top.
-                       Use META, DIFFERENTIAL, or track IDs; remaining tracks retain order.
+                       Use META, DIFFERENTIAL, track IDs, or /PATTERN/[imsx].
+                       Regex tokens may be mixed with exact names; remaining tracks retain order.
   --force               Rerun steps even if expected outputs already exist
+  --step-heartbeat-seconds N
+                       Print elapsed-time progress for running steps every N seconds.
+                       Default: 60; use 0 to disable.
   --list-steps          Print the available step names for the current spec and exit
   --step NAME           Run only one named step; repeat or comma-separate to run several
   --from-step NAME      Run from a named step onward
@@ -4895,6 +5078,8 @@ Options:
                        pipeline renders single-GWAS genomewide/local Manhattan
                        and local GTF plots and uses that selected GWAS for
                        top-hit selection unless --target-snps is provided.
+                       LIST also accepts /PATTERN/[imsx] tokens, which match
+                       track IDs, variable names, and display labels.
   --manhattan-differential-p-mode MODE
                        raw|standardized. Default: raw. Differential Manhattan
                        panels use PREFIX_DIFF_P by default; standardized mode

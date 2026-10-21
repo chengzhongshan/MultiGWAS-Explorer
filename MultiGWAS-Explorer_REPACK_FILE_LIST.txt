@@ -106,6 +106,7 @@ DiffGWASDeps/SNP_Local_Manhattan_With_GTF.sas
 DiffGWASDeps/sort_long_gwas_by_coord.sh
 DiffGWASDeps/SpaceAdjust.sas
 DiffGWASDeps/standardize_diff_gwas_zscore.pl
+DiffGWASDeps/test_track_regex_options.pl
 DiffGWASDeps/test_top_hit_maf_filter.pl
 DiffGWASDeps/TopHitMAF.pm
 DiffGWASDeps/totobsindsd.sas

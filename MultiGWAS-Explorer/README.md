@@ -102,7 +102,9 @@ The combined P can retain a SNP even when neither cohort P is below 0.05.
 Missing BETA or SE leaves that SNP's computed meta values blank. The merged
 AOA workflow continues to use supplied meta-analysis values without
 recalculation. Set `"compute_meta": 0` in a separate-cohort spec to disable
-the calculation.
+the calculation, or pass `--no-compute-meta` for a single invocation. To keep
+the computed values but omit them only from the genome-wide figure, pass
+`--exclude-manhattan-tracks META` instead.
 
 This is the combined-table format used by the old local AOA workflow: a
 tab-separated file (plain or gzip compressed) with `CHR`, `BP`, `SNP`, and at
@@ -1385,6 +1387,10 @@ loading and sorting the full GWAS-wide table in SAS `WORK` and speeds up the
 genome-wide gnuplot scan. Local Manhattan, local GTF, top-hit, and forest inputs
 are unchanged. The compact file, its import schema, and a row-count manifest
 are in `cache/sas_manhattan/`.
+Long-running pipeline steps print an immediate `[progress]` message and then an
+elapsed-time heartbeat every 60 seconds, including `extract_wide_subset`. Use
+`--step-heartbeat-seconds N` with either automation entry point to change the
+interval, or set it to `0` to disable heartbeat messages.
 Pass `--manhattan-all-snps` to either automation entry point to plot every
 coordinate-valid SNP in the genome-wide Manhattan plot. The all-SNP mode uses
 a separate cache and disables gnuplot's background point thinning; omitting
@@ -1422,8 +1428,31 @@ perl auto_prepare_and_run_diff_gwas.pl --spec my_gwas.json \
   --local-gtf-track-order META,ALL_FEMALE
 ```
 
+Every inclusion, exclusion, and ordering list above also accepts Perl regular
+expressions written as `/pattern/[imsx]`. Regex tokens may be mixed with exact
+track IDs and the `META` or `DIFFERENTIAL` groups. The matcher checks canonical
+track IDs, associated P/Z/BETA/SE variable names, and labels. Separators inside
+the slash-delimited pattern, including alternation with `|`, are preserved:
+
+```bash
+perl auto_prepare_and_run_diff_gwas.pl --spec my_gwas.json \
+  --plots manhattan \
+  --display-gwas '/^(?:ALL|EUR)(?:_FEMALE|_MALE)?$/i' \
+  --exclude-manhattan-tracks '/_META$/i' \
+  --manhattan-track-order '/^EUR(?:_|$)/i' \
+  --exclude-local-manhattan-tracks '/^ASN_/i' \
+  --local-manhattan-track-order '/^ALL(?:_|$)/i' \
+  --exclude-local-gtf-tracks '/_META$/i' \
+  --local-gtf-track-order '/^ASN(?:_|$)/i'
+```
+
+For a standalone genome-wide exclusion pattern, the convenience option
+`--exclude-manhattan-track-regex '/_META$/i'` and persistent spec value
+`"exclude_manhattan_track_regex": "/_META$/i"` are also available. An invalid
+expression or a pattern that matches no applicable track stops before plotting.
+
 The equivalent spec keys are `exclude_manhattan_tracks`,
-`manhattan_track_order`, `exclude_local_manhattan_tracks`,
+`exclude_manhattan_track_regex`, `manhattan_track_order`, `exclude_local_manhattan_tracks`,
 `local_manhattan_track_order`, `exclude_local_gtf_tracks`, and
 `local_gtf_track_order`. These change displayed scatter tracks only; top-hit
 selection and local LD calculation still use their configured inputs.

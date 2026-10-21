@@ -54,22 +54,30 @@ Options:
                                 Default: any displayed GWAS has P < 0.05.
   --include-x-chr               Include chromosome X / 23 in genomewide Manhattan.
                                 Default: autosomes only.
+  --[no-]compute-meta           Enable or disable fixed-effect meta-analysis calculation.
   --step NAME                   Plot step(s): plot_manhattan, plot_local_manhattan, plot_local_gtf, plot_forest
   --force                       Force plot regeneration while reusing valid upstream data.
   --force-upstream              Also rebuild the upstream wide GWAS subset.
+  --step-heartbeat-seconds N    Upstream progress interval. Default: 60; 0 disables.
   --display-gwas LIST           Comma-separated displayed GWAS tracks, shared with the
                                 SAS ODA runner config. Use pair prefixes such as
                                 ALL,EUR,ASN for differential tracks and GWAS labels
                                 such as ALL_FEMALE or EUR_MALE for single-GWAS tracks.
+                                LIST also accepts /PATTERN/[imsx] regex tokens.
   --exclude-manhattan-tracks LIST
                                 Remove tracks from genomewide Manhattan only, e.g.
                                 META,DIFFERENTIAL or ALL_FEMALE.
+  --exclude-manhattan-track-regex REGEX
+                                Remove genomewide tracks matching a Perl regex;
+                                accepts PATTERN or /PATTERN/[imsx].
   --manhattan-track-order LIST  Put listed genomewide tracks first, bottom to top;
                                 unlisted tracks retain their current order.
   --exclude-local-manhattan-tracks LIST  Remove local Manhattan scatter tracks.
   --local-manhattan-track-order LIST     Order local Manhattan scatter tracks.
   --exclude-local-gtf-tracks LIST        Remove local GTF scatter tracks.
   --local-gtf-track-order LIST           Order local GTF scatter tracks.
+                                Every track LIST option accepts exact names,
+                                META/DIFFERENTIAL, and /PATTERN/[imsx] regexes.
   --manhattan-differential-p-mode MODE
                                 raw or standardized. Default: raw.
   --remove-X-chr / --no-remove-X-chr
@@ -146,14 +154,17 @@ my $plots = 'manhattan,local_manhattan,local_gtf';
 my @step_args;
 my $force = 0;
 my $force_upstream = 0;
+my $step_heartbeat_seconds = 60;
 my $display_gwas_override = '';
 my $exclude_manhattan_tracks_override = '';
+my $exclude_manhattan_track_regex_override = '';
 my $manhattan_track_order_override = '';
 my $exclude_local_manhattan_tracks_override = '';
 my $local_manhattan_track_order_override = '';
 my $exclude_local_gtf_tracks_override = '';
 my $local_gtf_track_order_override = '';
 my $manhattan_differential_p_mode_override = '';
+my $compute_meta_override;
 my $manhattan_all_snps;
 my $target_snps_override = '';
 my $target_snp_genes_override = '';
@@ -201,14 +212,17 @@ GetOptions(
     'step=s@'                 => \@step_args,
     'force!'                  => \$force,
     'force-upstream!'         => \$force_upstream,
+    'step-heartbeat-seconds=i' => \$step_heartbeat_seconds,
     'display-gwas|display-tracks=s' => \$display_gwas_override,
     'exclude-manhattan-tracks|manhattan-exclude-tracks=s' => \$exclude_manhattan_tracks_override,
+    'exclude-manhattan-track-regex|manhattan-exclude-track-regex=s' => \$exclude_manhattan_track_regex_override,
     'manhattan-track-order=s' => \$manhattan_track_order_override,
     'exclude-local-manhattan-tracks=s' => \$exclude_local_manhattan_tracks_override,
     'local-manhattan-track-order=s' => \$local_manhattan_track_order_override,
     'exclude-local-gtf-tracks|exclude-gtf-tracks=s' => \$exclude_local_gtf_tracks_override,
     'local-gtf-track-order|gtf-track-order=s' => \$local_gtf_track_order_override,
     'manhattan-differential-p-mode=s' => \$manhattan_differential_p_mode_override,
+    'compute-meta!'             => \$compute_meta_override,
     'remove-x-chr!'            => \$remove_x_chr,
     'include-x-chr!'           => \$include_x_chr,
     'target-snps=s'           => \$target_snps_override,
@@ -323,6 +337,8 @@ my %requested = normalize_requested_plots($plots, \@step_args);
 die "No gnuplot plot steps were requested.\n" unless grep { $requested{$_} } qw(plot_manhattan plot_local_manhattan plot_local_gtf plot_forest);
 
 my $spec = load_json($spec_file);
+$spec->{compute_meta} = $compute_meta_override ? 1 : 0
+    if defined $compute_meta_override;
 my $explicit_target_local_only = length(trim(
     $target_snps_override || $spec->{target_snps} || ''
 ))
@@ -359,6 +375,8 @@ $ld_population_override = uc(
 );
 die "--ld-population must be AFR, AMR, ASN/EAS, EUR, MAJOR4, or a comma/plus-separated list of those populations\n"
     unless valid_local_ld_population_spec($ld_population_override);
+die "--step-heartbeat-seconds must be zero or a positive integer\n"
+    if $step_heartbeat_seconds < 0;
 my $target_snp_gene_overrides = parse_target_snp_gene_overrides(
     spec_value => $spec->{target_snp_genes},
     cli_value  => $target_snp_genes_override,
@@ -384,6 +402,7 @@ my $has_runner_override = 0;
 for my $override_value (
     $display_gwas_override,
     $exclude_manhattan_tracks_override,
+    $exclude_manhattan_track_regex_override,
     $manhattan_track_order_override,
     $exclude_local_manhattan_tracks_override,
     $local_manhattan_track_order_override,
@@ -403,6 +422,7 @@ for my $override_value (
     }
 }
 $has_runner_override = 1 if $local_max_hits_per_fig_override;
+$has_runner_override = 1 if defined $compute_meta_override;
 $has_runner_override = 1 if $manhattan_all_snps && ($spec->{source_mode} || '') ne 'merged_gwas_table';
 if (!$manhattan_all_snps && ($spec->{source_mode} || '') ne 'merged_gwas_table'
     && -f $runner_config_local) {
@@ -418,6 +438,8 @@ if (-f $runner_config_local) {
         if !!($cached_runner->{MANHATTAN_INCLUDE_X_CHR} || 0) != !!(!$remove_x_chr);
     my $requested_exclusions = length($exclude_manhattan_tracks_override)
         ? $exclude_manhattan_tracks_override : ($spec->{exclude_manhattan_tracks} || '');
+    my $requested_exclusion_regex = length($exclude_manhattan_track_regex_override)
+        ? $exclude_manhattan_track_regex_override : ($spec->{exclude_manhattan_track_regex} || '');
     my $requested_order = length($manhattan_track_order_override)
         ? $manhattan_track_order_override : ($spec->{manhattan_track_order} || '');
     my @local_plot_specs = (
@@ -428,6 +450,7 @@ if (-f $runner_config_local) {
     );
     $has_runner_override = 1
         if $requested_exclusions || ($cached_runner->{MANHATTAN_EXCLUDED_TRACKS} || '')
+        || $requested_exclusion_regex ne ($cached_runner->{MANHATTAN_EXCLUDE_TRACK_REGEX} || '')
         || $requested_order || ($cached_runner->{MANHATTAN_ORDER_PRIORITY} || '');
     for my $plot_spec (@local_plot_specs) {
         $has_runner_override = 1
@@ -458,16 +481,19 @@ if (!$reused_existing_runner) {
     run_upstream_preprocessing(
         spec_file                       => $spec_file,
         force                           => $force_upstream,
+        step_heartbeat_seconds          => $step_heartbeat_seconds,
         manhattan_all_snps              => $manhattan_all_snps,
         include_x_chr                   => !$remove_x_chr,
         display_gwas_override           => $display_gwas_override,
         exclude_manhattan_tracks_override => $exclude_manhattan_tracks_override,
+        exclude_manhattan_track_regex_override => $exclude_manhattan_track_regex_override,
         manhattan_track_order_override => $manhattan_track_order_override,
         exclude_local_manhattan_tracks_override => $exclude_local_manhattan_tracks_override,
         local_manhattan_track_order_override => $local_manhattan_track_order_override,
         exclude_local_gtf_tracks_override => $exclude_local_gtf_tracks_override,
         local_gtf_track_order_override => $local_gtf_track_order_override,
         manhattan_differential_p_mode_override => $manhattan_differential_p_mode_override,
+        compute_meta_override           => $compute_meta_override,
         target_snps_override            => $target_snps_override,
         target_snp_genes_override       => $target_snp_genes_override,
         get_common_associations         => $get_common_associations,
@@ -796,6 +822,8 @@ sub run_upstream_preprocessing {
         '--local-ld-display-mode', 'none',
     );
     push @cmd, '--force' if $args{force};
+    push @cmd, '--step-heartbeat-seconds', $args{step_heartbeat_seconds}
+        if defined $args{step_heartbeat_seconds};
     push @cmd, '--list-steps' if $args{config_only_for_explicit_local_targets};
     push @cmd, '--manhattan-all-snps' if $args{manhattan_all_snps};
     push @cmd, '--include-x-chr' if $args{include_x_chr};
@@ -804,6 +832,10 @@ sub run_upstream_preprocessing {
     }
     if ($args{exclude_manhattan_tracks_override}) {
         push @cmd, '--exclude-manhattan-tracks', $args{exclude_manhattan_tracks_override};
+    }
+    if ($args{exclude_manhattan_track_regex_override}) {
+        push @cmd, '--exclude-manhattan-track-regex',
+          $args{exclude_manhattan_track_regex_override};
     }
     if ($args{manhattan_track_order_override}) {
         push @cmd, '--manhattan-track-order', $args{manhattan_track_order_override};
@@ -821,6 +853,8 @@ sub run_upstream_preprocessing {
         push @cmd, '--manhattan-differential-p-mode',
           $args{manhattan_differential_p_mode_override};
     }
+    push @cmd, ($args{compute_meta_override} ? '--compute-meta' : '--no-compute-meta')
+        if defined $args{compute_meta_override};
     if ($args{target_snps_override}) {
         push @cmd, '--target-snps', $args{target_snps_override};
     }
