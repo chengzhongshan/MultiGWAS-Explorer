@@ -4318,6 +4318,11 @@ sub run_step {
         }
         if ($all_exist) {
             print "[skip] $name already has expected outputs\n";
+            print_step_output_paths(
+                name    => $name,
+                outputs => $outputs,
+                status  => 'reused',
+            );
             print "[done] $name finished in " . format_elapsed_seconds(time() - $step_started) . " (reused existing outputs)\n";
             return;
         }
@@ -4396,7 +4401,26 @@ sub run_step {
         close $cache_fh
           or die "Cannot close request cache marker $cache_file: $!\n";
     }
+    print_step_output_paths(
+        name    => $name,
+        outputs => $outputs,
+        status  => 'generated',
+    );
     print "[done] $name finished in " . format_elapsed_seconds(time() - $step_started) . "\n";
+}
+
+sub print_step_output_paths {
+    my (%args) = @_;
+    my $name = $args{name} || '';
+    return unless $name =~ /^plot_/;
+    my $outputs = $args{outputs} || [];
+    my $status = $args{status} || 'available';
+    for my $out (@{$outputs}) {
+        next unless defined $out && length $out;
+        my $local_path = cygpath_to_win($out);
+        next unless defined $local_path && length $local_path && -s $local_path;
+        print "[output] $name artifact ($status): $out\n";
+    }
 }
 
 sub run_gnuplot_space_fallback {

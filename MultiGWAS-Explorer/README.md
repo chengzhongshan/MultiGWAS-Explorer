@@ -1422,7 +1422,11 @@ subset itself must be rebuilt. A focused SAS ODA plot step expects its prepared
 inputs to exist; for a first run, use `--plots`, or prepare the missing stage
 explicitly before the plot-only command. During a normal full SAS ODA run, the
 summary may list the complete pipeline plan and print `[skip]` for inactive plot
-families; those skipped plots were not executed.
+families; those skipped plots were not executed. When a requested SAS ODA plot
+is reused from its matching cache, the orchestrator prints each declared,
+nonempty local artifact as `[output] plot_NAME artifact (reused): PATH`. Fresh SAS plot runs
+use the same line with `(generated)`. The gnuplot wrapper continues to print
+its complete path list under `Generated gnuplot outputs`.
 
 Both pipelines now share one track-selection model:
 
