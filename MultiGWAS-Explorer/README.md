@@ -1390,7 +1390,9 @@ are in `cache/sas_manhattan/`.
 Long-running pipeline steps print an immediate `[progress]` message and then an
 elapsed-time heartbeat every 60 seconds, including `extract_wide_subset`. Use
 `--step-heartbeat-seconds N` with either automation entry point to change the
-interval, or set it to `0` to disable heartbeat messages.
+interval, or set it to `0` to disable heartbeat messages. Child-process stderr,
+including SAS ODA upload and submission status, is streamed live while still
+being retained for failure classification.
 Pass `--manhattan-all-snps` to either automation entry point to plot every
 coordinate-valid SNP in the genome-wide Manhattan plot. The all-SNP mode uses
 a separate cache and disables gnuplot's background point thinning; omitting
@@ -1450,6 +1452,9 @@ For a standalone genome-wide exclusion pattern, the convenience option
 `--exclude-manhattan-track-regex '/_META$/i'` and persistent spec value
 `"exclude_manhattan_track_regex": "/_META$/i"` are also available. An invalid
 expression or a pattern that matches no applicable track stops before plotting.
+Before any processing step starts, the pipeline prints each supplied inclusion,
+exclusion, or ordering condition together with the concrete tracks selected,
+excluded, retained, or prioritized by that condition.
 
 The equivalent spec keys are `exclude_manhattan_tracks`,
 `exclude_manhattan_track_regex`, `manhattan_track_order`, `exclude_local_manhattan_tracks`,

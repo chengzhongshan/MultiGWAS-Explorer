@@ -2882,6 +2882,11 @@ sub resolve_display_track_selection {
 
     die "No valid display tracks remained after applying --display-gwas\n" unless @selected;
 
+    my $display_condition = $raw;
+    $display_condition =~ s/[\r\n]+/ /g;
+    print "[tracks] display inclusion condition '$display_condition' selected: "
+        . join(', ', map { $_->{id} } @selected) . "\n";
+
     return {
         explicit => 1,
         raw => $raw,
@@ -3006,6 +3011,33 @@ sub resolve_plot_track_subset {
             (map { $available{$_} } @priority),
             (grep { !$ordered{$_->{id}} } @tracks),
         );
+    }
+    my @exclusion_conditions;
+    if (length($exclude_raw // '')) {
+        my $condition = $exclude_raw;
+        $condition =~ s/[\r\n]+/ /g;
+        push @exclusion_conditions, "list='$condition'";
+    }
+    if (length($exclude_regex_raw // '')) {
+        my $condition = $exclude_regex_raw;
+        $condition =~ s/[\r\n]+/ /g;
+        push @exclusion_conditions, "regex='$condition'";
+    }
+    if (@exclusion_conditions) {
+        print "[tracks] $plot_name exclusion input condition(s): "
+            . join('; ', @exclusion_conditions) . "\n";
+        print "[tracks] $plot_name excluded tracks: "
+            . (@excluded_ids ? join(', ', @excluded_ids) : '<none>') . "\n";
+        print "[tracks] $plot_name retained tracks: "
+            . join(', ', map { $_->{id} } @tracks) . "\n";
+    }
+    if (length($order_raw // '')) {
+        my $condition = $order_raw;
+        $condition =~ s/[\r\n]+/ /g;
+        print "[tracks] $plot_name ordering input condition '$condition' prioritized: "
+            . (@priority ? join(', ', @priority) : '<none>') . "\n";
+        print "[tracks] $plot_name final track order: "
+            . join(', ', map { $_->{id} } @tracks) . "\n";
     }
     return (\@tracks, \@excluded_ids, \@priority);
 }
@@ -4151,12 +4183,32 @@ sub format_elapsed_seconds {
     return sprintf('%.1fs', $seconds);
 }
 
+sub stream_step_stderr {
+    my ($path, $offset_ref) = @_;
+    return unless defined($path) && length($path) && -f $path;
+    return unless ref($offset_ref) eq 'SCALAR';
+    open my $fh, '<', $path or return;
+    binmode $fh;
+    seek($fh, $$offset_ref, 0) or do {
+        close $fh;
+        return;
+    };
+    while (1) {
+        my $chunk = '';
+        my $read = read($fh, $chunk, 16 * 1024);
+        last unless defined($read) && $read > 0;
+        print STDERR $chunk;
+        $$offset_ref += $read;
+    }
+    close $fh;
+}
+
 sub run_command_with_heartbeat {
     my (%args) = @_;
     my $command = $args{command};
     my $name = $args{name} || 'step';
     my $interval = $args{interval} // 0;
-    return system($command) unless $interval > 0;
+    my $stderr_path = $args{stderr_path} // '';
 
     my $pid = fork();
     if (!defined $pid) {
@@ -4172,23 +4224,27 @@ sub run_command_with_heartbeat {
     local $| = 1;
     my $started = time();
     my $next_heartbeat = $started + $interval;
-    print "[progress] $name is running (child PID $pid); status will be printed every ${interval}s.\n";
+    my $stderr_offset = 0;
+    print "[progress] $name is running (child PID $pid); status will be printed every ${interval}s.\n"
+        if $interval > 0;
     while (1) {
         my $waited = waitpid($pid, WNOHANG);
+        my $child_status = $waited == $pid ? $? : undef;
+        stream_step_stderr($stderr_path, \$stderr_offset);
         if ($waited == $pid) {
-            my $status = $?;
-            return $status;
+            stream_step_stderr($stderr_path, \$stderr_offset);
+            return $child_status;
         }
         return -1 if $waited == -1;
 
         my $now = time();
-        if ($now >= $next_heartbeat) {
+        if ($interval > 0 && $now >= $next_heartbeat) {
             print "[progress] $name is still running; elapsed "
                 . format_elapsed_seconds($now - $started) . ".\n";
             $next_heartbeat += $interval while $next_heartbeat <= $now;
         }
-        my $pause = $next_heartbeat - $now;
-        $pause = 1 if $pause > 1;
+        my $pause = $interval > 0 ? $next_heartbeat - $now : 0.25;
+        $pause = 0.25 if $pause > 0.25;
         $pause = 0.05 if $pause < 0.05;
         select undef, undef, undef, $pause;
     }
@@ -4274,6 +4330,7 @@ sub run_step {
         command  => $wrapped_command,
         name     => $name,
         interval => $step_heartbeat_seconds,
+        stderr_path => $stderr_path,
     );
     if ($rc != 0) {
         my $exit_code = $rc == -1 ? -1 : ($rc >> 8);

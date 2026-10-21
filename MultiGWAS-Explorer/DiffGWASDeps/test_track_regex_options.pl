@@ -64,6 +64,15 @@ $runner = read_json($runner_path);
 is($runner->{MANHATTAN_EXCLUDED_TRACKS}, 'ALL_META,EUR_META,ASN_META',
     'dedicated regex excludes all meta tracks');
 
+my $resolution_output = qx{$^X "$driver" --spec "$spec_path" --mode configs --plots manhattan --exclude-manhattan-tracks META 2>&1};
+is($?, 0, 'aggregate META exclusion generates a track-resolution summary');
+like($resolution_output,
+    qr/\[tracks\] genomewide Manhattan exclusion input condition\(s\): list='META'/,
+    'track-resolution summary reports the supplied exclusion condition');
+like($resolution_output,
+    qr/\[tracks\] genomewide Manhattan excluded tracks: ALL_META, EUR_META, ASN_META/,
+    'track-resolution summary reports every concretely excluded track');
+
 is(system($^X, $driver, '--spec', $spec_path, '--mode', 'configs', '--plots', 'manhattan',
         '--display-gwas', '/^(?:ALL|EUR)(?:_FEMALE|_MALE)?$/i'), 0,
     'regex inclusion with alternation generates configs');
