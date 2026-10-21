@@ -13,6 +13,7 @@ DEFAULT_DATA_GZ="/mnt/e/LongCOVID_HGI_GWAS/PGC_Large_GWASs/PGC_SCZ_Sex_Stratifie
 DATA_GZ="${DATA_GZ:-${DEFAULT_DATA_GZ}}"
 LOCAL_TOP_HITS_CSV_HELPER="${LOCAL_TOP_HITS_CSV_HELPER:-${DEPS_DIR}/generate_requested_top_hits_csv.pl}"
 RENDER_SAS_HELPER="${RENDER_SAS_HELPER:-${DEPS_DIR}/render_sas_template.pl}"
+FOREST_HTML_BUILDER="${FOREST_HTML_BUILDER:-${DEPS_DIR}/build_forest_html.pl}"
 RUN_SAS_TEMPLATE="${RUN_SAS_TEMPLATE:-${DEPS_DIR}/run_sas_oda_top_hits_forest_plot.sas}"
 SESSION_ID="${SESSION_ID:-mysession}"
 USE_PERSISTENT_SESSION="${USE_PERSISTENT_SESSION:-0}"
@@ -496,23 +497,23 @@ if (( forest_png_count == 0 )); then
   exit 1
 fi
 
-{
-  echo '<!doctype html>'
-  echo '<html><head><meta charset="utf-8">'
-  printf '<title>%s</title>\n' "${FOREST_HTML_TITLE}"
-  echo '<style>'
-  echo 'body{margin:0;padding:20px;font-family:Arial,sans-serif;background:#fff;color:#1f2937;}'
-  echo '.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:24px;align-items:start;}'
-  echo '.panel{margin:0;padding:14px;border:1px solid #d9dee7;border-radius:10px;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,0.06);}'
-  echo '.panel figcaption{font-size:18px;font-weight:700;margin-bottom:10px;text-align:center;}'
-  echo '.panel img{width:100%;height:auto;display:block;}'
-  echo '</style></head><body><div class="grid">'
-  awk -F '\t' 'NR>1 {printf "<figure class=\"panel\"><figcaption>%s</figcaption><img src=\"%s\" alt=\"%s forest plot\"></figure>\n", $3, $4, $3}' "${MANIFEST_OUT}"
-  echo '</div></body></html>'
-} > "${HTML_OUT}"
+if [[ ! -f "${FOREST_HTML_BUILDER}" ]]; then
+  echo "ERROR: Self-contained forest HTML builder is missing: ${FOREST_HTML_BUILDER}" >&2
+  exit 1
+fi
+perl "${FOREST_HTML_BUILDER}" \
+  --manifest "${MANIFEST_OUT}" \
+  --output "${HTML_OUT}" \
+  --title "${FOREST_HTML_TITLE}" \
+  --image-dir "${WORKDIR}" \
+  --top-hits-csv "${CSV_OUT}"
 
 if [[ ! -s "${HTML_OUT}" ]]; then
   echo "ERROR: Expected forest HTML was not created or is empty: ${HTML_OUT}" >&2
+  exit 1
+fi
+if ! grep -qi 'data:image/[^;]*;base64,' "${HTML_OUT}"; then
+  echo "ERROR: Forest HTML does not contain an embedded plot image: ${HTML_OUT}" >&2
   exit 1
 fi
 

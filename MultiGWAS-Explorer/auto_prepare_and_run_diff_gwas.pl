@@ -89,7 +89,12 @@ my $top_hit_ld_bfile_override = '';
 my $top_hit_ld_plink2_override = '';
 my $top_hit_max_loci_override;
 my $local_max_hits_per_fig_override = 0;
+my $local_window_bp_override = '';
 my $local_gtf_window_bp_override = '';
+my $manhattan_title_override = '';
+my $local_manhattan_title_override = '';
+my $local_gtf_title_override = '';
+my $forest_title_override = '';
 my $figure_width_override = 0;
 my $figure_height_override = 0;
 my $manhattan_fig_width_override = 0;
@@ -218,7 +223,12 @@ GetOptions(
     'top-hit-ld-plink2=s' => \$top_hit_ld_plink2_override,
     'top-hit-max-loci=i'  => \$top_hit_max_loci_override,
     'local-max-hits-per-fig=i' => \$local_max_hits_per_fig_override,
+    'local-manhattan-window-bp|local-window-bp=s' => \$local_window_bp_override,
     'local-gtf-window-bp=s' => \$local_gtf_window_bp_override,
+    'manhattan-title=s' => \$manhattan_title_override,
+    'local-manhattan-title=s' => \$local_manhattan_title_override,
+    'local-gtf-title=s' => \$local_gtf_title_override,
+    'forest-title=s' => \$forest_title_override,
     'figure-width|plot-width=i' => \$figure_width_override,
     'figure-height|plot-height=i' => \$figure_height_override,
     'manhattan-fig-width=i' => \$manhattan_fig_width_override,
@@ -459,6 +469,16 @@ $spec->{clip_upper_quantile} = $clip_upper_quantile_override
   if defined $clip_upper_quantile_override && length $clip_upper_quantile_override;
 $spec->{local_gtf_window_bp} = $local_gtf_window_bp_override
   if defined $local_gtf_window_bp_override && length $local_gtf_window_bp_override;
+$spec->{local_window_bp} = $local_window_bp_override
+  if defined $local_window_bp_override && length $local_window_bp_override;
+$spec->{html_title} = $manhattan_title_override
+  if defined $manhattan_title_override && length $manhattan_title_override;
+$spec->{local_manhattan_title} = $local_manhattan_title_override
+  if defined $local_manhattan_title_override && length $local_manhattan_title_override;
+$spec->{local_gtf_title} = $local_gtf_title_override
+  if defined $local_gtf_title_override && length $local_gtf_title_override;
+$spec->{forest_html_title} = $forest_title_override
+  if defined $forest_title_override && length $forest_title_override;
 $spec->{gtf_yaxis_offset4max} = $local_gtf_yaxis_offset4max_override
   if defined $local_gtf_yaxis_offset4max_override && length $local_gtf_yaxis_offset4max_override;
 $spec->{gtf_yoffset4textlabels} = $local_gtf_yoffset4textlabels_override
@@ -590,6 +610,9 @@ my $top_hit_max_loci = defined($top_hit_max_loci_override)
     : cfg_or($spec, 'top_hit_max_loci', 0);
 my $local_window_bp = cfg_or($spec, 'local_window_bp', '1e7');
 my $local_gtf_window_bp = cfg_or($spec, 'local_gtf_window_bp', '1e6');
+die "--local-manhattan-window-bp must be a positive number of base pairs\n"
+    unless $local_window_bp =~ /^(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i
+       && (0 + $local_window_bp) > 0;
 if ($local_gtf_window_bp =~ /^(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i
     && (0 + $local_gtf_window_bp) > 5_000_000) {
     my $total_span = 2 * (0 + $local_gtf_window_bp);
@@ -1156,7 +1179,10 @@ if (!$skip_plots) {
         command     => qq{"$bash_path" -lc 'cd "$workdir" && RUNNER_CONFIG_JSON="$generated->{runner_config}" SESSION_ID="$runner_session" OPEN_RESULT="$open_result" CLEAN_ODA_INPUT="$plot_clean_oda_input" SKIP_DATA_UPLOAD="$plot_skip_upload" KEEP_REMOTE_PLOT_DATA="$keep_remote_plot_data" EMIT_LOCAL_SAS_DEBUG="$emit_local_sas_scripts" LOCAL_SAS_DEBUG_ONLY="$local_sas_only" "$deps_dir/run_sas_oda_top_hits_forest_plot_download_html.sh"'},
         outputs     => $local_sas_only ? [] : [
             "$Bin/" . ($runner_cfg->{FOREST_OUTPUT_HTML_BASENAME} || (($runner_cfg->{FOREST_OUTPUT_PREFIX} || "${project_tag}_SAS_top_hits_forest") . ".html")),
-            "$Bin/" . ($runner_cfg->{FOREST_TOP_HITS_CSV_BASENAME} || (($runner_cfg->{FOREST_OUTPUT_PREFIX} || "${project_tag}_SAS_top_hits_forest") . "_top_hits.csv")),
+            "$Bin/" . forest_csv_basename_for_targets(
+                base_name => ($runner_cfg->{FOREST_TOP_HITS_CSV_BASENAME} || (($runner_cfg->{FOREST_OUTPUT_PREFIX} || "${project_tag}_SAS_top_hits_forest") . "_top_hits.csv")),
+                target_snps => ($runner_cfg->{TARGET_SNP_LIST} || ''),
+            ),
             "$Bin/" . ($runner_cfg->{FOREST_OUTPUT_MANIFEST_BASENAME} || (($runner_cfg->{FOREST_OUTPUT_PREFIX} || "${project_tag}_SAS_top_hits_forest") . ".manifest.tsv")),
         ],
         enabled     => $wanted{forest} ? 1 : 0,
@@ -1228,7 +1254,7 @@ for my $step (@step_defs) {
     }
     if (!$local_sas_only
         && !($signed_ld_dispatch && $step->{name} eq 'plot_local_gtf')
-        && $step->{name} =~ /^plot_(?:manhattan|local_manhattan|local_gtf)$/) {
+        && $step->{name} =~ /^plot_(?:manhattan|local_manhattan|local_gtf|forest)$/) {
         my $cache_input = ($explicit_target_local_plot_fast_path
                 && $step->{name} =~ /^plot_local_(?:manhattan|gtf)$/)
             ? ($runner_cfg->{SOURCE_LONG_GZ} || $generated->{stdized_output} || '')
@@ -1238,7 +1264,9 @@ for my $step (@step_defs) {
             ? ($runner_cfg->{OUTPUT_PREFIX} || "${project_tag}_SAS_manhattan")
             : ($step->{name} eq 'plot_local_manhattan'
                 ? ($runner_cfg->{LOCAL_OUTPUT_PREFIX} || "${project_tag}_SAS_local_top_hits_manhattan")
-                : ($runner_cfg->{OUTPUT_HTML_BASENAME} || "${project_tag}_SAS_local_top_hits_with_gtf.html"));
+                : ($step->{name} eq 'plot_forest'
+                    ? ($runner_cfg->{FOREST_OUTPUT_PREFIX} || "${project_tag}_SAS_top_hits_forest")
+                    : ($runner_cfg->{OUTPUT_HTML_BASENAME} || "${project_tag}_SAS_local_top_hits_with_gtf.html")));
         my @input_identity = @input_stat ? ($input_stat[7], $input_stat[9]) : (0, 0);
         $step->{legacy_cache_key} = md5_hex(join("\0",
             $step->{name}, JSON::PP->new->canonical(1)->encode($runner_cfg),
@@ -3841,6 +3869,14 @@ sub build_runner_config {
         HTML_TITLE => cfg_or($spec, 'html_title', $project_tag . ' differential GWAS Manhattan Plot'),
         LOCAL_OUTPUT_PREFIX => $local_output_prefix,
         LOCAL_HTML_TITLE => cfg_or($spec, 'local_html_title', $project_tag . ' Local Top Hits Manhattan Plot'),
+        LOCAL_MANHATTAN_HTML_TITLE => cfg_or(
+            $spec, 'local_manhattan_title',
+            cfg_or($spec, 'local_html_title', $project_tag . ' Local Top Hits Manhattan Plot')
+        ),
+        LOCAL_GTF_HTML_TITLE => cfg_or(
+            $spec, 'local_gtf_title',
+            cfg_or($spec, 'local_html_title', $project_tag . ' Local Top Hits Manhattan and GTF Plot')
+        ),
         LOCAL_TOP_HITS_CSV_BASENAME => $local_top_hits_csv_basename,
         OUTPUT_HTML_BASENAME => $output_html_basename,
         FOREST_OUTPUT_PREFIX => $forest_output_prefix,
@@ -4253,7 +4289,9 @@ sub run_command_with_heartbeat {
 sub plot_cache_config {
     my ($step_name, $runner) = @_;
     return $runner unless $step_name eq 'plot_manhattan'
-        || $step_name eq 'plot_local_manhattan';
+        || $step_name eq 'plot_local_manhattan'
+        || $step_name eq 'plot_local_gtf'
+        || $step_name eq 'plot_forest';
     my %shared = map { $_ => 1 } qw(
         DATA_GZ SOURCE_LONG_GZ SOURCE_MODE PROJECT_TAG REFERENCE_BUILD
         EXTRACTOR_CONFIG_JSON DISPLAY_GWAS DISPLAY_GWAS_AVAILABLE
@@ -4264,12 +4302,31 @@ sub plot_cache_config {
         my $used = $shared{$key};
         if ($step_name eq 'plot_manhattan') {
             $used ||= $key =~ /^(?:MANHATTAN_|OUTPUT_PREFIX$|HTML_TITLE$)/;
-        } else {
+        } elsif ($step_name eq 'plot_local_manhattan' || $step_name eq 'plot_local_gtf') {
             $used ||= $key =~ /^(?:LOCAL_|TOP_HIT_|COMMON_ASSOC_|GTF_|MANHATTAN_)/;
+        } else {
+            $used ||= $key =~ /^(?:FOREST_|TOP_HIT_|COMMON_ASSOC_|TARGET_SNP_)/;
         }
         $scoped{$key} = $runner->{$key} if $used;
     }
     return \%scoped;
+}
+
+sub forest_csv_basename_for_targets {
+    my (%args) = @_;
+    my $name = $args{base_name} || 'forest_top_hits.csv';
+    my $targets = $args{target_snps} || '';
+    return $name unless length $targets;
+    my @items = grep { length } map { trim($_) } split /,/, $targets;
+    return $name unless @items;
+    my $variant = @items == 1
+        ? safe_name($items[0])
+        : ('targets_' . substr(md5_hex($targets), 0, 12));
+    if ($name =~ /\.csv$/) {
+        $name =~ s/\.csv$/_${variant}.csv/;
+        return $name;
+    }
+    return $name . '_' . $variant . '.csv';
 }
 
 sub run_step {
@@ -5124,6 +5181,15 @@ Options:
   --local-max-hits-per-fig N
                        Requested upper bound for local top-hit columns per panel.
                        Current pipeline maximum is 15.
+  --local-manhattan-window-bp BP
+                       Override the local Manhattan genomic half-window only.
+                       Alias: --local-window-bp. Default: 1e7.
+  --manhattan-title TEXT
+  --local-manhattan-title TEXT
+  --local-gtf-title TEXT
+  --forest-title TEXT
+                       Override the visible/HTML title for the corresponding
+                       plot family without editing the JSON specification.
   --figure-width N --figure-height N
                        Apply one pixel size to every requested plot type.
                        Plot-specific options below take precedence.

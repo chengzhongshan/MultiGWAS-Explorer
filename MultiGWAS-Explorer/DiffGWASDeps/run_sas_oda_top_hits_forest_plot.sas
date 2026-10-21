@@ -61,22 +61,24 @@ proc sql noprint;
   from forest_hits;
 quit;
 
+%global forest_single_snp forest_single_gene forest_single_title;
 data _null_;
   length forest_snp_local $128 forest_gene_local $256 forest_title_local $384;
-  if symget('forest_total_hits') = '' then call symputx('forest_total_hits', 0, 'L');
-  call symputx('forest_single_snp', '', 'L');
-  call symputx('forest_single_gene', '', 'L');
-  call symputx('forest_single_title', '', 'L');
+  if symget('forest_total_hits') = '' then call symputx('forest_total_hits', 0, 'G');
+  call symputx('forest_single_snp', '', 'G');
+  call symputx('forest_single_gene', '', 'G');
+  call symputx('forest_single_title', '', 'G');
   set forest_hits(obs=1);
   forest_snp_local = strip(forest_snp);
   forest_gene_local = strip(forest_gene);
   forest_title_local = forest_snp_local;
   if not missing(forest_gene_local) and upcase(forest_gene_local) ne 'NA' then
     forest_title_local = cats(forest_snp_local, ' (', forest_gene_local, ')');
-  call symputx('forest_single_snp', forest_snp_local, 'L');
-  call symputx('forest_single_gene', forest_gene_local, 'L');
-  call symputx('forest_single_title', forest_title_local, 'L');
+  call symputx('forest_single_snp', forest_snp_local, 'G');
+  call symputx('forest_single_gene', forest_gene_local, 'G');
+  call symputx('forest_single_title', forest_title_local, 'G');
 run;
+%put NOTE: Forest single-SNP title resolved to %superq(forest_single_title).;
 
 %macro render_single_snp_forest;
   data forest_single_panel;

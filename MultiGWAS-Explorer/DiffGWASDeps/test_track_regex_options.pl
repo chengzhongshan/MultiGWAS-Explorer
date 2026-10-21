@@ -87,6 +87,20 @@ $runner = read_json($runner_path);
 unlike($runner->{DISPLAY_GWAS}, qr/(?:^|,)\w*_?META(?:,|$)/,
     '--no-compute-meta removes computed meta tracks from the catalog');
 
+is(system($^X, $driver, '--spec', $spec_path, '--mode', 'configs', '--plots', 'all',
+        '--local-manhattan-window-bp', '2500000',
+        '--manhattan-title', 'Genome-wide title',
+        '--local-manhattan-title', 'Local Manhattan title',
+        '--local-gtf-title', 'Local GTF title',
+        '--forest-title', 'Forest title'), 0,
+    'plot title and local Manhattan window CLI overrides generate configs');
+$runner = read_json($runner_path);
+is($runner->{LOCAL_WINDOW_BP}, '2500000', 'local Manhattan window CLI override reaches runner config');
+is($runner->{HTML_TITLE}, 'Genome-wide title', 'genome-wide Manhattan title reaches runner config');
+is($runner->{LOCAL_MANHATTAN_HTML_TITLE}, 'Local Manhattan title', 'local Manhattan title reaches runner config');
+is($runner->{LOCAL_GTF_HTML_TITLE}, 'Local GTF title', 'local GTF title reaches runner config');
+is($runner->{FOREST_HTML_TITLE}, 'Forest title', 'forest title reaches runner config');
+
 my $heartbeat_output = qx{$^X "$driver" --spec "$spec_path" --step extract_wide_subset --force --step-heartbeat-seconds 1 2>&1};
 my $heartbeat_status = $?;
 isnt($heartbeat_status, 0, 'missing-data fixture preserves extract failure status');

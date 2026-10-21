@@ -130,7 +130,13 @@ Options:
                                 Optional starting threshold for common-association mode.
   --reference-build BUILD      Override genome build for local GTF annotations:
                                 hg19, hg38, or t2t. Default: auto-detect, then hg38 fallback.
-  --local-gtf-window-bp N       Override local GTF window.
+  --local-manhattan-window-bp N Override local Manhattan half-window only.
+                                Alias: --local-window-bp. Default: 1e7.
+  --local-gtf-window-bp N       Override local GTF half-window only.
+  --manhattan-title TEXT
+  --local-manhattan-title TEXT
+  --local-gtf-title TEXT
+  --forest-title TEXT           Override the corresponding plot-family title.
   --figure-width N --figure-height N
                                 Apply one pixel size to every requested plot type.
   --manhattan-fig-width N --manhattan-fig-height N
@@ -192,7 +198,12 @@ my $ld_heatmap_colors = '#f7fbff,#6baed6,#54278f';
 my $get_common_associations = '';
 my $common_association_top_hit_threshold = '';
 my $reference_build_override = '';
+my $local_window_bp_override = '';
 my $local_gtf_window_bp_override = '';
+my $manhattan_title_override = '';
+my $local_manhattan_title_override = '';
+my $local_gtf_title_override = '';
+my $forest_title_override = '';
 my $figure_width_override = 0;
 my $figure_height_override = 0;
 my $manhattan_fig_width_override = 0;
@@ -251,7 +262,12 @@ GetOptions(
     'get-common-associations:s' => \$get_common_associations,
     'common-association-top-hit-threshold=s' => \$common_association_top_hit_threshold,
     'reference-build=s'       => \$reference_build_override,
+    'local-manhattan-window-bp|local-window-bp=s' => \$local_window_bp_override,
     'local-gtf-window-bp=s'   => \$local_gtf_window_bp_override,
+    'manhattan-title=s'       => \$manhattan_title_override,
+    'local-manhattan-title=s' => \$local_manhattan_title_override,
+    'local-gtf-title=s'       => \$local_gtf_title_override,
+    'forest-title=s'          => \$forest_title_override,
     'figure-width|plot-width=i' => \$figure_width_override,
     'figure-height|plot-height=i' => \$figure_height_override,
     'manhattan-fig-width=i' => \$manhattan_fig_width_override,
@@ -422,7 +438,12 @@ for my $override_value (
     $get_common_associations,
     $common_association_top_hit_threshold,
     $reference_build_override,
+    $local_window_bp_override,
     $local_gtf_window_bp_override,
+    $manhattan_title_override,
+    $local_manhattan_title_override,
+    $local_gtf_title_override,
+    $forest_title_override,
 ) {
     if (defined $override_value && length $override_value) {
         $has_runner_override = 1;
@@ -507,7 +528,12 @@ if (!$reused_existing_runner) {
         get_common_associations         => $get_common_associations,
         common_association_top_hit_threshold => $common_association_top_hit_threshold,
         reference_build_override        => $reference_build_override,
+        local_window_bp_override        => $local_window_bp_override,
         local_gtf_window_bp_override    => $local_gtf_window_bp_override,
+        manhattan_title_override        => $manhattan_title_override,
+        local_manhattan_title_override  => $local_manhattan_title_override,
+        local_gtf_title_override        => $local_gtf_title_override,
+        forest_title_override           => $forest_title_override,
         local_max_hits_per_fig_override => $local_max_hits_per_fig_override,
         config_only_for_explicit_local_targets => $explicit_target_local_only,
     );
@@ -698,7 +724,7 @@ if ($requested{plot_local_manhattan}) {
             pcols        => \@local_manhattan_pcols,
             zcols        => \@local_manhattan_zcols,
             labels       => \@local_manhattan_labels,
-            window_bp    => ($runner->{LOCAL_WINDOW_BP} || '1e7'),
+            window_bp    => ($local_window_bp_override || $runner->{LOCAL_WINDOW_BP} || '1e7'),
             batch_size   => ($local_max_hits_per_fig_override || ($runner->{LOCAL_MAX_HITS_PER_FIG} || 15)),
             panel_columns=> ($local_manhattan_columns_override || $runner->{LOCAL_MANHATTAN_COLUMNS} || $spec->{local_manhattan_columns} || 0),
             annotation_mode => ($local_manhattan_annotation_override
@@ -706,7 +732,11 @@ if ($requested{plot_local_manhattan}) {
                 || $spec->{local_manhattan_annotation}
                 || 'gtf'),
             output_base  => gnuplotize_name($runner->{LOCAL_OUTPUT_PREFIX} || 'local_top_hits_manhattan'),
-            html_title   => gnuplot_title($runner->{LOCAL_HTML_TITLE} || 'Local top hits Manhattan Plot'),
+            html_title   => gnuplot_title(
+                $runner->{LOCAL_MANHATTAN_HTML_TITLE}
+                    || $runner->{LOCAL_HTML_TITLE}
+                    || 'Local top hits Manhattan Plot'
+            ),
             width        => ($runner->{LOCAL_MANHATTAN_FIG_WIDTH} || 1800),
             height       => ($runner->{LOCAL_MANHATTAN_FIG_HEIGHT} || 1200),
             with_gtf     => 0,
@@ -764,7 +794,11 @@ if ($requested{plot_local_gtf}) {
             window_bp    => $gtf_window,
             batch_size   => ($runner->{LOCAL_GTF_MAX_HITS_PER_FIG} || 1),
             output_base  => gnuplotize_name($runner->{OUTPUT_HTML_BASENAME} || 'local_top_hits_with_gtf.html'),
-            html_title   => gnuplot_title($runner->{LOCAL_HTML_TITLE} || 'Local top hits Manhattan and GTF Plot'),
+            html_title   => gnuplot_title(
+                $runner->{LOCAL_GTF_HTML_TITLE}
+                    || $runner->{LOCAL_HTML_TITLE}
+                    || 'Local top hits Manhattan and GTF Plot'
+            ),
             width        => ($runner->{GTF_DESIGN_WIDTH} || 1500),
             height       => ($runner->{GTF_DESIGN_HEIGHT} || compute_gtf_height(scalar(@gtf_pcols))),
             with_gtf     => 1,
@@ -883,8 +917,20 @@ sub run_upstream_preprocessing {
     if ($args{reference_build_override}) {
         push @cmd, '--reference-build', $args{reference_build_override};
     }
+    if ($args{local_window_bp_override}) {
+        push @cmd, '--local-manhattan-window-bp', $args{local_window_bp_override};
+    }
     if ($args{local_gtf_window_bp_override}) {
         push @cmd, '--local-gtf-window-bp', $args{local_gtf_window_bp_override};
+    }
+    for my $option (
+        ['manhattan-title', 'manhattan_title_override'],
+        ['local-manhattan-title', 'local_manhattan_title_override'],
+        ['local-gtf-title', 'local_gtf_title_override'],
+        ['forest-title', 'forest_title_override'],
+    ) {
+        push @cmd, '--' . $option->[0], $args{ $option->[1] }
+            if $args{ $option->[1] };
     }
     if ($args{local_max_hits_per_fig_override}) {
         push @cmd, '--local-max-hits-per-fig', $args{local_max_hits_per_fig_override};

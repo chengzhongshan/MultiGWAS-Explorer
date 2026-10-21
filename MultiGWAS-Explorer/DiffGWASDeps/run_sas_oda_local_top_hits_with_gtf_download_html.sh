@@ -23,6 +23,7 @@ if [[ "${CALLER_LOCAL_GTF_INCLUDE_NON_PROTEIN_CODING_GENES}" != "__UNSET__" ]]; 
   LOCAL_GTF_INCLUDE_NON_PROTEIN_CODING_GENES="${CALLER_LOCAL_GTF_INCLUDE_NON_PROTEIN_CODING_GENES}"
 fi
 PROJECT_TAG="${PROJECT_TAG:-PGC_SCZ}"
+LOCAL_GTF_HTML_TITLE="${LOCAL_GTF_HTML_TITLE:-${LOCAL_HTML_TITLE:-${PROJECT_TAG} Local Top Hits Manhattan and GTF Plot}}"
 DEFAULT_DATA_GZ="/mnt/e/LongCOVID_HGI_GWAS/PGC_Large_GWASs/PGC_SCZ_Sex_Stratified_GWASs/PGC_SCZ_female_vs_male_diff_effects.stdized.wide_beta_se_p_p_lt_0p05.final.tsv.gz"
 DATA_GZ="${DATA_GZ:-${DEFAULT_DATA_GZ}}"
 DEFAULT_REMOTE_DATA_BASENAME="PGC_SCZ_female_vs_male_diff_effects.stdized.wide_beta_se_p_p_lt_0p05.final.tsv.gz"
@@ -1091,7 +1092,7 @@ build_completed_html_from_png_if_available() {
     "${PNG_OUT}" \
     "${RAW_HTML_OUT}" \
     "${CSV_OUT}" \
-    "Local Manhattan and GTF plot for top hits" \
+    "${LOCAL_GTF_HTML_TITLE}" \
     "Local top-hit GTF plot"
 }
 
@@ -2019,9 +2020,9 @@ write_batched_html_index() {
   local idx
   : > "${HTML_OUT}"
   echo '<!doctype html>' >> "${HTML_OUT}"
-  echo '<html><head><meta charset="utf-8"><title>Local Top-Hit GTF Plot Batches</title></head>' >> "${HTML_OUT}"
+  echo "<html><head><meta charset=\"utf-8\"><title>${LOCAL_GTF_HTML_TITLE}</title></head>" >> "${HTML_OUT}"
   echo '<body style="font-family:Arial,Helvetica,sans-serif;margin:24px">' >> "${HTML_OUT}"
-  echo '<h1 style="font-size:20px">Local Manhattan and GTF plot for top hits</h1>' >> "${HTML_OUT}"
+  echo "<h1 style=\"font-size:20px\">${LOCAL_GTF_HTML_TITLE}</h1>" >> "${HTML_OUT}"
   echo "<p>Top hits were split into ${completed_parts} batch runs to keep the SAS ODA job size manageable.</p>" >> "${HTML_OUT}"
   echo '<ul>' >> "${HTML_OUT}"
   idx=1
@@ -2523,7 +2524,7 @@ if [[ -f "${CSV_OUT}" && -s "${CSV_OUT}" ]]; then
         "${batch_png}" \
         "${batch_raw_html}" \
         "${batch_csv}" \
-        "Local Manhattan and GTF plot for top hits (Part ${part})" \
+        "${LOCAL_GTF_HTML_TITLE} (Part ${part})" \
         "Local top-hit GTF plot (Part ${part})" || true
 
       if [[ ! -s "${batch_png}" ]]; then

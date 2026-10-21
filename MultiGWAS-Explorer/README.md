@@ -392,8 +392,42 @@ Example SAS ODA forest rerun:
 perl ./auto_prepare_and_run_diff_gwas.pl \
   --spec ./configs/spec_pgc_scz_sex_common_automation.json \
   --step plot_forest \
-  --target-snps rs185665940
+  --target-snps rs185665940 \
+  --forest-title "PGC schizophrenia sex-differential forest plot"
 ```
+
+### Plot titles and local genomic windows
+
+Both the SAS ODA and gnuplot entry scripts accept the same plot-specific CLI
+overrides: `--manhattan-title`, `--local-manhattan-title`,
+`--local-gtf-title`, and `--forest-title`. The local Manhattan half-window can
+be supplied with `--local-manhattan-window-bp` (or its shorter alias
+`--local-window-bp`); `--local-gtf-window-bp` independently controls the
+Manhattan+GTF half-window. For example:
+
+```bash
+# SAS ODA: regenerate only the local Manhattan plot, +/- 2.5 Mb around each hit.
+perl ./auto_prepare_and_run_diff_gwas.pl \
+  --spec configs/spec_pgc_scz_sex_common_automation.json \
+  --step plot_local_manhattan \
+  --local-manhattan-window-bp 2500000 \
+  --local-manhattan-title "Sex-differential loci: local Manhattan plots"
+
+# gnuplot: the same plot-only request and options, without SAS ODA.
+perl ./auto_prepare_and_run_diff_gwas_with_gnuplot.pl \
+  --spec configs/spec_pgc_scz_sex_common_automation.json \
+  --step plot_local_manhattan \
+  --local-manhattan-window-bp 2500000 \
+  --local-manhattan-title "Sex-differential loci: local Manhattan plots"
+```
+
+Use `--step` for a plot-only rerun. Use `--plots` for a normal preprocessing
+plus plotting run, especially the first run; do not combine `--step` and
+`--plots`. A cached plot is reused only when its relevant title, window,
+targets, track selection, and input identity still match. SAS ODA forest HTML
+is self-contained: downloaded panel images are embedded in the HTML, so moving
+or opening the HTML without its original sidecar PNG no longer produces a
+blank page.
 
 ### Forest gene labels
 
