@@ -7,6 +7,9 @@ marker_var=,
 marker_label=,
 svgoutname=,
 plot_title=OR Forest Plot,
+plot_title_prefix=,
+plot_title_gene=,
+plot_title_suffix=,
 figfmt=png,
 figwidth=600,
 figheight=800,
@@ -89,8 +92,11 @@ run;
 ods listing close;
 ods listing gpath="&_forest_output_dir";
 
-%if %length(&plot_title)>0 %then %do;
-title "&plot_title";
+%if %length(%superq(plot_title_gene))>0 %then %do;
+title font="Arial" "%superq(plot_title_prefix)" italic "%superq(plot_title_gene)" font="Arial" "%superq(plot_title_suffix)";
+%end;
+%else %if %length(%superq(plot_title))>0 %then %do;
+title "%superq(plot_title)";
 %end;
 %else %do;
 title;

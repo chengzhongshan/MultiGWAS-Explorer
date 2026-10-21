@@ -120,10 +120,12 @@ if ($single_snp_mode) {
     }
     die "No non-missing cohort rows were available for the single-SNP forest plot\n" unless @points;
     my $single_title = single_snp_title($row, $opt{title});
+    my $single_title_enhanced = single_snp_title_enhanced($row);
     my $png_path = $opt{out_prefix} . '_single_snp.png';
     render_panel(
         panel_id     => 'single_snp',
         panel_title  => $single_title,
+        panel_title_enhanced => $single_title_enhanced,
         png_path     => $png_path,
         points       => \@points,
         width        => $opt{width},
@@ -205,6 +207,9 @@ sub render_panel {
     $gp_path =~ s/\.png$/.gp/i;
     my $gp_png_path = gnuplot_path($png_path);
     my $gp_data_path = gnuplot_path($data_path);
+    my $panel_title_enhanced = defined($args{panel_title_enhanced})
+        ? $args{panel_title_enhanced}
+        : gnuplot_enhanced_plain($args{panel_title});
 
     open my $df, '>', $data_path or die "Cannot write $data_path: $!\n";
     print {$df} join("\t", qw(Y OR LOW HIGH SIG CLASS STAR LEFT_LABEL RIGHT_LABEL)), "\n";
@@ -273,7 +278,7 @@ sub render_panel {
 set terminal pngcairo size $args{width},$args{height} noenhanced font "Sans,$args{y_font_size}"
 set output "$gp_png_path"
 unset key
-set title "${\gp_escape($args{panel_title})}"
+set title "${\gp_escape($panel_title_enhanced)}" enhanced
 set xrange [$args{min_axis}:$args{max_axis}]
 set yrange [0.5:$n+0.5]
 set ytics nomirror font "Sans,$args{y_font_size}" ($ytics_text)
@@ -332,6 +337,17 @@ sub single_snp_title {
     my $title = $snp;
     $title .= " ($gene)" if length($gene) && uc($gene) ne 'NA';
     return $title;
+}
+
+sub single_snp_title_enhanced {
+    my ($row) = @_;
+    my $snp = trim($row->{SNP} // '');
+    my $gene = trim($row->{gene} // '');
+    return gnuplot_enhanced_plain($snp)
+        unless length($gene) && uc($gene) ne 'NA';
+    return gnuplot_enhanced_plain("$snp (")
+        . '{/:Italic ' . gnuplot_enhanced_plain($gene) . '}'
+        . gnuplot_enhanced_plain(')');
 }
 
 sub multi_snp_label {
@@ -416,6 +432,13 @@ sub gp_escape {
     $text //= '';
     $text =~ s/\\/\\\\/g;
     $text =~ s/"/\\"/g;
+    return $text;
+}
+
+sub gnuplot_enhanced_plain {
+    my ($text) = @_;
+    $text //= '';
+    $text =~ s/([_\^@&~{}])/\\$1/g;
     return $text;
 }
 

@@ -440,6 +440,12 @@ the nearest protein-coding gene, then the nearest other gene on that chromosome.
 These are positional annotations, not evidence of a causal gene. Missing
 annotation remains `NA`; chromosome 23 is matched to GTF chromosome X.
 
+When a single-SNP forest title or HTML caption contains its annotated gene
+symbol, the pipeline renders only the gene symbol in italics (for example,
+`rs185665940 (`*`CYP26B1`*`)`). This applies to both SAS ODA and gnuplot
+forest figures. Plain-text metadata, manifests, and image alternative text
+retain the unformatted gene symbol for portability and accessibility.
+
 The SAS right-side labels share the SNP row coordinates, so repeated genes or
 `NA` values appear on each corresponding row instead of collapsing into one
 category. Both SAS and gnuplot forest steps regenerate their top-hit CSV by

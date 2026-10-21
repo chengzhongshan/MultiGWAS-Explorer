@@ -39,7 +39,9 @@ for my $panel (@panels) {
         unless -s $image_path;
 
     my $label = trim($panel->{track_label});
-    if (!length($label) && lc(trim($panel->{track_id})) eq 'single_snp') {
+    my $single_snp_panel = lc(trim($panel->{track_id})) eq 'single_snp';
+    my $label_gene = $single_snp_panel ? $fallback_gene : '';
+    if (!length($label) && $single_snp_panel) {
         $label = $fallback_snp;
         $label .= " ($fallback_gene)"
             if length($fallback_gene) && uc($fallback_gene) ne 'NA';
@@ -49,10 +51,12 @@ for my $panel (@panels) {
 
     my $mime = $image_name =~ /\.svg$/i ? 'image/svg+xml' : 'image/png';
     $panel->{label} = $label;
+    $panel->{label_html} = html_with_italic_gene($label, $label_gene);
     $panel->{data_uri} = "data:$mime;base64," . encode_base64(slurp_binary($image_path), '');
 }
 
 my $escaped_title = html_escape($title);
+my $formatted_title = html_with_italic_gene($title, $fallback_gene);
 my $html = <<"HTML";
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8">
@@ -66,14 +70,15 @@ h1{font-size:24px;line-height:1.25;margin:0 0 20px;}
 .panel figcaption{font-size:18px;font-weight:700;margin-bottom:10px;text-align:center;}
 .panel img{width:100%;height:auto;display:block;}
 </style></head><body>
-<h1>$escaped_title</h1>
+<h1>$formatted_title</h1>
 <div class="grid">
 HTML
 
 for my $panel (@panels) {
     my $label = html_escape($panel->{label});
+    my $label_html = $panel->{label_html};
     my $uri = $panel->{data_uri};
-    $html .= qq{<figure class="panel"><figcaption>$label</figcaption><img src="$uri" alt="$label forest plot"></figure>\n};
+    $html .= qq{<figure class="panel"><figcaption>$label_html</figcaption><img src="$uri" alt="$label forest plot"></figure>\n};
 }
 $html .= "</div></body></html>\n";
 
@@ -192,6 +197,19 @@ sub html_escape {
     $value =~ s/"/&quot;/g;
     $value =~ s/'/&#39;/g;
     return $value;
+}
+
+sub html_with_italic_gene {
+    my ($text, $gene) = @_;
+    $text = '' unless defined $text;
+    $gene = trim($gene);
+    return html_escape($text) unless length($gene) && uc($gene) ne 'NA';
+    my @parts = split /((?<![A-Za-z0-9])\Q$gene\E(?![A-Za-z0-9]))/i, $text, -1;
+    return join '', map {
+        lc($_) eq lc($gene)
+            ? '<em class="gene-symbol">' . html_escape($_) . '</em>'
+            : html_escape($_)
+    } @parts;
 }
 
 sub usage {

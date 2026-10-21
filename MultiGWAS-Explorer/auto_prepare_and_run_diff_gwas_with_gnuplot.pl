@@ -1138,28 +1138,15 @@ sub plot_forest {
         }
     }
 
-    if (@images == 1) {
-        write_single_image_html(
-            path      => $html_path,
-            title     => gnuplot_title($runner->{FOREST_HTML_TITLE} || 'Top-hit forest plot'),
-            image_rel => basename($images[0]{image}),
-        );
-    }
-    elsif ($combined_png && -s $combined_png) {
-        write_single_image_html(
-            path      => $html_path,
-            title     => gnuplot_title($runner->{FOREST_HTML_TITLE} || 'Top-hit forest plots'),
-            image_rel => basename($combined_png),
-        );
-    }
-    else {
-        write_gallery_html(
-            path   => $html_path,
-            title  => gnuplot_title($runner->{FOREST_HTML_TITLE} || 'Top-hit forest plots'),
-            images => \@images,
-            top_csv=> basename($top_hits_csv_path),
-        );
-    }
+    run_cmd([
+        $^X,
+        File::Spec->catfile($Bin, 'DiffGWASDeps', 'build_forest_html.pl'),
+        '--manifest', $manifest_path,
+        '--output', $html_path,
+        '--title', gnuplot_title($runner->{FOREST_HTML_TITLE} || 'Top-hit forest plots'),
+        '--image-dir', $args{output_dir},
+        '--top-hits-csv', $top_hits_csv_path,
+    ], 'self-contained gnuplot forest HTML with scientific gene typography');
 
     my %out = (
         gnuplot_forest_html => $html_path,

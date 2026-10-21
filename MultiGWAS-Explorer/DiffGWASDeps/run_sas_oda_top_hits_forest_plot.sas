@@ -61,22 +61,31 @@ proc sql noprint;
   from forest_hits;
 quit;
 
-%global forest_single_snp forest_single_gene forest_single_title;
+%global forest_single_snp forest_single_gene forest_single_title
+        forest_single_title_prefix forest_single_title_suffix;
 data _null_;
-  length forest_snp_local $128 forest_gene_local $256 forest_title_local $384;
+  length forest_snp_local $128 forest_gene_local $256 forest_title_local $384
+         forest_title_prefix_local $384 forest_title_suffix_local $8;
   if symget('forest_total_hits') = '' then call symputx('forest_total_hits', 0, 'G');
   call symputx('forest_single_snp', '', 'G');
   call symputx('forest_single_gene', '', 'G');
   call symputx('forest_single_title', '', 'G');
+  call symputx('forest_single_title_prefix', '', 'G');
+  call symputx('forest_single_title_suffix', '', 'G');
   set forest_hits(obs=1);
   forest_snp_local = strip(forest_snp);
   forest_gene_local = strip(forest_gene);
   forest_title_local = forest_snp_local;
-  if not missing(forest_gene_local) and upcase(forest_gene_local) ne 'NA' then
+  if not missing(forest_gene_local) and upcase(forest_gene_local) ne 'NA' then do;
     forest_title_local = cats(forest_snp_local, ' (', forest_gene_local, ')');
+    forest_title_prefix_local = cats(forest_snp_local, ' (');
+    forest_title_suffix_local = ')';
+  end;
   call symputx('forest_single_snp', forest_snp_local, 'G');
   call symputx('forest_single_gene', forest_gene_local, 'G');
   call symputx('forest_single_title', forest_title_local, 'G');
+  call symputx('forest_single_title_prefix', forest_title_prefix_local, 'G');
+  call symputx('forest_single_title_suffix', forest_title_suffix_local, 'G');
 run;
 %put NOTE: Forest single-SNP title resolved to %superq(forest_single_title).;
 
@@ -114,6 +123,9 @@ run;
     marker_label=Cohort,
     svgoutname=__OUTPUT_IMAGE_PREFIX_PATH___single_snp,
     plot_title=%superq(forest_single_title),
+    plot_title_prefix=%superq(forest_single_title_prefix),
+    plot_title_gene=%superq(forest_single_gene),
+    plot_title_suffix=%superq(forest_single_title_suffix),
     figfmt=png,
     figwidth=&forest_fig_width,
     figheight=&forest_fig_height,
