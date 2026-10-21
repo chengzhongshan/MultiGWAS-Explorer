@@ -124,6 +124,11 @@ fi
 SAFE_TARGET_SNP="$(printf '%s' "${TARGET_SNP}" | tr -c 'A-Za-z0-9._-' '_')"
 OUTPUT_HTML_BASENAME="${OUTPUT_HTML_BASENAME:-}"
 LOCAL_WINDOW_BP="${LOCAL_WINDOW_BP:-1e6}"
+if ! perl -e 'my $v = shift // q{}; exit(($v =~ /^(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i && $v > 0) ? 0 : 1)' "${LOCAL_WINDOW_BP}"; then
+  echo "ERROR: LOCAL_WINDOW_BP for the local GTF plot must be a positive number of base pairs: ${LOCAL_WINDOW_BP}" >&2
+  exit 2
+fi
+echo "[window] local GTF half-window: ${LOCAL_WINDOW_BP} bp on each side."
 GTF_LABEL_SNPS="${GTF_LABEL_SNPS:-${TARGET_SNP}}"
 GTF_LABEL_SNPS="${GTF_LABEL_SNPS//,/ }"
 GTF_LABEL_LAYOUT="${GTF_LABEL_LAYOUT:-auto}"

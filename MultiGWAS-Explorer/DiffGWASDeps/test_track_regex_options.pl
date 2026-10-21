@@ -89,6 +89,7 @@ unlike($runner->{DISPLAY_GWAS}, qr/(?:^|,)\w*_?META(?:,|$)/,
 
 is(system($^X, $driver, '--spec', $spec_path, '--mode', 'configs', '--plots', 'all',
         '--local-manhattan-window-bp', '2500000',
+        '--local-gtf-window-bp', '750000',
         '--manhattan-title', 'Genome-wide title',
         '--local-manhattan-title', 'Local Manhattan title',
         '--local-gtf-title', 'Local GTF title',
@@ -96,10 +97,16 @@ is(system($^X, $driver, '--spec', $spec_path, '--mode', 'configs', '--plots', 'a
     'plot title and local Manhattan window CLI overrides generate configs');
 $runner = read_json($runner_path);
 is($runner->{LOCAL_WINDOW_BP}, '2500000', 'local Manhattan window CLI override reaches runner config');
+is($runner->{LOCAL_GTF_WINDOW_BP}, '750000', 'local GTF window CLI override reaches runner config independently');
 is($runner->{HTML_TITLE}, 'Genome-wide title', 'genome-wide Manhattan title reaches runner config');
 is($runner->{LOCAL_MANHATTAN_HTML_TITLE}, 'Local Manhattan title', 'local Manhattan title reaches runner config');
 is($runner->{LOCAL_GTF_HTML_TITLE}, 'Local GTF title', 'local GTF title reaches runner config');
 is($runner->{FOREST_HTML_TITLE}, 'Forest title', 'forest title reaches runner config');
+
+my $invalid_gtf_window_output = qx{$^X "$driver" --spec "$spec_path" --mode configs --plots local_gtf --local-gtf-window-bp 0 2>&1};
+isnt($?, 0, 'zero local GTF window is rejected');
+like($invalid_gtf_window_output, qr/--local-gtf-window-bp must be a positive number/,
+    'invalid local GTF window reports an actionable error');
 
 my $heartbeat_output = qx{$^X "$driver" --spec "$spec_path" --step extract_wide_subset --force --step-heartbeat-seconds 1 2>&1};
 my $heartbeat_status = $?;

@@ -2899,6 +2899,10 @@ locus. In this three-SNP example, the panel is centered on the first SNP;
 650,000 bp is the smallest rounded half-window that includes all three SNPs
 while substantially reducing the displayed region and the number of genes in
 the lower track.
+The value must be positive. Both entry points print the effective half-window
+and maximum total span before rendering, so the restriction is visible in the
+run log. It controls only `plot_local_gtf`; use
+`--local-manhattan-window-bp` for the separate local-Manhattan plot family.
 
 New specs and bundled configs default the local-GTF half-window to 1,000,000
 bp; the separate local-Manhattan window is unchanged. When the configured

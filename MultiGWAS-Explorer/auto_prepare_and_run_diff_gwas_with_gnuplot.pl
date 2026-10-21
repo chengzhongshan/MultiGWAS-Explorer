@@ -766,6 +766,12 @@ if ($requested{plot_local_manhattan}) {
 
 if ($requested{plot_local_gtf}) {
     my $gtf_window = $local_gtf_window_bp_override || ($runner->{LOCAL_GTF_WINDOW_BP} || '1e6');
+    die "--local-gtf-window-bp must be a positive number of base pairs\n"
+        unless $gtf_window =~ /^(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i
+           && (0 + $gtf_window) > 0;
+    printf "[window] local GTF half-window: %.0f bp on each side (up to %.0f bp total span)\n",
+        0 + $gtf_window,
+        2 * (0 + $gtf_window);
     if ($gtf_window =~ /^(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i
         && (0 + $gtf_window) > 5_000_000) {
         my $total_span = 2 * (0 + $gtf_window);

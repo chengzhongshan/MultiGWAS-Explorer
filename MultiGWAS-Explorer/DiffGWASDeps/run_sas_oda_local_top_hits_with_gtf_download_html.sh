@@ -55,6 +55,11 @@ TOP_HIT_GNOMAD_FREQ_FILE="${TOP_HIT_GNOMAD_FREQ_FILE:-}"
 TOP_HIT_GNOMAD_POP_MAP="${TOP_HIT_GNOMAD_POP_MAP:-}"
 LOCAL_WINDOW_BP="${LOCAL_WINDOW_BP:-1e7}"
 LOCAL_GTF_WINDOW_BP="${LOCAL_GTF_WINDOW_BP:-1e6}"
+if ! perl -e 'my $v = shift // q{}; exit(($v =~ /^(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i && $v > 0) ? 0 : 1)' "${LOCAL_GTF_WINDOW_BP}"; then
+  echo "ERROR: LOCAL_GTF_WINDOW_BP must be a positive number of base pairs: ${LOCAL_GTF_WINDOW_BP}" >&2
+  exit 2
+fi
+echo "[window] local GTF half-window: ${LOCAL_GTF_WINDOW_BP} bp on each side."
 TARGET_SNP_LIST="${TARGET_SNP_LIST:-}"
 TARGET_SNP_GENES="${TARGET_SNP_GENES:-}"
 

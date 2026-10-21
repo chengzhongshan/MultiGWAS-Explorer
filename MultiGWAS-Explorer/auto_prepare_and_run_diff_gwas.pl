@@ -613,6 +613,9 @@ my $local_gtf_window_bp = cfg_or($spec, 'local_gtf_window_bp', '1e6');
 die "--local-manhattan-window-bp must be a positive number of base pairs\n"
     unless $local_window_bp =~ /^(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i
        && (0 + $local_window_bp) > 0;
+die "--local-gtf-window-bp must be a positive number of base pairs\n"
+    unless $local_gtf_window_bp =~ /^(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i
+       && (0 + $local_gtf_window_bp) > 0;
 if ($local_gtf_window_bp =~ /^(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i
     && (0 + $local_gtf_window_bp) > 5_000_000) {
     my $total_span = 2 * (0 + $local_gtf_window_bp);
@@ -682,6 +685,11 @@ my $local_gtf_requested = $step_flag{plot_local_gtf}
     || scalar(grep { /^(?:plot_)?local_gtf$/ } @step_args)
     || (!@step_args && !$has_explicit_step_flag && !$skip_plots
         && ($plots || '') =~ /(?:^|,)local_gtf(?:,|$)/);
+if ($local_gtf_requested) {
+    printf "[window] local GTF half-window: %.0f bp on each side (up to %.0f bp total span)\n",
+        0 + $local_gtf_window_bp,
+        2 * (0 + $local_gtf_window_bp);
+}
 my $target_gtf_requested = @configured_target_snps > 0 && $local_gtf_requested;
 my $default_gtf_signed_ld = $local_gtf_requested
     && !defined($local_ld_display_mode)
