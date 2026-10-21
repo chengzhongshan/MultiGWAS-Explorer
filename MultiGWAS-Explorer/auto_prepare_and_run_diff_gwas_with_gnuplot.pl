@@ -45,17 +45,25 @@ Usage:
   perl auto_prepare_and_run_diff_gwas_with_gnuplot.pl --gwas-dir DIR [options]
   perl auto_prepare_and_run_diff_gwas_with_gnuplot.pl --input-merged combined.tsv.gz [options]
 
+Plot selection for the local gnuplot / PDL backend:
+  --plots LIST selects plot families for a normal preprocessing + plotting run.
+  --step plot_NAME renders only the named plot stage; repeat --step for several.
+  When any --step is supplied, it replaces --plots. Do not combine them.
+
 Options:
   --gwas-dir DIR                Auto-detect GWAS inputs in this directory.
   --input-merged FILE           Import a combined cohort/meta GWAS table directly.
   --spec-out FILE.json          Save the generated spec at this path for reuse.
-  --plots LIST                  Comma list: manhattan,local_manhattan,local_gtf,forest
+  --plots LIST                  Plot families for a normal run. Comma list:
+                                manhattan,local_manhattan,local_gtf,forest
   --manhattan-all-snps          Include every coordinate-valid SNP in genome-wide Manhattan.
                                 Default: any displayed GWAS has P < 0.05.
   --include-x-chr               Include chromosome X / 23 in genomewide Manhattan.
                                 Default: autosomes only.
   --[no-]compute-meta           Enable or disable fixed-effect meta-analysis calculation.
-  --step NAME                   Plot step(s): plot_manhattan, plot_local_manhattan, plot_local_gtf, plot_forest
+  --step NAME                   Render only this plot stage; repeat for several:
+                                plot_manhattan, plot_local_manhattan,
+                                plot_local_gtf, or plot_forest.
   --force                       Force plot regeneration while reusing valid upstream data.
   --force-upstream              Also rebuild the upstream wide GWAS subset.
   --step-heartbeat-seconds N    Upstream progress interval. Default: 60; 0 disables.

@@ -1356,6 +1356,74 @@ This pipeline should stay independent from `auto_prepare_and_run_diff_gwas.pl`.
 Use it when you want local rendering without SAS ODA, or when you want to
 prototype layout logic without modifying the SAS ODA workflow.
 
+### Choose the renderer and run only the intended plots
+
+Use `auto_prepare_and_run_diff_gwas.pl` for the SAS ODA renderer. It uploads the
+compact plotting input and downloads the SAS-generated artifacts. Use
+`auto_prepare_and_run_diff_gwas_with_gnuplot.pl` for local gnuplot / PDL
+rendering without a SAS ODA session. Running both entry points is useful for a
+backend comparison, but is not required to make one requested plot.
+
+The two selection controls have different purposes:
+
+- `--plots manhattan,local_manhattan,...` selects plot families during a normal
+  preprocessing + plotting run. This is most useful for the first run.
+- `--step plot_manhattan` selects an exact plot stage. Use it for a focused
+  plot-only rerun so unrelated plot stages are not executed. Repeat `--step`
+  when several exact plot stages are wanted.
+
+Do not combine `--plots` and `--step` in the same command. In the gnuplot
+wrapper, any `--step` replaces `--plots`; keeping them separate also makes the
+SAS ODA request unambiguous.
+
+| Intended output | SAS ODA exact step | gnuplot exact step |
+| --- | --- | --- |
+| Genome-wide Manhattan only | `--step plot_manhattan` | `--step plot_manhattan` |
+| Local Manhattan only | `--step plot_local_manhattan` | `--step plot_local_manhattan` |
+| Local GTF only | `--step plot_local_gtf` | `--step plot_local_gtf` |
+| Forest plot only | `--step plot_forest` | `--step plot_forest` |
+
+For example, this rerenders only the SAS ODA genome-wide Manhattan plot and
+excludes every track matched by the `META` group:
+
+```bash
+perl auto_prepare_and_run_diff_gwas.pl \
+  --spec configs/spec_pgc_scz_sex_common_automation.json \
+  --step plot_manhattan \
+  --exclude-manhattan-tracks META \
+  --force
+```
+
+The corresponding local gnuplot-only request is:
+
+```bash
+perl auto_prepare_and_run_diff_gwas_with_gnuplot.pl \
+  --spec configs/spec_pgc_scz_sex_common_automation.json \
+  --step plot_manhattan \
+  --exclude-manhattan-tracks META \
+  --force
+```
+
+To render exactly two local plot types, repeat the explicit step and provide
+the inquiry SNPs needed by those plots:
+
+```bash
+perl auto_prepare_and_run_diff_gwas_with_gnuplot.pl \
+  --spec configs/spec_pgc_scz_sex_common_automation.json \
+  --target-snps rs2070788,rs383510 \
+  --step plot_local_manhattan \
+  --step plot_local_gtf \
+  --force
+```
+
+`--force` regenerates the selected plot stages while retaining valid prepared
+data. In the gnuplot wrapper, add `--force-upstream` only when the wide GWAS
+subset itself must be rebuilt. A focused SAS ODA plot step expects its prepared
+inputs to exist; for a first run, use `--plots`, or prepare the missing stage
+explicitly before the plot-only command. During a normal full SAS ODA run, the
+summary may list the complete pipeline plan and print `[skip]` for inactive plot
+families; those skipped plots were not executed.
+
 Both pipelines now share one track-selection model:
 
 - use pair prefixes such as `ALL`, `EUR`, or `ASN` to display differential

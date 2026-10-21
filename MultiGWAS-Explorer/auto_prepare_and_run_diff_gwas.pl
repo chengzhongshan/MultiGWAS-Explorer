@@ -5003,6 +5003,12 @@ Usage:
   perl auto_prepare_and_run_diff_gwas.pl --spec comparison_spec.json [options]
   perl auto_prepare_and_run_diff_gwas.pl --gwas-dir /mnt/e/path/to/gwas_dir --generate-spec-only [options]
 
+Plot selection for the SAS ODA backend:
+  --plots LIST selects plot families during a normal preprocessing + plotting run.
+  --step plot_NAME runs only the named plot stage from prepared data. Repeat
+  --step to request several exact plot stages. Avoid combining --plots and
+  --step; use --step when the goal is to regenerate only specific plots.
+
 Options:
   --spec FILE.json      Required comparison spec
   --gwas-dir DIR        Scan a directory of potential raw GWAS summary-statistics files and draft a spec JSON
@@ -5014,7 +5020,8 @@ Options:
   --preview-spec        Print the inferred spec JSON to STDOUT before writing it
   --mode MODE           full|configs . Default: full
   --skip-plots          Generate/prepare data but do not call SAS ODA runners
-  --plots LIST          Comma-separated plot set. Default: manhattan,local_manhattan,local_gtf
+  --plots LIST          Plot families for a normal full-pipeline run. Comma-separated;
+                        default: manhattan,local_manhattan,local_gtf
   --manhattan-all-snps  Include every coordinate-valid SNP in genome-wide Manhattan
                         instead of the default any-displayed-GWAS P < 0.05 filter.
   --include-x-chr       Include chromosome X / 23 in genomewide Manhattan.
@@ -5035,7 +5042,10 @@ Options:
                        Print elapsed-time progress for running steps every N seconds.
                        Default: 60; use 0 to disable.
   --list-steps          Print the available step names for the current spec and exit
-  --step NAME           Run only one named step; repeat or comma-separate to run several
+  --step NAME           Run only one named pipeline step; repeat or comma-separate for several.
+                        For plot-only reruns use plot_manhattan, plot_local_manhattan,
+                        plot_local_gtf, or plot_forest. Explicit plot steps run even when
+                        that family is absent from --plots.
   --from-step NAME      Run from a named step onward
   --to-step NAME        Stop after a named step
   --merge-raw           Convenience alias for --step merge_raw
