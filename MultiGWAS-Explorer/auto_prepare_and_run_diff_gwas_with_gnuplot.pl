@@ -95,6 +95,9 @@ Options:
                                 With local plots only, explicit targets use the
                                 indexed long GWAS directly and skip rebuilding
                                 the genome-wide plotting-wide table.
+                                Transitively overlapping SNP-centered windows
+                                are combined and the shared plot window expands
+                                to contain every member window.
   --target-snp-genes MAP        Optional SNP:GENE overrides, comma-separated. Example: rs17425819:JAK2,rs2564978:CR1
   --ld-snps A,B,C               Optional LD-linked SNPs to overlay with asterisks.
   --[no-]highlight-high-ld-snps Resolve and draw high-LD markers. Default: off.
@@ -1671,6 +1674,76 @@ sub resolve_ld_snps_for_query {
     return (\@ld, \%r2_for, \@r2_snps);
 }
 
+sub build_overlapping_local_loci {
+    my ($hits, $window_text) = @_;
+    my $window = 0 + $window_text;
+    die "Local plot window must be a positive number\n" unless $window > 0;
+
+    my @located = map {
+        +{
+            index => $_,
+            hit   => $hits->[$_],
+            chr   => $hits->[$_]{CHR},
+            bp    => 0 + $hits->[$_]{BP},
+        }
+    } grep {
+        defined($hits->[$_]{CHR}) && length($hits->[$_]{CHR})
+            && defined($hits->[$_]{BP}) && $hits->[$_]{BP} =~ /^\d+$/
+    } 0 .. $#$hits;
+    @located = sort {
+        normalize_chr_label($a->{chr}) cmp normalize_chr_label($b->{chr})
+            || $a->{bp} <=> $b->{bp}
+            || $a->{index} <=> $b->{index}
+    } @located;
+
+    my @groups;
+    my %located_index;
+    for my $row (@located) {
+        $located_index{$row->{index}} = 1;
+        my $start = $row->{bp} - $window;
+        my $end = $row->{bp} + $window;
+        if (!@groups
+            || normalize_chr_label($groups[-1]{chr}) ne normalize_chr_label($row->{chr})
+            || $start > $groups[-1]{window_end}) {
+            push @groups, {
+                chr        => $row->{chr},
+                window_end => $end,
+                members    => [],
+            };
+        }
+        push @{ $groups[-1]{members} }, $row;
+        $groups[-1]{window_end} = $end if $end > $groups[-1]{window_end};
+    }
+    for my $i (0 .. $#$hits) {
+        next if $located_index{$i};
+        push @groups, {
+            chr     => '',
+            members => [ { index => $i, hit => $hits->[$i] } ],
+        };
+    }
+
+    my @loci;
+    for my $group (@groups) {
+        my @members = sort { $a->{index} <=> $b->{index} } @{ $group->{members} };
+        my $reference = $members[0];
+        my $plot_window = $window;
+        if (defined $reference->{bp}) {
+            for my $member (@members) {
+                next unless defined $member->{bp};
+                my $required = abs($member->{bp} - $reference->{bp}) + $window;
+                $plot_window = $required if $required > $plot_window;
+            }
+        }
+        push @loci, {
+            anchor_index   => $reference->{index},
+            member_indices => [ map { $_->{index} } @members ],
+            plot_window_bp => int($plot_window + 0.5),
+            first_order    => $reference->{index},
+        };
+    }
+    return sort { $a->{first_order} <=> $b->{first_order} } @loci;
+}
+
 sub plot_local_series {
     my (%args) = @_;
     my $runner = $args{runner};
@@ -1708,43 +1781,26 @@ sub plot_local_series {
         reference_build => $runner->{REFERENCE_BUILD},
     );
 
-    my (%label_snps_for_index, %skip_hit_index);
+    my (%label_snps_for_index, %plot_window_for_index, %skip_hit_index);
     if ($args{kind} eq 'local_gtf' || $args{kind} eq 'local_manhattan') {
         my $window = 0 + $args{window_bp};
-        for my $i (0 .. $#{ $args{hits} }) {
-            next if $skip_hit_index{$i};
-            my $anchor = $args{hits}[$i];
-            my @members = ($anchor->{SNP});
-            if (defined($anchor->{CHR}) && defined($anchor->{BP})) {
-                for my $j ($i + 1 .. $#{ $args{hits} }) {
-                    next if $skip_hit_index{$j};
-                    my $candidate = $args{hits}[$j];
-                    next unless defined($candidate->{CHR}) && defined($candidate->{BP});
-                    next unless normalize_chr_label($candidate->{CHR}) eq normalize_chr_label($anchor->{CHR});
-                    next unless abs((0 + $candidate->{BP}) - (0 + $anchor->{BP})) <= $window;
-                    push @members, $candidate->{SNP};
-                    $skip_hit_index{$j} = 1;
-                }
-            }
+        for my $locus (build_overlapping_local_loci($args{hits}, $window)) {
+            my $i = $locus->{anchor_index};
+            my @member_indices = @{ $locus->{member_indices} };
+            my @members = map { $args{hits}[$_]{SNP} } @member_indices;
             $label_snps_for_index{$i} = \@members;
+            $plot_window_for_index{$i} = $locus->{plot_window_bp};
+            $skip_hit_index{$_} = 1 for grep { $_ != $i } @member_indices;
             if (@members > 1) {
-                print "[prep] Combining close $args{kind} query SNPs in one shared window centered on $anchor->{SNP}: "
-                    . join(', ', @members) . "\n";
+                print "[prep] Combining overlapping $args{kind} query-SNP intervals in one shared window centered on "
+                    . "$args{hits}[$i]{SNP}: " . join(', ', @members)
+                    . " (requested half-window $window bp; expanded plot half-window "
+                    . "$locus->{plot_window_bp} bp)\n";
             }
         }
     }
     my $n_hits = scalar grep { !$skip_hit_index{$_} }
         0 .. $#{ $args{hits} };
-    if ($args{kind} eq 'local_gtf' || $args{kind} eq 'local_manhattan') {
-        for my $i (keys %label_snps_for_index) {
-            my $members = $label_snps_for_index{$i};
-            next unless @{$members} > 1;
-            my $shared = $locus_sources->{uc($members->[0])};
-            next unless $shared;
-            $locus_sources->{uc($_)} = $shared for @{$members}[1 .. $#{$members}];
-        }
-    }
-
     write_top_hits_csv(
         path       => File::Spec->catfile($args{output_dir}, $args{top_csv_name}),
         hits       => $args{hits},
@@ -1760,6 +1816,7 @@ sub plot_local_series {
         $render_idx++;
         my $hit = $args{hits}[$hit_idx];
         my @label_snps = @{ $label_snps_for_index{$hit_idx} || [$hit->{SNP}] };
+        my $locus_window_bp = $plot_window_for_index{$hit_idx} || $args{window_bp};
         my $label_snps_csv = join(',', @label_snps);
         my $locus_title_snps = join(', ', @label_snps);
         my $ld_reference_snp = trim($args{ld_reference_snp} // '');
@@ -1813,7 +1870,7 @@ sub plot_local_series {
                 # A heatmap needs every estimable in-window R2 value.  The
                 # user threshold is applied later, only to the marker layer.
                 min_r2      => ($complete_ld_colors ? 0 : $args{ld_r2_threshold}),
-                window_kb   => ($runner->{TOP_HIT_LD_WINDOW_KB} || int(($args{window_bp} || 1) / 1000) || 1000),
+                window_kb   => ($runner->{TOP_HIT_LD_WINDOW_KB} || int(($locus_window_bp || 1) / 1000) || 1000),
                 pfile       => $pfile,
                 bfile       => $bfile,
                 plink2      => $plink2,
@@ -1855,7 +1912,7 @@ sub plot_local_series {
             exists($ld_r2_ref->{$key}) ? $_ . ':' . sprintf('%.6g', $ld_r2_ref->{$key}) : ()
         } @ld_r2_snps)) : '';
         my $safe_snp = safe_name($hit->{SNP});
-        my $safe_window = safe_name($args{window_bp});
+        my $safe_window = safe_name($locus_window_bp);
         my $batch_index = int($render_idx / $batch_size);
         my $batch_start = $batch_index * $batch_size;
         my $batch_end = $batch_start + $batch_size - 1;
@@ -1888,7 +1945,7 @@ sub plot_local_series {
         my $expected_gtf_file = infer_cached_locus_gtf_path(
             output_dir => $args{output_dir},
             snp        => $hit->{SNP},
-            window_bp  => $args{window_bp},
+            window_bp  => $locus_window_bp,
             runner     => $runner,
         );
         my $expected_has_gtf = ($args{with_gtf} || $batch_annotation_mode eq 'gtf') ? 1 : 0;
@@ -1904,7 +1961,7 @@ sub plot_local_series {
             png               => $locus_prefix . '.png',
             renderer          => File::Spec->catfile($Bin, 'DiffGWASDeps', 'gnuplot', 'pdl_gnuplot_local_locus.pl'),
             snp               => $hit->{SNP},
-            window_bp         => $args{window_bp},
+            window_bp         => $locus_window_bp,
             reference_build   => ($runner->{REFERENCE_BUILD} // ''),
             pcols             => join(',', @{ $args{pcols} }),
             zcols             => join(',', @{ $args{zcols} || [] }),
@@ -1973,9 +2030,29 @@ sub plot_local_series {
             close $ldfh or die "Cannot close LD R2 sidecar $ld_r2_file: $!\n";
         }
 
+        my $expanded_locus_source;
+        if ((0 + $locus_window_bp) != (0 + $args{window_bp})) {
+            my $expanded_sources = prepare_locus_wide_sources(
+                hits          => [$hit],
+                output_dir    => $args{output_dir},
+                window_bp     => $locus_window_bp,
+                wide_data     => $args{wide_data},
+                source_long   => $args{source_long},
+                preset_config => $args{preset_config},
+                required_cols => \@locus_required_pcols,
+                force         => $args{force},
+                reference_build => $runner->{REFERENCE_BUILD},
+            );
+            $expanded_locus_source = $expanded_sources->{uc($hit->{SNP})};
+        }
+
         my $locus_input = $args{wide_data};
         my $cached_locus_input = File::Spec->catfile($args{output_dir}, "gnuplot_locus_${safe_snp}_window_${safe_window}.wide.tsv.gz");
         my $cached_locus_manifest = File::Spec->catfile($args{output_dir}, "gnuplot_locus_${safe_snp}_window_${safe_window}.wide.manifest.tsv");
+        if ($expanded_locus_source) {
+            $cached_locus_input = $expanded_locus_source->{data};
+            $cached_locus_manifest = $expanded_locus_source->{manifest};
+        }
         my $legacy_locus_input = File::Spec->catfile($args{output_dir}, $base_name . '_' . $safe_snp . '.wide.tsv.gz');
         my $legacy_locus_manifest = File::Spec->catfile($args{output_dir}, $base_name . '_' . $safe_snp . '.wide.manifest.tsv');
         if (!(-s $cached_locus_input && -s $cached_locus_manifest) && -s $legacy_locus_input && -s $legacy_locus_manifest) {
@@ -2015,7 +2092,7 @@ sub plot_local_series {
                 '--config', $args{preset_config},
                 '--input', $args{source_long},
                 '--target-snp', $hit->{SNP},
-                '--window-bp', $args{window_bp},
+                '--window-bp', $locus_window_bp,
                 '--output', $locus_input,
                 '--manifest', $locus_manifest,
                 '--output-dir', $args{output_dir},
@@ -2043,7 +2120,7 @@ sub plot_local_series {
             );
             my ($region_start, $region_end) = locus_window(
                 $runner->{REFERENCE_BUILD}, $hit->{CHR}, $hit->{BP},
-                0 + $args{window_bp});
+                0 + $locus_window_bp);
             if (!$args{force} && -s $gtf_file) {
                 print "[skip] reusing cached gnuplot GTF subset $gtf_file\n";
             }
@@ -2073,7 +2150,7 @@ sub plot_local_series {
             '--snp', $hit->{SNP},
             '--label-snps', $label_snps_csv,
             '--out-prefix', $locus_prefix,
-            '--window-bp', $args{window_bp},
+            '--window-bp', $locus_window_bp,
             '--reference-build', ($runner->{REFERENCE_BUILD} // ''),
             '--pcols', join(',', @{ $args{pcols} }),
             '--labels', join('|', @{ $args{labels} }),

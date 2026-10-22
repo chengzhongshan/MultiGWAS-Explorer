@@ -2762,8 +2762,10 @@ reports that separately from connection shutdown; inspect the saved SAS log
 and status file for the program failure.
 
 When two or more explicit target SNPs have overlapping SNP-centered windows on
-the same chromosome, the SAS local-GTF runner now merges them into one displayed
-locus and labels every requested rsID in that plot. For example, with a `1e6`
+the same chromosome, both the SAS ODA and gnuplot local-plot runners merge them
+into one displayed locus and label every requested rsID in that plot. Overlap
+is transitive: if window A overlaps B and B overlaps C, all three belong to one
+locus even when A does not overlap C directly. For example, with a `1e6`
 half-window, `rs2070788` (chr21:41470061) and `rs383510` (chr21:41486440) are
 rendered together rather than as two nearly identical figures. The first
 requested or most-significant lead remains the named LD reference, and the
