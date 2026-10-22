@@ -81,6 +81,10 @@ close $gp;
 die "Signed-R2 colorbar is missing\n"
     unless $gp_text =~ /set cbrange \[-1:1\]/
         && $gp_text =~ /set cblabel 'Signed LD r\^2 \(r\^2 x sign\(Z\); EUR; 1000 Genomes Phase 3 \/ PLINK2\)'/;
+die "Signed-R2 colorbar does not reserve enough room for its full label\n"
+    unless $gp_text =~ /set rmargin 15/
+        && $gp_text =~ /set cblabel 'Signed LD r\^2 .*' font ',9'/
+        && $gp_text =~ /set colorbox vertical user origin 0\.89,0\.12 size 0\.02,0\.76/;
 die "Separate LD inset should not be emitted in signed-R2 mode\n"
     if $gp_text =~ /LD r\^2 to rs100/ || $gp_text =~ /using \(\(\$9>=0\)\?\$1:1\/0\):2:10/;
 
@@ -142,6 +146,9 @@ close $manhattan_gp;
 die "Local Manhattan plot did not use the signed-R2 colorbar\n"
     unless $manhattan_gp_text =~ /set cbrange \[-1:1\]/
         && $manhattan_gp_text =~ /Signed LD r\^2 \(r\^2 x sign\(Z\)/;
+die "Local Manhattan colorbar label can be clipped at the right edge\n"
+    unless $manhattan_gp_text =~ /set rmargin 15/
+        && $manhattan_gp_text =~ /set colorbox vertical user origin 0\.89,0\.12 size 0\.02,0\.76/;
 die "Local Manhattan plot emitted the unsigned LD inset\n"
     if $manhattan_gp_text =~ /LD r\^2 to rs100/
         || $manhattan_gp_text =~ /using \(\(\$9>=0\)\?\$1:1\/0\):2:10/;

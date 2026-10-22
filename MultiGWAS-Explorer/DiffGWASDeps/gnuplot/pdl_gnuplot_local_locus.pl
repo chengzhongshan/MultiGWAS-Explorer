@@ -522,7 +522,8 @@ sub write_gnuplot {
     print {$gp} "set yrange [$ymin:$ymax]\n";
     print {$gp} "set border " . ($args{hide_y_axis} ? 1 : 3) . "\n";
     print {$gp} "set lmargin " . ($args{hide_y_axis} ? 2 : 8) . "\n";
-    print {$gp} "set rmargin 6\n";
+    my $has_main_colorbox = $args{use_zcolors} || $args{use_signed_r2};
+    print {$gp} "set rmargin " . ($has_main_colorbox ? 15 : 6) . "\n";
     print {$gp} "set tics out nomirror\n";
     print {$gp} "set grid ytics lc rgb '#dddddd' dt 2\n";
     print {$gp} "unset key\n";
@@ -681,8 +682,8 @@ sub write_gnuplot {
                      "(-8 '#63d67f', -4 '#63d8d2', 0 '#ffbf00', 4 '#ff5b00', 8 '#df1f2d')");
             print {$gp} "set cbrange [$cbmin:$cbmax]\n";
             print {$gp} "set cbtics $cbticks\n";
-            print {$gp} "set cblabel '" . escape_gp($cblabel) . "'\n";
-            print {$gp} "set colorbox vertical user origin 0.94,0.12 size 0.02,0.76\n";
+            print {$gp} "set cblabel '" . escape_gp($cblabel) . "' font ',9'\n";
+            print {$gp} "set colorbox vertical user origin 0.89,0.12 size 0.02,0.76\n";
             print {$gp} "set palette defined $palette\n";
             my @plots = ("'" . escape_gp($args{plot_tsv}) . "' using 1:2:7 with points pt 7 ps 0.72 lc palette");
             push @plots, @ld_layers;
@@ -712,8 +713,8 @@ sub write_gnuplot {
                 . '; ' . ($args{ld_reference_panel} || '1000 Genomes Phase 3 / PLINK2') . ')';
             print {$gp} "set cbrange [-1:1]\n";
             print {$gp} "set cbtics ('-1' -1, '0' 0, '1' 1)\n";
-            print {$gp} "set cblabel '" . escape_gp($cblabel) . "'\n";
-            print {$gp} "set colorbox vertical user origin 0.94,0.12 size 0.02,0.76\n";
+            print {$gp} "set cblabel '" . escape_gp($cblabel) . "' font ',9'\n";
+            print {$gp} "set colorbox vertical user origin 0.89,0.12 size 0.02,0.76\n";
             print {$gp} "set palette defined (-1 '#63d67f', -0.5 '#63d8d2', 0 '#ffbf00', 0.5 '#ff5b00', 1 '#df1f2d')\n";
             push @plots, "'" . escape_gp($args{plot_tsv})
                 . "' using 1:2:7 with points pt 7 ps 0.9 lc palette";
@@ -721,8 +722,8 @@ sub write_gnuplot {
         elsif ($args{use_zcolors}) {
             print {$gp} "set cbrange [-8:8]\n";
             print {$gp} "set cbtics ('-8' -8, '0' 0, '8' 8)\n";
-            print {$gp} "set cblabel '" . escape_gp($args{colorbar_label} || 'Z score') . "'\n";
-            print {$gp} "set colorbox vertical user origin 0.94,0.12 size 0.02,0.76\n";
+            print {$gp} "set cblabel '" . escape_gp($args{colorbar_label} || 'Z score') . "' font ',9'\n";
+            print {$gp} "set colorbox vertical user origin 0.89,0.12 size 0.02,0.76\n";
             print {$gp} "set palette defined (-8 '#63d67f', -4 '#63d8d2', 0 '#ffbf00', 4 '#ff5b00', 8 '#df1f2d')\n";
             push @plots, "'" . escape_gp($args{plot_tsv})
                 . "' using 1:2:7 with points pt 7 ps 0.9 lc palette";

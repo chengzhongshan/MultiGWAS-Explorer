@@ -2850,7 +2850,7 @@ sub render_combined_local_manhattan_gtf_batch {
     print {$gp} "set ylabel '-Log10(p)'\n";
     print {$gp} "set border 3\n";
     print {$gp} "set lmargin 8\n";
-    print {$gp} "set rmargin 3\n";
+    print {$gp} "set rmargin " . (($combined_signed_r2 || $combined_zscore) ? 15 : 3) . "\n";
     print {$gp} "set bmargin 4\n";
     print {$gp} "unset key\n";
     print {$gp} "set tics out nomirror\n";
@@ -2942,15 +2942,15 @@ sub render_combined_local_manhattan_gtf_batch {
             . ($combined_ld_reference_panel || '1000 Genomes Phase 3 / PLINK2') . ')';
         print {$gp} "set cbrange [-1:1]\n";
         print {$gp} "set cbtics ('-1' -1, '0' 0, '1' 1)\n";
-        print {$gp} "set cblabel '" . escape_gp($cblabel) . "'\n";
-        print {$gp} "set colorbox vertical user origin 0.94,0.12 size 0.02,0.76\n";
+        print {$gp} "set cblabel '" . escape_gp($cblabel) . "' font ',9'\n";
+        print {$gp} "set colorbox vertical user origin 0.89,0.12 size 0.02,0.76\n";
         print {$gp} "set palette defined (-1 '#63d67f', -0.5 '#63d8d2', 0 '#ffbf00', 0.5 '#ff5b00', 1 '#df1f2d')\n";
     }
     elsif ($combined_zscore) {
         print {$gp} "set cbrange [-8:8]\n";
         print {$gp} "set cbtics ('-8' -8, '0' 0, '8' 8)\n";
-        print {$gp} "set cblabel 'Z score'\n";
-        print {$gp} "set colorbox vertical user origin 0.94,0.12 size 0.02,0.76\n";
+        print {$gp} "set cblabel 'Z score' font ',9'\n";
+        print {$gp} "set colorbox vertical user origin 0.89,0.12 size 0.02,0.76\n";
         print {$gp} "set palette defined (-8 '#63d67f', -4 '#63d8d2', 0 '#ffbf00', 4 '#ff5b00', 8 '#df1f2d')\n";
     }
     else {
