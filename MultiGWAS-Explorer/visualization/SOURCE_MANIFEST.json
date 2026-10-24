@@ -1,0 +1,656 @@
+{
+   "client_changes" : "Module command name, token prefix, example in help, and removal of automatic book catalog merging; execution protocol unchanged. Catalog-controlled capture_failed_outputs optionally downloads declared diagnostics after an expected FAILED job without changing its status.",
+   "client_original_sha256" : "0f84836cae124a64c589855421477b5f341f9ec8f3770760185815494ed16b29",
+   "client_sha256" : "fd13c0e6c5df457cfe4c53033a9499bc6839eeac0cf515d3e65c7508600f736a",
+   "client_source" : "scripts/sas_book.pl",
+   "files" : [
+      {
+         "adapted" : false,
+         "file" : "companion/reader/figure_support.sas",
+         "sha256" : "b068fea66f3e0be04a2744b40f20f789ec08b461e422a33503d9295e5cc0ca32",
+         "source_book_file" : "companion/reader/figure_support.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/reader/regional_scope.sas",
+         "sha256" : "f01612344dd6328982a5bf79ae06f8468f4cbc99ae7c8fcf229081e7cb6bca3c",
+         "source_book_file" : "companion/reader/regional_scope.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/advanced_figures/sources/definitions/ApplyFunc_rowwide.sas",
+         "sha256" : "b4358a27d8201e40ad5a022a934b1cc6ec07d79bb1c3d794ad0a4439f6ac0d2b",
+         "source_book_file" : "companion/research/advanced_figures/sources/definitions/ApplyFunc_rowwide.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/advanced_figures/sources/definitions/Check_VarnamesInDsd.sas",
+         "sha256" : "a6db792971c64d48e22b195fd53966bdbdc91e4c803ab79d70942c53bdf6682a",
+         "source_book_file" : "companion/research/advanced_figures/sources/definitions/Check_VarnamesInDsd.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/advanced_figures/sources/definitions/FileOrDirExist.sas",
+         "sha256" : "c91a9c1d733754fd8f9e9b2505f9d8d58cf3ccfc3b4e67178286c50ec2690d1a",
+         "source_book_file" : "companion/research/advanced_figures/sources/definitions/FileOrDirExist.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/advanced_figures/sources/definitions/GetVarAttrib.sas",
+         "sha256" : "09873a0c0766679f44d0c8cc4d0cfd6f97033009252d2ab9173f7bf1c431dfbb",
+         "source_book_file" : "companion/research/advanced_figures/sources/definitions/GetVarAttrib.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/advanced_figures/sources/definitions/GetVarType.sas",
+         "sha256" : "16b42fd337a854fe7a8d7646238105af4594d2392a48eb04215dfbc2008d74ee",
+         "source_book_file" : "companion/research/advanced_figures/sources/definitions/GetVarType.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/advanced_figures/sources/definitions/Lattice_gscatter_over_bed_track.sas",
+         "sha256" : "b4635d9e9d527d396d159509d9227dcc8b8f1ffcff3dd5269f53dad0b8fa84a6",
+         "source_book_file" : "companion/research/advanced_figures/sources/definitions/Lattice_gscatter_over_bed_track.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/advanced_figures/sources/definitions/Manhattan4DiffGWASs_png.sas",
+         "sha256" : "845beef917b6554eafea2d259fef7a0c19403c9bc7888337a6311e763006433d",
+         "source_book_file" : "companion/research/advanced_figures/sources/definitions/Manhattan4DiffGWASs_png.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/advanced_figures/sources/definitions/Multgscatter_with_gene_exons.sas",
+         "sha256" : "cd13b83142cffee4220707dc33324d00ba93fccbb4b4f40260799090d7e0363d",
+         "source_book_file" : "companion/research/advanced_figures/sources/definitions/Multgscatter_with_gene_exons.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/advanced_figures/sources/definitions/OpenSVG_Printer.sas",
+         "sha256" : "eb9a7c66ee08805fb61f9967765c2cd3b2c8ae42e8cdea5aa6465f8749bfa1f5",
+         "source_book_file" : "companion/research/advanced_figures/sources/definitions/OpenSVG_Printer.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/advanced_figures/sources/definitions/QQplot.sas",
+         "sha256" : "3504b88f0c996f2988d5f710079afd170cb298ad66389d75eb9e72c342d6f6b3",
+         "source_book_file" : "companion/research/advanced_figures/sources/definitions/QQplot.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/advanced_figures/sources/definitions/QueryLD_SNPs_at_Haploreg4.sas",
+         "sha256" : "1a94c4d838efff1f3e7cae430ab6abd2241e21026d35fc15dfd4f7befedfc4df",
+         "source_book_file" : "companion/research/advanced_figures/sources/definitions/QueryLD_SNPs_at_Haploreg4.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/advanced_figures/sources/definitions/RandBetween.sas",
+         "sha256" : "491406ff03b14d1d1e72ae6a5e6fb4f566049922d2219162105021c64b6eedeb",
+         "source_book_file" : "companion/research/advanced_figures/sources/definitions/RandBetween.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/advanced_figures/sources/definitions/Rename_Del_Rgx4All_Vars.sas",
+         "sha256" : "3fd47444266b4f2a4b1b31cf1e6adafa98e9f61e356ba1d273a2c4b301e94204",
+         "source_book_file" : "companion/research/advanced_figures/sources/definitions/Rename_Del_Rgx4All_Vars.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/advanced_figures/sources/definitions/SNP_Local_Manhattan_With_GTF.sas",
+         "sha256" : "8221ec587aafa3d079a1e9d1441a22408689e9fb7bd3588afab102e8bf0c9982",
+         "source_book_file" : "companion/research/advanced_figures/sources/definitions/SNP_Local_Manhattan_With_GTF.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/advanced_figures/sources/definitions/TotVarsInDsd.sas",
+         "sha256" : "cc5882b0681ba2a39a9c0bfbc72104b9168e90656f68d8700dfefba268c7d642",
+         "source_book_file" : "companion/research/advanced_figures/sources/definitions/TotVarsInDsd.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/advanced_figures/sources/definitions/add_fake_pos_by_grp4nonnegvars.sas",
+         "sha256" : "3af4c157ad847e1341e7ab25089e78071495d6f8e36446964b068cdd8c3fb2c0",
+         "source_book_file" : "companion/research/advanced_figures/sources/definitions/add_fake_pos_by_grp4nonnegvars.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/advanced_figures/sources/definitions/adj_grpnum4close_gene_bed_regs.sas",
+         "sha256" : "a34f471a9b20e4e89ea3a1d8d6458e608e8d72b4630a5dc4cba1a672749f2b5b",
+         "source_book_file" : "companion/research/advanced_figures/sources/definitions/adj_grpnum4close_gene_bed_regs.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/advanced_figures/sources/definitions/adjust_close_positions.sas",
+         "sha256" : "d5936046e927d95a51935114fa0125ac9764644f276e2e549bf187780ee4eee4",
+         "source_book_file" : "companion/research/advanced_figures/sources/definitions/adjust_close_positions.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/advanced_figures/sources/definitions/bed_region_plot_by_grp.sas",
+         "sha256" : "bdfc4f059d65fdf1ada175648b69bf124ac3a2a1b7dff60c063e616f8a0b167e",
+         "source_book_file" : "companion/research/advanced_figures/sources/definitions/bed_region_plot_by_grp.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/advanced_figures/sources/definitions/beta2OR_forest_plot.sas",
+         "sha256" : "06e822cf994f9e83bdcbf63e7533783eace5bf1bec264142a62f406b599d32d5",
+         "source_book_file" : "companion/research/advanced_figures/sources/definitions/beta2OR_forest_plot.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/advanced_figures/sources/definitions/char_grp_to_num_grp.sas",
+         "sha256" : "0791cbe0cef3d68e09ade75ade961ca637a3c2a317140cec3cb1d0625bd449cd",
+         "source_book_file" : "companion/research/advanced_figures/sources/definitions/char_grp_to_num_grp.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/advanced_figures/sources/definitions/check_var_type.sas",
+         "sha256" : "0cae3183c34519b640e4b752392cf86a0ebe7fcbc33ab389165c68a435a57dde",
+         "source_book_file" : "companion/research/advanced_figures/sources/definitions/check_var_type.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/advanced_figures/sources/definitions/delete_empty_dsd.sas",
+         "sha256" : "f29539fa946053ab1d123b987bab913b4e21c4905042bb47b651caa2a3bd7311",
+         "source_book_file" : "companion/research/advanced_figures/sources/definitions/delete_empty_dsd.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/advanced_figures/sources/definitions/format_xaxis_with_numeric_order.sas",
+         "sha256" : "89987e6a204eef11cd31389c126fb826370f52f6fede5103a353be815a349104",
+         "source_book_file" : "companion/research/advanced_figures/sources/definitions/format_xaxis_with_numeric_order.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/advanced_figures/sources/definitions/get_tgt_hits4Manhattan.sas",
+         "sha256" : "68ff2d36c92bdc8656efcf2e9d697a5f7095020b6ea47cd250babb8fa171e170",
+         "source_book_file" : "companion/research/advanced_figures/sources/definitions/get_tgt_hits4Manhattan.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/advanced_figures/sources/definitions/get_top_hits4Manhattan.sas",
+         "sha256" : "853cbf6f3f95ad5bce4f5b15914ed6e8ffcb0f83425de9e3a1010d00546f68b2",
+         "source_book_file" : "companion/research/advanced_figures/sources/definitions/get_top_hits4Manhattan.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/advanced_figures/sources/definitions/get_top_signal_with_ld.sas",
+         "sha256" : "445fd144acb95fd3d278ef76624438604d2a6763ad1619ef5cd1c89a5daea334",
+         "source_book_file" : "companion/research/advanced_figures/sources/definitions/get_top_signal_with_ld.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/advanced_figures/sources/definitions/get_top_signal_within_dist.sas",
+         "sha256" : "76610f9774050433acf2a7c8f6963bd2279f84dad955e08c18f776662800db5c",
+         "source_book_file" : "companion/research/advanced_figures/sources/definitions/get_top_signal_within_dist.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/advanced_figures/sources/definitions/iscolallmissing.sas",
+         "sha256" : "a4504bec5254da9d3ed9475ee1ddbb59999af7bdbf60dab0d7216d546c02a090",
+         "source_book_file" : "companion/research/advanced_figures/sources/definitions/iscolallmissing.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/advanced_figures/sources/definitions/make_fake_axis4NegPosVal_by_grps.sas",
+         "sha256" : "b04b22f9bd169e4ecba0c7aebe2dbe3b7d5f3c6254da225def1c19bf28ae0ed4",
+         "source_book_file" : "companion/research/advanced_figures/sources/definitions/make_fake_axis4NegPosVal_by_grps.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/advanced_figures/sources/definitions/make_fake_axis_values4grps.sas",
+         "sha256" : "c2f746994c936c6b090eaaa2fd29aa6f7192cfc983604b3f54aa2447a1a55cb2",
+         "source_book_file" : "companion/research/advanced_figures/sources/definitions/make_fake_axis_values4grps.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/advanced_figures/sources/definitions/map_grp_assoc2gene4covidsexgwas.sas",
+         "sha256" : "66324dec9aacbfef434e0057e3e61f8764265ca9fb83d3e6bd9fa25812e22d59",
+         "source_book_file" : "companion/research/advanced_figures/sources/definitions/map_grp_assoc2gene4covidsexgwas.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/advanced_figures/sources/definitions/mkfmt4grps_by_var.sas",
+         "sha256" : "8e5c115b8b509d9abc1476b918121c21dfe1f443f0c45ee190fa738114e31771",
+         "source_book_file" : "companion/research/advanced_figures/sources/definitions/mkfmt4grps_by_var.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/advanced_figures/sources/definitions/ntokens.sas",
+         "sha256" : "4586bfd504705c030cc1bcbbb17f3feea8b90534425bef52027ba2be545996dc",
+         "source_book_file" : "companion/research/advanced_figures/sources/definitions/ntokens.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/advanced_figures/sources/definitions/numargs.sas",
+         "sha256" : "efd7dd902ff46b2c0e3245fefccd6d3539ba18bfdfd28c599669ac226e395c19",
+         "source_book_file" : "companion/research/advanced_figures/sources/definitions/numargs.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/advanced_figures/sources/definitions/number_rows_by_grp.sas",
+         "sha256" : "e736ac1f090d0dc5d4e5d34be6880427731d34ac63d536a7fc42602ad103225f",
+         "source_book_file" : "companion/research/advanced_figures/sources/definitions/number_rows_by_grp.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/advanced_figures/sources/definitions/nums_in_range_adj_scale.sas",
+         "sha256" : "210820d1aef68ab23967bd21a3216fdc30f73658cdd2e0c061547e8c0cf2a59f",
+         "source_book_file" : "companion/research/advanced_figures/sources/definitions/nums_in_range_adj_scale.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/advanced_figures/sources/definitions/rank4grps.sas",
+         "sha256" : "77734b3bbf2898db0760005afb2bf74adb76594eac017699b8b796b12fd9434f",
+         "source_book_file" : "companion/research/advanced_figures/sources/definitions/rank4grps.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/advanced_figures/sources/definitions/rows_in_sas_dsd.sas",
+         "sha256" : "8f9bf49786fbf6a8b3ebfa226c6ad161b75936afc6c2349802be5975fc6f5f1a",
+         "source_book_file" : "companion/research/advanced_figures/sources/definitions/rows_in_sas_dsd.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/advanced_figures/sources/definitions/sas_dsd_exist.sas",
+         "sha256" : "088ea9e369e6ac22ed2119f5d0992315ff238bdd51cc07271a27a227b171d95c",
+         "source_book_file" : "companion/research/advanced_figures/sources/definitions/sas_dsd_exist.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/advanced_figures/sources/definitions/scale_nums_in_list.sas",
+         "sha256" : "0f158ac4d162fc36e4436a73de89cdb288da56ff91306782b9346e996a48adc3",
+         "source_book_file" : "companion/research/advanced_figures/sources/definitions/scale_nums_in_list.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/advanced_figures/sources/definitions/select_element_range_from_list.sas",
+         "sha256" : "ad5038488e01636467c634039f6671b981547042a654949e7779e89dc8bc4451",
+         "source_book_file" : "companion/research/advanced_figures/sources/definitions/select_element_range_from_list.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/advanced_figures/sources/definitions/spaceAdjust.sas",
+         "sha256" : "5dc2099743da5f6e0be5296fd4f97c518a300d96d097306833a6aa07ddcf59f4",
+         "source_book_file" : "companion/research/advanced_figures/sources/definitions/spaceAdjust.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/advanced_figures/sources/definitions/totobsindsd.sas",
+         "sha256" : "ed6675536c9f8a63d1bfc12a09c0bd494f9a507b4570c315521529247a121329",
+         "source_book_file" : "companion/research/advanced_figures/sources/definitions/totobsindsd.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/advanced_figures/sources/definitions/varexist.sas",
+         "sha256" : "9cbd3380d553da88e035489f522e90e6d164221424ad298d0f783874fc216cea",
+         "source_book_file" : "companion/research/advanced_figures/sources/definitions/varexist.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/ch17_layout/data/tp53_isoform_features.tsv",
+         "sha256" : "7988703c71509c14bc5020f179fa86c18858f112e58ee9f9a94465abbcb587db",
+         "source_book_file" : "companion/research/ch17_layout/data/tp53_isoform_features.tsv"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/ch17_layout/data/tp53_isoform_site_projection.tsv",
+         "sha256" : "df04e8522cfdf039533d5394dedb07db67149d8c9fa3ca2259a102884e7abb12",
+         "source_book_file" : "companion/research/ch17_layout/data/tp53_isoform_site_projection.tsv"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/ch17_layout/data/tp53_isoforms.fasta",
+         "sha256" : "265e09aa0a7452bec525bfaeb1c404c3e24b4e141a0794558199e8922d84fb3e",
+         "source_book_file" : "companion/research/ch17_layout/data/tp53_isoforms.fasta"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/ch17_layout/data/tp53_isoforms.tsv",
+         "sha256" : "d88852b9d840bea1df8a58f5ce1863110164d88f4ff49de9737a94b331b4444c",
+         "source_book_file" : "companion/research/ch17_layout/data/tp53_isoforms.tsv"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/ch17_layout/data/uniprot_isoforms_verified.fasta",
+         "sha256" : "9253bb49fe6f7484336a2f560c1f7576e63ef5365f062938f6cf7b8437383bb6",
+         "source_book_file" : "companion/research/ch17_layout/data/uniprot_isoforms_verified.fasta"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/ch17_layout/programs/ch17_gdc_tp53_gene.sas",
+         "sha256" : "8c491abe1145dc66dda81c92d6be451c55fffb0d5db566610901fc8ed066245b",
+         "source_book_file" : "companion/research/ch17_layout/programs/ch17_gdc_tp53_gene.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/ch17_layout/programs/ch17_gdc_tp53_protein.sas",
+         "sha256" : "6d6b634c058d0eb9df8086377455377223025c71ba5dae993da00ee99a7cc627",
+         "source_book_file" : "companion/research/ch17_layout/programs/ch17_gdc_tp53_protein.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/ch17_layout/programs/ch17_track_cnv.sas",
+         "sha256" : "9406c23ca17ebd9862a941b566ed91c583e5016b4cdb3fe15cc8c65953e61589",
+         "source_book_file" : "companion/research/ch17_layout/programs/ch17_track_cnv.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/ch17_layout/programs/tp53_isoforms.sas",
+         "sha256" : "0f9d27cefca539ea5c3f2adf94ae0905fee051721becdc9db2a75c6beb990a12",
+         "source_book_file" : "companion/research/ch17_layout/programs/tp53_isoforms.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/ch17_layout/support/chapter17_layout.sas",
+         "sha256" : "035fd343c6581f5cb8e06aff611c120058c70f0227bfd769af864a1e11168c86",
+         "source_book_file" : "companion/research/ch17_layout/support/chapter17_layout.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/ch17_layout/tp53_isoform_manifest.json",
+         "sha256" : "c408f6fbe52bd318953009add27f071650bddaa5fd69c636ebb902fcdea087bf",
+         "source_book_file" : "companion/research/ch17_layout/tp53_isoform_manifest.json"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/clustergram_branches/data/expression40.tsv",
+         "sha256" : "672ff88cbf7e21564b0e944aae2a2fa0242778689247f2b3c086dcfb3b8ea511",
+         "source_book_file" : "companion/research/clustergram_branches/data/expression40.tsv"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/clustergram_branches/data/gtex_v8_medians.json",
+         "sha256" : "a575610e5ff2c07f61aa4935e3b7fb76621a9d40fedef10c78306403d4776dd2",
+         "source_book_file" : "companion/research/clustergram_branches/data/gtex_v8_medians.json"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/clustergram_branches/data_manifest.json",
+         "sha256" : "92a1e5dac74c5b31b24cfa0b2d95bd6a8c9aff157c288c8d5be1eba3da2f902c",
+         "source_book_file" : "companion/research/clustergram_branches/data_manifest.json"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/clustergram_branches/definitions/RandBetween.sas",
+         "sha256" : "8e9dbed502eb2cf97c52aa93a88b184e6ff0021f7c1142003909e9bd0df25039",
+         "source_book_file" : "companion/research/clustergram_branches/definitions/RandBetween.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/clustergram_branches/definitions/Rename_Add_Prefix.sas",
+         "sha256" : "37c532338554bda36c39f35090904b23bed336ee1dcdf9d5bcb8bb94c693a893",
+         "source_book_file" : "companion/research/clustergram_branches/definitions/Rename_Add_Prefix.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/clustergram_branches/definitions/check_col_orders.sas",
+         "sha256" : "6a573fc884c529d69f4ba4bc1939a7f7d22a9bd3b407b918a97235ebcf1b3528",
+         "source_book_file" : "companion/research/clustergram_branches/definitions/check_col_orders.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/clustergram_branches/definitions/clustergram4sas.sas",
+         "sha256" : "83aa32dc3594d8714c94356b47c3c50b48df8262543bf98e98e55aaf24b1f1f8",
+         "source_book_file" : "companion/research/clustergram_branches/definitions/clustergram4sas.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/clustergram_branches/definitions/review_tree_branches.sas",
+         "sha256" : "1c6f659d8002209c749d6e815949cd32511c80275b3ed3306e9d30fb19d47020",
+         "source_book_file" : "companion/research/clustergram_branches/definitions/review_tree_branches.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/clustergram_branches/definitions/subbranches.sas",
+         "sha256" : "431206c3827b6c51b0ca49f6bd7c80ef5f25a035744e7aa9b212c70125eab131",
+         "source_book_file" : "companion/research/clustergram_branches/definitions/subbranches.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/clustergram_branches/definitions/tanspose_table.sas",
+         "sha256" : "3dde83b474a3cb8160fa4bedd581860a30e54f3308f8d4ef054ec069cee112b6",
+         "source_book_file" : "companion/research/clustergram_branches/definitions/tanspose_table.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/clustergram_branches/definitions/totobsindsd.sas",
+         "sha256" : "f939d195a59ed0d4ff6770b0cbffe25ad815d79c66ca48e02ede732582ad7219",
+         "source_book_file" : "companion/research/clustergram_branches/definitions/totobsindsd.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/clustergram_branches/definitions/tree_CL_positions.sas",
+         "sha256" : "2d678fb826de9aa31e1dfe36d61f2253e6bd803fee9f91920bcd57996e9bb9aa",
+         "source_book_file" : "companion/research/clustergram_branches/definitions/tree_CL_positions.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/clustergram_branches/definitions/treeorder.sas",
+         "sha256" : "474058510022a9c4ea4bbfd3cedc41faae011da9a4d15e6501ef6712673c08ee",
+         "source_book_file" : "companion/research/clustergram_branches/definitions/treeorder.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/clustergram_branches/programs/cluster40.sas",
+         "sha256" : "53ba128a39c1b5bc6eeaf810f1fa9764fde99d3f2730a7e6006c8ef936212e61",
+         "source_book_file" : "companion/research/clustergram_branches/programs/cluster40.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/clustergram_branches/programs/cluster_branch.sas",
+         "sha256" : "4642f75a3ba877f58377badf6f8ebe21fe13257b6ab5a32bcdf117b638cacffd",
+         "source_book_file" : "companion/research/clustergram_branches/programs/cluster_branch.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/clustergram_branches/programs/invalid_dataset.sas",
+         "sha256" : "d6b74dcc246a3b9b0e61cb026ac82987f713c4f09a39dc3932d8fcb0d0722ac0",
+         "source_book_file" : "companion/research/clustergram_branches/programs/invalid_dataset.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/clustergram_branches/source_manifest.json",
+         "sha256" : "0ea9232edb94881ec773221b6fb2f359cc1c092f849c9d747b102b8ae0a7bf79",
+         "source_book_file" : "companion/research/clustergram_branches/source_manifest.json"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/gdc_tp53/data/gene_occurrences.tsv",
+         "sha256" : "c8136d7caa735b47bda7cb3f79d6259ea268a8dfd74aa7d034cd412a94906468",
+         "source_book_file" : "companion/research/gdc_tp53/data/gene_occurrences.tsv"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/gdc_tp53/data/protein_occurrences.tsv",
+         "sha256" : "126616517523d2b86a7ee507b5a29ab84f0b43387f00a8ea955707b79911f431",
+         "source_book_file" : "companion/research/gdc_tp53/data/protein_occurrences.tsv"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/gdc_tp53/data/selected_variants.tsv",
+         "sha256" : "59664c88e35c37b8658272aa6d054d7615b1a1a19dc51fd0309bad6b60ee0727",
+         "source_book_file" : "companion/research/gdc_tp53/data/selected_variants.tsv"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/gdc_tp53/data/tp53_annotation_window.tsv",
+         "sha256" : "fe3bdd182adb81703d12f75ef1d023b68a9b0b3e7709f64c1f124815aac1494d",
+         "source_book_file" : "companion/research/gdc_tp53/data/tp53_annotation_window.tsv"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/gdc_tp53/data/tp53_protein_features.tsv",
+         "sha256" : "8d806f9298ba425d660a359df7e15ef59b5c016e6e830cd2d3cddefcb189e85e",
+         "source_book_file" : "companion/research/gdc_tp53/data/tp53_protein_features.tsv"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/gdc_tp53/programs/gdc_warning_checks.sas",
+         "sha256" : "f6333176a5e82a3cf741c4312b4d76856599c6d6dd0f1f2578e6139c93f768b6",
+         "source_book_file" : "companion/research/gdc_tp53/programs/gdc_warning_checks.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/gdc_tp53/raw/download_manifest.json",
+         "sha256" : "3f382cf7e3de119374be108d79720e85023a19f14029603b4f1fa5024a716318",
+         "source_book_file" : "companion/research/gdc_tp53/raw/download_manifest.json"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/gdc_tp53/raw/tp53_uniprot.json",
+         "sha256" : "6bdb471fae5b0d4c92a1e2fd63f35b49e3826188e82ff54fcddec70c4e63e114",
+         "source_book_file" : "companion/research/gdc_tp53/raw/tp53_uniprot.json"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/gdc_tp53/support/BookBaselineGrouping.sas",
+         "sha256" : "7bb031091d3ff8efc315058ba7cf96817caa2fdebf8971cfc8d42799f57d3b8b",
+         "source_book_file" : "companion/research/gdc_tp53/support/BookBaselineGrouping.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/gdc_tp53/support/BookGDCDropCoordinates.sas",
+         "sha256" : "073395bc73db6c5b0c98689416cc4ba434c53bee99611c83314317e384a5e9af",
+         "source_book_file" : "companion/research/gdc_tp53/support/BookGDCDropCoordinates.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/gdc_tp53/support/BookGDCMutationGeneTrack.sas",
+         "sha256" : "c906558db0da71dd9207e7fa2b6299831e8ce6865cf6948655ec521d8cf33323",
+         "source_book_file" : "companion/research/gdc_tp53/support/BookGDCMutationGeneTrack.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/gdc_tp53/support/BookGDCMutationProteinTrack.sas",
+         "sha256" : "80fbc403775d76473ea8c0182d8f68ecd9f10b77256b9b1de813bbbbbda172b0",
+         "source_book_file" : "companion/research/gdc_tp53/support/BookGDCMutationProteinTrack.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/gdc_tp53/support/BookGDC_Lattice_gscatter_over_bed_track.sas",
+         "sha256" : "fa07fcdaf1a9b73cf657e63c1805f4f038c190309722640158ef3420e9753b18",
+         "source_book_file" : "companion/research/gdc_tp53/support/BookGDC_Lattice_gscatter_over_bed_track.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/gdc_tp53/support/BookGDC_adj_grpnum4close_gene_bed_regs.sas",
+         "sha256" : "83342c1358b102c16277ea5c135395e1ebeff9c112fd6ccaec8f5e91f807c35c",
+         "source_book_file" : "companion/research/gdc_tp53/support/BookGDC_adj_grpnum4close_gene_bed_regs.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/local_gtf_tracks/data/track_annotation.tsv",
+         "sha256" : "9e7bda6ad0ddb9d64ab1e437ca4f5f522741d2ac2f60b4840d2bb0e0d3d25b70",
+         "source_book_file" : "companion/research/local_gtf_tracks/data/track_annotation.tsv"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/mutation_tracks/definitions/Get_All_Var_Info.sas",
+         "sha256" : "5a46b5862284d2fe277f4a09541d66997e6b8ec90e7407ab77a308b9acc8e51a",
+         "source_book_file" : "companion/research/mutation_tracks/definitions/Get_All_Var_Info.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/mutation_tracks/definitions/Long_format_muts2ProteinTrack.sas",
+         "sha256" : "1a5b733f9f63d04576ba6750da3bea6881a060499363bc1b652647717d16ff71",
+         "source_book_file" : "companion/research/mutation_tracks/definitions/Long_format_muts2ProteinTrack.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/mutation_tracks/definitions/Long_format_muts2genetrack.sas",
+         "sha256" : "6d7c7897e47411357db3ad7d7f3782aa47542bccaaf7d6f93c20c7a715c7a86d",
+         "source_book_file" : "companion/research/mutation_tracks/definitions/Long_format_muts2genetrack.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/mutation_tracks/definitions/get_num_or_char_vars4dsd.sas",
+         "sha256" : "784cba0422727c776397e4f303c1d41f5cbe1b41ea5997e2a0e6b124ccf6c5d5",
+         "source_book_file" : "companion/research/mutation_tracks/definitions/get_num_or_char_vars4dsd.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/mutation_tracks/definitions/idx4list_in_alphabet_ord.sas",
+         "sha256" : "e01e804d905cc0e962c614b68264c2541947576aef35f5fe5b8e039bc3d12ded",
+         "source_book_file" : "companion/research/mutation_tracks/definitions/idx4list_in_alphabet_ord.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/mutation_tracks/definitions/long2wide4multigrpsSameTypeVars.sas",
+         "sha256" : "ae4418f2a7d191c9cf56b92ae219a667a29ea188cb88082726dbf0a0211072a2",
+         "source_book_file" : "companion/research/mutation_tracks/definitions/long2wide4multigrpsSameTypeVars.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/mutation_tracks/definitions/quotelst.sas",
+         "sha256" : "f6c764965f3c83fe8b7afaa34da8961e510cc0da646bf73c53e09fef9c959ad2",
+         "source_book_file" : "companion/research/mutation_tracks/definitions/quotelst.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/publication_figures/support/publication_style.sas",
+         "sha256" : "eb25fd985be3b0d25c9eff92eb527f417bc8f9b7d4a21536cb1f5c352ac968b0",
+         "source_book_file" : "companion/research/publication_figures/support/publication_style.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/track_proportions/support/cnv_display.sas",
+         "sha256" : "47376c2424c7c529ceb5910d5ccdd5dd4768de02ca2e07b36a5d1e3e9e52d2be",
+         "source_book_file" : "companion/research/track_proportions/support/cnv_display.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/track_proportions/support/mutation_compact.sas",
+         "sha256" : "a2bd370010b6154b6e206926d2f624ba9f7a4a9f05f9185ac1070db1aeb33384",
+         "source_book_file" : "companion/research/track_proportions/support/mutation_compact.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/track_proportions/support/track_display.sas",
+         "sha256" : "72d50962bdeedb63e84f820e9f71a2b55e85783bbd8be555f09fc8b97359be1c",
+         "source_book_file" : "companion/research/track_proportions/support/track_display.sas"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/clustergram_branches/data/expression40_long.tsv",
+         "sha256" : "7c496968599c58218c953953b77d3d1852088af4194a978ea01516dacfaf0bba",
+         "source_book_file" : "companion/research/clustergram_branches/data/expression40_long.tsv"
+      },
+      {
+         "adapted" : false,
+         "file" : "companion/research/clustergram_branches/data/gtex_v26_genes.json",
+         "sha256" : "47b219d42fe2702862857fcf521703b766afec61b1146dae999a71e91f31d184",
+         "source_book_file" : "companion/research/clustergram_branches/data/gtex_v26_genes.json"
+      }
+   ],
+   "multigwas_base_commit" : "8679d7e6136c52fef9de518b042a6a010494a850",
+   "oncoprint" : {
+      "changes" : "Parameterize the original event-glyph design, derive dimensions/formats from validated input tables, preserve events and callability denominators, explicit return code and negative contracts; invented fixture retained as invented.",
+      "macro_sha256" : "ec29172e083c1769e878fef6ff7b50c7fee3a55217e04e0065a1e47554bab697",
+      "new_macro" : "companion/research/multigwas_port/MGXOncoPrint.sas",
+      "original_program" : "companion/research/publication_figures/programs/pub_oncoprint.sas",
+      "original_sha256" : "745b2b64fe9b025c990389b4ff0d41107c146882b5944e5d1750653e997f3683",
+      "template_sha256" : "617cac5dfddce55f13314f427c5b2fe570db25e58519af63e066ee3d91930470"
+   },
+   "scope" : "Optional isolated-session visualization package. Original source files copied exactly; current scoped derivatives retain explicit Book names. No normal GWAS pipeline entrypoint or original user working file changed.",
+   "source_book_commit" : "43160affa592212604fb227da3f4ea992c680ded",
+   "source_book_update_branch" : "chapter17-track-layout",
+   "verification_tools" : [
+      {
+         "file" : "tests/validate_visualization.pl",
+         "sha256" : "1c040e335a0640e6fb17506037c4304a4b3439059f5a7763285585afa8ec9093"
+      },
+      {
+         "file" : "tests/lib/BookTrackSVG.pm",
+         "sha256" : "25314df27c37484cf4a4646269c0020c75a3734ded0dca41326a2e86e851788c"
+      },
+      {
+         "file" : "load_visualization.sas",
+         "sha256" : "cfdc720152de2f46ef3753511dda20ffe361bbebc6fa58e231439698d37b3622"
+      },
+      {
+         "file" : "companion/reader/lessons.json",
+         "sha256" : "de7a9472763ec48ddbd99a4410034eea0ff6537fb290c06eda306964b42d1b5d"
+      }
+   ]
+}

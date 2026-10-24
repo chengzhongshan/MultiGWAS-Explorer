@@ -1,0 +1,5 @@
+sample,sample_index,cohort,gene,gene_index,callable,n_variants,truncating,splice,inframe,missense
+C1,1,ArmA,GENE1,1,1,2,1,0,0,1
+C1,1,ArmA,GENE2,2,0,0,0,0,0,0
+C2,2,ArmB,GENE1,1,1,1,0,1,0,0
+C2,2,ArmB,GENE2,2,,0,0,0,0,0

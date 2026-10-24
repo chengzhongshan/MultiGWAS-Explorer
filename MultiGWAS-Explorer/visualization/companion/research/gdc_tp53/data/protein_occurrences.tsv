@@ -1,0 +1,11 @@
+marker	chr	pos	panel	mutation_type
+W53Ter	1	53	LUAD	Nonsense
+R175H	1	175	BRCA	Missense
+R175H	1	175	LUAD	Missense
+Y220C	1	220	BRCA	Missense
+Y220C	1	220	LUAD	Missense
+R248Q	1	248	BRCA	Missense
+R273H	1	273	BRCA	Missense
+R273H	1	273	LUAD	Missense
+R342Ter	1	342	BRCA	Nonsense
+R342Ter	1	342	LUAD	Nonsense

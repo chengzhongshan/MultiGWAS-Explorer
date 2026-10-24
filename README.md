@@ -179,3 +179,7 @@ and [platform installation checks](https://github.com/chengzhongshan/MultiGWAS-E
 The main entry points are `auto_prepare_and_run_diff_gwas_with_gnuplot.pl`
 for local gnuplot and `auto_prepare_and_run_diff_gwas.pl` for SAS ODA. Their
 historical filenames are retained for compatibility.
+
+## Optional SAS expression and mutation visualizations
+
+[Clustergrams, branch selection, protein/gene mutation tracks and the reusable oncoprint macro](MultiGWAS-Explorer/visualization/README.md) are available as an isolated-session module. It includes small public or explicitly invented inputs, complete SAS sources, execution evidence, numerical checks and a figure gallery. It leaves the existing differential-GWAS entrypoints unchanged.

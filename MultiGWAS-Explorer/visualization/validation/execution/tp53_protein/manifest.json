@@ -1,0 +1,413 @@
+{
+   "artifacts" : [
+      {
+         "bytes" : 382,
+         "name" : "mutation_long.csv",
+         "sha256" : "c013f2201ba6bab606516971ea96d88131aeb69423a1ec0cf70bbd00d3368116"
+      },
+      {
+         "bytes" : 221,
+         "name" : "mutation_wide.csv",
+         "sha256" : "ca1a0988d47a5b73f59d557914ddeb44e00f6f76ced7d2be74f5ae412ec21ba7"
+      },
+      {
+         "bytes" : 2385,
+         "name" : "mutation_plot.csv",
+         "sha256" : "49daf3a6266fa71065e53cc78a1bdc437142e721cb3fd03db3967844afd9bc82"
+      },
+      {
+         "bytes" : 2675,
+         "name" : "track_display.csv",
+         "sha256" : "5550e719f36bb6b9cc9cd4d8b7f34b6400dc79a7587ce5d82801b76f962b4ae0"
+      },
+      {
+         "bytes" : 74,
+         "name" : "track_checks.csv",
+         "sha256" : "76d5b8c9c137c314c2978645cb24ec45d97ca8357c56a1e3ef75003899a2f7b8"
+      },
+      {
+         "bytes" : 2675,
+         "name" : "mutation_compact_display.csv",
+         "sha256" : "5550e719f36bb6b9cc9cd4d8b7f34b6400dc79a7587ce5d82801b76f962b4ae0"
+      },
+      {
+         "bytes" : 2675,
+         "name" : "chapter17_display.csv",
+         "sha256" : "5550e719f36bb6b9cc9cd4d8b7f34b6400dc79a7587ce5d82801b76f962b4ae0"
+      },
+      {
+         "bytes" : 18,
+         "name" : "chapter17_compare.csv",
+         "sha256" : "96be3a3c6a7052dd0bf8e823bd5a48872b590a26b7abdcb444b2a086b77a2653"
+      },
+      {
+         "bytes" : 90,
+         "name" : "chapter17_layout_parameters.csv",
+         "sha256" : "f29815a7bf081a48e872767bed260d4e4773b622b46882f6e13d4b1b2bf2bbe7"
+      },
+      {
+         "bytes" : 90,
+         "name" : "environment.csv",
+         "sha256" : "a2215430537060657ee28832aaf1cd3cbe0439f552a0ff8493f0c8d832ef9b35"
+      },
+      {
+         "bytes" : 103448,
+         "name" : "gdc_tp53_protein.png",
+         "sha256" : "ba0232368ecb7525d9f429c8549a4433db4b5ba1a08185c116d5c8001bde76b1"
+      },
+      {
+         "bytes" : 42581,
+         "name" : "gdc_tp53_protein.svg",
+         "sha256" : "f6044fafeb1e690b6b098466f30f7940016f59b8f6e1cc2b47048186c48f07d1"
+      },
+      {
+         "bytes" : 5119,
+         "name" : "gdc_tp53_protein_native_template.sas",
+         "sha256" : "72acc414f77270a8cc7e5e35a4ec5a8fc10f53c6290446db045c1ee5890bdaf1"
+      },
+      {
+         "bytes" : 5171,
+         "name" : "gdc_tp53_protein_template.sas",
+         "sha256" : "ed69f079125cc1b85315d46eeb00492b9f893f868f9469565cb57bebaa15c3d6"
+      },
+      {
+         "bytes" : 5109,
+         "name" : "publication_template.sas",
+         "sha256" : "b3c3491ec3ce12851eb5e268239280a5075698822dbf828f72dbd593a8a7d45b"
+      },
+      {
+         "bytes" : 5845,
+         "name" : "track_template.sas",
+         "sha256" : "c5b83c7ae4524ea51dc5a227853f21c96aa22b1669619786da3551a1cd23b393"
+      },
+      {
+         "bytes" : 5622,
+         "name" : "track_resolved_template.sas",
+         "sha256" : "5a3bbcc1abbd1a17fd82dfec07df6b5d8e40e80166733411896b00e48798914b"
+      },
+      {
+         "bytes" : 5919,
+         "name" : "mutation_compact_template.sas",
+         "sha256" : "576888262f14a6e1173cc4ca16b55a5f443b3c0675bcf508649a35b997013151"
+      },
+      {
+         "bytes" : 6243,
+         "name" : "mutation_compact_resolved.sas",
+         "sha256" : "6d26b81655657885e56442f6fba9285153e0a78ea411e174c91b59b00a047777"
+      },
+      {
+         "bytes" : 6492,
+         "name" : "ch17_before_template.sas",
+         "sha256" : "9aa4d6fc407c471fdfb8704a18977db8cebace89a81384c797b122d182e08f53"
+      },
+      {
+         "bytes" : 5930,
+         "name" : "ch17_template.sas",
+         "sha256" : "c0a695cd62f33cecb48465bb2d12ebce88fdae92ad9f557c89cccc90e95c3d03"
+      }
+   ],
+   "capture_complete" : true,
+   "client_sha256" : "2804db52325187308f632e893ab49609e7565805325d3fe6abcb6fa187b61662",
+   "dependencies" : [
+      {
+         "file" : "companion/research/advanced_figures/sources/definitions/ApplyFunc_rowwide.sas",
+         "sha256" : "b4358a27d8201e40ad5a022a934b1cc6ec07d79bb1c3d794ad0a4439f6ac0d2b"
+      },
+      {
+         "file" : "companion/research/advanced_figures/sources/definitions/Check_VarnamesInDsd.sas",
+         "sha256" : "a6db792971c64d48e22b195fd53966bdbdc91e4c803ab79d70942c53bdf6682a"
+      },
+      {
+         "file" : "companion/research/advanced_figures/sources/definitions/FileOrDirExist.sas",
+         "sha256" : "c91a9c1d733754fd8f9e9b2505f9d8d58cf3ccfc3b4e67178286c50ec2690d1a"
+      },
+      {
+         "file" : "companion/research/advanced_figures/sources/definitions/GetVarAttrib.sas",
+         "sha256" : "09873a0c0766679f44d0c8cc4d0cfd6f97033009252d2ab9173f7bf1c431dfbb"
+      },
+      {
+         "file" : "companion/research/advanced_figures/sources/definitions/GetVarType.sas",
+         "sha256" : "16b42fd337a854fe7a8d7646238105af4594d2392a48eb04215dfbc2008d74ee"
+      },
+      {
+         "file" : "companion/research/advanced_figures/sources/definitions/Lattice_gscatter_over_bed_track.sas",
+         "sha256" : "b4635d9e9d527d396d159509d9227dcc8b8f1ffcff3dd5269f53dad0b8fa84a6"
+      },
+      {
+         "file" : "companion/research/advanced_figures/sources/definitions/Manhattan4DiffGWASs_png.sas",
+         "sha256" : "845beef917b6554eafea2d259fef7a0c19403c9bc7888337a6311e763006433d"
+      },
+      {
+         "file" : "companion/research/advanced_figures/sources/definitions/Multgscatter_with_gene_exons.sas",
+         "sha256" : "cd13b83142cffee4220707dc33324d00ba93fccbb4b4f40260799090d7e0363d"
+      },
+      {
+         "file" : "companion/research/advanced_figures/sources/definitions/OpenSVG_Printer.sas",
+         "sha256" : "eb9a7c66ee08805fb61f9967765c2cd3b2c8ae42e8cdea5aa6465f8749bfa1f5"
+      },
+      {
+         "file" : "companion/research/advanced_figures/sources/definitions/QQplot.sas",
+         "sha256" : "3504b88f0c996f2988d5f710079afd170cb298ad66389d75eb9e72c342d6f6b3"
+      },
+      {
+         "file" : "companion/research/advanced_figures/sources/definitions/QueryLD_SNPs_at_Haploreg4.sas",
+         "sha256" : "1a94c4d838efff1f3e7cae430ab6abd2241e21026d35fc15dfd4f7befedfc4df"
+      },
+      {
+         "file" : "companion/research/advanced_figures/sources/definitions/RandBetween.sas",
+         "sha256" : "491406ff03b14d1d1e72ae6a5e6fb4f566049922d2219162105021c64b6eedeb"
+      },
+      {
+         "file" : "companion/research/advanced_figures/sources/definitions/Rename_Del_Rgx4All_Vars.sas",
+         "sha256" : "3fd47444266b4f2a4b1b31cf1e6adafa98e9f61e356ba1d273a2c4b301e94204"
+      },
+      {
+         "file" : "companion/research/advanced_figures/sources/definitions/SNP_Local_Manhattan_With_GTF.sas",
+         "sha256" : "8221ec587aafa3d079a1e9d1441a22408689e9fb7bd3588afab102e8bf0c9982"
+      },
+      {
+         "file" : "companion/research/advanced_figures/sources/definitions/TotVarsInDsd.sas",
+         "sha256" : "cc5882b0681ba2a39a9c0bfbc72104b9168e90656f68d8700dfefba268c7d642"
+      },
+      {
+         "file" : "companion/research/advanced_figures/sources/definitions/add_fake_pos_by_grp4nonnegvars.sas",
+         "sha256" : "3af4c157ad847e1341e7ab25089e78071495d6f8e36446964b068cdd8c3fb2c0"
+      },
+      {
+         "file" : "companion/research/advanced_figures/sources/definitions/adj_grpnum4close_gene_bed_regs.sas",
+         "sha256" : "a34f471a9b20e4e89ea3a1d8d6458e608e8d72b4630a5dc4cba1a672749f2b5b"
+      },
+      {
+         "file" : "companion/research/advanced_figures/sources/definitions/adjust_close_positions.sas",
+         "sha256" : "d5936046e927d95a51935114fa0125ac9764644f276e2e549bf187780ee4eee4"
+      },
+      {
+         "file" : "companion/research/advanced_figures/sources/definitions/bed_region_plot_by_grp.sas",
+         "sha256" : "bdfc4f059d65fdf1ada175648b69bf124ac3a2a1b7dff60c063e616f8a0b167e"
+      },
+      {
+         "file" : "companion/research/advanced_figures/sources/definitions/beta2OR_forest_plot.sas",
+         "sha256" : "06e822cf994f9e83bdcbf63e7533783eace5bf1bec264142a62f406b599d32d5"
+      },
+      {
+         "file" : "companion/research/advanced_figures/sources/definitions/char_grp_to_num_grp.sas",
+         "sha256" : "0791cbe0cef3d68e09ade75ade961ca637a3c2a317140cec3cb1d0625bd449cd"
+      },
+      {
+         "file" : "companion/research/advanced_figures/sources/definitions/check_var_type.sas",
+         "sha256" : "0cae3183c34519b640e4b752392cf86a0ebe7fcbc33ab389165c68a435a57dde"
+      },
+      {
+         "file" : "companion/research/advanced_figures/sources/definitions/delete_empty_dsd.sas",
+         "sha256" : "f29539fa946053ab1d123b987bab913b4e21c4905042bb47b651caa2a3bd7311"
+      },
+      {
+         "file" : "companion/research/advanced_figures/sources/definitions/format_xaxis_with_numeric_order.sas",
+         "sha256" : "89987e6a204eef11cd31389c126fb826370f52f6fede5103a353be815a349104"
+      },
+      {
+         "file" : "companion/research/advanced_figures/sources/definitions/get_tgt_hits4Manhattan.sas",
+         "sha256" : "68ff2d36c92bdc8656efcf2e9d697a5f7095020b6ea47cd250babb8fa171e170"
+      },
+      {
+         "file" : "companion/research/advanced_figures/sources/definitions/get_top_hits4Manhattan.sas",
+         "sha256" : "853cbf6f3f95ad5bce4f5b15914ed6e8ffcb0f83425de9e3a1010d00546f68b2"
+      },
+      {
+         "file" : "companion/research/advanced_figures/sources/definitions/get_top_signal_with_ld.sas",
+         "sha256" : "445fd144acb95fd3d278ef76624438604d2a6763ad1619ef5cd1c89a5daea334"
+      },
+      {
+         "file" : "companion/research/advanced_figures/sources/definitions/get_top_signal_within_dist.sas",
+         "sha256" : "76610f9774050433acf2a7c8f6963bd2279f84dad955e08c18f776662800db5c"
+      },
+      {
+         "file" : "companion/research/advanced_figures/sources/definitions/iscolallmissing.sas",
+         "sha256" : "a4504bec5254da9d3ed9475ee1ddbb59999af7bdbf60dab0d7216d546c02a090"
+      },
+      {
+         "file" : "companion/research/advanced_figures/sources/definitions/make_fake_axis4NegPosVal_by_grps.sas",
+         "sha256" : "b04b22f9bd169e4ecba0c7aebe2dbe3b7d5f3c6254da225def1c19bf28ae0ed4"
+      },
+      {
+         "file" : "companion/research/advanced_figures/sources/definitions/make_fake_axis_values4grps.sas",
+         "sha256" : "c2f746994c936c6b090eaaa2fd29aa6f7192cfc983604b3f54aa2447a1a55cb2"
+      },
+      {
+         "file" : "companion/research/advanced_figures/sources/definitions/map_grp_assoc2gene4covidsexgwas.sas",
+         "sha256" : "66324dec9aacbfef434e0057e3e61f8764265ca9fb83d3e6bd9fa25812e22d59"
+      },
+      {
+         "file" : "companion/research/advanced_figures/sources/definitions/mkfmt4grps_by_var.sas",
+         "sha256" : "8e5c115b8b509d9abc1476b918121c21dfe1f443f0c45ee190fa738114e31771"
+      },
+      {
+         "file" : "companion/research/advanced_figures/sources/definitions/ntokens.sas",
+         "sha256" : "4586bfd504705c030cc1bcbbb17f3feea8b90534425bef52027ba2be545996dc"
+      },
+      {
+         "file" : "companion/research/advanced_figures/sources/definitions/numargs.sas",
+         "sha256" : "efd7dd902ff46b2c0e3245fefccd6d3539ba18bfdfd28c599669ac226e395c19"
+      },
+      {
+         "file" : "companion/research/advanced_figures/sources/definitions/number_rows_by_grp.sas",
+         "sha256" : "e736ac1f090d0dc5d4e5d34be6880427731d34ac63d536a7fc42602ad103225f"
+      },
+      {
+         "file" : "companion/research/advanced_figures/sources/definitions/nums_in_range_adj_scale.sas",
+         "sha256" : "210820d1aef68ab23967bd21a3216fdc30f73658cdd2e0c061547e8c0cf2a59f"
+      },
+      {
+         "file" : "companion/research/advanced_figures/sources/definitions/rank4grps.sas",
+         "sha256" : "77734b3bbf2898db0760005afb2bf74adb76594eac017699b8b796b12fd9434f"
+      },
+      {
+         "file" : "companion/research/advanced_figures/sources/definitions/rows_in_sas_dsd.sas",
+         "sha256" : "8f9bf49786fbf6a8b3ebfa226c6ad161b75936afc6c2349802be5975fc6f5f1a"
+      },
+      {
+         "file" : "companion/research/advanced_figures/sources/definitions/sas_dsd_exist.sas",
+         "sha256" : "088ea9e369e6ac22ed2119f5d0992315ff238bdd51cc07271a27a227b171d95c"
+      },
+      {
+         "file" : "companion/research/advanced_figures/sources/definitions/scale_nums_in_list.sas",
+         "sha256" : "0f158ac4d162fc36e4436a73de89cdb288da56ff91306782b9346e996a48adc3"
+      },
+      {
+         "file" : "companion/research/advanced_figures/sources/definitions/select_element_range_from_list.sas",
+         "sha256" : "ad5038488e01636467c634039f6671b981547042a654949e7779e89dc8bc4451"
+      },
+      {
+         "file" : "companion/research/advanced_figures/sources/definitions/spaceAdjust.sas",
+         "sha256" : "5dc2099743da5f6e0be5296fd4f97c518a300d96d097306833a6aa07ddcf59f4"
+      },
+      {
+         "file" : "companion/research/advanced_figures/sources/definitions/totobsindsd.sas",
+         "sha256" : "ed6675536c9f8a63d1bfc12a09c0bd494f9a507b4570c315521529247a121329"
+      },
+      {
+         "file" : "companion/research/advanced_figures/sources/definitions/varexist.sas",
+         "sha256" : "9cbd3380d553da88e035489f522e90e6d164221424ad298d0f783874fc216cea"
+      },
+      {
+         "file" : "companion/research/mutation_tracks/definitions/Get_All_Var_Info.sas",
+         "sha256" : "5a46b5862284d2fe277f4a09541d66997e6b8ec90e7407ab77a308b9acc8e51a"
+      },
+      {
+         "file" : "companion/research/mutation_tracks/definitions/Long_format_muts2ProteinTrack.sas",
+         "sha256" : "1a5b733f9f63d04576ba6750da3bea6881a060499363bc1b652647717d16ff71"
+      },
+      {
+         "file" : "companion/research/mutation_tracks/definitions/Long_format_muts2genetrack.sas",
+         "sha256" : "6d7c7897e47411357db3ad7d7f3782aa47542bccaaf7d6f93c20c7a715c7a86d"
+      },
+      {
+         "file" : "companion/research/mutation_tracks/definitions/get_num_or_char_vars4dsd.sas",
+         "sha256" : "784cba0422727c776397e4f303c1d41f5cbe1b41ea5997e2a0e6b124ccf6c5d5"
+      },
+      {
+         "file" : "companion/research/mutation_tracks/definitions/idx4list_in_alphabet_ord.sas",
+         "sha256" : "e01e804d905cc0e962c614b68264c2541947576aef35f5fe5b8e039bc3d12ded"
+      },
+      {
+         "file" : "companion/research/mutation_tracks/definitions/long2wide4multigrpsSameTypeVars.sas",
+         "sha256" : "ae4418f2a7d191c9cf56b92ae219a667a29ea188cb88082726dbf0a0211072a2"
+      },
+      {
+         "file" : "companion/research/mutation_tracks/definitions/quotelst.sas",
+         "sha256" : "f6c764965f3c83fe8b7afaa34da8961e510cc0da646bf73c53e09fef9c959ad2"
+      },
+      {
+         "file" : "companion/research/gdc_tp53/support/BookGDCDropCoordinates.sas",
+         "sha256" : "073395bc73db6c5b0c98689416cc4ba434c53bee99611c83314317e384a5e9af"
+      },
+      {
+         "file" : "companion/research/gdc_tp53/support/BookGDCMutationProteinTrack.sas",
+         "sha256" : "80fbc403775d76473ea8c0182d8f68ecd9f10b77256b9b1de813bbbbbda172b0"
+      },
+      {
+         "file" : "companion/research/gdc_tp53/support/BookGDCMutationGeneTrack.sas",
+         "sha256" : "c906558db0da71dd9207e7fa2b6299831e8ce6865cf6948655ec521d8cf33323"
+      },
+      {
+         "file" : "companion/research/gdc_tp53/support/BookGDC_adj_grpnum4close_gene_bed_regs.sas",
+         "sha256" : "83342c1358b102c16277ea5c135395e1ebeff9c112fd6ccaec8f5e91f807c35c"
+      },
+      {
+         "file" : "companion/research/gdc_tp53/support/BookGDC_Lattice_gscatter_over_bed_track.sas",
+         "sha256" : "fa07fcdaf1a9b73cf657e63c1805f4f038c190309722640158ef3420e9753b18"
+      },
+      {
+         "file" : "companion/reader/figure_support.sas",
+         "sha256" : "b068fea66f3e0be04a2744b40f20f789ec08b461e422a33503d9295e5cc0ca32"
+      },
+      {
+         "file" : "companion/reader/regional_scope.sas",
+         "sha256" : "f01612344dd6328982a5bf79ae06f8468f4cbc99ae7c8fcf229081e7cb6bca3c"
+      },
+      {
+         "file" : "companion/research/publication_figures/support/publication_style.sas",
+         "sha256" : "eb25fd985be3b0d25c9eff92eb527f417bc8f9b7d4a21536cb1f5c352ac968b0"
+      },
+      {
+         "file" : "companion/research/track_proportions/support/track_display.sas",
+         "sha256" : "72d50962bdeedb63e84f820e9f71a2b55e85783bbd8be555f09fc8b97359be1c"
+      },
+      {
+         "file" : "companion/research/track_proportions/support/mutation_compact.sas",
+         "sha256" : "a2bd370010b6154b6e206926d2f624ba9f7a4a9f05f9185ac1070db1aeb33384"
+      },
+      {
+         "file" : "companion/research/ch17_layout/support/chapter17_layout.sas",
+         "sha256" : "035fd343c6581f5cb8e06aff611c120058c70f0227bfd769af864a1e11168c86"
+      }
+   ],
+   "endpoint" : "http://127.0.0.1:18841/mcp",
+   "exit_code" : 0,
+   "expected" : "COMPLETE",
+   "expected_outcome_observed" : true,
+   "inputs" : [
+      {
+         "remote" : "~/mgxviz_1792854933_2695_protein_occurrences.tsv",
+         "sha256" : "126616517523d2b86a7ee507b5a29ab84f0b43387f00a8ea955707b79911f431",
+         "source" : "companion/research/gdc_tp53/data/protein_occurrences.tsv"
+      },
+      {
+         "remote" : "~/mgxviz_1792854933_2695_tp53_protein_features.tsv",
+         "sha256" : "8d806f9298ba425d660a359df7e15ef59b5c016e6e830cd2d3cddefcb189e85e",
+         "source" : "companion/research/gdc_tp53/data/tp53_protein_features.tsv"
+      }
+   ],
+   "job_pid" : 2746,
+   "lesson" : "tp53_protein",
+   "log_sha256" : "4202930f9abe99040ca28853424582b67c5afa6d3caedad89a46bf2168cee509",
+   "persistent" : false,
+   "remote_output" : "~/mgxviz_1792854933_2695",
+   "rpc" : [
+      "rpc_1.json",
+      "rpc_2.json",
+      "rpc_3.json",
+      "rpc_4.json",
+      "rpc_5.json",
+      "rpc_6.json",
+      "rpc_7.json",
+      "rpc_8.json",
+      "rpc_9.json",
+      "rpc_10.json",
+      "rpc_11.json",
+      "rpc_12.json",
+      "rpc_13.json",
+      "rpc_14.json",
+      "rpc_15.json",
+      "rpc_16.json",
+      "rpc_17.json",
+      "rpc_18.json"
+   ],
+   "scope" : "Actual plotting/teaching submission; no upstream study or native IDE transcript implied",
+   "source" : "companion/research/ch17_layout/programs/ch17_gdc_tp53_protein.sas",
+   "source_sha256" : "6d6b634c058d0eb9df8086377455377223025c71ba5dae993da00ee99a7cc627",
+   "status" : "COMPLETE",
+   "submitted_sha256" : "1dc6b8d43dd2c294b195f0944d997ec5a8337139a962094dac7a2f894e446f04",
+   "target" : "oda",
+   "variant" : "baseline"
+}

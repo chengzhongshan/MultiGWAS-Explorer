@@ -1,0 +1,24 @@
+define statgraph HeatDendrogram;
+   begingraph / designheight=1050 designwidth=950;
+      rangeattrmap name='cgscale';
+         range -3 - 3 / rangecolormodel=(CX2166AC CXF7F7F7 CXB2182B);
+      endrangeattrmap;
+      rangeattrvar var=DIST attrmap='cgscale' attrvar=RangeVar;
+      layout lattice / rowdatarange=union columndatarange=union rows=2 columns=2 borderattrs=(color=white) columnweights=(0.17 0.83) rowweights=(0.14 0.86);
+         layout overlay;
+            entry ' ';
+         endlayout;
+         layout overlay / xaxisopts=(display=none) yaxisopts=(display=none) walldisplay=none;
+            dendrogram nodeID=Y_NAME_ parentID=Y_PARENT_ clusterheight=Y_HEIGHT_;
+         endlayout;
+         layout overlay / xaxisopts=(display=none reverse=true) yaxisopts=(display=none reverse=true) walldisplay=none;
+            dendrogram nodeID=X_NAME_ parentID=X_PARENT_ clusterheight=X_HEIGHT_ / orient=horizontal;
+         endlayout;
+         layout overlay / walldisplay=none yaxisopts=(display=none reverse=true displaysecondary=(tickvalues) discreteopts=(tickvaluefitpolicy=none) TICKVALUEATTRS=(style=normal size=12 family="Albany AMT")) xaxisopts=(display=(tickvalues) TICKVALUEATTRS=(style=normal size=12 family=
+            "Albany AMT") discreteopts=(tickvaluefitpolicy=rotate TICKVALUEROTATION=vertical));
+            heatmapparm y=COL x=ROW colorresponse=RangeVar / name="ht";
+            continuouslegend "ht" / location=outside valign=bottom border=false title="Within-gene Z of log2(median TPM + 1)" valuecounthint=7;
+         endlayout;
+      endlayout;
+   endgraph;
+end;
