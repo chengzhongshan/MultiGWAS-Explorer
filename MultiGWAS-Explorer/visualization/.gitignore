@@ -1,0 +1,5 @@
+.runs/
+local_*.sas
+/*.log
+!validation/**/sas.log
+!validation/**/*.png

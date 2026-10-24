@@ -1,0 +1,596 @@
+%macro SNP_Local_Manhattan_With_GTF(
+/*Note: this macro can draw CNVs and SNVs together. Please ensure the macro variable
+Variant_Length_Var is not empty, which contains distance of these CNVs (>1), with non-CNVs
+assigned with missing value, and the middle positions of these CNVs is required to be 
+combined with that of SNVs and gene tracks!
+
+Tip 1: when there gene labels are cluttered within the gene track, it is feasible to 
+resolve the issue by increasing the values for either variable pct4neg_y or dist2sep_genes or both!
+such as pct4neg_y and dist2sep_genes=1000000; alternatively, it also possible to address the problem
+by increase the width of figure, such as assigning larger value to the macro variable track_width=800.
+
+  Tip 2: the figure width and height should ideally set around 500 and no less then 300 or greater than
+1000, as large figures are not good for publication purpose! 
+
+  Tip 3: For SNP labels on the top, please try to use this parameter, which only works when 
+there are less than or equal to 3 top SNPs if track_width <= 500, or 4 top SNPs if track_width between 500 and 800, or 5 top SNPs if 
+track_width >=800, otherwise, this parameter will be excluded and even step will be used to separate them on the top!
+
+ Tip 4: dist_pct_to_cluster_pos and pct2adj4dencluste (0.0001 to ~) can affect the top SNP labels positions when there are <= 3 or 4, or 5 SNP labels, as the its value
+dist_pct_to_cluster_pos will be internally replaced as 0.5/total number of top SNPs, and pct2adj4dencluste will be changed differently
+when make_even_pos=1, the macro will multiple the amplification_fc with 10*pct2adj4dencluster to further enlarge the even distance among positions; 
+while if make_even_pos=0, it is useful when elements within a cluster is overlapped with each other or overlapped with elements from other cluster, 
+so it is also feasible to avoid this issue by increasing or reducing the pct.
+
+ Tip 5: In default, the scatterplot will use the transformed values of all variables inclued in the macro variable
+ZscoreVars into a variable for the lattice_subgrp_var to color dots differently across different scatter groups; User can supply
+an independent variable represented by the macro variable color_resp_var to color scatter plot dots but different scattergroups
+will be applied in a union style! 
+*/
+
+/*
+As this macro use other sub-macros, it is not uncommon that some global macro
+vars would be in the same name, such as macro vars chr and i, thus, to avoid of crash, 
+chr_var is used instead of macro var chr in this macro;*/
+/*
+Important: there are many other parameters of the sub-macro Lattice_gscatter_over_bed_track,
+which can be modified by changing the default values for them to improve the quality of final produced figure!
+*/
+
+focus_on_transcript=0,/*This will generate a subset exon GTF data set by 
+replacing gene variable with ensembl transcript variable and removing rows 
+with the type of "gene" and update transcript as "gene" to enable the macro
+to work on these transcripts instead of genes*/
+gwas_dsd=,
+chr_var=chr,
+AssocPVars=pval1 pval2,
+SNP_IDs=rs370604612 rs2070788 9:5114773,
+/*if providing chr:pos or chr:st:end, it will query by pos;
+Please also enlarge the dist2snp to extract the whole gene body and its exons,
+although the final plots will be only restricted by the input start and end positions!*/
+dist2snp=2000000,
+chromosome_lengths=,/*Comma-separated lengths for chromosomes 1-22, X, Y in the GWAS build.*/
+/*assign value in bp, and the final figure will be add extend this distance for both start and end positions*/
+SNP_Var=snp,
+Pos_Var=pos,
+Variant_Length_Var=,/*this variable if not empty, its value will be used to extend the value of Pos_Var for making 
+the start and end position for SNP_Var, i.e., st=&Pos_Var-0.5*&Variant_Length_Var and end=&Pos_Var-0.5*&Variant_Length_Var;
+This would be especially helpful for mixing CNV and SNV data for making scatter plots, as it is only necessary
+to provide middle position for CNVs and its lengths for ploting CNVs and SNVs together!
+*/
+gtf_dsd=FM.GTF_HG19,
+ZscoreVars=zscore1 zscore2,/*Can be beta1 beat2 or other numberic vars indicating assoc or other +/- directions,
+the values of which can be used to color scatter plots of association signals specifically for its corresponding scatter
+plot group membership for the following gwas labels. Please ensure makedotheatmap=1 and the input zscoreVars 
+are in the same type of variable that can be used properly along with the heatmap feature*/ 
+gwas_labels_in_order=gwas1 gwas2,/*If providing _ for labeling each GWAS, 
+the _ will be replaced with empty string, which is useful when wanting to remove gwas label 
+if only one scatterplot or the label for a gwas containing spaces;
+The list will be used to label scatterplots 
+by the sub-macro map_grp_assoc2gene4covidsexgwas*/
+design_width=500,/*Best width for publication, and usually used width rangs from 400 to 800*/ 
+design_height=500,/*Best height for publication, and usally used height rangs from 400 to 800*/
+image_dpi=300,/*Raster output DPI; the SAS ODA wrapper uses 150 to limit Java memory.*/
+barthickness=10, /*gene track bar thinkness*/
+dotsize=6,/*scatter data point size for the following macro variable scattermarker_symbol*/
+grp_font_size=8,/*font size for gene labels in the bottom gene track*/
+
+/*Important parameters for drawing SNVs and CNVs together*/
+scattermarker_symbol=circlefilled,/*Assign specific marker symbol, such as ibeam, circlefilled, circle, dot, squarefilled, or square, for scatter plot;
+Note the size of the designated marker symbol will be defined by the macro variable dotsize; when creating heatmap, you can assign
+squarefilled to the scattermarker_symbol, which would be more compatable with the highlow line style in for CNV or bed regions!*/ 
+highlow_line_cmd=%str(thickness=6 color=darkorange pattern=solid),/*For CNV bed regions, customize the following parameters using dot, dash, or solid line pattern 
+with custome thickness and color for the line; please increase the thickness to match with that of 
+dotsize=10 when scattermarker_symbol=squarefilled for the scatter plot, which will enable the square and the line
+in the same size and color*/
+
+dist2sep_genes=100000,/*Distance to separate close genes into different rows in the gene track; provide negative value or 0
+to have all genes in a single row in the final gene track
+this will ensure these genes close to each other to 
+be separated in the final gene track; 
+(1) give 0 or negative value to plot ALL genes in the same line;
+(2) give value >0 and <1 to separate genes based on the pct distance to the whole region;
+(3) give value > 1 to use absolute distance to separate genes into different groups;
+Customize this for different gene exon track!*/
+where_cndtn_for_gwasdsd=%str(), /*where condition to filter input gwas_dsd*/
+
+shift_text_yval=0.1, /*in terms of gene track labels, add positive or negative vale, ranging from 0 to 1, 
+                      to liftup or lower text labels on the y axis; the default value is -0.2 to put gene lable under gene tracks;
+                      Change it with the macro var pct4neg_y!*/
+fig_fmt=png, /*output figure formats: svg, png, jpg, and others*/
+pct4neg_y=2, /*the most often used value is 1;
+              compacting the bed track y values by increasing the scatterplot scale, 
+              which can reduce the bed trace spaces; It seems that two-fold increasement
+              leads to better ticks for different tracks!
+              Use value >1 will increase the gene tract, while value < 1 will reduce it!
+              Note: when there are only 1 or 2 scatterplots, it is better to provide value = 0.5;
+              Modify this parameter with the parameter shift_text_yval to adjust gene label!
+              Typically, when there are more scatterplots, it is necessary to increase the value of pct4neg_y accordingly;
+              If there are only <4 scatterplots, the value would be usually set as 1 or 2;
+              */
+adjval4header=-0.2, /*In terms of header of each subscatterplot, provide postive value to move up scatter group header by the input value*/
+makedotheatmap=1,/*use colormap to draw dots in scatterplot instead of the discretemap;
+Note: if makedotheatmap=1, the scatterplot will not use the discretemap mode based on
+the negative and postive values of lattice_subgrp_var to color dots in scatterplot
+Note: the macro is updated to use heatmap to illustrate positve and negative values
+of scatter plot represented by the variable ZscoreVars in the sub macros
+map_grp_assoc2gene4covidsexgwas=>Multgscatter_with_gene_exons (HERE inside the 1st submacro) 
+=>Lattice_gscatter_over_bed_track, and you can see the details by reading the 
+parameters for  the 2nd sub macro used by the 1st sub mcro;
+Set it as 0 to use binary mode to color the negative and postive values in scatter plot*/
+
+/*Main color scheme for coloring dots in scatter plot with your quantitative color response variable
+Note: it is necessary to have makedotheatmap=1 and use the default heatmap_var or other quantitative
+variable with both negative and positive values to color the scatter plot; when the quantitative response
+variable is postive or negative, please change the heatmap_min_neg_val as 0 for postive values, meanwhile,
+for all negative values, please assign value 0 to heatmap_max_pos_val*/
+heatmap_var=AssocGrp,/*This variable is generated by transposing all ZscoreVars into a long format internally by the macro,
+thus, do not change this macro variable, just update ZscoreVars accordingly; the macro uses this var to draw scatter plot in heatmap
+with rangeattrmap instead of drawing dots using binary mode, such as 0 and 1 representing Pos
+and negative directions of latticen_subgrp_var!*/
+heatmap_Neg_rangealtcolormodel=darkgreen lightgreen deepskyblue,/*Range alt color model for negative values, heatmap_var<=0,  in heatmap*/
+heatmap_Pos_rangealtcolormodel=gold mediumred vipk,/*Range alt color model for positve values, heatmap_var>=0, in heatmap*/
+heatmap_min_neg_val=-8,/*Minimum negative value for the heatmap_var when it is not empty; 
+change this to customize the minimum value for colorbar in heatmap*/
+heatmap_max_pos_val=8,/*Maximum postive value for the heatmap_var when it is not empty; 
+change this to customize the max value for colorbar in heatmap*/
+
+/*Alternative color scheme for categorical color response variable! Please keep it in default
+value if you don't want to use it for your quantitative color response variable*/
+
+color_resp_var=,/*Use the variable to draw colormap of dots in scatterplots with colors
+supplied by a later macro variable dataContrastCols that are specifically designated for 
+scatterplot dots but not other tracks under the scatter plots, such as gene tracks;.
+previously if the macro var is empty, the default var would be the same as that of yval_var;
+Later it is updated to enable the macro to use lattice_subgrp_var but not yval_var when 
+this color_resp_var is empty! A later macro variable dataContrastCols will be used 
+to supply colors for different groups of the variable solely for coloring scatterplot dots!*/
+fixedcols4tracksunderscatter=cyan blue, /*when color_resp_var is not empty, all tracks under scatterplots will be fixed with 
+two different colors, including cyan and blue, represented by the macro var fixedcols4tracksunderscatter!*/
+color_resp_grpdsd=,/*this dataset contains two columns, including &color_resp_var and the fixed
+variable numgrp4color_resp,which are corresponding to the unique char color_resp_var and 
+its associated numeric var that would be sorted to order these char color_resp_var in the final figure legend!
+Note: for color_resp_var not included in the dataset, they will be asigned as Others;
+Custom colors with the same number of unique color_resp_var for these groups can be provided to 
+a latter macro variable dataContrastCols*/
+dataContrastCols=%str(darkblue darkgreen darkred darkyellow 
+CXFFF000 CXFF7F00 CXFF00FF CXFF0000 CXEAADEA CXE6E8FA CXDB9370 CXDB70DB CXD9D919 CXD8D8BF 
+CXCD7F32 CXC0C0C0 CXBC8F8F CXB87333 CXB5A642 CXADEAEA CXA67D3D CXA62A2A CX9F9F5F CX9F5F9F 
+CX97694F CX8E236B CX8E2323 CX8C7853 CX8C1717 CX871F78 CX856363 CX855E42 CX70DB93 CX5F9F9F 
+CX5C4033 CX545454 CX4F2F4F CX4E2F2F CX32CD32 CX2F4F2F CX238E23 CX236B8E CX23238E CX00FFFF 
+CX00FF00 CX0000FF CX000000
+),
+/*Note: these colors will be used for the scatterplot and gene track together when color_resp_var is a char var, so it is difficult control*/
+
+makeheatmapdotintooneline=0,/*This will make all dots have the same yaxis value but have different colors 
+based on its real value in the heatmap plot; To keep the original dot y axis value, assign 0 to the macro var
+This would be handy when there are multiple subgrps represented by different y-axis values! By modifying
+the y-axis values for these subgrps, the macro can plot them separately in each subtrack!
+*/
+var4label_scatterplot_dots= ,/*Make sure the variable name is not grp, which is a fixed var used by the macro for other purpose;
+the variable should contain values of target SNPs and other non-targets are asigned with empty values;
+Whenever  makeheatmapdotintooneline=1 or 0, it is possible to use values of the var4label_scatterplot_dots to
+label specific scatterplot dots based on the customization of the variable predifined by users for the input data set; 
+default is empty; provide a variable that include non-empty strings for specific dots in the 
+scatterplots;*/
+SNPs2label_scatterplot_dots=, /*Add multiple SNP rsids to label dots within or at the top of scatterplot
+Note: if this parameter is provided, it will replace the parameter var4label_scatterplot_dots!
+If there are too much space on the top for these SNP labels, please manually change default value of
+the macro variable yoffset4max_drawmarkersontop included in the macro Lattice_gscatter_over_bed_track
+ from 0.2 to a smaller value, such as 0.1;
+*/
+LD_SNPs2mark_scatterplot_dots=, /*Optional space-delimited LD-linked SNPs overlaid with the selected marker on every association track.*/
+LD_marker_symbol=*, /*Marker text for LD-linked SNPs: *, +, x, o, s, ^, or d.*/
+LD_marker_color=black, /*SAS color name or CXrrggbb value for LD-linked SNP markers.*/
+LD_r2_values=, /*Space-delimited SNP:r2 pairs used by the optional LD heatmap overlay.*/
+LD_r2_var=LD_R2, /*Numeric LD column uploaded with the GWAS plotting dataset.*/
+LD_reference_snp=, /*Explicit LD reference SNP; falls back to the first labeled SNP when omitted.*/
+LD_display_mode=none, /*none, markers, heatmap, or both. LD display is opt-in.*/
+LD_heatmap_colormodel=CXF7FBFF CX6BAED6 CX54278F, /*Retained for legacy marker-overlay mode.*/
+LD_heatmap_legend_title=%str(LD r2),
+text_rotate_angle=90, /*Angle to rotate text labels for these selected dots by users*/
+label_position_overrides=, /*Optional SNP=BP list computed before SAS to avoid label collisions.*/
+font_size4textlabels=10, /*Actual text size used by the Perl label planner and SAS renderer.*/
+label_headroom_frac=,
+label_center_offset=,
+auto_rotate2zero=1, /*supply value 1 when there are <=3 text labels and you want them kept horizontal in the top headroom*/
+pct2adj4dencluster=2,/*Input value can be ranging from 0.0001 to 10 or even higher value!
+For SNP labels on the top, please try to use this parameter, which only works when 
+there are less than or equal to 3 top SNPs if track_width <= 500, or 4 top SNPs if track_width between 500 and 800, or 5 top SNPs if 
+track_width >=800, otherwise, this parameter will be excluded and even step will be used to separate them on the top!
+and SNPs within a cluster are overlapped with each other or overlapped with elements from other SNP cluster, so it is feasible to 
+avoid this issue by increasing the pct or reducing it, respectively*/
+yoffset4max_drawmarkersontop=0.25, /*If draw scatterplot marker labels on the top of track, 
+ this fixed value will be used instead of yaxis_offset4max!*/
+Yoffset4textlabels=3.5, /*Move up the text labels for target SNPs in specific fold; 
+the default value 2.5 fold works for most cases*/
+scatter_yaxis_label=%str(-log10%(P%)),/*Visible y-axis title for the stacked association tracks*/
+heatmap_legend_title=%str(Z score),/*Visible title for the continuous colorbar when heatmap coloring is enabled*/
+adj_spaces_among_top_snps=1,/*Provide value 1 to adjust spaces among top SNP labels; otherwise, give value 0 to not 
+adjust top SNPs labels if these labels are rotated 90 degree, which is helpful when the space adjusted labels are not pretty*/ 
+verbose=0 /*Not print any notes in SAS log*/
+);
+
+%local effective_ld_marker_var effective_ld_heatmap_var effective_heatmap_legend_title effective_plot_title _chrom_end_for_window;
+%let effective_ld_marker_var=;
+%let effective_ld_heatmap_var=;
+%let effective_heatmap_legend_title=&heatmap_legend_title;
+ 
+%*It is better to output these notes into the log for AI; 
+%*However, too large number of notes will slow down the pipeline dramatically;
+%*Thus, we will only print these notes when verbose=1;
+%if &verbose=0 %then %do;
+%put To prevent too many notes printed in the SAS log, we will enable options nonotes;
+options nonotes;
+%end;
+
+
+*Note: the macro map_grp_assoc2gene4covidsexgwas requires the input dsd contain the var chr;
+%if "&chr_var"^="chr" %then %do;
+data &gwas_dsd;
+set &gwas_dsd;
+chr=&chr_var;
+run;
+%end;
+
+*Add a compact star-overlay variable for LD-linked SNPs.;
+%if %length(&LD_SNPs2mark_scatterplot_dots)>0 and
+    (%upcase(&LD_display_mode)=MARKERS or %upcase(&LD_display_mode)=BOTH) %then %do;
+ %let effective_ld_marker_var=_LD_SNP_MARK_;
+ data &gwas_dsd;
+ set &gwas_dsd;
+ length _LD_SNP_MARK_ $8.;
+ _LD_SNP_MARK_="";
+ %do _li_=1 %to %ntokens(&LD_SNPs2mark_scatterplot_dots);
+   if &SNP_Var="%scan(&LD_SNPs2mark_scatterplot_dots,&_li_,%str( ))" then _LD_SNP_MARK_="&LD_marker_symbol";
+ %end;
+ run;
+%end;
+
+*Add a numeric r2 overlay variable from the uploaded LD_R2 column.;
+%if (%upcase(&LD_display_mode)=HEATMAP or %upcase(&LD_display_mode)=BOTH) %then %do;
+ %let effective_ld_heatmap_var=_LD_R2_;
+ data &gwas_dsd;
+ set &gwas_dsd;
+ _LD_R2_=&LD_r2_var;
+ %let _ld_reference_snp_=&LD_reference_snp;
+ %if %length(&_ld_reference_snp_)=0 %then %let _ld_reference_snp_=%scan(&SNPs2label_scatterplot_dots,1,%str( ));
+ %if %length(&_ld_reference_snp_)=0 %then %let _ld_reference_snp_=%scan(&SNP_IDs,1,%str( ));
+ if missing(_LD_R2_) and upcase(&SNP_Var)=upcase("&_ld_reference_snp_") then _LD_R2_=1;
+ %if %length(%superq(LD_r2_values))>0 %then %do;
+   %do _li_=1 %to %ntokens(&LD_r2_values);
+     %let _ld_pair_=%scan(&LD_r2_values,&_li_,%str( ));
+     if upcase(&SNP_Var)=upcase("%scan(&_ld_pair_,1,%str(:))") then
+       if missing(_LD_R2_) then _LD_R2_=input("%scan(&_ld_pair_,2,%str(:))",best32.);
+   %end;
+ %end;
+ run;
+ %let effective_signed_r2=1;
+ %let effective_ld_heatmap_var=;
+%end;
+%else %let effective_signed_r2=0;
+%let effective_zscore_vars=&ZscoreVars;
+%let effective_heatmap_min_neg_val=&heatmap_min_neg_val;
+%let effective_heatmap_max_pos_val=&heatmap_max_pos_val;
+%if &effective_signed_r2=1 %then %do;
+  %let effective_zscore_vars=;
+  data &gwas_dsd;
+  set &gwas_dsd;
+  %do _zi_=1 %to %sysfunc(countw(&ZscoreVars));
+    _SIGNED_R2_&_zi_=0;
+    if not missing(_LD_R2_) then do;
+      if %scan(&ZscoreVars,&_zi_) < 0 then _SIGNED_R2_&_zi_=-_LD_R2_;
+      else if %scan(&ZscoreVars,&_zi_) > 0 then _SIGNED_R2_&_zi_=_LD_R2_;
+    end;
+  %end;
+  run;
+  %do _zi_=1 %to %sysfunc(countw(&ZscoreVars));
+    %let effective_zscore_vars=&effective_zscore_vars _SIGNED_R2_&_zi_;
+  %end;
+  %let effective_heatmap_min_neg_val=-1;
+  %let effective_heatmap_max_pos_val=1;
+  %let effective_heatmap_legend_title=&LD_heatmap_legend_title;
+%end;
+
+*Add labels for target SNPs if they exist;
+%if %length(&SNPs2label_scatterplot_dots)>0 %then %do;
+ %let var4label_scatterplot_dots=_Target_SNP_;
+data &gwas_dsd;
+set &gwas_dsd;
+length _Target_SNP_ $25.;
+ _Target_SNP_="";
+ %do _si_=1 %to %ntokens(&SNPs2label_scatterplot_dots);
+    if &SNP_Var="%scan(&SNPs2label_scatterplot_dots,&_si_,%str( ))" then _Target_SNP_=&SNP_Var;
+ %end;
+run;
+%end;
+
+%do snpi=1 %to %ntokens(&SNP_IDs);
+  *query SNP using the index snpi (do not use i that may interupt with other macro var i used other sub-macros!);
+  %let qsnp=%scan(&SNP_IDs,&snpi,%str( ));
+   %if %sysfunc(countc(&qsnp,%str(:)))=1 %then %do;
+      *Manually add the start position as end position when the input is in the format of chrNum:Pos!;
+      %let qsnp=%sysfunc(prxchange(s/^([^:]+):(\d+)/$1:$2:$2/,-1,&qsnp));
+   %end;
+  *determine whether input snp is a chrpos based markder;
+  %if %sysfunc(prxmatch(/:/,&qsnp)) %then %do;
+    %let qsnp=%sysfunc(prxchange(s/chr//i,-1,&qsnp));
+    %let chrposquery=1;
+    %let num_chr=%scan(&qsnp,1,%str(:));
+    %let tgt_pos=%scan(&qsnp,2,%str(:));
+    
+    %let st_pos=%sysevalf(&tgt_pos-&dist2snp);
+    %let end_pos=%sysevalf(&tgt_pos+&dist2snp);
+    
+    %if %sysfunc(countc(&qsnp,%str(:)))>1 %then %do;
+     /*To keep the proc sql codes consistant for creating macros vars of minst and maxend;
+     The position range need to be adjusted by dist2snp, because the proc sql command
+     will substract and add the dist2snp to the st and end positions; By adding and substracting
+     the dist2snp from st and end position, respectively, the final minst and maxend will
+     be the same as the input st and end positions!*/
+     %if &dist2snp<50000000 %then %do;
+      %let st_pos=%sysevalf(%scan(&qsnp,2,%str(:)) - 50000000);
+      %let end_pos=%sysevalf(%scan(&qsnp,3,%str(:)) + 50000000);
+     %end;
+     %else %do;
+      %let st_pos=%sysevalf(%scan(&qsnp,2,%str(:)) - &dist2snp);
+      %let end_pos=%sysevalf(%scan(&qsnp,3,%str(:)) + &dsdt2snp);    
+     %end;
+    %end;
+    
+  %end;
+  %else %do;
+    %let chrposquery=0;
+    %if %sysfunc(prxmatch(/^rs/i,&qsnp)) and &dist2snp<10000 %then %do;
+      %put Please be noted that your query SNP is rsid (&qsnp);
+      %put It is necessary to expand the searching region > +/-10kb to get genes that cover the variant and specific genes!;
+      %abort 255;
+    %end;
+  %end;
+  
+  title "Query SNP is &qsnp";
+  proc sql noprint;
+  select &chr_var,&SNP_Var,minst,maxend
+  into: chr,:snp,:minst,:maxend
+  from (
+  select &chr_var,&SNP_Var,&Pos_Var-&dist2snp as minst,&Pos_Var+&dist2snp as maxend
+  from &gwas_dsd
+  %if &chrposquery=0 %then %do;
+    where &SNP_Var="&qsnp"
+  %end;
+  %else %do;
+    where &chr_var=&num_chr and 
+    (&Pos_Var between 
+      &st_pos and &end_pos
+    )
+  %end;
+  );
+  %if %sysfunc(countc(&qsnp,%str(:)))=2 %then %do;
+     /*To keep the proc sql codes consistant for creating macros vars of minst and maxend;
+     The position range need to be adjusted by dist2snp, because the proc sql command
+     will substract and add the dist2snp to the st and end positions; By adding and substracting
+     the dist2snp from st and end position, respectively, the final minst and maxend will
+     be the same as the input st and end positions!*/
+     %let chr=%scan(&qsnp,1,%str(:));
+     %let minst=%sysevalf(%scan(&qsnp,2,%str(:))-&dist2snp);
+     %let maxend=%sysevalf(%scan(&qsnp,3,%str(:))+&dist2snp);    
+  %end;  
+  
+  %if %symexist(chr)=0 %then %do;
+   %put no record for your query SNP &qsnp;
+   %abort 255;
+  %end;
+  %if %length(%superq(chromosome_lengths))>0 %then %do;
+    /* PROC SQL can pad numeric chromosome values in macro variables. Strip
+       that padding before checking the chromosome and looking up its length. */
+    %let _chrom_for_window=%sysfunc(strip(%superq(chr)));
+    %if %sysfunc(prxmatch(/^(?:[1-9]|1[0-9]|2[0-4])$/,%superq(_chrom_for_window))) %then %do;
+      %let _chrom_end_for_window=%scan(%superq(chromosome_lengths),&_chrom_for_window,%str(,));
+      %if %sysevalf(&maxend>&_chrom_end_for_window) %then %do;
+        %put NOTE: Clipping the local GTF x-axis for chromosome &_chrom_for_window from &maxend to its reference end &_chrom_end_for_window.;
+        %let maxend=&_chrom_end_for_window;
+      %end;
+    %end;
+  %end;
+  %let force_lattice_xaxis_viewmin=&minst;
+  %let force_lattice_xaxis_viewmax=&maxend;
+  %if %sysevalf(&force_lattice_xaxis_viewmin<1) %then %let force_lattice_xaxis_viewmin=1;
+  %put Your input three parameters for the SNP &qsnp are: chr=&chr minst=&minst maxend=&maxend;
+  %put NOTE: The displayed x-axis for &qsnp will use the requested SNP-centered window [&force_lattice_xaxis_viewmin, &force_lattice_xaxis_viewmax].;
+
+  /* SAS ODA already has the HTML5 plot destination open. The extra printer
+     destination renders a second 300-DPI bitmap and can exhaust Java memory. */
+  %if not %symexist(local_gtf_ods_html5) %then %do;
+    %OpenSVG_Printer(
+     filename=Local_SNP_Manhattanplot,
+     svgfileref=out,
+     other_paras4ods_graphics=%str(noborder)
+     );
+  %end;
+/*  %abort 255;*/
+  %if &effective_signed_r2=1 %then
+    %let effective_plot_title=Signed LD r2 x sign(Z score): &qsnp;
+  %else
+    %let effective_plot_title=Z-score-colored local Manhattan: &qsnp;
+  title "&effective_plot_title";
+  %map_grp_assoc2gene4covidsexgwas(
+focus_on_transcript=&focus_on_transcript,/*This will generate a subset exon GTF data set by 
+replacing gene variable with ensembl transcript variable and removing rows 
+with the type of "gene" and update transcript as "gene" to enable the macro
+to work on these transcripts instead of genes*/ 
+  gwas_dsd=&gwas_dsd, 
+  gtf_dsd=&gtf_dsd, 
+  chr=&chr, 
+  min_st=&minst, 
+  max_end=&maxend, 
+  dist2genes=1000, 
+  AssocPVars=&AssocPVars, 
+  ZscoreVars=&effective_zscore_vars,
+  gwas_labels_in_order=&gwas_labels_in_order,
+  design_width=&design_width, 
+  design_height=&design_height, 
+  image_dpi=&image_dpi,
+  barthickness=&barthickness, 
+  dotsize=&dotsize, 
+  grp_font_size=&grp_font_size,
+  /*Important parameters for drawing SNVs and CNVs together*/
+scattermarker_symbol=&scattermarker_symbol,/*Assign specific marker symbol, such as ibeam, circlefilled, circle, dot, squarefilled, or square, for scatter plot;
+Note the size of the designated marker symbol will be defined by the macro variable dotsize; when creating heatmap, you can assign
+squarefilled to the scattermarker_symbol, which would be more compatable with the highlow line style in for CNV or bed regions!*/ 
+highlow_line_cmd=&highlow_line_cmd,/*For CNV bed regions, customize the following parameters using dot, dash, or solid line pattern 
+with custome thickness and color for the line; please increase the thickness to match with that of 
+dotsize=10 when scattermarker_symbol=squarefilled for the scatter plot, which will enable the square and the line
+in the same size and color*/
+  dist2sep_genes=&dist2sep_genes,
+ /*this will ensure these genes close to each other to 
+be separated in the final gene track; 
+(1) give 0 to plot ALL genes in the same line;
+(2) give value between 0 and 1 to separate genes based on the pct distance to the whole region;
+(3) give value > 1 to use absolute distance to separate genes into different groups;
+Customize this for different gene exon track! */
+  where_cndtn_for_gwasdsd=&where_cndtn_for_gwasdsd,
+  gwas_pos_var=&Pos_Var,
+  Variant_Length_Var=&Variant_Length_Var,/*this variable if not empty, its value will be used to extend the value of Pos_Var for making 
+the start and end position for SNP_Var, i.e., st=&Pos_Var-0.5*&Variant_Length_Var and end=&Pos_Var-0.5*&Variant_Length_Var;
+This would be especially helpful for mixing CNV and SNV data for making scatter plots, as it is only necessary
+to provide middle position for CNVs and its lengths for ploting CNVs and SNVs together!
+*/
+  shift_text_yval=&shift_text_yval, /*in terms of gene track labels, add positive or negative vale, ranging from 0 to 1, 
+                      to liftup or lower text labels on the y axis; the default value is -0.2 to put gene lable under gene tracks;
+                      Change it with the macro var pct4neg_y!*/
+  fig_fmt=&fig_fmt, /*output figure formats: svg, png, jpg, and others*/
+ pct4neg_y=&pct4neg_y, /*the most often used value is 1;
+              compacting the bed track y values by increasing the scatterplot scale, 
+              which can reduce the bed trace spaces; It seems that two-fold increasement
+              leads to better ticks for different tracks!
+              Use value >1 will increase the gene tract, while value < 1 will reduce it!
+              Note: when there are only 1 or 2 scatterplots, it is better to provide value = 0.5;
+              Modify this parameter with the parameter shift_text_yval to adjust gene label!
+              Typically, when there are more scatterplots, it is necessary to increase the value of pct4neg_y accordingly;
+              If there are only <4 scatterplots, the value would be usually set as 1 or 2;
+              */
+  adjval4header=&adjval4header, /*In terms of header of each subscatterplot, provide postive value to move up scatter group header by the input value*/
+  makedotheatmap=&makedotheatmap,/*use colormap to draw dots in scatterplot instead of the discretemap;
+Note: if makedotheatmap=1, the scatterplot will not use the discretemap mode based on
+the negative and postive values of lattice_subgrp_var to color dots in scatterplot*/
+
+/*Main color scheme for coloring dots in scatter plot with your quantitative color response variable
+Note: it is necessary to have makedotheatmap=1 and use the default heatmap_var or other quantitative
+variable with both negative and positive values to color the scatter plot; when the quantitative response
+variable is postive or negative, please change the heatmap_min_neg_val as 0 for postive values, meanwhile,
+for all negative values, please assign value 0 to heatmap_max_pos_val*/
+heatmap_var=&heatmap_var,/*Assign lattice_subgrp_var to this macro var to draw scatter plot in heatmap
+using lattice_subgrp_var with rangeattrmap instead of drawing dots using binary mode, such as 0 and 1 representing Pos
+and negative directions of latticen_subgrp_var!*/
+heatmap_Neg_rangealtcolormodel=&heatmap_Neg_rangealtcolormodel,/*Range alt color model for negative values, heatmap_var<=0,  in heatmap*/
+heatmap_Pos_rangealtcolormodel=&heatmap_Pos_rangealtcolormodel,/*Range alt color model for positve values, heatmap_var>=0, in heatmap*/
+  heatmap_min_neg_val=&effective_heatmap_min_neg_val,/*Minimum negative value for the heatmap_var when it is not empty;
+change this to customize the minimum value for colorbar in heatmap*/
+  heatmap_max_pos_val=&effective_heatmap_max_pos_val,/*Maximum postive value for the heatmap_var when it is not empty;
+change this to customize the max value for colorbar in heatmap*/
+
+/*Alternative color scheme for categorical color response variable! Please keep it in default
+value if you don't want to use it for your quantitative color response variable*/
+color_resp_var=&color_resp_var,/*Use the variable to draw colormap of dots in scatterplots with colors
+supplied by a later macro variable dataContrastCols that are specifically designated for 
+scatterplot dots but not other tracks under the scatter plots, such as gene tracks;.
+previously if the macro var is empty, the default var would be the same as that of yval_var;
+Later it is updated to enable the macro to use lattice_subgrp_var but not yval_var when 
+this color_resp_var is empty! A later macro variable dataContrastCols will be used 
+to supply colors for different groups of the variable solely for coloring scatterplot dots!*/
+fixedcols4tracksunderscatter=&fixedcols4tracksunderscatter, /*when color_resp_var is not empty, all tracks under scatterplots will be fixed with 
+two different colors, including cyan and blue, represented by the macro var fixedcols4tracksunderscatter!*/
+color_resp_grpdsd=&color_resp_grpdsd,/*this dataset contains two columns, including &color_resp_var and the fixed
+variable numgrp4color_resp,which are corresponding to the unique char color_resp_var and 
+its associated numeric var that would be sorted to order these char color_resp_var in the final figure legend!
+Note: for color_resp_var not included in the dataset, they will be asigned as Others;
+Custom colors with the same number of unique color_resp_var for these groups can be provided to 
+a latter macro variable dataContrastCols*/
+dataContrastCols=&dataContrastCols,
+/*Note: these colors will be used for the scatterplot and gene track together when color_resp_var is a char var, so it is difficult control*/
+
+makeheatmapdotintooneline=&makeheatmapdotintooneline, /*This will make all dots have the same yaxis value but have different colors 
+based on its real value in the heatmap plot; To keep the original dot y axis value, assign 0 to the macro var
+This would be handy when there are multiple subgrps represented by different y-axis values! By modifying
+the y-axis values for these subgrps, the macro can plot them separately in each subtrack!
+*/
+var4label_scatterplot_dots=&var4label_scatterplot_dots, /*Make sure the variable name is not grp, which is a fixed var used by the macro for other purpose;
+Whenever  makeheatmapdotintooneline=1 or 0, it is possible to use values of the var4label_scatterplot_dots to
+label specific scatterplot dots based on the customization of the variable predifined by users for the input data set; 
+default is empty; provide a variable that include non-empty strings for specific dots in the 
+scatterplots;*/
+var4mark_ld_scatterplot_dots=&effective_ld_marker_var,
+ld_marker_color=&LD_marker_color,
+ld_marker_legend_symbol=&LD_marker_symbol,
+ld_heatmap_var=&effective_ld_heatmap_var,
+ld_heatmap_colormodel=&LD_heatmap_colormodel,
+ld_heatmap_legend_title=&LD_heatmap_legend_title,
+text_rotate_angle=&text_rotate_angle, /*Angle to rotate text labels for these selected dots by users*/
+label_position_overrides=&label_position_overrides,
+font_size4textlabels=&font_size4textlabels,
+label_headroom_frac=&label_headroom_frac,
+label_center_offset=&label_center_offset,
+auto_rotate2zero=&auto_rotate2zero, /*supply value 1 when there are <=3 text labels and you want them kept horizontal in the top headroom*/
+pct2adj4dencluster=&pct2adj4dencluster,/*For SNP labels on the top, please try to use this parameter, which only works when there are less than or equal to 4 top SNPs
+and SNPs within a cluster are overlapped with each other or overlapped with elements from other SNP cluster, so it is feasible to 
+avoid this issue by increasing the pct or reducing it, respectively*/
+yoffset4max_drawmarkersontop=&yoffset4max_drawmarkersontop, /*If draw scatterplot marker labels on the top of track, 
+this fixed value will be used instead of yaxis_offset4max!*/
+Yoffset4textlabels=&Yoffset4textlabels, /*Move up the text labels for target SNPs in specific fold; 
+the default value 2.5 fold works for most cases*/
+scatter_yaxis_label=&scatter_yaxis_label, /*Visible y-axis title for the stacked association tracks*/
+heatmap_legend_title=&effective_heatmap_legend_title, /*Visible title for the continuous colorbar when heatmap coloring is enabled*/
+plot_title=&effective_plot_title,
+adj_spaces_among_top_snps=&adj_spaces_among_top_snps /*Provide value 1 to adjust spaces among top SNP labels; otherwise, give value 0 to not 
+adjust top SNPs labels if these labels are rotated 90 degree, which is helpful when the space adjusted labels are not pretty*/ 
+  ); 
+  %if not %symexist(local_gtf_ods_html5) %then %do;
+    ods printer close;
+    *Also need to close the fileref out generated by the macro;
+    filename out clear;
+    ods listing;
+  %end;
+  
+  proc print data=&gwas_dsd;
+  where &SNP_Var="&qsnp";
+  run;
+  
+  *Need to delete previously generated dataset Final;
+  proc datasets nolist;
+/*   delete Final: _X1_ BEDCHR: Exon: X1 X2 TMP_: Single_DSD; */
+  delete _X1_ BEDCHR: Exon: X1 X2 TMP_: Single_DSD;
+  run;
+  title;
+  %let force_lattice_xaxis_viewmin=;
+  %let force_lattice_xaxis_viewmax=;
+  
+%end;
+
+*Reove target SNPs if they exist;
+%if %length(&SNPs2label_scatterplot_dots)>0 %then %do;
+data &gwas_dsd;
+set &gwas_dsd;
+drop _Target_SNP_;
+run;
+%end;
+
+%if %length(&effective_ld_marker_var)>0 %then %do;
+data &gwas_dsd;
+set &gwas_dsd;
+drop _LD_SNP_MARK_;
+run;
+%end;
+
+%if %length(&effective_ld_heatmap_var)>0 %then %do;
+data &gwas_dsd;
+set &gwas_dsd;
+drop _LD_R2_;
+run;
+%end;
+
+%if &verbose=0 %then %do;
+%put We will enable options notes;
+options notes;
+%end;
+
+%mend;

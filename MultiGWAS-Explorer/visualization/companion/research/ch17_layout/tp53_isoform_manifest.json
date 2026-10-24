@@ -1,0 +1,404 @@
+{
+   "entry_version" : 315,
+   "independent_fasta" : {
+      "all_nine_sequences_match" : true,
+      "retrieved_utc" : "2026-10-24T14:28:11Z",
+      "sha256" : "9253bb49fe6f7484336a2f560c1f7576e63ef5365f062938f6cf7b8437383bb6",
+      "status" : 200,
+      "url" : "https://rest.uniprot.org/uniprotkb/stream?format=fasta&includeIsoform=true&query=accession%3AP04637"
+   },
+   "isoforms" : [
+      {
+         "alternative_end" : "",
+         "alternative_start" : "",
+         "canonical_end" : 393,
+         "canonical_start" : 1,
+         "id" : "P04637-1",
+         "length" : 393,
+         "name" : "p53alpha",
+         "sequence" : "MEEPQSDPSVEPPLSQETFSDLWKLLPENNVLSPLPSQAMDDLMLSPDDIEQWFTEDPGPDEAPRMPEAAPPVAPAPAAPTPAAPAPAPSWPLSSSVPSQKTYQGSYGFRLGFLHSGTAKSVTCTYSPALNKMFCQLAKTCPVQLWVDSTPPPGTRVRAMAIYKQSQHMTEVVRRCPHHERCSDSDGLAPPQHLIRVEGNLRVEYLDDRNTFRHSVVVPYEPPEVGSDCTTIHYNYMCNSSCMGGMNRRPILTIITLEDSSGNLLGRNSFEVRVCACPGRDRRTEEENLRKKGEPHHELPPGSTKRALPNNTSSSPQPKKKPLDGEYFTLQIRGRERFEMFRELNEALELKDAQAGKEPGGSRAHSSHLKSKKGQSTSRHKKLMFKTEGPDSD",
+         "sequence_feature_ids" : [],
+         "sha256" : "e3ca60f18e3b6e98986ad6749215ee3b7a3abc09c191675213d1f243c035c9a3"
+      },
+      {
+         "alternative_end" : 341,
+         "alternative_start" : 332,
+         "canonical_end" : 341,
+         "canonical_start" : 1,
+         "id" : "P04637-2",
+         "length" : 341,
+         "name" : "p53beta",
+         "sequence" : "MEEPQSDPSVEPPLSQETFSDLWKLLPENNVLSPLPSQAMDDLMLSPDDIEQWFTEDPGPDEAPRMPEAAPPVAPAPAAPTPAAPAPAPSWPLSSSVPSQKTYQGSYGFRLGFLHSGTAKSVTCTYSPALNKMFCQLAKTCPVQLWVDSTPPPGTRVRAMAIYKQSQHMTEVVRRCPHHERCSDSDGLAPPQHLIRVEGNLRVEYLDDRNTFRHSVVVPYEPPEVGSDCTTIHYNYMCNSSCMGGMNRRPILTIITLEDSSGNLLGRNSFEVRVCACPGRDRRTEEENLRKKGEPHHELPPGSTKRALPNNTSSSPQPKKKPLDGEYFTLQDQTSFQKENC",
+         "sequence_feature_ids" : [
+            "VSP_006535",
+            "VSP_006536"
+         ],
+         "sha256" : "1327d0a247e802a2a9f1466bb70b0738cc99b8ce6184cd4d9e6e605f796bb14f"
+      },
+      {
+         "alternative_end" : 346,
+         "alternative_start" : 332,
+         "canonical_end" : 346,
+         "canonical_start" : 1,
+         "id" : "P04637-3",
+         "length" : 346,
+         "name" : "p53gamma",
+         "sequence" : "MEEPQSDPSVEPPLSQETFSDLWKLLPENNVLSPLPSQAMDDLMLSPDDIEQWFTEDPGPDEAPRMPEAAPPVAPAPAAPTPAAPAPAPSWPLSSSVPSQKTYQGSYGFRLGFLHSGTAKSVTCTYSPALNKMFCQLAKTCPVQLWVDSTPPPGTRVRAMAIYKQSQHMTEVVRRCPHHERCSDSDGLAPPQHLIRVEGNLRVEYLDDRNTFRHSVVVPYEPPEVGSDCTTIHYNYMCNSSCMGGMNRRPILTIITLEDSSGNLLGRNSFEVRVCACPGRDRRTEEENLRKKGEPHHELPPGSTKRALPNNTSSSPQPKKKPLDGEYFTLQMLLDLRWCYFLINSS",
+         "sequence_feature_ids" : [
+            "VSP_040560",
+            "VSP_040561"
+         ],
+         "sha256" : "c3482c3c105ae0bc933e52591c6845cff19d28934c1e27329cbe1780a56922de"
+      },
+      {
+         "alternative_end" : "",
+         "alternative_start" : "",
+         "canonical_end" : 393,
+         "canonical_start" : 40,
+         "id" : "P04637-4",
+         "length" : 354,
+         "name" : "Del40-p53alpha",
+         "sequence" : "MDDLMLSPDDIEQWFTEDPGPDEAPRMPEAAPPVAPAPAAPTPAAPAPAPSWPLSSSVPSQKTYQGSYGFRLGFLHSGTAKSVTCTYSPALNKMFCQLAKTCPVQLWVDSTPPPGTRVRAMAIYKQSQHMTEVVRRCPHHERCSDSDGLAPPQHLIRVEGNLRVEYLDDRNTFRHSVVVPYEPPEVGSDCTTIHYNYMCNSSCMGGMNRRPILTIITLEDSSGNLLGRNSFEVRVCACPGRDRRTEEENLRKKGEPHHELPPGSTKRALPNNTSSSPQPKKKPLDGEYFTLQIRGRERFEMFRELNEALELKDAQAGKEPGGSRAHSSHLKSKKGQSTSRHKKLMFKTEGPDSD",
+         "sequence_feature_ids" : [
+            "VSP_040832"
+         ],
+         "sha256" : "69145a68c65f2a8c90154b6ad781120e42d1f323a8cd5dc4291fbf3c351f73c2"
+      },
+      {
+         "alternative_end" : 341,
+         "alternative_start" : 332,
+         "canonical_end" : 341,
+         "canonical_start" : 40,
+         "id" : "P04637-5",
+         "length" : 302,
+         "name" : "Del40-p53beta",
+         "sequence" : "MDDLMLSPDDIEQWFTEDPGPDEAPRMPEAAPPVAPAPAAPTPAAPAPAPSWPLSSSVPSQKTYQGSYGFRLGFLHSGTAKSVTCTYSPALNKMFCQLAKTCPVQLWVDSTPPPGTRVRAMAIYKQSQHMTEVVRRCPHHERCSDSDGLAPPQHLIRVEGNLRVEYLDDRNTFRHSVVVPYEPPEVGSDCTTIHYNYMCNSSCMGGMNRRPILTIITLEDSSGNLLGRNSFEVRVCACPGRDRRTEEENLRKKGEPHHELPPGSTKRALPNNTSSSPQPKKKPLDGEYFTLQDQTSFQKENC",
+         "sequence_feature_ids" : [
+            "VSP_040832",
+            "VSP_006535",
+            "VSP_006536"
+         ],
+         "sha256" : "58d1b6a11d4ca9c7bfc0a93e9cd1f1655ccc248e0fd97a614a50c6fbe9579036"
+      },
+      {
+         "alternative_end" : 346,
+         "alternative_start" : 332,
+         "canonical_end" : 346,
+         "canonical_start" : 40,
+         "id" : "P04637-6",
+         "length" : 307,
+         "name" : "Del40-p53gamma",
+         "sequence" : "MDDLMLSPDDIEQWFTEDPGPDEAPRMPEAAPPVAPAPAAPTPAAPAPAPSWPLSSSVPSQKTYQGSYGFRLGFLHSGTAKSVTCTYSPALNKMFCQLAKTCPVQLWVDSTPPPGTRVRAMAIYKQSQHMTEVVRRCPHHERCSDSDGLAPPQHLIRVEGNLRVEYLDDRNTFRHSVVVPYEPPEVGSDCTTIHYNYMCNSSCMGGMNRRPILTIITLEDSSGNLLGRNSFEVRVCACPGRDRRTEEENLRKKGEPHHELPPGSTKRALPNNTSSSPQPKKKPLDGEYFTLQMLLDLRWCYFLINSS",
+         "sequence_feature_ids" : [
+            "VSP_040832",
+            "VSP_040560",
+            "VSP_040561"
+         ],
+         "sha256" : "adbad0c355be80f7fb2538cba3084c88cadeda8f23dc2da49902cbd3ea2875e7"
+      },
+      {
+         "alternative_end" : "",
+         "alternative_start" : "",
+         "canonical_end" : 393,
+         "canonical_start" : 133,
+         "id" : "P04637-7",
+         "length" : 261,
+         "name" : "Del133-p53alpha",
+         "sequence" : "MFCQLAKTCPVQLWVDSTPPPGTRVRAMAIYKQSQHMTEVVRRCPHHERCSDSDGLAPPQHLIRVEGNLRVEYLDDRNTFRHSVVVPYEPPEVGSDCTTIHYNYMCNSSCMGGMNRRPILTIITLEDSSGNLLGRNSFEVRVCACPGRDRRTEEENLRKKGEPHHELPPGSTKRALPNNTSSSPQPKKKPLDGEYFTLQIRGRERFEMFRELNEALELKDAQAGKEPGGSRAHSSHLKSKKGQSTSRHKKLMFKTEGPDSD",
+         "sequence_feature_ids" : [
+            "VSP_040833"
+         ],
+         "sha256" : "7dc2011fcdb1248f4a00d9b120790b8bf6873f3b392c3c892481b532d54e31fd"
+      },
+      {
+         "alternative_end" : 341,
+         "alternative_start" : 332,
+         "canonical_end" : 341,
+         "canonical_start" : 133,
+         "id" : "P04637-8",
+         "length" : 209,
+         "name" : "Del133-p53beta",
+         "sequence" : "MFCQLAKTCPVQLWVDSTPPPGTRVRAMAIYKQSQHMTEVVRRCPHHERCSDSDGLAPPQHLIRVEGNLRVEYLDDRNTFRHSVVVPYEPPEVGSDCTTIHYNYMCNSSCMGGMNRRPILTIITLEDSSGNLLGRNSFEVRVCACPGRDRRTEEENLRKKGEPHHELPPGSTKRALPNNTSSSPQPKKKPLDGEYFTLQDQTSFQKENC",
+         "sequence_feature_ids" : [
+            "VSP_040833",
+            "VSP_006535",
+            "VSP_006536"
+         ],
+         "sha256" : "01872e7dbd452fe66f0c330daba5d37f3563be08bc714991a174958c88facfba"
+      },
+      {
+         "alternative_end" : 346,
+         "alternative_start" : 332,
+         "canonical_end" : 346,
+         "canonical_start" : 133,
+         "id" : "P04637-9",
+         "length" : 214,
+         "name" : "Del133-p53gamma",
+         "sequence" : "MFCQLAKTCPVQLWVDSTPPPGTRVRAMAIYKQSQHMTEVVRRCPHHERCSDSDGLAPPQHLIRVEGNLRVEYLDDRNTFRHSVVVPYEPPEVGSDCTTIHYNYMCNSSCMGGMNRRPILTIITLEDSSGNLLGRNSFEVRVCACPGRDRRTEEENLRKKGEPHHELPPGSTKRALPNNTSSSPQPKKKPLDGEYFTLQMLLDLRWCYFLINSS",
+         "sequence_feature_ids" : [
+            "VSP_040833",
+            "VSP_040560",
+            "VSP_040561"
+         ],
+         "sha256" : "9e0f27ccec6a112a01d8c4e30bd9431ca80b19c5a82ed35891adeba262ee2903"
+      }
+   ],
+   "projection" : [
+      {
+         "canonical_position" : 175,
+         "canonical_variant" : "R175H",
+         "isoform" : "P04637-1",
+         "isoform_position" : 175,
+         "reference_residue" : "R"
+      },
+      {
+         "canonical_position" : 220,
+         "canonical_variant" : "Y220C",
+         "isoform" : "P04637-1",
+         "isoform_position" : 220,
+         "reference_residue" : "Y"
+      },
+      {
+         "canonical_position" : 248,
+         "canonical_variant" : "R248Q",
+         "isoform" : "P04637-1",
+         "isoform_position" : 248,
+         "reference_residue" : "R"
+      },
+      {
+         "canonical_position" : 273,
+         "canonical_variant" : "R273H",
+         "isoform" : "P04637-1",
+         "isoform_position" : 273,
+         "reference_residue" : "R"
+      },
+      {
+         "canonical_position" : 175,
+         "canonical_variant" : "R175H",
+         "isoform" : "P04637-2",
+         "isoform_position" : 175,
+         "reference_residue" : "R"
+      },
+      {
+         "canonical_position" : 220,
+         "canonical_variant" : "Y220C",
+         "isoform" : "P04637-2",
+         "isoform_position" : 220,
+         "reference_residue" : "Y"
+      },
+      {
+         "canonical_position" : 248,
+         "canonical_variant" : "R248Q",
+         "isoform" : "P04637-2",
+         "isoform_position" : 248,
+         "reference_residue" : "R"
+      },
+      {
+         "canonical_position" : 273,
+         "canonical_variant" : "R273H",
+         "isoform" : "P04637-2",
+         "isoform_position" : 273,
+         "reference_residue" : "R"
+      },
+      {
+         "canonical_position" : 175,
+         "canonical_variant" : "R175H",
+         "isoform" : "P04637-3",
+         "isoform_position" : 175,
+         "reference_residue" : "R"
+      },
+      {
+         "canonical_position" : 220,
+         "canonical_variant" : "Y220C",
+         "isoform" : "P04637-3",
+         "isoform_position" : 220,
+         "reference_residue" : "Y"
+      },
+      {
+         "canonical_position" : 248,
+         "canonical_variant" : "R248Q",
+         "isoform" : "P04637-3",
+         "isoform_position" : 248,
+         "reference_residue" : "R"
+      },
+      {
+         "canonical_position" : 273,
+         "canonical_variant" : "R273H",
+         "isoform" : "P04637-3",
+         "isoform_position" : 273,
+         "reference_residue" : "R"
+      },
+      {
+         "canonical_position" : 175,
+         "canonical_variant" : "R175H",
+         "isoform" : "P04637-4",
+         "isoform_position" : 136,
+         "reference_residue" : "R"
+      },
+      {
+         "canonical_position" : 220,
+         "canonical_variant" : "Y220C",
+         "isoform" : "P04637-4",
+         "isoform_position" : 181,
+         "reference_residue" : "Y"
+      },
+      {
+         "canonical_position" : 248,
+         "canonical_variant" : "R248Q",
+         "isoform" : "P04637-4",
+         "isoform_position" : 209,
+         "reference_residue" : "R"
+      },
+      {
+         "canonical_position" : 273,
+         "canonical_variant" : "R273H",
+         "isoform" : "P04637-4",
+         "isoform_position" : 234,
+         "reference_residue" : "R"
+      },
+      {
+         "canonical_position" : 175,
+         "canonical_variant" : "R175H",
+         "isoform" : "P04637-5",
+         "isoform_position" : 136,
+         "reference_residue" : "R"
+      },
+      {
+         "canonical_position" : 220,
+         "canonical_variant" : "Y220C",
+         "isoform" : "P04637-5",
+         "isoform_position" : 181,
+         "reference_residue" : "Y"
+      },
+      {
+         "canonical_position" : 248,
+         "canonical_variant" : "R248Q",
+         "isoform" : "P04637-5",
+         "isoform_position" : 209,
+         "reference_residue" : "R"
+      },
+      {
+         "canonical_position" : 273,
+         "canonical_variant" : "R273H",
+         "isoform" : "P04637-5",
+         "isoform_position" : 234,
+         "reference_residue" : "R"
+      },
+      {
+         "canonical_position" : 175,
+         "canonical_variant" : "R175H",
+         "isoform" : "P04637-6",
+         "isoform_position" : 136,
+         "reference_residue" : "R"
+      },
+      {
+         "canonical_position" : 220,
+         "canonical_variant" : "Y220C",
+         "isoform" : "P04637-6",
+         "isoform_position" : 181,
+         "reference_residue" : "Y"
+      },
+      {
+         "canonical_position" : 248,
+         "canonical_variant" : "R248Q",
+         "isoform" : "P04637-6",
+         "isoform_position" : 209,
+         "reference_residue" : "R"
+      },
+      {
+         "canonical_position" : 273,
+         "canonical_variant" : "R273H",
+         "isoform" : "P04637-6",
+         "isoform_position" : 234,
+         "reference_residue" : "R"
+      },
+      {
+         "canonical_position" : 175,
+         "canonical_variant" : "R175H",
+         "isoform" : "P04637-7",
+         "isoform_position" : 43,
+         "reference_residue" : "R"
+      },
+      {
+         "canonical_position" : 220,
+         "canonical_variant" : "Y220C",
+         "isoform" : "P04637-7",
+         "isoform_position" : 88,
+         "reference_residue" : "Y"
+      },
+      {
+         "canonical_position" : 248,
+         "canonical_variant" : "R248Q",
+         "isoform" : "P04637-7",
+         "isoform_position" : 116,
+         "reference_residue" : "R"
+      },
+      {
+         "canonical_position" : 273,
+         "canonical_variant" : "R273H",
+         "isoform" : "P04637-7",
+         "isoform_position" : 141,
+         "reference_residue" : "R"
+      },
+      {
+         "canonical_position" : 175,
+         "canonical_variant" : "R175H",
+         "isoform" : "P04637-8",
+         "isoform_position" : 43,
+         "reference_residue" : "R"
+      },
+      {
+         "canonical_position" : 220,
+         "canonical_variant" : "Y220C",
+         "isoform" : "P04637-8",
+         "isoform_position" : 88,
+         "reference_residue" : "Y"
+      },
+      {
+         "canonical_position" : 248,
+         "canonical_variant" : "R248Q",
+         "isoform" : "P04637-8",
+         "isoform_position" : 116,
+         "reference_residue" : "R"
+      },
+      {
+         "canonical_position" : 273,
+         "canonical_variant" : "R273H",
+         "isoform" : "P04637-8",
+         "isoform_position" : 141,
+         "reference_residue" : "R"
+      },
+      {
+         "canonical_position" : 175,
+         "canonical_variant" : "R175H",
+         "isoform" : "P04637-9",
+         "isoform_position" : 43,
+         "reference_residue" : "R"
+      },
+      {
+         "canonical_position" : 220,
+         "canonical_variant" : "Y220C",
+         "isoform" : "P04637-9",
+         "isoform_position" : 88,
+         "reference_residue" : "Y"
+      },
+      {
+         "canonical_position" : 248,
+         "canonical_variant" : "R248Q",
+         "isoform" : "P04637-9",
+         "isoform_position" : 116,
+         "reference_residue" : "R"
+      },
+      {
+         "canonical_position" : 273,
+         "canonical_variant" : "R273H",
+         "isoform" : "P04637-9",
+         "isoform_position" : 141,
+         "reference_residue" : "R"
+      }
+   ],
+   "scope" : "Nine annotated UniProt TP53 protein sequences aligned to canonical P04637-1 residue coordinates. GDC canonical mutation sites are projected annotation guides, not evidence of isoform-specific tumor expression or mutations.",
+   "sequence_version" : 4,
+   "source" : "companion/research/gdc_tp53/raw/tp53_uniprot.json",
+   "source_sha256" : "6bdb471fae5b0d4c92a1e2fd63f35b49e3826188e82ff54fcddec70c4e63e114"
+}
