@@ -1,10 +1,10 @@
 
 === Submitted SAS Codes or file ===
-<NEW_BOOK>/.audit-local/phase3/runtime/tmp1kygmL/input.sas
+<NEW_BOOK>/.audit-local/phase3/runtime/tmp34A0Sm/input.sas
 
 
 === Output Directory ===
-<NEW_BOOK>/.audit-local/phase3/runtime/SAS_Output_MCP4SAS_cVxREO
+<NEW_BOOK>/.audit-local/phase3/runtime/SAS_Output_MCP4SAS_j0vctb
 
 === Dependency Logs ===
 Injected targeted remote macro loader for: to
@@ -21,10 +21,10 @@ Could not access a local copy for preflight analysis.
 state: running
 phase: submit_returned
 message: SAS submit returned to the wrapper
-last_update: 2026-10-24 13:31:33
+last_update: 2026-10-24 13:48:23
 
 === SAS Log ===
-5                                                          The SAS System                     Saturday, October 24, 2026 06:31:00 PM
+5                                                          The SAS System                     Saturday, October 24, 2026 06:48:00 PM
 
 24         ods listing close;ods html5 (id=saspy_internal) file=_tomods1 options(bitmap_mode='inline') device=svg style=HTMLBlue;
 24       ! ods graphics on / outputfmt=png;
@@ -49,18 +49,18 @@ last_update: 2026-10-24 13:31:33
 43         %_pipeline_load_macro_tmp;
 44         
 45         options dlcreatedir notes source nodate nonumber;
-46         libname bookout "~/mgxviz_1792866647_3247";
+46         libname bookout "~/mgxviz_1792867656_4554";
 NOTE: Library BOOKOUT was created.
 NOTE: Libref BOOKOUT was successfully assigned as follows: 
       Engine:        V9 
-      Physical Name: <SAS_HOME>/mgxviz_1792866647_3247
+      Physical Name: <SAS_HOME>/mgxviz_1792867656_4554
 47         libname bookout clear;
 NOTE: Libref BOOKOUT has been deassigned.
-48         %let BOOK_OUT=%sysget(HOME)/mgxviz_1792866647_3247;
-49         %let P2_OUT=%sysget(HOME)/mgxviz_1792866647_3247;
-50         %let P3_OUT=%sysget(HOME)/mgxviz_1792866647_3247;
-51         %let AF_OUT=%sysget(HOME)/mgxviz_1792866647_3247;
-52         %let AF_REMOTE=mgxviz_1792866647_3247;
+48         %let BOOK_OUT=%sysget(HOME)/mgxviz_1792867656_4554;
+49         %let P2_OUT=%sysget(HOME)/mgxviz_1792867656_4554;
+50         %let P3_OUT=%sysget(HOME)/mgxviz_1792867656_4554;
+51         %let AF_OUT=%sysget(HOME)/mgxviz_1792867656_4554;
+52         %let AF_REMOTE=mgxviz_1792867656_4554;
 53         
 54         /* Zhongshan Cheng. Reusable form of the book's event-glyph oncoprint.
 55            GPL-3.0. Fixed input schema is documented beside the example.
@@ -265,17 +265,17 @@ NOTE: Libref BOOKOUT has been deassigned.
 NOTE: The data set WORK.SAMPLES has 12 observations and 3 variables.
 NOTE: DATA statement used (Total process time):
       real time           0.00 seconds
-      user cpu time       0.00 seconds
+      user cpu time       0.01 seconds
       system cpu time     0.00 seconds
-      memory              528.59k
-      OS Memory           18596.00k
-      Timestamp           10/24/2026 06:31:29 PM
+      memory              527.90k
+      OS Memory           18852.00k
+      Timestamp           10/24/2026 06:48:18 PM
       Step Count                        2  Switch Count  2
       Page Faults                       0
       Page Reclaims                     181
       Page Swaps                        0
       Voluntary Context Switches        8
-      Involuntary Context Switches      1
+      Involuntary Context Switches      0
       Block Input Operations            0
       Block Output Operations           264
       
@@ -293,14 +293,14 @@ NOTE: DATA statement used (Total process time):
       real time           0.00 seconds
       user cpu time       0.00 seconds
       system cpu time     0.00 seconds
-      memory              524.12k
-      OS Memory           18596.00k
-      Timestamp           10/24/2026 06:31:29 PM
+      memory              523.18k
+      OS Memory           18852.00k
+      Timestamp           10/24/2026 06:48:18 PM
       Step Count                        3  Switch Count  2
       Page Faults                       0
       Page Reclaims                     89
       Page Swaps                        0
-      Voluntary Context Switches        10
+      Voluntary Context Switches        9
       Involuntary Context Switches      0
       Block Input Operations            0
       Block Output Operations           264
@@ -327,12 +327,12 @@ NOTE: DATA statement used (Total process time):
       real time           0.00 seconds
       user cpu time       0.00 seconds
       system cpu time     0.00 seconds
-      memory              801.21k
-      OS Memory           18856.00k
-      Timestamp           10/24/2026 06:31:29 PM
+      memory              799.75k
+      OS Memory           19112.00k
+      Timestamp           10/24/2026 06:48:18 PM
       Step Count                        4  Switch Count  2
       Page Faults                       0
-      Page Reclaims                     128
+      Page Reclaims                     129
       Page Swaps                        0
       Voluntary Context Switches        8
       Involuntary Context Switches      0
@@ -350,16 +350,16 @@ NOTE: DATA statement used (Total process time):
 NOTE: The data set WORK.VARIANTS has 32 observations and 4 variables.
 NOTE: DATA statement used (Total process time):
       real time           0.00 seconds
-      user cpu time       0.01 seconds
+      user cpu time       0.00 seconds
       system cpu time     0.00 seconds
-      memory              524.12k
-      OS Memory           18596.00k
-      Timestamp           10/24/2026 06:31:29 PM
+      memory              523.00k
+      OS Memory           18852.00k
+      Timestamp           10/24/2026 06:48:18 PM
       Step Count                        5  Switch Count  2
       Page Faults                       0
-      Page Reclaims                     90
+      Page Reclaims                     87
       Page Swaps                        0
-      Voluntary Context Switches        8
+      Voluntary Context Switches        9
       Involuntary Context Switches      0
       Block Input Operations            0
       Block Output Operations           264
@@ -372,18 +372,18 @@ NOTE: DATA statement used (Total process time):
 334        %MGXOncoPrint(samples=work.samples,genes=work.genes,
 335         callability=work.callability,variants=work.variants,
 336         outlib=work,prefix=mgx_onco,outdir=&BOOK_OUT,image=mgx_oncoprint,
-337         template_file="~/mgxviz_1792866647_3247_oncoprint_template.sas");
+337         template_file="~/mgxviz_1792867656_4554_oncoprint_template.sas");
 
 NOTE: DATA statement used (Total process time):
       real time           0.00 seconds
       user cpu time       0.00 seconds
-      system cpu time     0.00 seconds
-      memory              429.68k
+      system cpu time     0.01 seconds
+      memory              428.50k
       OS Memory           18592.00k
-      Timestamp           10/24/2026 06:31:29 PM
+      Timestamp           10/24/2026 06:48:18 PM
       Step Count                        6  Switch Count  0
       Page Faults                       0
-      Page Reclaims                     53
+      Page Reclaims                     51
       Page Swaps                        0
       Voluntary Context Switches        0
       Involuntary Context Switches      0
@@ -396,14 +396,14 @@ NOTE: There were 12 observations read from the data set WORK.SAMPLES.
 NOTE: The data set WORK._MGXO_SAMPLES has 12 observations and 3 variables.
 NOTE: DATA statement used (Total process time):
       real time           0.00 seconds
-      user cpu time       0.00 seconds
+      user cpu time       0.01 seconds
       system cpu time     0.00 seconds
-      memory              798.00k
+      memory              796.93k
       OS Memory           19112.00k
-      Timestamp           10/24/2026 06:31:29 PM
+      Timestamp           10/24/2026 06:48:18 PM
       Step Count                        7  Switch Count  2
       Page Faults                       0
-      Page Reclaims                     126
+      Page Reclaims                     130
       Page Swaps                        0
       Voluntary Context Switches        8
       Involuntary Context Switches      0
@@ -417,10 +417,10 @@ NOTE: The data set WORK._MGXO_GENES has 8 observations and 2 variables.
 NOTE: DATA statement used (Total process time):
       real time           0.00 seconds
       user cpu time       0.00 seconds
-      system cpu time     0.01 seconds
-      memory              795.34k
+      system cpu time     0.00 seconds
+      memory              793.93k
       OS Memory           19112.00k
-      Timestamp           10/24/2026 06:31:29 PM
+      Timestamp           10/24/2026 06:48:18 PM
       Step Count                        8  Switch Count  2
       Page Faults                       0
       Page Reclaims                     121
@@ -436,11 +436,11 @@ NOTE: There were 96 observations read from the data set WORK.CALLABILITY.
 NOTE: The data set WORK._MGXO_CALLABILITY has 96 observations and 3 variables.
 NOTE: DATA statement used (Total process time):
       real time           0.00 seconds
-      user cpu time       0.01 seconds
+      user cpu time       0.00 seconds
       system cpu time     0.00 seconds
-      memory              796.00k
+      memory              794.93k
       OS Memory           19112.00k
-      Timestamp           10/24/2026 06:31:29 PM
+      Timestamp           10/24/2026 06:48:18 PM
       Step Count                        9  Switch Count  2
       Page Faults                       0
       Page Reclaims                     121
@@ -458,9 +458,9 @@ NOTE: DATA statement used (Total process time):
       real time           0.00 seconds
       user cpu time       0.00 seconds
       system cpu time     0.00 seconds
-      memory              797.00k
+      memory              795.93k
       OS Memory           19112.00k
-      Timestamp           10/24/2026 06:31:29 PM
+      Timestamp           10/24/2026 06:48:18 PM
       Step Count                        10  Switch Count  2
       Page Faults                       0
       Page Reclaims                     121
@@ -476,18 +476,18 @@ NOTE: Table WORK._MGXO_BAD_KEYS created, with 0 rows and 3 columns.
 NOTE: Table WORK._MGXO_CONFLICTS created, with 0 rows and 4 columns.
 
 NOTE: PROCEDURE SQL used (Total process time):
-      real time           0.02 seconds
+      real time           0.03 seconds
       user cpu time       0.02 seconds
-      system cpu time     0.01 seconds
-      memory              7712.04k
+      system cpu time     0.02 seconds
+      memory              7712.48k
       OS Memory           28088.00k
-      Timestamp           10/24/2026 06:31:29 PM
+      Timestamp           10/24/2026 06:48:18 PM
       Step Count                        11  Switch Count  4
       Page Faults                       0
-      Page Reclaims                     2126
+      Page Reclaims                     2146
       Page Swaps                        0
-      Voluntary Context Switches        53
-      Involuntary Context Switches      6
+      Voluntary Context Switches        48
+      Involuntary Context Switches      7
       Block Input Operations            0
       Block Output Operations           656
       
@@ -500,15 +500,15 @@ NOTE: PROCEDURE SORT used (Total process time):
       real time           0.00 seconds
       user cpu time       0.00 seconds
       system cpu time     0.00 seconds
-      memory              1045.53k
-      OS Memory           22956.00k
-      Timestamp           10/24/2026 06:31:29 PM
+      memory              1045.59k
+      OS Memory           23212.00k
+      Timestamp           10/24/2026 06:48:18 PM
       Step Count                        12  Switch Count  2
       Page Faults                       0
       Page Reclaims                     168
       Page Swaps                        0
       Voluntary Context Switches        8
-      Involuntary Context Switches      1
+      Involuntary Context Switches      0
       Block Input Operations            0
       Block Output Operations           272
       
@@ -529,16 +529,16 @@ NOTE: Table WORK._MGXO_COHORTS created, with 2 rows and 1 columns.
 NOTE: The PROCEDURE SQL printed pages 1-3.
 NOTE: PROCEDURE SQL used (Total process time):
       real time           0.04 seconds
-      user cpu time       0.03 seconds
+      user cpu time       0.04 seconds
       system cpu time     0.01 seconds
-      memory              11824.89k
-      OS Memory           31860.00k
-      Timestamp           10/24/2026 06:31:29 PM
+      memory              11830.85k
+      OS Memory           32116.00k
+      Timestamp           10/24/2026 06:48:18 PM
       Step Count                        13  Switch Count  12
       Page Faults                       0
-      Page Reclaims                     2088
+      Page Reclaims                     2041
       Page Swaps                        0
-      Voluntary Context Switches        115
+      Voluntary Context Switches        112
       Involuntary Context Switches      6
       Block Input Operations            0
       Block Output Operations           1624
@@ -551,9 +551,9 @@ NOTE: DATA statement used (Total process time):
       real time           0.00 seconds
       user cpu time       0.00 seconds
       system cpu time     0.00 seconds
-      memory              804.31k
+      memory              804.93k
       OS Memory           22952.00k
-      Timestamp           10/24/2026 06:31:29 PM
+      Timestamp           10/24/2026 06:48:18 PM
       Step Count                        14  Switch Count  2
       Page Faults                       0
       Page Reclaims                     121
@@ -571,9 +571,9 @@ NOTE: PROCEDURE SORT used (Total process time):
       real time           0.00 seconds
       user cpu time       0.00 seconds
       system cpu time     0.00 seconds
-      memory              785.40k
+      memory              785.93k
       OS Memory           22952.00k
-      Timestamp           10/24/2026 06:31:29 PM
+      Timestamp           10/24/2026 06:48:18 PM
       Step Count                        15  Switch Count  2
       Page Faults                       0
       Page Reclaims                     114
@@ -590,10 +590,10 @@ NOTE: The data set WORK.MGX_ONCO_GLYPHS has 32 observations and 13 variables.
 NOTE: DATA statement used (Total process time):
       real time           0.00 seconds
       user cpu time       0.00 seconds
-      system cpu time     0.01 seconds
-      memory              903.00k
+      system cpu time     0.00 seconds
+      memory              897.84k
       OS Memory           22952.00k
-      Timestamp           10/24/2026 06:31:29 PM
+      Timestamp           10/24/2026 06:48:18 PM
       Step Count                        16  Switch Count  2
       Page Faults                       0
       Page Reclaims                     122
@@ -615,12 +615,12 @@ NOTE: DATA statement used (Total process time):
       real time           0.00 seconds
       user cpu time       0.00 seconds
       system cpu time     0.00 seconds
-      memory              2259.37k
+      memory              2260.09k
       OS Memory           23992.00k
-      Timestamp           10/24/2026 06:31:29 PM
+      Timestamp           10/24/2026 06:48:18 PM
       Step Count                        17  Switch Count  2
       Page Faults                       0
-      Page Reclaims                     243
+      Page Reclaims                     246
       Page Swaps                        0
       Voluntary Context Switches        8
       Involuntary Context Switches      0
@@ -634,11 +634,11 @@ NOTE: There were 8 observations read from the data set WORK._MGXO_GENES.
 NOTE: The data set WORK._MGXO_FORMATS has 20 observations and 4 variables.
 NOTE: DATA statement used (Total process time):
       real time           0.00 seconds
-      user cpu time       0.00 seconds
+      user cpu time       0.01 seconds
       system cpu time     0.00 seconds
-      memory              1169.87k
+      memory              1171.03k
       OS Memory           23212.00k
-      Timestamp           10/24/2026 06:31:29 PM
+      Timestamp           10/24/2026 06:48:18 PM
       Step Count                        18  Switch Count  2
       Page Faults                       0
       Page Reclaims                     154
@@ -654,11 +654,11 @@ NOTE: Format MGXGENE has been output.
 
 NOTE: PROCEDURE FORMAT used (Total process time):
       real time           0.00 seconds
-      user cpu time       0.01 seconds
+      user cpu time       0.00 seconds
       system cpu time     0.00 seconds
-      memory              507.93k
+      memory              508.81k
       OS Memory           22692.00k
-      Timestamp           10/24/2026 06:31:29 PM
+      Timestamp           10/24/2026 06:48:18 PM
       Step Count                        19  Switch Count  2
       Page Faults                       0
       Page Reclaims                     66
@@ -671,13 +671,13 @@ NOTE: PROCEDURE FORMAT used (Total process time):
 NOTE: There were 20 observations read from the data set WORK._MGXO_FORMATS.
 
 
-NOTE: The file "<SAS_HOME>/mgxviz_1792866647_3247/mgx_onco_cohorts.sas" is:
-      Filename=<SAS_HOME>/mgxviz_1792866647_3247/mgx_onco_cohorts.sas,
+NOTE: The file "<SAS_HOME>/mgxviz_1792867656_4554/mgx_onco_cohorts.sas" is:
+      Filename=<SAS_HOME>/mgxviz_1792867656_4554/mgx_onco_cohorts.sas,
       Owner Name=<SAS_USER>,Group Name=oda,
       Access Permission=-rw-r--r--,
-      Last Modified=24Oct2026:18:31:29
+      Last Modified=24Oct2026:18:48:18
 
-NOTE: 4 records were written to the file "<SAS_HOME>/mgxviz_1792866647_3247/mgx_onco_cohorts.sas".
+NOTE: 4 records were written to the file "<SAS_HOME>/mgxviz_1792867656_4554/mgx_onco_cohorts.sas".
       The minimum record length was 19.
       The maximum record length was 85.
 NOTE: There were 2 observations read from the data set WORK._MGXO_COHORTS.
@@ -685,9 +685,9 @@ NOTE: DATA statement used (Total process time):
       real time           0.00 seconds
       user cpu time       0.00 seconds
       system cpu time     0.00 seconds
-      memory              674.15k
+      memory              672.81k
       OS Memory           22692.00k
-      Timestamp           10/24/2026 06:31:29 PM
+      Timestamp           10/24/2026 06:48:18 PM
       Step Count                        20  Switch Count  0
       Page Faults                       0
       Page Reclaims                     57
@@ -701,16 +701,16 @@ NOTE: DATA statement used (Total process time):
 NOTE: STATGRAPH 'MGXOncoTemplate' has been saved to: WORK.TEMPLAT
 NOTE: PROCEDURE TEMPLATE used (Total process time):
       real time           0.00 seconds
-      user cpu time       0.00 seconds
+      user cpu time       0.01 seconds
       system cpu time     0.00 seconds
-      memory              782.09k
+      memory              782.34k
       OS Memory           22432.00k
-      Timestamp           10/24/2026 06:31:29 PM
+      Timestamp           10/24/2026 06:48:18 PM
       Step Count                        21  Switch Count  1
       Page Faults                       0
       Page Reclaims                     87
       Page Swaps                        0
-      Voluntary Context Switches        15
+      Voluntary Context Switches        16
       Involuntary Context Switches      0
       Block Input Operations            0
       Block Output Operations           128
@@ -721,59 +721,63 @@ NOTE: PROCEDURE TEMPLATE used (Total process time):
       real time           0.00 seconds
       user cpu time       0.00 seconds
       system cpu time     0.00 seconds
-      memory              741.93k
+      memory              738.62k
       OS Memory           22432.00k
-      Timestamp           10/24/2026 06:31:29 PM
+      Timestamp           10/24/2026 06:48:18 PM
       Step Count                        22  Switch Count  0
       Page Faults                       0
       Page Reclaims                     20
       Page Swaps                        0
       Voluntary Context Switches        9
-      Involuntary Context Switches      1
+      Involuntary Context Switches      0
       Block Input Operations            0
       Block Output Operations           8
       
 
 
+NOTE: Some of the tick values have been thinned.
+NOTE: Some of the tick values have been thinned.
 WARNING: A very large output size of (3420, 2430) is in effect. This could make Java VM run out of memory and result in some Java 
          exceptions. You should reduce the output size or DPI settings.
-NOTE: Listing image output written to <SAS_HOME>/mgxviz_1792866647_3247/mgx_oncoprint.png.
+NOTE: Listing image output written to <SAS_HOME>/mgxviz_1792867656_4554/mgx_oncoprint.png.
 NOTE: There were 160 observations read from the data set WORK.MGX_ONCO_RENDER.
 NOTE: PROCEDURE SGRENDER used (Total process time):
-      real time           2.68 seconds
-      user cpu time       0.33 seconds
+      real time           2.74 seconds
+      user cpu time       0.34 seconds
       system cpu time     0.04 seconds
-      memory              39476.56k
-      OS Memory           59072.00k
-      Timestamp           10/24/2026 06:31:32 PM
+      memory              39653.12k
+      OS Memory           59328.00k
+      Timestamp           10/24/2026 06:48:21 PM
       Step Count                        23  Switch Count  0
       Page Faults                       0
-      Page Reclaims                     4444
+      Page Reclaims                     4547
       Page Swaps                        0
-      Voluntary Context Switches        1712
-      Involuntary Context Switches      5
+      Voluntary Context Switches        1716
+      Involuntary Context Switches      4
       Block Input Operations            0
-      Block Output Operations           680
+      Block Output Operations           808
       
 
 
-NOTE: Listing image output written to <SAS_HOME>/mgxviz_1792866647_3247/mgx_oncoprint.svg.
+NOTE: Some of the tick values have been thinned.
+NOTE: Some of the tick values have been thinned.
+NOTE: Listing image output written to <SAS_HOME>/mgxviz_1792867656_4554/mgx_oncoprint.svg.
 NOTE: There were 160 observations read from the data set WORK.MGX_ONCO_RENDER.
 NOTE: PROCEDURE SGRENDER used (Total process time):
-      real time           0.30 seconds
-      user cpu time       0.07 seconds
-      system cpu time     0.02 seconds
-      memory              3379.56k
-      OS Memory           36008.00k
-      Timestamp           10/24/2026 06:31:32 PM
+      real time           0.33 seconds
+      user cpu time       0.08 seconds
+      system cpu time     0.01 seconds
+      memory              3390.12k
+      OS Memory           36264.00k
+      Timestamp           10/24/2026 06:48:21 PM
       Step Count                        24  Switch Count  0
       Page Faults                       0
-      Page Reclaims                     604
+      Page Reclaims                     610
       Page Swaps                        0
-      Voluntary Context Switches        1553
+      Voluntary Context Switches        1562
       Involuntary Context Switches      2
       Block Input Operations            0
-      Block Output Operations           1008
+      Block Output Operations           1024
       
 
 NOTE: MGX_ONCOPRINT_COMPLETE samples=12 genes=8
@@ -784,9 +788,9 @@ NOTE: DATA statement used (Total process time):
       real time           0.00 seconds
       user cpu time       0.00 seconds
       system cpu time     0.00 seconds
-      memory              525.56k
-      OS Memory           36004.00k
-      Timestamp           10/24/2026 06:31:32 PM
+      memory              518.71k
+      OS Memory           36260.00k
+      Timestamp           10/24/2026 06:48:21 PM
       Step Count                        25  Switch Count  2
       Page Faults                       0
       Page Reclaims                     94
@@ -807,22 +811,22 @@ NOTE: There were 96 observations read from the data set WORK.MGX_ONCO_TILES.
 NOTE: The data set WORK.READER_EXPORT has 96 observations and 11 variables.
 NOTE: DATA statement used (Total process time):
       real time           0.00 seconds
-      user cpu time       0.00 seconds
+      user cpu time       0.01 seconds
       system cpu time     0.00 seconds
-      memory              813.87k
-      OS Memory           36264.00k
-      Timestamp           10/24/2026 06:31:32 PM
+      memory              806.96k
+      OS Memory           36520.00k
+      Timestamp           10/24/2026 06:48:21 PM
       Step Count                        26  Switch Count  2
       Page Faults                       0
       Page Reclaims                     119
       Page Swaps                        0
-      Voluntary Context Switches        8
+      Voluntary Context Switches        9
       Involuntary Context Switches      0
       Block Input Operations            0
       Block Output Operations           264
       
 
-423        proc export data=work.reader_export outfile="~/mgxviz_1792866647_3247/mgx_onco_tiles.csv" dbms=csv replace;
+423        proc export data=work.reader_export outfile="~/mgxviz_1792867656_4554/mgx_onco_tiles.csv" dbms=csv replace;
 423      !                                                                                                            run;
 
 NOTE: Unable to open parameter catalog: SASUSER.PARMS.PARMS.SLIST in update mode. Temporary parameter values will be saved to 
@@ -838,7 +842,7 @@ WORK.PARMS.PARMS.SLIST.
 432            data _null_;
 433            %let _EFIERR_ = 0; /* set the ERROR detection macro variable */
 434            %let _EFIREC_ = 0;     /* clear export record count macro variable */
-435            file '~/mgxviz_1792866647_3247/mgx_onco_tiles.csv' delimiter=',' DSD DROPOVER lrecl=32767;
+435            file '~/mgxviz_1792867656_4554/mgx_onco_tiles.csv' delimiter=',' DSD DROPOVER lrecl=32767;
 436            if _n_ = 1 then        /* write column names or labels */
 437             do;
 438               put
@@ -896,13 +900,13 @@ WORK.PARMS.PARMS.SLIST.
 490            if EFIEOD then call symputx('_EFIREC_',EFIOUT);
 491            run;
 
-NOTE: The file '~/mgxviz_1792866647_3247/mgx_onco_tiles.csv' is:
-      Filename=<SAS_HOME>/mgxviz_1792866647_3247/mgx_onco_tiles.csv,
+NOTE: The file '~/mgxviz_1792867656_4554/mgx_onco_tiles.csv' is:
+      Filename=<SAS_HOME>/mgxviz_1792867656_4554/mgx_onco_tiles.csv,
       Owner Name=<SAS_USER>,Group Name=oda,
       Access Permission=-rw-r--r--,
-      Last Modified=24Oct2026:18:31:32
+      Last Modified=24Oct2026:18:48:21
 
-NOTE: 97 records were written to the file '~/mgxviz_1792866647_3247/mgx_onco_tiles.csv'.
+NOTE: 97 records were written to the file '~/mgxviz_1792867656_4554/mgx_onco_tiles.csv'.
       The minimum record length was 28.
       The maximum record length was 97.
 NOTE: There were 96 observations read from the data set WORK.READER_EXPORT.
@@ -910,12 +914,12 @@ NOTE: DATA statement used (Total process time):
       real time           0.00 seconds
       user cpu time       0.00 seconds
       system cpu time     0.00 seconds
-      memory              10295.18k
-      OS Memory           43548.00k
-      Timestamp           10/24/2026 06:31:32 PM
+      memory              10296.90k
+      OS Memory           43804.00k
+      Timestamp           10/24/2026 06:48:21 PM
       Step Count                        27  Switch Count  0
       Page Faults                       0
-      Page Reclaims                     129
+      Page Reclaims                     124
       Page Swaps                        0
       Voluntary Context Switches        8
       Involuntary Context Switches      0
@@ -923,23 +927,23 @@ NOTE: DATA statement used (Total process time):
       Block Output Operations           8
       
 
-96 records created in ~/mgxviz_1792866647_3247/mgx_onco_tiles.csv from WORK.READER_EXPORT.
+96 records created in ~/mgxviz_1792867656_4554/mgx_onco_tiles.csv from WORK.READER_EXPORT.
   
   
-NOTE: "~/mgxviz_1792866647_3247/mgx_onco_tiles.csv" file was successfully created.
+NOTE: "~/mgxviz_1792867656_4554/mgx_onco_tiles.csv" file was successfully created.
 NOTE: PROCEDURE EXPORT used (Total process time):
       real time           0.04 seconds
-      user cpu time       0.03 seconds
-      system cpu time     0.00 seconds
-      memory              10295.18k
-      OS Memory           43808.00k
-      Timestamp           10/24/2026 06:31:32 PM
+      user cpu time       0.02 seconds
+      system cpu time     0.01 seconds
+      memory              10296.90k
+      OS Memory           44064.00k
+      Timestamp           10/24/2026 06:48:21 PM
       Step Count                        27  Switch Count  7
       Page Faults                       0
-      Page Reclaims                     1973
+      Page Reclaims                     1961
       Page Swaps                        0
-      Voluntary Context Switches        54
-      Involuntary Context Switches      1
+      Voluntary Context Switches        56
+      Involuntary Context Switches      0
       Block Input Operations            0
       Block Output Operations           112
       
@@ -952,9 +956,9 @@ NOTE: DATA statement used (Total process time):
       real time           0.00 seconds
       user cpu time       0.00 seconds
       system cpu time     0.00 seconds
-      memory              808.12k
-      OS Memory           39340.00k
-      Timestamp           10/24/2026 06:31:32 PM
+      memory              802.15k
+      OS Memory           39084.00k
+      Timestamp           10/24/2026 06:48:21 PM
       Step Count                        28  Switch Count  2
       Page Faults                       0
       Page Reclaims                     125
@@ -965,7 +969,7 @@ NOTE: DATA statement used (Total process time):
       Block Output Operations           264
       
 
-493        proc export data=work.reader_export outfile="~/mgxviz_1792866647_3247/mgx_onco_frequency.csv" dbms=csv replace;
+493        proc export data=work.reader_export outfile="~/mgxviz_1792867656_4554/mgx_onco_frequency.csv" dbms=csv replace;
 493      !                                                                                                                run;
 
 NOTE: Unable to open parameter catalog: SASUSER.PARMS.PARMS.SLIST in update mode. Temporary parameter values will be saved to 
@@ -981,7 +985,7 @@ WORK.PARMS.PARMS.SLIST.
 502            data _null_;
 503            %let _EFIERR_ = 0; /* set the ERROR detection macro variable */
 504            %let _EFIREC_ = 0;     /* clear export record count macro variable */
-505            file '~/mgxviz_1792866647_3247/mgx_onco_frequency.csv' delimiter=',' DSD DROPOVER lrecl=32767;
+505            file '~/mgxviz_1792867656_4554/mgx_onco_frequency.csv' delimiter=',' DSD DROPOVER lrecl=32767;
 506            if _n_ = 1 then        /* write column names or labels */
 507             do;
 508               put
@@ -1019,26 +1023,26 @@ WORK.PARMS.PARMS.SLIST.
 540            if EFIEOD then call symputx('_EFIREC_',EFIOUT);
 541            run;
 
-NOTE: The file '~/mgxviz_1792866647_3247/mgx_onco_frequency.csv' is:
-      Filename=<SAS_HOME>/mgxviz_1792866647_3247/mgx_onco_frequency.csv,
+NOTE: The file '~/mgxviz_1792867656_4554/mgx_onco_frequency.csv' is:
+      Filename=<SAS_HOME>/mgxviz_1792867656_4554/mgx_onco_frequency.csv,
       Owner Name=<SAS_USER>,Group Name=oda,
       Access Permission=-rw-r--r--,
-      Last Modified=24Oct2026:18:31:32
+      Last Modified=24Oct2026:18:48:21
 
-NOTE: 9 records were written to the file '~/mgxviz_1792866647_3247/mgx_onco_frequency.csv'.
+NOTE: 9 records were written to the file '~/mgxviz_1792867656_4554/mgx_onco_frequency.csv'.
       The minimum record length was 19.
       The maximum record length was 60.
 NOTE: There were 8 observations read from the data set WORK.READER_EXPORT.
 NOTE: DATA statement used (Total process time):
       real time           0.00 seconds
       user cpu time       0.00 seconds
-      system cpu time     0.00 seconds
-      memory              9160.37k
-      OS Memory           43804.00k
-      Timestamp           10/24/2026 06:31:32 PM
+      system cpu time     0.01 seconds
+      memory              9156.34k
+      OS Memory           44060.00k
+      Timestamp           10/24/2026 06:48:21 PM
       Step Count                        29  Switch Count  0
       Page Faults                       0
-      Page Reclaims                     35
+      Page Reclaims                     81
       Page Swaps                        0
       Voluntary Context Switches        8
       Involuntary Context Switches      0
@@ -1046,23 +1050,23 @@ NOTE: DATA statement used (Total process time):
       Block Output Operations           16
       
 
-8 records created in ~/mgxviz_1792866647_3247/mgx_onco_frequency.csv from WORK.READER_EXPORT.
+8 records created in ~/mgxviz_1792867656_4554/mgx_onco_frequency.csv from WORK.READER_EXPORT.
   
   
-NOTE: "~/mgxviz_1792866647_3247/mgx_onco_frequency.csv" file was successfully created.
+NOTE: "~/mgxviz_1792867656_4554/mgx_onco_frequency.csv" file was successfully created.
 NOTE: PROCEDURE EXPORT used (Total process time):
       real time           0.02 seconds
       user cpu time       0.02 seconds
       system cpu time     0.01 seconds
-      memory              9160.37k
-      OS Memory           44064.00k
-      Timestamp           10/24/2026 06:31:32 PM
+      memory              9156.34k
+      OS Memory           44320.00k
+      Timestamp           10/24/2026 06:48:21 PM
       Step Count                        29  Switch Count  7
       Page Faults                       0
-      Page Reclaims                     988
+      Page Reclaims                     1100
       Page Swaps                        0
       Voluntary Context Switches        40
-      Involuntary Context Switches      2
+      Involuntary Context Switches      1
       Block Input Operations            0
       Block Output Operations           32
       
@@ -1075,20 +1079,20 @@ NOTE: DATA statement used (Total process time):
       real time           0.00 seconds
       user cpu time       0.00 seconds
       system cpu time     0.00 seconds
-      memory              806.15k
-      OS Memory           40108.00k
-      Timestamp           10/24/2026 06:31:32 PM
+      memory              801.93k
+      OS Memory           39852.00k
+      Timestamp           10/24/2026 06:48:21 PM
       Step Count                        30  Switch Count  2
       Page Faults                       0
       Page Reclaims                     121
       Page Swaps                        0
       Voluntary Context Switches        8
-      Involuntary Context Switches      1
+      Involuntary Context Switches      0
       Block Input Operations            0
       Block Output Operations           264
       
 
-543        proc export data=work.reader_export outfile="~/mgxviz_1792866647_3247/mgx_onco_burden.csv" dbms=csv replace;
+543        proc export data=work.reader_export outfile="~/mgxviz_1792867656_4554/mgx_onco_burden.csv" dbms=csv replace;
 543      !                                                                                                             run;
 
 NOTE: Unable to open parameter catalog: SASUSER.PARMS.PARMS.SLIST in update mode. Temporary parameter values will be saved to 
@@ -1104,7 +1108,7 @@ WORK.PARMS.PARMS.SLIST.
 552            data _null_;
 553            %let _EFIERR_ = 0; /* set the ERROR detection macro variable */
 554            %let _EFIREC_ = 0;     /* clear export record count macro variable */
-555            file '~/mgxviz_1792866647_3247/mgx_onco_burden.csv' delimiter=',' DSD DROPOVER lrecl=32767;
+555            file '~/mgxviz_1792867656_4554/mgx_onco_burden.csv' delimiter=',' DSD DROPOVER lrecl=32767;
 556            if _n_ = 1 then        /* write column names or labels */
 557             do;
 558               put
@@ -1138,13 +1142,13 @@ WORK.PARMS.PARMS.SLIST.
 586            if EFIEOD then call symputx('_EFIREC_',EFIOUT);
 587            run;
 
-NOTE: The file '~/mgxviz_1792866647_3247/mgx_onco_burden.csv' is:
-      Filename=<SAS_HOME>/mgxviz_1792866647_3247/mgx_onco_burden.csv,
+NOTE: The file '~/mgxviz_1792867656_4554/mgx_onco_burden.csv' is:
+      Filename=<SAS_HOME>/mgxviz_1792867656_4554/mgx_onco_burden.csv,
       Owner Name=<SAS_USER>,Group Name=oda,
       Access Permission=-rw-r--r--,
-      Last Modified=24Oct2026:18:31:32
+      Last Modified=24Oct2026:18:48:21
 
-NOTE: 13 records were written to the file '~/mgxviz_1792866647_3247/mgx_onco_burden.csv'.
+NOTE: 13 records were written to the file '~/mgxviz_1792867656_4554/mgx_onco_burden.csv'.
       The minimum record length was 13.
       The maximum record length was 43.
 NOTE: There were 12 observations read from the data set WORK.READER_EXPORT.
@@ -1152,12 +1156,12 @@ NOTE: DATA statement used (Total process time):
       real time           0.00 seconds
       user cpu time       0.01 seconds
       system cpu time     0.00 seconds
-      memory              9053.46k
-      OS Memory           43804.00k
-      Timestamp           10/24/2026 06:31:32 PM
+      memory              9045.78k
+      OS Memory           44060.00k
+      Timestamp           10/24/2026 06:48:21 PM
       Step Count                        31  Switch Count  0
       Page Faults                       0
-      Page Reclaims                     36
+      Page Reclaims                     96
       Page Swaps                        0
       Voluntary Context Switches        8
       Involuntary Context Switches      0
@@ -1165,23 +1169,23 @@ NOTE: DATA statement used (Total process time):
       Block Output Operations           16
       
 
-12 records created in ~/mgxviz_1792866647_3247/mgx_onco_burden.csv from WORK.READER_EXPORT.
+12 records created in ~/mgxviz_1792867656_4554/mgx_onco_burden.csv from WORK.READER_EXPORT.
   
   
-NOTE: "~/mgxviz_1792866647_3247/mgx_onco_burden.csv" file was successfully created.
+NOTE: "~/mgxviz_1792867656_4554/mgx_onco_burden.csv" file was successfully created.
 NOTE: PROCEDURE EXPORT used (Total process time):
       real time           0.02 seconds
       user cpu time       0.02 seconds
       system cpu time     0.00 seconds
-      memory              9053.46k
-      OS Memory           44064.00k
-      Timestamp           10/24/2026 06:31:32 PM
+      memory              9045.78k
+      OS Memory           44320.00k
+      Timestamp           10/24/2026 06:48:21 PM
       Step Count                        31  Switch Count  7
       Page Faults                       0
-      Page Reclaims                     770
+      Page Reclaims                     903
       Page Swaps                        0
-      Voluntary Context Switches        42
-      Involuntary Context Switches      0
+      Voluntary Context Switches        41
+      Involuntary Context Switches      1
       Block Input Operations            0
       Block Output Operations           32
       
@@ -1193,21 +1197,21 @@ NOTE: The data set WORK.READER_EXPORT has 32 observations and 13 variables.
 NOTE: DATA statement used (Total process time):
       real time           0.00 seconds
       user cpu time       0.00 seconds
-      system cpu time     0.01 seconds
-      memory              816.15k
+      system cpu time     0.00 seconds
+      memory              810.62k
       OS Memory           39852.00k
-      Timestamp           10/24/2026 06:31:32 PM
+      Timestamp           10/24/2026 06:48:21 PM
       Step Count                        32  Switch Count  2
       Page Faults                       0
       Page Reclaims                     120
       Page Swaps                        0
-      Voluntary Context Switches        9
+      Voluntary Context Switches        8
       Involuntary Context Switches      1
       Block Input Operations            0
       Block Output Operations           264
       
 
-589        proc export data=work.reader_export outfile="~/mgxviz_1792866647_3247/mgx_onco_glyphs.csv" dbms=csv replace;
+589        proc export data=work.reader_export outfile="~/mgxviz_1792867656_4554/mgx_onco_glyphs.csv" dbms=csv replace;
 589      !                                                                                                             run;
 
 NOTE: Unable to open parameter catalog: SASUSER.PARMS.PARMS.SLIST in update mode. Temporary parameter values will be saved to 
@@ -1223,7 +1227,7 @@ WORK.PARMS.PARMS.SLIST.
 598            data _null_;
 599            %let _EFIERR_ = 0; /* set the ERROR detection macro variable */
 600            %let _EFIREC_ = 0;     /* clear export record count macro variable */
-601            file '~/mgxviz_1792866647_3247/mgx_onco_glyphs.csv' delimiter=',' DSD DROPOVER lrecl=32767;
+601            file '~/mgxviz_1792867656_4554/mgx_onco_glyphs.csv' delimiter=',' DSD DROPOVER lrecl=32767;
 602            if _n_ = 1 then        /* write column names or labels */
 603             do;
 604               put
@@ -1289,26 +1293,26 @@ WORK.PARMS.PARMS.SLIST.
 664            if EFIEOD then call symputx('_EFIREC_',EFIOUT);
 665            run;
 
-NOTE: The file '~/mgxviz_1792866647_3247/mgx_onco_glyphs.csv' is:
-      Filename=<SAS_HOME>/mgxviz_1792866647_3247/mgx_onco_glyphs.csv,
+NOTE: The file '~/mgxviz_1792867656_4554/mgx_onco_glyphs.csv' is:
+      Filename=<SAS_HOME>/mgxviz_1792867656_4554/mgx_onco_glyphs.csv,
       Owner Name=<SAS_USER>,Group Name=oda,
       Access Permission=-rw-r--r--,
-      Last Modified=24Oct2026:18:31:32
+      Last Modified=24Oct2026:18:48:21
 
-NOTE: 33 records were written to the file '~/mgxviz_1792866647_3247/mgx_onco_glyphs.csv'.
+NOTE: 33 records were written to the file '~/mgxviz_1792867656_4554/mgx_onco_glyphs.csv'.
       The minimum record length was 51.
       The maximum record length was 138.
 NOTE: There were 32 observations read from the data set WORK.READER_EXPORT.
 NOTE: DATA statement used (Total process time):
       real time           0.00 seconds
-      user cpu time       0.01 seconds
+      user cpu time       0.00 seconds
       system cpu time     0.00 seconds
-      memory              9372.84k
-      OS Memory           44064.00k
-      Timestamp           10/24/2026 06:31:32 PM
+      memory              9362.25k
+      OS Memory           44320.00k
+      Timestamp           10/24/2026 06:48:21 PM
       Step Count                        33  Switch Count  0
       Page Faults                       0
-      Page Reclaims                     86
+      Page Reclaims                     98
       Page Swaps                        0
       Voluntary Context Switches        8
       Involuntary Context Switches      0
@@ -1316,23 +1320,23 @@ NOTE: DATA statement used (Total process time):
       Block Output Operations           8
       
 
-32 records created in ~/mgxviz_1792866647_3247/mgx_onco_glyphs.csv from WORK.READER_EXPORT.
+32 records created in ~/mgxviz_1792867656_4554/mgx_onco_glyphs.csv from WORK.READER_EXPORT.
   
   
-NOTE: "~/mgxviz_1792866647_3247/mgx_onco_glyphs.csv" file was successfully created.
+NOTE: "~/mgxviz_1792867656_4554/mgx_onco_glyphs.csv" file was successfully created.
 NOTE: PROCEDURE EXPORT used (Total process time):
       real time           0.02 seconds
       user cpu time       0.02 seconds
-      system cpu time     0.00 seconds
-      memory              9372.84k
-      OS Memory           44324.00k
-      Timestamp           10/24/2026 06:31:32 PM
+      system cpu time     0.01 seconds
+      memory              9362.25k
+      OS Memory           44580.00k
+      Timestamp           10/24/2026 06:48:21 PM
       Step Count                        33  Switch Count  7
       Page Faults                       0
-      Page Reclaims                     871
+      Page Reclaims                     958
       Page Swaps                        0
-      Voluntary Context Switches        41
-      Involuntary Context Switches      0
+      Voluntary Context Switches        40
+      Involuntary Context Switches      1
       Block Input Operations            0
       Block Output Operations           48
       
@@ -1345,20 +1349,20 @@ NOTE: DATA statement used (Total process time):
       real time           0.00 seconds
       user cpu time       0.00 seconds
       system cpu time     0.00 seconds
-      memory              871.56k
-      OS Memory           40368.00k
-      Timestamp           10/24/2026 06:31:32 PM
+      memory              886.59k
+      OS Memory           40112.00k
+      Timestamp           10/24/2026 06:48:21 PM
       Step Count                        34  Switch Count  2
       Page Faults                       0
       Page Reclaims                     109
       Page Swaps                        0
-      Voluntary Context Switches        9
+      Voluntary Context Switches        8
       Involuntary Context Switches      0
       Block Input Operations            0
       Block Output Operations           264
       
 
-667        proc export data=work.reader_export outfile="~/mgxviz_1792866647_3247/mgx_onco_render.csv" dbms=csv replace;
+667        proc export data=work.reader_export outfile="~/mgxviz_1792867656_4554/mgx_onco_render.csv" dbms=csv replace;
 667      !                                                                                                             run;
 
 NOTE: Unable to open parameter catalog: SASUSER.PARMS.PARMS.SLIST in update mode. Temporary parameter values will be saved to 
@@ -1374,7 +1378,7 @@ WORK.PARMS.PARMS.SLIST.
 676            data _null_;
 677            %let _EFIERR_ = 0; /* set the ERROR detection macro variable */
 678            %let _EFIREC_ = 0;     /* clear export record count macro variable */
-679            file '~/mgxviz_1792866647_3247/mgx_onco_render.csv' delimiter=',' DSD DROPOVER lrecl=32767;
+679            file '~/mgxviz_1792867656_4554/mgx_onco_render.csv' delimiter=',' DSD DROPOVER lrecl=32767;
 680            if _n_ = 1 then        /* write column names or labels */
 681             do;
 682               put
@@ -1520,13 +1524,13 @@ WORK.PARMS.PARMS.SLIST.
 822            if EFIEOD then call symputx('_EFIREC_',EFIOUT);
 823            run;
 
-NOTE: The file '~/mgxviz_1792866647_3247/mgx_onco_render.csv' is:
-      Filename=<SAS_HOME>/mgxviz_1792866647_3247/mgx_onco_render.csv,
+NOTE: The file '~/mgxviz_1792867656_4554/mgx_onco_render.csv' is:
+      Filename=<SAS_HOME>/mgxviz_1792867656_4554/mgx_onco_render.csv,
       Owner Name=<SAS_USER>,Group Name=oda,
       Access Permission=-rw-r--r--,
-      Last Modified=24Oct2026:18:31:32
+      Last Modified=24Oct2026:18:48:21
 
-NOTE: 161 records were written to the file '~/mgxviz_1792866647_3247/mgx_onco_render.csv'.
+NOTE: 161 records were written to the file '~/mgxviz_1792867656_4554/mgx_onco_render.csv'.
       The minimum record length was 41.
       The maximum record length was 325.
 NOTE: There were 160 observations read from the data set WORK.READER_EXPORT.
@@ -1534,12 +1538,12 @@ NOTE: DATA statement used (Total process time):
       real time           0.00 seconds
       user cpu time       0.00 seconds
       system cpu time     0.00 seconds
-      memory              9320.50k
-      OS Memory           44320.00k
-      Timestamp           10/24/2026 06:31:32 PM
+      memory              9318.93k
+      OS Memory           44576.00k
+      Timestamp           10/24/2026 06:48:21 PM
       Step Count                        35  Switch Count  0
       Page Faults                       0
-      Page Reclaims                     78
+      Page Reclaims                     126
       Page Swaps                        0
       Voluntary Context Switches        8
       Involuntary Context Switches      0
@@ -1547,23 +1551,23 @@ NOTE: DATA statement used (Total process time):
       Block Output Operations           40
       
 
-160 records created in ~/mgxviz_1792866647_3247/mgx_onco_render.csv from WORK.READER_EXPORT.
+160 records created in ~/mgxviz_1792867656_4554/mgx_onco_render.csv from WORK.READER_EXPORT.
   
   
-NOTE: "~/mgxviz_1792866647_3247/mgx_onco_render.csv" file was successfully created.
+NOTE: "~/mgxviz_1792867656_4554/mgx_onco_render.csv" file was successfully created.
 NOTE: PROCEDURE EXPORT used (Total process time):
       real time           0.03 seconds
-      user cpu time       0.03 seconds
+      user cpu time       0.02 seconds
       system cpu time     0.00 seconds
-      memory              9320.50k
-      OS Memory           44580.00k
-      Timestamp           10/24/2026 06:31:32 PM
+      memory              9318.93k
+      OS Memory           44836.00k
+      Timestamp           10/24/2026 06:48:21 PM
       Step Count                        35  Switch Count  7
       Page Faults                       0
-      Page Reclaims                     828
+      Page Reclaims                     905
       Page Swaps                        0
       Voluntary Context Switches        40
-      Involuntary Context Switches      2
+      Involuntary Context Switches      0
       Block Input Operations            0
       Block Output Operations           56
       
@@ -1576,20 +1580,20 @@ NOTE: DATA statement used (Total process time):
       real time           0.00 seconds
       user cpu time       0.00 seconds
       system cpu time     0.00 seconds
-      memory              802.56k
+      memory              796.59k
       OS Memory           40624.00k
-      Timestamp           10/24/2026 06:31:32 PM
+      Timestamp           10/24/2026 06:48:21 PM
       Step Count                        36  Switch Count  2
       Page Faults                       0
-      Page Reclaims                     121
+      Page Reclaims                     124
       Page Swaps                        0
       Voluntary Context Switches        8
-      Involuntary Context Switches      0
+      Involuntary Context Switches      1
       Block Input Operations            0
       Block Output Operations           264
       
 
-825        proc export data=work.reader_export outfile="~/mgxviz_1792866647_3247/mgx_onco_status.csv" dbms=csv replace;
+825        proc export data=work.reader_export outfile="~/mgxviz_1792867656_4554/mgx_onco_status.csv" dbms=csv replace;
 825      !                                                                                                             run;
 
 NOTE: Unable to open parameter catalog: SASUSER.PARMS.PARMS.SLIST in update mode. Temporary parameter values will be saved to 
@@ -1605,7 +1609,7 @@ WORK.PARMS.PARMS.SLIST.
 834            data _null_;
 835            %let _EFIERR_ = 0; /* set the ERROR detection macro variable */
 836            %let _EFIREC_ = 0;     /* clear export record count macro variable */
-837            file '~/mgxviz_1792866647_3247/mgx_onco_status.csv' delimiter=',' DSD DROPOVER lrecl=32767;
+837            file '~/mgxviz_1792867656_4554/mgx_onco_status.csv' delimiter=',' DSD DROPOVER lrecl=32767;
 838            if _n_ = 1 then        /* write column names or labels */
 839             do;
 840               put
@@ -1623,13 +1627,13 @@ WORK.PARMS.PARMS.SLIST.
 852            if EFIEOD then call symputx('_EFIREC_',EFIOUT);
 853            run;
 
-NOTE: The file '~/mgxviz_1792866647_3247/mgx_onco_status.csv' is:
-      Filename=<SAS_HOME>/mgxviz_1792866647_3247/mgx_onco_status.csv,
+NOTE: The file '~/mgxviz_1792867656_4554/mgx_onco_status.csv' is:
+      Filename=<SAS_HOME>/mgxviz_1792867656_4554/mgx_onco_status.csv,
       Owner Name=<SAS_USER>,Group Name=oda,
       Access Permission=-rw-r--r--,
-      Last Modified=24Oct2026:18:31:32
+      Last Modified=24Oct2026:18:48:21
 
-NOTE: 2 records were written to the file '~/mgxviz_1792866647_3247/mgx_onco_status.csv'.
+NOTE: 2 records were written to the file '~/mgxviz_1792867656_4554/mgx_onco_status.csv'.
       The minimum record length was 1.
       The maximum record length was 6.
 NOTE: There were 1 observations read from the data set WORK.READER_EXPORT.
@@ -1637,12 +1641,12 @@ NOTE: DATA statement used (Total process time):
       real time           0.00 seconds
       user cpu time       0.00 seconds
       system cpu time     0.00 seconds
-      memory              9039.65k
+      memory              9036.50k
       OS Memory           44320.00k
-      Timestamp           10/24/2026 06:31:32 PM
+      Timestamp           10/24/2026 06:48:21 PM
       Step Count                        37  Switch Count  0
       Page Faults                       0
-      Page Reclaims                     29
+      Page Reclaims                     49
       Page Swaps                        0
       Voluntary Context Switches        8
       Involuntary Context Switches      0
@@ -1650,22 +1654,22 @@ NOTE: DATA statement used (Total process time):
       Block Output Operations           16
       
 
-1 records created in ~/mgxviz_1792866647_3247/mgx_onco_status.csv from WORK.READER_EXPORT.
+1 records created in ~/mgxviz_1792867656_4554/mgx_onco_status.csv from WORK.READER_EXPORT.
   
   
-NOTE: "~/mgxviz_1792866647_3247/mgx_onco_status.csv" file was successfully created.
+NOTE: "~/mgxviz_1792867656_4554/mgx_onco_status.csv" file was successfully created.
 NOTE: PROCEDURE EXPORT used (Total process time):
       real time           0.02 seconds
       user cpu time       0.02 seconds
       system cpu time     0.00 seconds
-      memory              9055.78k
+      memory              9052.15k
       OS Memory           44580.00k
-      Timestamp           10/24/2026 06:31:32 PM
+      Timestamp           10/24/2026 06:48:21 PM
       Step Count                        37  Switch Count  7
       Page Faults                       0
-      Page Reclaims                     758
+      Page Reclaims                     791
       Page Swaps                        0
-      Voluntary Context Switches        41
+      Voluntary Context Switches        40
       Involuntary Context Switches      0
       Block Input Operations            0
       Block Output Operations           32
@@ -1679,9 +1683,9 @@ NOTE: DATA statement used (Total process time):
       real time           0.00 seconds
       user cpu time       0.00 seconds
       system cpu time     0.00 seconds
-      memory              524.03k
-      OS Memory           40364.00k
-      Timestamp           10/24/2026 06:31:32 PM
+      memory              519.25k
+      OS Memory           40108.00k
+      Timestamp           10/24/2026 06:48:21 PM
       Step Count                        38  Switch Count  2
       Page Faults                       0
       Page Reclaims                     87
@@ -1692,7 +1696,7 @@ NOTE: DATA statement used (Total process time):
       Block Output Operations           264
       
 
-855        proc export data=work.reader_environment outfile="~/mgxviz_1792866647_3247/environment.csv" dbms=csv replace;
+855        proc export data=work.reader_environment outfile="~/mgxviz_1792867656_4554/environment.csv" dbms=csv replace;
 855      !                                                                                                              run;
 
 NOTE: Unable to open parameter catalog: SASUSER.PARMS.PARMS.SLIST in update mode. Temporary parameter values will be saved to 
@@ -1708,7 +1712,7 @@ WORK.PARMS.PARMS.SLIST.
 864            data _null_;
 865            %let _EFIERR_ = 0; /* set the ERROR detection macro variable */
 866            %let _EFIREC_ = 0;     /* clear export record count macro variable */
-867            file '~/mgxviz_1792866647_3247/environment.csv' delimiter=',' DSD DROPOVER lrecl=32767;
+867            file '~/mgxviz_1792867656_4554/environment.csv' delimiter=',' DSD DROPOVER lrecl=32767;
 868            if _n_ = 1 then        /* write column names or labels */
 869             do;
 870               put
@@ -1734,13 +1738,13 @@ WORK.PARMS.PARMS.SLIST.
 890            if EFIEOD then call symputx('_EFIREC_',EFIOUT);
 891            run;
 
-NOTE: The file '~/mgxviz_1792866647_3247/environment.csv' is:
-      Filename=<SAS_HOME>/mgxviz_1792866647_3247/environment.csv,
+NOTE: The file '~/mgxviz_1792867656_4554/environment.csv' is:
+      Filename=<SAS_HOME>/mgxviz_1792867656_4554/environment.csv,
       Owner Name=<SAS_USER>,Group Name=oda,
       Access Permission=-rw-r--r--,
-      Last Modified=24Oct2026:18:31:32
+      Last Modified=24Oct2026:18:48:21
 
-NOTE: 2 records were written to the file '~/mgxviz_1792866647_3247/environment.csv'.
+NOTE: 2 records were written to the file '~/mgxviz_1792867656_4554/environment.csv'.
       The minimum record length was 31.
       The maximum record length was 57.
 NOTE: There were 1 observations read from the data set WORK.READER_ENVIRONMENT.
@@ -1748,33 +1752,33 @@ NOTE: DATA statement used (Total process time):
       real time           0.00 seconds
       user cpu time       0.00 seconds
       system cpu time     0.00 seconds
-      memory              9075.40k
+      memory              9072.50k
       OS Memory           44320.00k
-      Timestamp           10/24/2026 06:31:32 PM
+      Timestamp           10/24/2026 06:48:21 PM
       Step Count                        39  Switch Count  0
       Page Faults                       0
-      Page Reclaims                     23
+      Page Reclaims                     74
       Page Swaps                        0
       Voluntary Context Switches        8
       Involuntary Context Switches      0
       Block Input Operations            0
-      Block Output Operations           16
+      Block Output Operations           8
       
 
-1 records created in ~/mgxviz_1792866647_3247/environment.csv from WORK.READER_ENVIRONMENT.
+1 records created in ~/mgxviz_1792867656_4554/environment.csv from WORK.READER_ENVIRONMENT.
   
   
-NOTE: "~/mgxviz_1792866647_3247/environment.csv" file was successfully created.
+NOTE: "~/mgxviz_1792867656_4554/environment.csv" file was successfully created.
 NOTE: PROCEDURE EXPORT used (Total process time):
       real time           0.02 seconds
-      user cpu time       0.01 seconds
-      system cpu time     0.00 seconds
-      memory              9075.40k
+      user cpu time       0.02 seconds
+      system cpu time     0.01 seconds
+      memory              9072.50k
       OS Memory           44580.00k
-      Timestamp           10/24/2026 06:31:32 PM
+      Timestamp           10/24/2026 06:48:21 PM
       Step Count                        39  Switch Count  7
       Page Faults                       0
-      Page Reclaims                     752
+      Page Reclaims                     812
       Page Swaps                        0
       Voluntary Context Switches        40
       Involuntary Context Switches      1
@@ -1792,4 +1796,4 @@ NOTE: PROCEDURE EXPORT used (Total process time):
 897        
 
 === Output ===
-HTML output saved to: <NEW_BOOK>/.audit-local/phase3/runtime/SAS_Output_MCP4SAS_cVxREO/sas_res_RqtTo.html
+HTML output saved to: <NEW_BOOK>/.audit-local/phase3/runtime/SAS_Output_MCP4SAS_j0vctb/sas_res_bkhqa.html

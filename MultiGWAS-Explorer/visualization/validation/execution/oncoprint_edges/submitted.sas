@@ -1,11 +1,11 @@
 options dlcreatedir notes source nodate nonumber;
-libname bookout "~/mgxviz_1792866657_3269";
+libname bookout "~/mgxviz_1792867666_4576";
 libname bookout clear;
-%let BOOK_OUT=%sysget(HOME)/mgxviz_1792866657_3269;
-%let P2_OUT=%sysget(HOME)/mgxviz_1792866657_3269;
-%let P3_OUT=%sysget(HOME)/mgxviz_1792866657_3269;
-%let AF_OUT=%sysget(HOME)/mgxviz_1792866657_3269;
-%let AF_REMOTE=mgxviz_1792866657_3269;
+%let BOOK_OUT=%sysget(HOME)/mgxviz_1792867666_4576;
+%let P2_OUT=%sysget(HOME)/mgxviz_1792867666_4576;
+%let P3_OUT=%sysget(HOME)/mgxviz_1792867666_4576;
+%let AF_OUT=%sysget(HOME)/mgxviz_1792867666_4576;
+%let AF_REMOTE=mgxviz_1792867666_4576;
 
 /* Zhongshan Cheng. Reusable form of the book's event-glyph oncoprint.
    GPL-3.0. Fixed input schema is documented beside the example.
@@ -228,23 +228,23 @@ run;
 %MGXOncoPrint(samples=work.samples,genes=work.genes,
  callability=work.calls,variants=work.variants,
  prefix=edge,outdir=&BOOK_OUT,image=oncoprint_edges,width=6,height=4,
- template_file="~/mgxviz_1792866657_3269_oncoprint_template.sas");
+ template_file="~/mgxviz_1792867666_4576_oncoprint_template.sas");
 data work.edge_status;status=&MGX_ONCOPRINT_RC;run;
 
 /* LESSON_END */
 
 /* Reader capture: export values without changing the analysis. */
 data work.reader_export;set work.edge_tiles;format _numeric_ best32.;run;
-proc export data=work.reader_export outfile="~/mgxviz_1792866657_3269/edge_tiles.csv" dbms=csv replace;run;
+proc export data=work.reader_export outfile="~/mgxviz_1792867666_4576/edge_tiles.csv" dbms=csv replace;run;
 data work.reader_export;set work.edge_frequency;format _numeric_ best32.;run;
-proc export data=work.reader_export outfile="~/mgxviz_1792866657_3269/edge_frequency.csv" dbms=csv replace;run;
+proc export data=work.reader_export outfile="~/mgxviz_1792867666_4576/edge_frequency.csv" dbms=csv replace;run;
 data work.reader_export;set work.edge_burden;format _numeric_ best32.;run;
-proc export data=work.reader_export outfile="~/mgxviz_1792866657_3269/edge_burden.csv" dbms=csv replace;run;
+proc export data=work.reader_export outfile="~/mgxviz_1792867666_4576/edge_burden.csv" dbms=csv replace;run;
 data work.reader_export;set work.edge_glyphs;format _numeric_ best32.;run;
-proc export data=work.reader_export outfile="~/mgxviz_1792866657_3269/edge_glyphs.csv" dbms=csv replace;run;
+proc export data=work.reader_export outfile="~/mgxviz_1792867666_4576/edge_glyphs.csv" dbms=csv replace;run;
 data work.reader_export;set work.edge_render;format _numeric_ best32.;run;
-proc export data=work.reader_export outfile="~/mgxviz_1792866657_3269/edge_render.csv" dbms=csv replace;run;
+proc export data=work.reader_export outfile="~/mgxviz_1792867666_4576/edge_render.csv" dbms=csv replace;run;
 data work.reader_export;set work.edge_status;format _numeric_ best32.;run;
-proc export data=work.reader_export outfile="~/mgxviz_1792866657_3269/edge_status.csv" dbms=csv replace;run;
+proc export data=work.reader_export outfile="~/mgxviz_1792867666_4576/edge_status.csv" dbms=csv replace;run;
 data work.reader_environment;length sas_version $64 platform $32 process_id $40; sas_version="&sysvlong";platform="&sysscp";process_id="&sysprocessid";run;
-proc export data=work.reader_environment outfile="~/mgxviz_1792866657_3269/environment.csv" dbms=csv replace;run;
+proc export data=work.reader_environment outfile="~/mgxviz_1792867666_4576/environment.csv" dbms=csv replace;run;

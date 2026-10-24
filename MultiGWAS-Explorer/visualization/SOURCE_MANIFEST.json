@@ -630,7 +630,7 @@
       "new_macro" : "companion/research/multigwas_port/MGXOncoPrint.sas",
       "original_program" : "companion/research/publication_figures/programs/pub_oncoprint.sas",
       "original_sha256" : "745b2b64fe9b025c990389b4ff0d41107c146882b5944e5d1750653e997f3683",
-      "template_sha256" : "617cac5dfddce55f13314f427c5b2fe570db25e58519af63e066ee3d91930470"
+      "template_sha256" : "951aa294ba82f29a752188c7f4e947bef3dbf25053c23da310d6f616e8fbb149"
    },
    "scope" : "Optional isolated-session visualization package. Original source files copied exactly; current scoped derivatives retain explicit Book names. No normal GWAS pipeline entrypoint or original user working file changed.",
    "source_book_commit" : "43160affa592212604fb227da3f4ea992c680ded",

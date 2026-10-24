@@ -33,17 +33,17 @@
       {
          "bytes" : 90,
          "name" : "environment.csv",
-         "sha256" : "7838df83ea886a755ca157a4c1afa7e03dd420f90280c2ccbcf8787698525f6d"
+         "sha256" : "1fa0a42ea43a8e30d4f2caeb6849c05343f240d686befef83a97c3f09c87f458"
       },
       {
-         "bytes" : 114501,
+         "bytes" : 161688,
          "name" : "mgx_oncoprint.png",
-         "sha256" : "32b4e44ab3c4d01c5d00935c314cd0816b18fa994620acc2371d7f50597da78f"
+         "sha256" : "5961e85b6bc4e8d8cd478b435280a9f5f1d0cf84f61f39f1e8e68a4a1e7a4965"
       },
       {
-         "bytes" : 95187,
+         "bytes" : 95234,
          "name" : "mgx_oncoprint.svg",
-         "sha256" : "01b9d541141b6934a089d65a3ae079e4c04fe970b4b1159c6ca5f744136e78d1"
+         "sha256" : "075fc18d2659e67fe97bf2c04a8d8a62312053d1e9bd817225f9f65cec825c46"
       },
       {
          "bytes" : 229,
@@ -51,9 +51,9 @@
          "sha256" : "97465ace72c52ca8c6331ba6a6f0da78b1ecf0e2923590959c870716f4d1a668"
       },
       {
-         "bytes" : 3897,
+         "bytes" : 3895,
          "name" : "mgx_onco_template.sas",
-         "sha256" : "3a403cd98ed753280164d8aeada8a65f8739cbcd082a0179946a3f3bc33f1573"
+         "sha256" : "a1372f672ff40dcaf503f026fcb1e827e84107855755e35d19796bd47760a260"
       }
    ],
    "capture_complete" : true,
@@ -70,16 +70,16 @@
    "expected_outcome_observed" : true,
    "inputs" : [
       {
-         "remote" : "~/mgxviz_1792866647_3247_oncoprint_template.sas",
-         "sha256" : "617cac5dfddce55f13314f427c5b2fe570db25e58519af63e066ee3d91930470",
+         "remote" : "~/mgxviz_1792867656_4554_oncoprint_template.sas",
+         "sha256" : "951aa294ba82f29a752188c7f4e947bef3dbf25053c23da310d6f616e8fbb149",
          "source" : "companion/research/multigwas_port/oncoprint_template.sas"
       }
    ],
-   "job_pid" : 3291,
+   "job_pid" : 4598,
    "lesson" : "oncoprint",
-   "log_sha256" : "310a98a60008357b9ec7325438b05eb471f63616122321f16e332245aea01071",
+   "log_sha256" : "c2c08194a6f081c0f3dc55e02ef2b34c4a3bae6f547daba45bc76a5dff604f6a",
    "persistent" : false,
-   "remote_output" : "~/mgxviz_1792866647_3247",
+   "remote_output" : "~/mgxviz_1792867656_4554",
    "rpc" : [
       "rpc_1.json",
       "rpc_2.json",
@@ -98,7 +98,7 @@
    "source" : "companion/research/multigwas_port/oncoprint_demo.sas",
    "source_sha256" : "5901a9b981594a0b5182221a53edaacbe05bf08cfda7cbbcfd1850b641acf9c2",
    "status" : "COMPLETE",
-   "submitted_sha256" : "1685cfa06e25153cb801cc64c25c081b1914020df289ff6f962acad4e299f36c",
+   "submitted_sha256" : "3ffbae997dbd9af4f4c6a9c8f6b2669bd4b6ce645f26041b855ae6d75f862aed",
    "target" : "oda",
    "variant" : "baseline"
 }

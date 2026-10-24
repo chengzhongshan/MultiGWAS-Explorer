@@ -1,11 +1,11 @@
 options dlcreatedir notes source nodate nonumber;
-libname bookout "~/mgxviz_1792866779_3376";
+libname bookout "~/mgxviz_1792867788_4682";
 libname bookout clear;
-%let BOOK_OUT=%sysget(HOME)/mgxviz_1792866779_3376;
-%let P2_OUT=%sysget(HOME)/mgxviz_1792866779_3376;
-%let P3_OUT=%sysget(HOME)/mgxviz_1792866779_3376;
-%let AF_OUT=%sysget(HOME)/mgxviz_1792866779_3376;
-%let AF_REMOTE=mgxviz_1792866779_3376;
+%let BOOK_OUT=%sysget(HOME)/mgxviz_1792867788_4682;
+%let P2_OUT=%sysget(HOME)/mgxviz_1792867788_4682;
+%let P3_OUT=%sysget(HOME)/mgxviz_1792867788_4682;
+%let AF_OUT=%sysget(HOME)/mgxviz_1792867788_4682;
+%let AF_REMOTE=mgxviz_1792867788_4682;
 
 /* Zhongshan Cheng. Reusable form of the book's event-glyph oncoprint.
    GPL-3.0. Fixed input schema is documented beside the example.
@@ -289,18 +289,18 @@ run;
 
 %MGXOncoPrint(samples=work.absent,genes=work.genes,
  callability=work.callability,variants=work.variants,outdir=&BOOK_OUT,
- template_file="~/mgxviz_1792866779_3376_oncoprint_template.sas");
+ template_file="~/mgxviz_1792867788_4682_oncoprint_template.sas");
 data work.mgx_negative_status;length test $40;test='Missing dataset';status=&MGX_ONCOPRINT_RC;output;run;
 data work.bad_variants;set work.variants;if _n_=1 then mutation_class='Unsupported';run;
 %MGXOncoPrint(samples=work.samples,genes=work.genes,
  callability=work.callability,variants=work.bad_variants,outdir=&BOOK_OUT,
- template_file="~/mgxviz_1792866779_3376_oncoprint_template.sas");
+ template_file="~/mgxviz_1792867788_4682_oncoprint_template.sas");
 data work._mgx_status;length test $40;test='Invalid mutation class';status=&MGX_ONCOPRINT_RC;run;
 proc append base=work.mgx_negative_status data=work._mgx_status;run;
 data work.bad_calls;set work.callability;if sample='S01' and gene_index=8 then callable=0;run;
 %MGXOncoPrint(samples=work.samples,genes=work.genes,
  callability=work.bad_calls,variants=work.variants,outdir=&BOOK_OUT,
- template_file="~/mgxviz_1792866779_3376_oncoprint_template.sas");
+ template_file="~/mgxviz_1792867788_4682_oncoprint_template.sas");
 data work._mgx_status;length test $40;test='Event in unassessable pair';status=&MGX_ONCOPRINT_RC;run;
 proc append base=work.mgx_negative_status data=work._mgx_status;run;
 
@@ -308,6 +308,6 @@ proc append base=work.mgx_negative_status data=work._mgx_status;run;
 
 /* Reader capture: export values without changing the analysis. */
 data work.reader_export;set work.mgx_negative_status;format _numeric_ best32.;run;
-proc export data=work.reader_export outfile="~/mgxviz_1792866779_3376/mgx_negative_status.csv" dbms=csv replace;run;
+proc export data=work.reader_export outfile="~/mgxviz_1792867788_4682/mgx_negative_status.csv" dbms=csv replace;run;
 data work.reader_environment;length sas_version $64 platform $32 process_id $40; sas_version="&sysvlong";platform="&sysscp";process_id="&sysprocessid";run;
-proc export data=work.reader_environment outfile="~/mgxviz_1792866779_3376/environment.csv" dbms=csv replace;run;
+proc export data=work.reader_environment outfile="~/mgxviz_1792867788_4682/environment.csv" dbms=csv replace;run;

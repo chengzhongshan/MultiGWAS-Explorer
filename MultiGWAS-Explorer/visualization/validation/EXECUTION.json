@@ -195,6 +195,90 @@
          "lesson" : "oncoprint_edges",
          "reason" : "Superseded render before requested summary-bar widths/colors, solid cohort strokes and visible zero-denominator labels were finalized.",
          "status" : "COMPLETE"
+      },
+      {
+         "accepted" : false,
+         "files" : [
+            {
+               "file" : "validation/diagnostics/mgxviz_1792866647_3247_oncoprint_baseline/source.sas",
+               "raw_sha256" : "5901a9b981594a0b5182221a53edaacbe05bf08cfda7cbbcfd1850b641acf9c2",
+               "sha256" : "5901a9b981594a0b5182221a53edaacbe05bf08cfda7cbbcfd1850b641acf9c2"
+            },
+            {
+               "file" : "validation/diagnostics/mgxviz_1792866647_3247_oncoprint_baseline/submitted.sas",
+               "raw_sha256" : "1685cfa06e25153cb801cc64c25c081b1914020df289ff6f962acad4e299f36c",
+               "sha256" : "1685cfa06e25153cb801cc64c25c081b1914020df289ff6f962acad4e299f36c"
+            },
+            {
+               "file" : "validation/diagnostics/mgxviz_1792866647_3247_oncoprint_baseline/sas.log",
+               "raw_sha256" : "310a98a60008357b9ec7325438b05eb471f63616122321f16e332245aea01071",
+               "sha256" : "60176867f55b53be9b5d8b0d8281b36bd54b1746cc6b8cb215d02f4727d30a8a"
+            },
+            {
+               "file" : "validation/diagnostics/mgxviz_1792866647_3247_oncoprint_baseline/manifest.json",
+               "raw_sha256" : "09e48a3c95748ce675a528b81b6558ec2ecff075434f6dc370f50f2524d2806c",
+               "sha256" : "09e48a3c95748ce675a528b81b6558ec2ecff075434f6dc370f50f2524d2806c"
+            }
+         ],
+         "lesson" : "oncoprint",
+         "reason" : "Superseded render before requested summary-bar widths/colors, solid cohort strokes and visible zero-denominator labels were finalized.",
+         "status" : "COMPLETE"
+      },
+      {
+         "accepted" : false,
+         "files" : [
+            {
+               "file" : "validation/diagnostics/mgxviz_1792866657_3269_oncoprint_edges_baseline/source.sas",
+               "raw_sha256" : "db01bda079eaa24c0ef36bc3b453b139674887df3484b56060a06b92b71977f7",
+               "sha256" : "db01bda079eaa24c0ef36bc3b453b139674887df3484b56060a06b92b71977f7"
+            },
+            {
+               "file" : "validation/diagnostics/mgxviz_1792866657_3269_oncoprint_edges_baseline/submitted.sas",
+               "raw_sha256" : "6e6929129630e3a94bd0a9184215602881e7b5bac4a8d31a882c74ab2e480192",
+               "sha256" : "6e6929129630e3a94bd0a9184215602881e7b5bac4a8d31a882c74ab2e480192"
+            },
+            {
+               "file" : "validation/diagnostics/mgxviz_1792866657_3269_oncoprint_edges_baseline/sas.log",
+               "raw_sha256" : "c966b487db257986b6c50a301af09cf7d11be3d036c56d60184fca3ff565be7e",
+               "sha256" : "dd9e4cf939159a7a68c5360ac2a9bb895d7c6a7a3801ff20f70ef48416026977"
+            },
+            {
+               "file" : "validation/diagnostics/mgxviz_1792866657_3269_oncoprint_edges_baseline/manifest.json",
+               "raw_sha256" : "c02056db060b2622bae4cf3d1c6961511dbbbe69475fe9f59ba8e55b97c5ecd3",
+               "sha256" : "c02056db060b2622bae4cf3d1c6961511dbbbe69475fe9f59ba8e55b97c5ecd3"
+            }
+         ],
+         "lesson" : "oncoprint_edges",
+         "reason" : "Superseded render before requested summary-bar widths/colors, solid cohort strokes and visible zero-denominator labels were finalized.",
+         "status" : "COMPLETE"
+      },
+      {
+         "accepted" : false,
+         "files" : [
+            {
+               "file" : "validation/diagnostics/mgxviz_1792866779_3376_oncoprint_invalid_baseline/source.sas",
+               "raw_sha256" : "ed90d9db95fa0d5311428ab88f280e878069fa0c9b9f2c2dd257c707b7cd1548",
+               "sha256" : "ed90d9db95fa0d5311428ab88f280e878069fa0c9b9f2c2dd257c707b7cd1548"
+            },
+            {
+               "file" : "validation/diagnostics/mgxviz_1792866779_3376_oncoprint_invalid_baseline/submitted.sas",
+               "raw_sha256" : "3c8f21548868ea3bfd53166b3c4ead56c4a5323fed9d37684c36c97f89f14e74",
+               "sha256" : "3c8f21548868ea3bfd53166b3c4ead56c4a5323fed9d37684c36c97f89f14e74"
+            },
+            {
+               "file" : "validation/diagnostics/mgxviz_1792866779_3376_oncoprint_invalid_baseline/sas.log",
+               "raw_sha256" : "90d3ae459b37a1bee2eb4b2a4d59108958494acd41d9fb05c03d1ab4d6950e04",
+               "sha256" : "4ad28405a7ceb8077f0ae670c2e526765757c4f510c2f17b0d8b82152c5bc0d0"
+            },
+            {
+               "file" : "validation/diagnostics/mgxviz_1792866779_3376_oncoprint_invalid_baseline/manifest.json",
+               "raw_sha256" : "7f62665b77d0f395653a4b40c2d069a28867999697bed67dd627a08262505afa",
+               "sha256" : "7f62665b77d0f395653a4b40c2d069a28867999697bed67dd627a08262505afa"
+            }
+         ],
+         "lesson" : "oncoprint_invalid",
+         "reason" : "Superseded expected-error capture; final run uses the current macro and downloads its return-code CSV.",
+         "status" : "FAILED"
       }
    ],
    "runs" : [
@@ -481,9 +565,9 @@
          "files" : [
             {
                "file" : "validation/execution/oncoprint/artifacts/environment.csv",
-               "raw_sha256" : "7838df83ea886a755ca157a4c1afa7e03dd420f90280c2ccbcf8787698525f6d",
+               "raw_sha256" : "1fa0a42ea43a8e30d4f2caeb6849c05343f240d686befef83a97c3f09c87f458",
                "redacted" : false,
-               "sha256" : "7838df83ea886a755ca157a4c1afa7e03dd420f90280c2ccbcf8787698525f6d"
+               "sha256" : "1fa0a42ea43a8e30d4f2caeb6849c05343f240d686befef83a97c3f09c87f458"
             },
             {
                "file" : "validation/execution/oncoprint/artifacts/mgx_onco_burden.csv",
@@ -523,9 +607,9 @@
             },
             {
                "file" : "validation/execution/oncoprint/artifacts/mgx_onco_template.sas",
-               "raw_sha256" : "3a403cd98ed753280164d8aeada8a65f8739cbcd082a0179946a3f3bc33f1573",
+               "raw_sha256" : "a1372f672ff40dcaf503f026fcb1e827e84107855755e35d19796bd47760a260",
                "redacted" : false,
-               "sha256" : "3a403cd98ed753280164d8aeada8a65f8739cbcd082a0179946a3f3bc33f1573"
+               "sha256" : "a1372f672ff40dcaf503f026fcb1e827e84107855755e35d19796bd47760a260"
             },
             {
                "file" : "validation/execution/oncoprint/artifacts/mgx_onco_tiles.csv",
@@ -535,15 +619,15 @@
             },
             {
                "file" : "validation/execution/oncoprint/artifacts/mgx_oncoprint.png",
-               "raw_sha256" : "32b4e44ab3c4d01c5d00935c314cd0816b18fa994620acc2371d7f50597da78f",
+               "raw_sha256" : "5961e85b6bc4e8d8cd478b435280a9f5f1d0cf84f61f39f1e8e68a4a1e7a4965",
                "redacted" : false,
-               "sha256" : "32b4e44ab3c4d01c5d00935c314cd0816b18fa994620acc2371d7f50597da78f"
+               "sha256" : "5961e85b6bc4e8d8cd478b435280a9f5f1d0cf84f61f39f1e8e68a4a1e7a4965"
             },
             {
                "file" : "validation/execution/oncoprint/artifacts/mgx_oncoprint.svg",
-               "raw_sha256" : "01b9d541141b6934a089d65a3ae079e4c04fe970b4b1159c6ca5f744136e78d1",
+               "raw_sha256" : "075fc18d2659e67fe97bf2c04a8d8a62312053d1e9bd817225f9f65cec825c46",
                "redacted" : false,
-               "sha256" : "01b9d541141b6934a089d65a3ae079e4c04fe970b4b1159c6ca5f744136e78d1"
+               "sha256" : "075fc18d2659e67fe97bf2c04a8d8a62312053d1e9bd817225f9f65cec825c46"
             },
             {
                "file" : "validation/execution/oncoprint/client.pl",
@@ -553,15 +637,15 @@
             },
             {
                "file" : "validation/execution/oncoprint/manifest.json",
-               "raw_sha256" : "09e48a3c95748ce675a528b81b6558ec2ecff075434f6dc370f50f2524d2806c",
+               "raw_sha256" : "b9c50e461b70de39296d1a2ed6f0cb2d42b487f94d804539884a4edb251fab7e",
                "redacted" : false,
-               "sha256" : "09e48a3c95748ce675a528b81b6558ec2ecff075434f6dc370f50f2524d2806c"
+               "sha256" : "b9c50e461b70de39296d1a2ed6f0cb2d42b487f94d804539884a4edb251fab7e"
             },
             {
                "file" : "validation/execution/oncoprint/sas.log",
-               "raw_sha256" : "310a98a60008357b9ec7325438b05eb471f63616122321f16e332245aea01071",
+               "raw_sha256" : "c2c08194a6f081c0f3dc55e02ef2b34c4a3bae6f547daba45bc76a5dff604f6a",
                "redacted" : true,
-               "sha256" : "60176867f55b53be9b5d8b0d8281b36bd54b1746cc6b8cb215d02f4727d30a8a"
+               "sha256" : "eceab23b957c91465e20ce886d5749544de2ab9520fbfd5f0035c7780a27793c"
             },
             {
                "file" : "validation/execution/oncoprint/source.sas",
@@ -571,15 +655,15 @@
             },
             {
                "file" : "validation/execution/oncoprint/submitted.sas",
-               "raw_sha256" : "1685cfa06e25153cb801cc64c25c081b1914020df289ff6f962acad4e299f36c",
+               "raw_sha256" : "3ffbae997dbd9af4f4c6a9c8f6b2669bd4b6ce645f26041b855ae6d75f862aed",
                "redacted" : false,
-               "sha256" : "1685cfa06e25153cb801cc64c25c081b1914020df289ff6f962acad4e299f36c"
+               "sha256" : "3ffbae997dbd9af4f4c6a9c8f6b2669bd4b6ce645f26041b855ae6d75f862aed"
             }
          ],
          "inputs" : [
             {
-               "remote" : "~/mgxviz_1792866647_3247_oncoprint_template.sas",
-               "sha256" : "617cac5dfddce55f13314f427c5b2fe570db25e58519af63e066ee3d91930470",
+               "remote" : "~/mgxviz_1792867656_4554_oncoprint_template.sas",
+               "sha256" : "951aa294ba82f29a752188c7f4e947bef3dbf25053c23da310d6f616e8fbb149",
                "source" : "companion/research/multigwas_port/oncoprint_template.sas"
             }
          ],
@@ -637,9 +721,9 @@
             },
             {
                "file" : "validation/execution/oncoprint_edges/artifacts/edge_template.sas",
-               "raw_sha256" : "c09eae08d021dae597771da0f3fa3cb52ca48ab986ab6ecc4e4806d7e350e8c9",
+               "raw_sha256" : "43fcb722633920368815eefec32a472743de08db10e3483845d577c8449bdac5",
                "redacted" : false,
-               "sha256" : "c09eae08d021dae597771da0f3fa3cb52ca48ab986ab6ecc4e4806d7e350e8c9"
+               "sha256" : "43fcb722633920368815eefec32a472743de08db10e3483845d577c8449bdac5"
             },
             {
                "file" : "validation/execution/oncoprint_edges/artifacts/edge_tiles.csv",
@@ -649,21 +733,21 @@
             },
             {
                "file" : "validation/execution/oncoprint_edges/artifacts/environment.csv",
-               "raw_sha256" : "c6d9efef65f64f1e6a30e6f4d23a14e66c4c626edd1b1a9d8c316eec18593bef",
+               "raw_sha256" : "c77b46ad64b0b1e290d4724a486b6fb69f84cc155601047ec41ba83042cab543",
                "redacted" : false,
-               "sha256" : "c6d9efef65f64f1e6a30e6f4d23a14e66c4c626edd1b1a9d8c316eec18593bef"
+               "sha256" : "c77b46ad64b0b1e290d4724a486b6fb69f84cc155601047ec41ba83042cab543"
             },
             {
                "file" : "validation/execution/oncoprint_edges/artifacts/oncoprint_edges.png",
-               "raw_sha256" : "01754db65a819115d5ade48cd70067f27b90134ea17cce77e5c569a88a97ecb9",
+               "raw_sha256" : "956651044cf79af14c02dc2848fcbc791295a199192e4c1ab05a068dfcd05f38",
                "redacted" : false,
-               "sha256" : "01754db65a819115d5ade48cd70067f27b90134ea17cce77e5c569a88a97ecb9"
+               "sha256" : "956651044cf79af14c02dc2848fcbc791295a199192e4c1ab05a068dfcd05f38"
             },
             {
                "file" : "validation/execution/oncoprint_edges/artifacts/oncoprint_edges.svg",
-               "raw_sha256" : "d55184ed5b85180d8f16a6d46af1d5ed3a5de110a8ad3d60f8c184b280f9d2c2",
+               "raw_sha256" : "55a550195cb014e24f4d184fa386ba678e40b8bf66c63fe6933c821dd9d5ac43",
                "redacted" : false,
-               "sha256" : "d55184ed5b85180d8f16a6d46af1d5ed3a5de110a8ad3d60f8c184b280f9d2c2"
+               "sha256" : "55a550195cb014e24f4d184fa386ba678e40b8bf66c63fe6933c821dd9d5ac43"
             },
             {
                "file" : "validation/execution/oncoprint_edges/client.pl",
@@ -673,15 +757,15 @@
             },
             {
                "file" : "validation/execution/oncoprint_edges/manifest.json",
-               "raw_sha256" : "c02056db060b2622bae4cf3d1c6961511dbbbe69475fe9f59ba8e55b97c5ecd3",
+               "raw_sha256" : "ddaedc4f3ecdeeb94aa53d878bf8ce9507c44bdd9e4bad188ad1c3fcfe120e2b",
                "redacted" : false,
-               "sha256" : "c02056db060b2622bae4cf3d1c6961511dbbbe69475fe9f59ba8e55b97c5ecd3"
+               "sha256" : "ddaedc4f3ecdeeb94aa53d878bf8ce9507c44bdd9e4bad188ad1c3fcfe120e2b"
             },
             {
                "file" : "validation/execution/oncoprint_edges/sas.log",
-               "raw_sha256" : "c966b487db257986b6c50a301af09cf7d11be3d036c56d60184fca3ff565be7e",
+               "raw_sha256" : "5761ff432f30a6ae3e6b6a5f54171408f63a3260bcd92530f9236fcd2f0f510d",
                "redacted" : true,
-               "sha256" : "dd9e4cf939159a7a68c5360ac2a9bb895d7c6a7a3801ff20f70ef48416026977"
+               "sha256" : "c346bf6f136d4df058c4aea0a855ed1b9559ac71f9b46677c6783446d896c212"
             },
             {
                "file" : "validation/execution/oncoprint_edges/source.sas",
@@ -691,15 +775,15 @@
             },
             {
                "file" : "validation/execution/oncoprint_edges/submitted.sas",
-               "raw_sha256" : "6e6929129630e3a94bd0a9184215602881e7b5bac4a8d31a882c74ab2e480192",
+               "raw_sha256" : "8542623cecc056d0b45009c49dafb7cbd650abc0d915d5fa58e404fcb568d0a4",
                "redacted" : false,
-               "sha256" : "6e6929129630e3a94bd0a9184215602881e7b5bac4a8d31a882c74ab2e480192"
+               "sha256" : "8542623cecc056d0b45009c49dafb7cbd650abc0d915d5fa58e404fcb568d0a4"
             }
          ],
          "inputs" : [
             {
-               "remote" : "~/mgxviz_1792866657_3269_oncoprint_template.sas",
-               "sha256" : "617cac5dfddce55f13314f427c5b2fe570db25e58519af63e066ee3d91930470",
+               "remote" : "~/mgxviz_1792867666_4576_oncoprint_template.sas",
+               "sha256" : "951aa294ba82f29a752188c7f4e947bef3dbf25053c23da310d6f616e8fbb149",
                "source" : "companion/research/multigwas_port/oncoprint_template.sas"
             }
          ],
@@ -721,9 +805,9 @@
          "files" : [
             {
                "file" : "validation/execution/oncoprint_invalid/artifacts/environment.csv",
-               "raw_sha256" : "a3f579d559e57648ec2634480974a4a8957039530a4d7f2b41b89c830ea9722d",
+               "raw_sha256" : "b8642077456ecf72897ff38fe07010c89fca4e99a4a5006f07439042ec055f3c",
                "redacted" : false,
-               "sha256" : "a3f579d559e57648ec2634480974a4a8957039530a4d7f2b41b89c830ea9722d"
+               "sha256" : "b8642077456ecf72897ff38fe07010c89fca4e99a4a5006f07439042ec055f3c"
             },
             {
                "file" : "validation/execution/oncoprint_invalid/artifacts/mgx_negative_status.csv",
@@ -739,15 +823,15 @@
             },
             {
                "file" : "validation/execution/oncoprint_invalid/manifest.json",
-               "raw_sha256" : "7f62665b77d0f395653a4b40c2d069a28867999697bed67dd627a08262505afa",
+               "raw_sha256" : "c7ca99d2189f224f78800c5748dcf265253f7ff5902b2cf7886ee563279b12d9",
                "redacted" : false,
-               "sha256" : "7f62665b77d0f395653a4b40c2d069a28867999697bed67dd627a08262505afa"
+               "sha256" : "c7ca99d2189f224f78800c5748dcf265253f7ff5902b2cf7886ee563279b12d9"
             },
             {
                "file" : "validation/execution/oncoprint_invalid/sas.log",
-               "raw_sha256" : "90d3ae459b37a1bee2eb4b2a4d59108958494acd41d9fb05c03d1ab4d6950e04",
+               "raw_sha256" : "80ed4d7338134f91bcdf808000dcec9071c4534f193203962d60762fd8537ceb",
                "redacted" : true,
-               "sha256" : "4ad28405a7ceb8077f0ae670c2e526765757c4f510c2f17b0d8b82152c5bc0d0"
+               "sha256" : "886d677daeb309a9d860c93665dd0603561970afe1b4a84ac320a091ed9cea2f"
             },
             {
                "file" : "validation/execution/oncoprint_invalid/source.sas",
@@ -757,15 +841,15 @@
             },
             {
                "file" : "validation/execution/oncoprint_invalid/submitted.sas",
-               "raw_sha256" : "3c8f21548868ea3bfd53166b3c4ead56c4a5323fed9d37684c36c97f89f14e74",
+               "raw_sha256" : "c423eb3f991c1d59585d07dafacf8e508799742d906afc47fe6577b22acb4c9d",
                "redacted" : false,
-               "sha256" : "3c8f21548868ea3bfd53166b3c4ead56c4a5323fed9d37684c36c97f89f14e74"
+               "sha256" : "c423eb3f991c1d59585d07dafacf8e508799742d906afc47fe6577b22acb4c9d"
             }
          ],
          "inputs" : [
             {
-               "remote" : "~/mgxviz_1792866779_3376_oncoprint_template.sas",
-               "sha256" : "617cac5dfddce55f13314f427c5b2fe570db25e58519af63e066ee3d91930470",
+               "remote" : "~/mgxviz_1792867788_4682_oncoprint_template.sas",
+               "sha256" : "951aa294ba82f29a752188c7f4e947bef3dbf25053c23da310d6f616e8fbb149",
                "source" : "companion/research/multigwas_port/oncoprint_template.sas"
             }
          ],

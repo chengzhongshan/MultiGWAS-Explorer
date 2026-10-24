@@ -1,11 +1,11 @@
 options dlcreatedir notes source nodate nonumber;
-libname bookout "~/mgxviz_1792866647_3247";
+libname bookout "~/mgxviz_1792867656_4554";
 libname bookout clear;
-%let BOOK_OUT=%sysget(HOME)/mgxviz_1792866647_3247;
-%let P2_OUT=%sysget(HOME)/mgxviz_1792866647_3247;
-%let P3_OUT=%sysget(HOME)/mgxviz_1792866647_3247;
-%let AF_OUT=%sysget(HOME)/mgxviz_1792866647_3247;
-%let AF_REMOTE=mgxviz_1792866647_3247;
+%let BOOK_OUT=%sysget(HOME)/mgxviz_1792867656_4554;
+%let P2_OUT=%sysget(HOME)/mgxviz_1792867656_4554;
+%let P3_OUT=%sysget(HOME)/mgxviz_1792867656_4554;
+%let AF_OUT=%sysget(HOME)/mgxviz_1792867656_4554;
+%let AF_REMOTE=mgxviz_1792867656_4554;
 
 /* Zhongshan Cheng. Reusable form of the book's event-glyph oncoprint.
    GPL-3.0. Fixed input schema is documented beside the example.
@@ -290,23 +290,23 @@ run;
 %MGXOncoPrint(samples=work.samples,genes=work.genes,
  callability=work.callability,variants=work.variants,
  outlib=work,prefix=mgx_onco,outdir=&BOOK_OUT,image=mgx_oncoprint,
- template_file="~/mgxviz_1792866647_3247_oncoprint_template.sas");
+ template_file="~/mgxviz_1792867656_4554_oncoprint_template.sas");
 data work.mgx_onco_status;status=&MGX_ONCOPRINT_RC;run;
 
 /* LESSON_END */
 
 /* Reader capture: export values without changing the analysis. */
 data work.reader_export;set work.mgx_onco_tiles;format _numeric_ best32.;run;
-proc export data=work.reader_export outfile="~/mgxviz_1792866647_3247/mgx_onco_tiles.csv" dbms=csv replace;run;
+proc export data=work.reader_export outfile="~/mgxviz_1792867656_4554/mgx_onco_tiles.csv" dbms=csv replace;run;
 data work.reader_export;set work.mgx_onco_frequency;format _numeric_ best32.;run;
-proc export data=work.reader_export outfile="~/mgxviz_1792866647_3247/mgx_onco_frequency.csv" dbms=csv replace;run;
+proc export data=work.reader_export outfile="~/mgxviz_1792867656_4554/mgx_onco_frequency.csv" dbms=csv replace;run;
 data work.reader_export;set work.mgx_onco_burden;format _numeric_ best32.;run;
-proc export data=work.reader_export outfile="~/mgxviz_1792866647_3247/mgx_onco_burden.csv" dbms=csv replace;run;
+proc export data=work.reader_export outfile="~/mgxviz_1792867656_4554/mgx_onco_burden.csv" dbms=csv replace;run;
 data work.reader_export;set work.mgx_onco_glyphs;format _numeric_ best32.;run;
-proc export data=work.reader_export outfile="~/mgxviz_1792866647_3247/mgx_onco_glyphs.csv" dbms=csv replace;run;
+proc export data=work.reader_export outfile="~/mgxviz_1792867656_4554/mgx_onco_glyphs.csv" dbms=csv replace;run;
 data work.reader_export;set work.mgx_onco_render;format _numeric_ best32.;run;
-proc export data=work.reader_export outfile="~/mgxviz_1792866647_3247/mgx_onco_render.csv" dbms=csv replace;run;
+proc export data=work.reader_export outfile="~/mgxviz_1792867656_4554/mgx_onco_render.csv" dbms=csv replace;run;
 data work.reader_export;set work.mgx_onco_status;format _numeric_ best32.;run;
-proc export data=work.reader_export outfile="~/mgxviz_1792866647_3247/mgx_onco_status.csv" dbms=csv replace;run;
+proc export data=work.reader_export outfile="~/mgxviz_1792867656_4554/mgx_onco_status.csv" dbms=csv replace;run;
 data work.reader_environment;length sas_version $64 platform $32 process_id $40; sas_version="&sysvlong";platform="&sysscp";process_id="&sysprocessid";run;
-proc export data=work.reader_environment outfile="~/mgxviz_1792866647_3247/environment.csv" dbms=csv replace;run;
+proc export data=work.reader_environment outfile="~/mgxviz_1792867656_4554/environment.csv" dbms=csv replace;run;

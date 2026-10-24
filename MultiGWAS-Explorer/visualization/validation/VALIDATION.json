@@ -11317,142 +11317,7 @@
       },
       {
          "detail" : "",
-         "name" : "Rendered gene cluster40.svg/CD79A",
-         "passed" : true
-      },
-      {
-         "detail" : "",
-         "name" : "Rendered gene cluster40.svg/APOA1",
-         "passed" : true
-      },
-      {
-         "detail" : "",
-         "name" : "Rendered gene cluster40.svg/INS",
-         "passed" : true
-      },
-      {
-         "detail" : "",
-         "name" : "Rendered gene cluster40.svg/IAPP",
-         "passed" : true
-      },
-      {
-         "detail" : "",
-         "name" : "Rendered gene cluster40.svg/APOA2",
-         "passed" : true
-      },
-      {
-         "detail" : "",
-         "name" : "Rendered gene cluster40.svg/CYP3A4",
-         "passed" : true
-      },
-      {
-         "detail" : "",
-         "name" : "Rendered gene cluster40.svg/HBB",
-         "passed" : true
-      },
-      {
-         "detail" : "",
-         "name" : "Rendered gene cluster40.svg/SFTPA1",
-         "passed" : true
-      },
-      {
-         "detail" : "",
-         "name" : "Rendered gene cluster40.svg/CD3E",
-         "passed" : true
-      },
-      {
-         "detail" : "",
-         "name" : "Rendered gene cluster40.svg/TNNT2",
-         "passed" : true
-      },
-      {
-         "detail" : "",
-         "name" : "Rendered gene cluster40.svg/SCGB1A1",
-         "passed" : true
-      },
-      {
-         "detail" : "",
-         "name" : "Rendered gene cluster40.svg/MYH1",
-         "passed" : true
-      },
-      {
-         "detail" : "",
-         "name" : "Rendered gene cluster40.svg/SFTPC",
-         "passed" : true
-      },
-      {
-         "detail" : "",
-         "name" : "Rendered gene cluster40.svg/GRIN1",
-         "passed" : true
-      },
-      {
-         "detail" : "",
-         "name" : "Rendered gene cluster40.svg/FOXJ1",
-         "passed" : true
-      },
-      {
-         "detail" : "",
-         "name" : "Rendered gene cluster40.svg/PNLIP",
-         "passed" : true
-      },
-      {
-         "detail" : "",
-         "name" : "Rendered gene cluster40.svg/AMY2A",
-         "passed" : true
-      },
-      {
-         "detail" : "",
-         "name" : "Rendered gene cluster40.svg/FGB",
-         "passed" : true
-      },
-      {
-         "detail" : "",
-         "name" : "Rendered gene cluster40.svg/CD55",
-         "passed" : true
-      },
-      {
-         "detail" : "",
-         "name" : "Rendered gene cluster40.svg/REG1A",
-         "passed" : true
-      },
-      {
-         "detail" : "",
-         "name" : "Rendered gene cluster40.svg/SNAP25",
-         "passed" : true
-      },
-      {
-         "detail" : "",
-         "name" : "Rendered gene cluster40.svg/CD3D",
-         "passed" : true
-      },
-      {
-         "detail" : "",
-         "name" : "Rendered gene cluster40.svg/TNNT3",
-         "passed" : true
-      },
-      {
-         "detail" : "",
-         "name" : "Rendered gene cluster40.svg/TTR",
-         "passed" : true
-      },
-      {
-         "detail" : "",
-         "name" : "Rendered gene cluster40.svg/CPA1",
-         "passed" : true
-      },
-      {
-         "detail" : "",
-         "name" : "Rendered gene cluster40.svg/MS4A1",
-         "passed" : true
-      },
-      {
-         "detail" : "",
-         "name" : "Rendered gene cluster40.svg/HBA1",
-         "passed" : true
-      },
-      {
-         "detail" : "",
-         "name" : "Rendered gene cluster40.svg/MBP",
+         "name" : "Rendered gene cluster40.svg/FGG",
          "passed" : true
       },
       {
@@ -11462,47 +11327,27 @@
       },
       {
          "detail" : "",
-         "name" : "Rendered gene cluster40.svg/SFTPA2",
+         "name" : "Rendered gene cluster40.svg/SFTPC",
          "passed" : true
       },
       {
          "detail" : "",
-         "name" : "Rendered gene cluster40.svg/FGA",
+         "name" : "Rendered gene cluster40.svg/HBB",
          "passed" : true
       },
       {
          "detail" : "",
-         "name" : "Rendered gene cluster40.svg/MYH7",
+         "name" : "Rendered gene cluster40.svg/SNAP25",
          "passed" : true
       },
       {
          "detail" : "",
-         "name" : "Rendered gene cluster40.svg/GFAP",
+         "name" : "Rendered gene cluster40.svg/FOXJ1",
          "passed" : true
       },
       {
          "detail" : "",
          "name" : "Rendered gene cluster40.svg/PRSS1",
-         "passed" : true
-      },
-      {
-         "detail" : "",
-         "name" : "Rendered gene cluster40.svg/MAP3K19",
-         "passed" : true
-      },
-      {
-         "detail" : "",
-         "name" : "Rendered gene cluster40.svg/FGG",
-         "passed" : true
-      },
-      {
-         "detail" : "",
-         "name" : "Rendered gene cluster40.svg/ALB",
-         "passed" : true
-      },
-      {
-         "detail" : "",
-         "name" : "Rendered gene cluster40.svg/ACTA1",
          "passed" : true
       },
       {
@@ -11517,27 +11362,172 @@
       },
       {
          "detail" : "",
+         "name" : "Rendered gene cluster40.svg/CD3E",
+         "passed" : true
+      },
+      {
+         "detail" : "",
+         "name" : "Rendered gene cluster40.svg/APOA2",
+         "passed" : true
+      },
+      {
+         "detail" : "",
+         "name" : "Rendered gene cluster40.svg/MAP3K19",
+         "passed" : true
+      },
+      {
+         "detail" : "",
+         "name" : "Rendered gene cluster40.svg/CD55",
+         "passed" : true
+      },
+      {
+         "detail" : "",
+         "name" : "Rendered gene cluster40.svg/MYH1",
+         "passed" : true
+      },
+      {
+         "detail" : "",
+         "name" : "Rendered gene cluster40.svg/ALB",
+         "passed" : true
+      },
+      {
+         "detail" : "",
+         "name" : "Rendered gene cluster40.svg/REG1A",
+         "passed" : true
+      },
+      {
+         "detail" : "",
+         "name" : "Rendered gene cluster40.svg/AMY2A",
+         "passed" : true
+      },
+      {
+         "detail" : "",
+         "name" : "Rendered gene cluster40.svg/CD3D",
+         "passed" : true
+      },
+      {
+         "detail" : "",
+         "name" : "Rendered gene cluster40.svg/CYP3A4",
+         "passed" : true
+      },
+      {
+         "detail" : "",
+         "name" : "Rendered gene cluster40.svg/FGA",
+         "passed" : true
+      },
+      {
+         "detail" : "",
+         "name" : "Rendered gene cluster40.svg/SCGB1A1",
+         "passed" : true
+      },
+      {
+         "detail" : "",
+         "name" : "Rendered gene cluster40.svg/MYH7",
+         "passed" : true
+      },
+      {
+         "detail" : "",
+         "name" : "Rendered gene cluster40.svg/MS4A1",
+         "passed" : true
+      },
+      {
+         "detail" : "",
+         "name" : "Rendered gene cluster40.svg/CPA1",
+         "passed" : true
+      },
+      {
+         "detail" : "",
+         "name" : "Rendered gene cluster40.svg/ACTA1",
+         "passed" : true
+      },
+      {
+         "detail" : "",
+         "name" : "Rendered gene cluster40.svg/GFAP",
+         "passed" : true
+      },
+      {
+         "detail" : "",
+         "name" : "Rendered gene cluster40.svg/INS",
+         "passed" : true
+      },
+      {
+         "detail" : "",
+         "name" : "Rendered gene cluster40.svg/IAPP",
+         "passed" : true
+      },
+      {
+         "detail" : "",
+         "name" : "Rendered gene cluster40.svg/TNNT3",
+         "passed" : true
+      },
+      {
+         "detail" : "",
+         "name" : "Rendered gene cluster40.svg/TTR",
+         "passed" : true
+      },
+      {
+         "detail" : "",
+         "name" : "Rendered gene cluster40.svg/GRIN1",
+         "passed" : true
+      },
+      {
+         "detail" : "",
+         "name" : "Rendered gene cluster40.svg/HBA1",
+         "passed" : true
+      },
+      {
+         "detail" : "",
+         "name" : "Rendered gene cluster40.svg/CD79A",
+         "passed" : true
+      },
+      {
+         "detail" : "",
+         "name" : "Rendered gene cluster40.svg/APOA1",
+         "passed" : true
+      },
+      {
+         "detail" : "",
+         "name" : "Rendered gene cluster40.svg/PNLIP",
+         "passed" : true
+      },
+      {
+         "detail" : "",
+         "name" : "Rendered gene cluster40.svg/MBP",
+         "passed" : true
+      },
+      {
+         "detail" : "",
+         "name" : "Rendered gene cluster40.svg/FGB",
+         "passed" : true
+      },
+      {
+         "detail" : "",
+         "name" : "Rendered gene cluster40.svg/SFTPA1",
+         "passed" : true
+      },
+      {
+         "detail" : "",
+         "name" : "Rendered gene cluster40.svg/TNNT2",
+         "passed" : true
+      },
+      {
+         "detail" : "",
+         "name" : "Rendered gene cluster40.svg/SFTPA2",
+         "passed" : true
+      },
+      {
+         "detail" : "",
          "name" : "Rendered gene cluster_selected.svg/FGB",
          "passed" : true
       },
       {
          "detail" : "",
-         "name" : "Rendered gene cluster_selected.svg/APOA1",
-         "passed" : true
-      },
-      {
-         "detail" : "",
-         "name" : "Rendered gene cluster_selected.svg/FGA",
-         "passed" : true
-      },
-      {
-         "detail" : "",
-         "name" : "Rendered gene cluster_selected.svg/APOA2",
-         "passed" : true
-      },
-      {
-         "detail" : "",
          "name" : "Rendered gene cluster_selected.svg/ALB",
+         "passed" : true
+      },
+      {
+         "detail" : "",
+         "name" : "Rendered gene cluster_selected.svg/TTR",
          "passed" : true
       },
       {
@@ -11552,7 +11542,17 @@
       },
       {
          "detail" : "",
-         "name" : "Rendered gene cluster_selected.svg/TTR",
+         "name" : "Rendered gene cluster_selected.svg/APOA2",
+         "passed" : true
+      },
+      {
+         "detail" : "",
+         "name" : "Rendered gene cluster_selected.svg/FGA",
+         "passed" : true
+      },
+      {
+         "detail" : "",
+         "name" : "Rendered gene cluster_selected.svg/APOA1",
          "passed" : true
       },
       {

@@ -18,27 +18,27 @@ define statgraph MGXOncoTemplate;
       sidebar / align=bottom;
         layout gridded / rows=2;
           discretelegend 'events' 'background' / across=3
-            exclude=(' ') valueattrs=(size=6.5) border=false;
-          discretelegend 'cohort' / title='Cohort' titleattrs=(size=7 weight=normal) across=2
-            exclude=(' ') valueattrs=(size=6.5) border=false;
+            exclude=(' ') valueattrs=(size=10) border=false;
+          discretelegend 'cohort' / title='Cohort' titleattrs=(size=10 weight=normal) across=2
+            exclude=(' ') valueattrs=(size=10) border=false;
         endlayout;
       endsidebar;
       columnaxes;
-        columnaxis / display=(tickvalues) tickvalueattrs=(size=6.5)
+        columnaxis / display=(tickvalues) tickvalueattrs=(size=10)
           offsetmin=0 offsetmax=0
           linearopts=(viewmin=.5 viewmax=%sysevalf(&ns+.5) tickvalueformat=mgxsample.
             tickvaluelist=(&sample_ticks));
-        columnaxis / label='Frequency (%)' labelattrs=(size=7)
-          tickvalueattrs=(size=6.5) offsetmin=0 offsetmax=0
+        columnaxis / label='Frequency (%)' labelattrs=(size=10)
+          tickvalueattrs=(size=10) offsetmin=0 offsetmax=0
           linearopts=(viewmin=0 viewmax=130 tickvaluelist=(0 50 100));
       endcolumnaxes;
       rowaxes;
-        rowaxis / label='Events' labelattrs=(size=7)
-          tickvalueattrs=(size=6.5) offsetmin=0 offsetmax=.03
+        rowaxis / label='Events' labelattrs=(size=10)
+          tickvalueattrs=(size=10) offsetmin=0 offsetmax=.03
           linearopts=(viewmin=0 viewmax=&maxburden tickvaluelist=(0 &maxburden));
         rowaxis / display=none offsetmin=0 offsetmax=0
           linearopts=(viewmin=.5 viewmax=1.5);
-        rowaxis / display=(tickvalues) tickvalueattrs=(size=7 style=italic)
+        rowaxis / display=(tickvalues) tickvalueattrs=(size=10 style=italic)
           offsetmin=0 offsetmax=0
           linearopts=(viewmin=.5 viewmax=%sysevalf(&ng+.5) tickvalueformat=mgxgene.
             tickvaluelist=(&gene_ticks));
@@ -49,7 +49,7 @@ define statgraph MGXOncoTemplate;
           lineattrs=(thickness=&summary_thickness.px pattern=solid);
       endlayout;
       layout gridded;
-        entry 'Positive / assessable' / textattrs=(size=6);
+        entry 'Positive / assessable' / textattrs=(size=9);
       endlayout;
       layout overlay / walldisplay=none;
         heatmapparm x=cohort_x y=strip_y colorgroup=cohortclass /
@@ -68,7 +68,7 @@ define statgraph MGXOncoTemplate;
         highlowplot y=freq_y low=zero high=pct_mutated /
           highcap=none lowcap=none lineattrs=(color=&gene_summary_color thickness=&summary_thickness.px);
         textplot x=label_x y=freq_y text=count_label / position=right
-          textattrs=(size=6.5);
+          textattrs=(size=10);
       endlayout;
     endlayout;
   endgraph;

@@ -1,10 +1,10 @@
 
 === Submitted SAS Codes or file ===
-<NEW_BOOK>/.audit-local/phase3/runtime/tmp9qTyIG/input.sas
+<NEW_BOOK>/.audit-local/phase3/runtime/tmpymoRsW/input.sas
 
 
 === Output Directory ===
-<NEW_BOOK>/.audit-local/phase3/runtime/SAS_Output_MCP4SAS_VCQidT
+<NEW_BOOK>/.audit-local/phase3/runtime/SAS_Output_MCP4SAS_tPViYp
 
 === Dependency Logs ===
 Injected targeted remote macro loader for: to
@@ -21,10 +21,10 @@ Could not access a local copy for preflight analysis.
 state: running
 phase: submit_returned
 message: SAS submit returned to the wrapper
-last_update: 2026-10-24 13:31:43
+last_update: 2026-10-24 13:48:31
 
 === SAS Log ===
-5                                                          The SAS System                     Saturday, October 24, 2026 06:31:00 PM
+5                                                          The SAS System                     Saturday, October 24, 2026 06:48:00 PM
 
 24         ods listing close;ods html5 (id=saspy_internal) file=_tomods1 options(bitmap_mode='inline') device=svg style=HTMLBlue;
 24       ! ods graphics on / outputfmt=png;
@@ -49,18 +49,18 @@ last_update: 2026-10-24 13:31:43
 43         %_pipeline_load_macro_tmp;
 44         
 45         options dlcreatedir notes source nodate nonumber;
-46         libname bookout "~/mgxviz_1792866657_3269";
+46         libname bookout "~/mgxviz_1792867666_4576";
 NOTE: Library BOOKOUT was created.
 NOTE: Libref BOOKOUT was successfully assigned as follows: 
       Engine:        V9 
-      Physical Name: <SAS_HOME>/mgxviz_1792866657_3269
+      Physical Name: <SAS_HOME>/mgxviz_1792867666_4576
 47         libname bookout clear;
 NOTE: Libref BOOKOUT has been deassigned.
-48         %let BOOK_OUT=%sysget(HOME)/mgxviz_1792866657_3269;
-49         %let P2_OUT=%sysget(HOME)/mgxviz_1792866657_3269;
-50         %let P3_OUT=%sysget(HOME)/mgxviz_1792866657_3269;
-51         %let AF_OUT=%sysget(HOME)/mgxviz_1792866657_3269;
-52         %let AF_REMOTE=mgxviz_1792866657_3269;
+48         %let BOOK_OUT=%sysget(HOME)/mgxviz_1792867666_4576;
+49         %let P2_OUT=%sysget(HOME)/mgxviz_1792867666_4576;
+50         %let P3_OUT=%sysget(HOME)/mgxviz_1792867666_4576;
+51         %let AF_OUT=%sysget(HOME)/mgxviz_1792867666_4576;
+52         %let AF_REMOTE=mgxviz_1792867666_4576;
 53         
 54         /* Zhongshan Cheng. Reusable form of the book's event-glyph oncoprint.
 55            GPL-3.0. Fixed input schema is documented beside the example.
@@ -267,7 +267,7 @@ NOTE: DATA statement used (Total process time):
       system cpu time     0.01 seconds
       memory              521.34k
       OS Memory           18596.00k
-      Timestamp           10/24/2026 06:31:39 PM
+      Timestamp           10/24/2026 06:48:27 PM
       Step Count                        2  Switch Count  2
       Page Faults                       0
       Page Reclaims                     169
@@ -289,10 +289,10 @@ NOTE: DATA statement used (Total process time):
       system cpu time     0.00 seconds
       memory              522.87k
       OS Memory           18596.00k
-      Timestamp           10/24/2026 06:31:39 PM
+      Timestamp           10/24/2026 06:48:27 PM
       Step Count                        3  Switch Count  2
       Page Faults                       0
-      Page Reclaims                     88
+      Page Reclaims                     89
       Page Swaps                        0
       Voluntary Context Switches        8
       Involuntary Context Switches      0
@@ -311,7 +311,7 @@ NOTE: DATA statement used (Total process time):
       system cpu time     0.00 seconds
       memory              521.87k
       OS Memory           18596.00k
-      Timestamp           10/24/2026 06:31:39 PM
+      Timestamp           10/24/2026 06:48:27 PM
       Step Count                        4  Switch Count  2
       Page Faults                       0
       Page Reclaims                     87
@@ -334,7 +334,7 @@ NOTE: DATA statement used (Total process time):
       system cpu time     0.00 seconds
       memory              522.87k
       OS Memory           18596.00k
-      Timestamp           10/24/2026 06:31:39 PM
+      Timestamp           10/24/2026 06:48:27 PM
       Step Count                        5  Switch Count  2
       Page Faults                       0
       Page Reclaims                     93
@@ -350,7 +350,7 @@ NOTE: DATA statement used (Total process time):
 272        %MGXOncoPrint(samples=work.samples,genes=work.genes,
 273         callability=work.calls,variants=work.variants,
 274         prefix=edge,outdir=&BOOK_OUT,image=oncoprint_edges,width=6,height=4,
-275         template_file="~/mgxviz_1792866657_3269_oncoprint_template.sas");
+275         template_file="~/mgxviz_1792867666_4576_oncoprint_template.sas");
 
 NOTE: DATA statement used (Total process time):
       real time           0.00 seconds
@@ -358,7 +358,7 @@ NOTE: DATA statement used (Total process time):
       system cpu time     0.00 seconds
       memory              428.43k
       OS Memory           18592.00k
-      Timestamp           10/24/2026 06:31:39 PM
+      Timestamp           10/24/2026 06:48:27 PM
       Step Count                        6  Switch Count  0
       Page Faults                       0
       Page Reclaims                     61
@@ -376,9 +376,9 @@ NOTE: DATA statement used (Total process time):
       real time           0.00 seconds
       user cpu time       0.00 seconds
       system cpu time     0.00 seconds
-      memory              798.12k
+      memory              798.25k
       OS Memory           19112.00k
-      Timestamp           10/24/2026 06:31:39 PM
+      Timestamp           10/24/2026 06:48:27 PM
       Step Count                        7  Switch Count  2
       Page Faults                       0
       Page Reclaims                     130
@@ -398,7 +398,7 @@ NOTE: DATA statement used (Total process time):
       system cpu time     0.00 seconds
       memory              794.00k
       OS Memory           19112.00k
-      Timestamp           10/24/2026 06:31:39 PM
+      Timestamp           10/24/2026 06:48:27 PM
       Step Count                        8  Switch Count  2
       Page Faults                       0
       Page Reclaims                     121
@@ -416,15 +416,15 @@ NOTE: DATA statement used (Total process time):
       real time           0.00 seconds
       user cpu time       0.00 seconds
       system cpu time     0.00 seconds
-      memory              795.00k
+      memory              795.12k
       OS Memory           19112.00k
-      Timestamp           10/24/2026 06:31:39 PM
+      Timestamp           10/24/2026 06:48:27 PM
       Step Count                        9  Switch Count  2
       Page Faults                       0
       Page Reclaims                     121
       Page Swaps                        0
       Voluntary Context Switches        8
-      Involuntary Context Switches      0
+      Involuntary Context Switches      1
       Block Input Operations            0
       Block Output Operations           264
       
@@ -436,9 +436,9 @@ NOTE: DATA statement used (Total process time):
       real time           0.00 seconds
       user cpu time       0.00 seconds
       system cpu time     0.00 seconds
-      memory              796.00k
+      memory              796.12k
       OS Memory           19112.00k
-      Timestamp           10/24/2026 06:31:39 PM
+      Timestamp           10/24/2026 06:48:27 PM
       Step Count                        10  Switch Count  2
       Page Faults                       0
       Page Reclaims                     121
@@ -455,17 +455,17 @@ NOTE: Table WORK._MGXO_CONFLICTS created, with 0 rows and 4 columns.
 
 NOTE: PROCEDURE SQL used (Total process time):
       real time           0.03 seconds
-      user cpu time       0.02 seconds
+      user cpu time       0.01 seconds
       system cpu time     0.02 seconds
-      memory              7711.62k
+      memory              7710.34k
       OS Memory           27832.00k
-      Timestamp           10/24/2026 06:31:39 PM
+      Timestamp           10/24/2026 06:48:27 PM
       Step Count                        11  Switch Count  4
       Page Faults                       0
-      Page Reclaims                     2115
+      Page Reclaims                     2133
       Page Swaps                        0
-      Voluntary Context Switches        52
-      Involuntary Context Switches      5
+      Voluntary Context Switches        53
+      Involuntary Context Switches      8
       Block Input Operations            0
       Block Output Operations           656
       
@@ -478,15 +478,15 @@ NOTE: PROCEDURE SORT used (Total process time):
       real time           0.00 seconds
       user cpu time       0.00 seconds
       system cpu time     0.00 seconds
-      memory              1045.75k
+      memory              1045.96k
       OS Memory           22700.00k
-      Timestamp           10/24/2026 06:31:39 PM
+      Timestamp           10/24/2026 06:48:27 PM
       Step Count                        12  Switch Count  2
       Page Faults                       0
       Page Reclaims                     168
       Page Swaps                        0
-      Voluntary Context Switches        9
-      Involuntary Context Switches      0
+      Voluntary Context Switches        8
+      Involuntary Context Switches      1
       Block Input Operations            0
       Block Output Operations           272
       
@@ -508,16 +508,16 @@ NOTE: The PROCEDURE SQL printed pages 1-3.
 NOTE: PROCEDURE SQL used (Total process time):
       real time           0.04 seconds
       user cpu time       0.03 seconds
-      system cpu time     0.02 seconds
-      memory              11816.93k
+      system cpu time     0.01 seconds
+      memory              11818.31k
       OS Memory           31860.00k
-      Timestamp           10/24/2026 06:31:39 PM
+      Timestamp           10/24/2026 06:48:27 PM
       Step Count                        13  Switch Count  12
       Page Faults                       0
-      Page Reclaims                     2118
+      Page Reclaims                     2116
       Page Swaps                        0
-      Voluntary Context Switches        120
-      Involuntary Context Switches      6
+      Voluntary Context Switches        113
+      Involuntary Context Switches      9
       Block Input Operations            0
       Block Output Operations           1632
       
@@ -529,9 +529,9 @@ NOTE: DATA statement used (Total process time):
       real time           0.00 seconds
       user cpu time       0.00 seconds
       system cpu time     0.00 seconds
-      memory              808.78k
+      memory              799.15k
       OS Memory           22696.00k
-      Timestamp           10/24/2026 06:31:39 PM
+      Timestamp           10/24/2026 06:48:27 PM
       Step Count                        14  Switch Count  2
       Page Faults                       0
       Page Reclaims                     121
@@ -551,12 +551,12 @@ NOTE: PROCEDURE SORT used (Total process time):
       system cpu time     0.00 seconds
       memory              779.43k
       OS Memory           22696.00k
-      Timestamp           10/24/2026 06:31:39 PM
+      Timestamp           10/24/2026 06:48:27 PM
       Step Count                        15  Switch Count  2
       Page Faults                       0
       Page Reclaims                     114
       Page Swaps                        0
-      Voluntary Context Switches        10
+      Voluntary Context Switches        8
       Involuntary Context Switches      0
       Block Input Operations            0
       Block Output Operations           264
@@ -569,9 +569,9 @@ NOTE: DATA statement used (Total process time):
       real time           0.00 seconds
       user cpu time       0.00 seconds
       system cpu time     0.00 seconds
-      memory              900.00k
+      memory              890.78k
       OS Memory           22696.00k
-      Timestamp           10/24/2026 06:31:39 PM
+      Timestamp           10/24/2026 06:48:27 PM
       Step Count                        16  Switch Count  2
       Page Faults                       0
       Page Reclaims                     123
@@ -595,15 +595,15 @@ NOTE: The data set WORK.EDGE_RENDER has 13 observations and 33 variables.
 NOTE: DATA statement used (Total process time):
       real time           0.00 seconds
       user cpu time       0.00 seconds
-      system cpu time     0.00 seconds
-      memory              2265.96k
+      system cpu time     0.01 seconds
+      memory              2272.90k
       OS Memory           23736.00k
-      Timestamp           10/24/2026 06:31:39 PM
+      Timestamp           10/24/2026 06:48:27 PM
       Step Count                        17  Switch Count  2
       Page Faults                       0
       Page Reclaims                     256
       Page Swaps                        0
-      Voluntary Context Switches        10
+      Voluntary Context Switches        8
       Involuntary Context Switches      0
       Block Input Operations            0
       Block Output Operations           264
@@ -615,16 +615,16 @@ NOTE: There were 2 observations read from the data set WORK._MGXO_GENES.
 NOTE: The data set WORK._MGXO_FORMATS has 4 observations and 4 variables.
 NOTE: DATA statement used (Total process time):
       real time           0.00 seconds
-      user cpu time       0.01 seconds
+      user cpu time       0.00 seconds
       system cpu time     0.00 seconds
-      memory              1173.90k
+      memory              1164.56k
       OS Memory           22956.00k
-      Timestamp           10/24/2026 06:31:39 PM
+      Timestamp           10/24/2026 06:48:27 PM
       Step Count                        18  Switch Count  2
       Page Faults                       0
       Page Reclaims                     155
       Page Swaps                        0
-      Voluntary Context Switches        9
+      Voluntary Context Switches        8
       Involuntary Context Switches      0
       Block Input Operations            0
       Block Output Operations           264
@@ -635,11 +635,11 @@ NOTE: Format MGXGENE has been output.
 
 NOTE: PROCEDURE FORMAT used (Total process time):
       real time           0.00 seconds
-      user cpu time       0.00 seconds
+      user cpu time       0.01 seconds
       system cpu time     0.00 seconds
-      memory              501.21k
+      memory              501.50k
       OS Memory           22436.00k
-      Timestamp           10/24/2026 06:31:39 PM
+      Timestamp           10/24/2026 06:48:27 PM
       Step Count                        19  Switch Count  2
       Page Faults                       0
       Page Reclaims                     64
@@ -652,13 +652,13 @@ NOTE: PROCEDURE FORMAT used (Total process time):
 NOTE: There were 4 observations read from the data set WORK._MGXO_FORMATS.
 
 
-NOTE: The file "<SAS_HOME>/mgxviz_1792866657_3269/edge_cohorts.sas" is:
-      Filename=<SAS_HOME>/mgxviz_1792866657_3269/edge_cohorts.sas,
+NOTE: The file "<SAS_HOME>/mgxviz_1792867666_4576/edge_cohorts.sas" is:
+      Filename=<SAS_HOME>/mgxviz_1792867666_4576/edge_cohorts.sas,
       Owner Name=<SAS_USER>,Group Name=oda,
       Access Permission=-rw-r--r--,
-      Last Modified=24Oct2026:18:31:39
+      Last Modified=24Oct2026:18:48:27
 
-NOTE: 4 records were written to the file "<SAS_HOME>/mgxviz_1792866657_3269/edge_cohorts.sas".
+NOTE: 4 records were written to the file "<SAS_HOME>/mgxviz_1792867666_4576/edge_cohorts.sas".
       The minimum record length was 19.
       The maximum record length was 86.
 NOTE: There were 2 observations read from the data set WORK._MGXO_COHORTS.
@@ -666,9 +666,9 @@ NOTE: DATA statement used (Total process time):
       real time           0.00 seconds
       user cpu time       0.00 seconds
       system cpu time     0.00 seconds
-      memory              667.18k
+      memory              666.93k
       OS Memory           22436.00k
-      Timestamp           10/24/2026 06:31:39 PM
+      Timestamp           10/24/2026 06:48:27 PM
       Step Count                        20  Switch Count  0
       Page Faults                       0
       Page Reclaims                     57
@@ -682,17 +682,17 @@ NOTE: DATA statement used (Total process time):
 NOTE: STATGRAPH 'MGXOncoTemplate' has been saved to: WORK.TEMPLAT
 NOTE: PROCEDURE TEMPLATE used (Total process time):
       real time           0.00 seconds
-      user cpu time       0.01 seconds
+      user cpu time       0.00 seconds
       system cpu time     0.00 seconds
-      memory              775.60k
+      memory              777.51k
       OS Memory           22176.00k
-      Timestamp           10/24/2026 06:31:39 PM
+      Timestamp           10/24/2026 06:48:27 PM
       Step Count                        21  Switch Count  1
       Page Faults                       0
-      Page Reclaims                     90
+      Page Reclaims                     89
       Page Swaps                        0
-      Voluntary Context Switches        16
-      Involuntary Context Switches      1
+      Voluntary Context Switches        15
+      Involuntary Context Switches      0
       Block Input Operations            0
       Block Output Operations           128
       
@@ -702,55 +702,55 @@ NOTE: PROCEDURE TEMPLATE used (Total process time):
       real time           0.00 seconds
       user cpu time       0.00 seconds
       system cpu time     0.00 seconds
-      memory              736.26k
+      memory              743.20k
       OS Memory           22176.00k
-      Timestamp           10/24/2026 06:31:39 PM
+      Timestamp           10/24/2026 06:48:27 PM
       Step Count                        22  Switch Count  0
       Page Faults                       0
-      Page Reclaims                     20
+      Page Reclaims                     21
       Page Swaps                        0
       Voluntary Context Switches        9
-      Involuntary Context Switches      1
+      Involuntary Context Switches      0
       Block Input Operations            0
       Block Output Operations           8
       
 
 
-NOTE: Listing image output written to <SAS_HOME>/mgxviz_1792866657_3269/oncoprint_edges.png.
+NOTE: Listing image output written to <SAS_HOME>/mgxviz_1792867666_4576/oncoprint_edges.png.
 NOTE: There were 13 observations read from the data set WORK.EDGE_RENDER.
 NOTE: PROCEDURE SGRENDER used (Total process time):
-      real time           2.42 seconds
-      user cpu time       0.21 seconds
+      real time           2.48 seconds
+      user cpu time       0.22 seconds
       system cpu time     0.01 seconds
-      memory              29373.65k
-      OS Memory           48964.00k
-      Timestamp           10/24/2026 06:31:42 PM
+      memory              29255.40k
+      OS Memory           48708.00k
+      Timestamp           10/24/2026 06:48:30 PM
       Step Count                        23  Switch Count  0
       Page Faults                       0
-      Page Reclaims                     4358
+      Page Reclaims                     4344
       Page Swaps                        0
-      Voluntary Context Switches        642
-      Involuntary Context Switches      5
+      Voluntary Context Switches        638
+      Involuntary Context Switches      2
       Block Input Operations            0
-      Block Output Operations           536
+      Block Output Operations           600
       
 
 
-NOTE: Listing image output written to <SAS_HOME>/mgxviz_1792866657_3269/oncoprint_edges.svg.
+NOTE: Listing image output written to <SAS_HOME>/mgxviz_1792867666_4576/oncoprint_edges.svg.
 NOTE: There were 13 observations read from the data set WORK.EDGE_RENDER.
 NOTE: PROCEDURE SGRENDER used (Total process time):
-      real time           0.25 seconds
-      user cpu time       0.06 seconds
+      real time           0.27 seconds
+      user cpu time       0.05 seconds
       system cpu time     0.01 seconds
-      memory              3272.12k
+      memory              3271.21k
       OS Memory           36008.00k
-      Timestamp           10/24/2026 06:31:42 PM
+      Timestamp           10/24/2026 06:48:30 PM
       Step Count                        24  Switch Count  0
       Page Faults                       0
-      Page Reclaims                     623
+      Page Reclaims                     612
       Page Swaps                        0
-      Voluntary Context Switches        482
-      Involuntary Context Switches      2
+      Voluntary Context Switches        485
+      Involuntary Context Switches      1
       Block Input Operations            0
       Block Output Operations           592
       
@@ -763,9 +763,9 @@ NOTE: DATA statement used (Total process time):
       real time           0.00 seconds
       user cpu time       0.00 seconds
       system cpu time     0.00 seconds
-      memory              516.09k
-      OS Memory           36004.00k
-      Timestamp           10/24/2026 06:31:42 PM
+      memory              516.78k
+      OS Memory           35748.00k
+      Timestamp           10/24/2026 06:48:30 PM
       Step Count                        25  Switch Count  2
       Page Faults                       0
       Page Reclaims                     94
@@ -787,21 +787,21 @@ NOTE: The data set WORK.READER_EXPORT has 4 observations and 11 variables.
 NOTE: DATA statement used (Total process time):
       real time           0.00 seconds
       user cpu time       0.00 seconds
-      system cpu time     0.01 seconds
-      memory              804.15k
-      OS Memory           36264.00k
-      Timestamp           10/24/2026 06:31:42 PM
+      system cpu time     0.00 seconds
+      memory              806.18k
+      OS Memory           36008.00k
+      Timestamp           10/24/2026 06:48:30 PM
       Step Count                        26  Switch Count  2
       Page Faults                       0
       Page Reclaims                     121
       Page Swaps                        0
-      Voluntary Context Switches        8
+      Voluntary Context Switches        9
       Involuntary Context Switches      0
       Block Input Operations            0
       Block Output Operations           264
       
 
-361        proc export data=work.reader_export outfile="~/mgxviz_1792866657_3269/edge_tiles.csv" dbms=csv replace;
+361        proc export data=work.reader_export outfile="~/mgxviz_1792867666_4576/edge_tiles.csv" dbms=csv replace;
 361      !                                                                                                        run;
 
 NOTE: Unable to open parameter catalog: SASUSER.PARMS.PARMS.SLIST in update mode. Temporary parameter values will be saved to 
@@ -817,7 +817,7 @@ WORK.PARMS.PARMS.SLIST.
 370            data _null_;
 371            %let _EFIERR_ = 0; /* set the ERROR detection macro variable */
 372            %let _EFIREC_ = 0;     /* clear export record count macro variable */
-373            file '~/mgxviz_1792866657_3269/edge_tiles.csv' delimiter=',' DSD DROPOVER lrecl=32767;
+373            file '~/mgxviz_1792867666_4576/edge_tiles.csv' delimiter=',' DSD DROPOVER lrecl=32767;
 374            if _n_ = 1 then        /* write column names or labels */
 375             do;
 376               put
@@ -875,26 +875,26 @@ WORK.PARMS.PARMS.SLIST.
 428            if EFIEOD then call symputx('_EFIREC_',EFIOUT);
 429            run;
 
-NOTE: The file '~/mgxviz_1792866657_3269/edge_tiles.csv' is:
-      Filename=<SAS_HOME>/mgxviz_1792866657_3269/edge_tiles.csv,
+NOTE: The file '~/mgxviz_1792867666_4576/edge_tiles.csv' is:
+      Filename=<SAS_HOME>/mgxviz_1792867666_4576/edge_tiles.csv,
       Owner Name=<SAS_USER>,Group Name=oda,
       Access Permission=-rw-r--r--,
-      Last Modified=24Oct2026:18:31:42
+      Last Modified=24Oct2026:18:48:30
 
-NOTE: 5 records were written to the file '~/mgxviz_1792866657_3269/edge_tiles.csv'.
+NOTE: 5 records were written to the file '~/mgxviz_1792867666_4576/edge_tiles.csv'.
       The minimum record length was 28.
       The maximum record length was 97.
 NOTE: There were 4 observations read from the data set WORK.READER_EXPORT.
 NOTE: DATA statement used (Total process time):
       real time           0.00 seconds
       user cpu time       0.00 seconds
-      system cpu time     0.00 seconds
-      memory              10318.09k
-      OS Memory           43292.00k
-      Timestamp           10/24/2026 06:31:42 PM
+      system cpu time     0.01 seconds
+      memory              10298.34k
+      OS Memory           43036.00k
+      Timestamp           10/24/2026 06:48:30 PM
       Step Count                        27  Switch Count  0
       Page Faults                       0
-      Page Reclaims                     116
+      Page Reclaims                     126
       Page Swaps                        0
       Voluntary Context Switches        8
       Involuntary Context Switches      0
@@ -902,22 +902,22 @@ NOTE: DATA statement used (Total process time):
       Block Output Operations           16
       
 
-4 records created in ~/mgxviz_1792866657_3269/edge_tiles.csv from WORK.READER_EXPORT.
+4 records created in ~/mgxviz_1792867666_4576/edge_tiles.csv from WORK.READER_EXPORT.
   
   
-NOTE: "~/mgxviz_1792866657_3269/edge_tiles.csv" file was successfully created.
+NOTE: "~/mgxviz_1792867666_4576/edge_tiles.csv" file was successfully created.
 NOTE: PROCEDURE EXPORT used (Total process time):
       real time           0.04 seconds
-      user cpu time       0.02 seconds
+      user cpu time       0.03 seconds
       system cpu time     0.01 seconds
-      memory              10318.09k
-      OS Memory           43552.00k
-      Timestamp           10/24/2026 06:31:42 PM
+      memory              10298.34k
+      OS Memory           43296.00k
+      Timestamp           10/24/2026 06:48:30 PM
       Step Count                        27  Switch Count  7
       Page Faults                       0
-      Page Reclaims                     1953
+      Page Reclaims                     2021
       Page Swaps                        0
-      Voluntary Context Switches        54
+      Voluntary Context Switches        55
       Involuntary Context Switches      1
       Block Input Operations            0
       Block Output Operations           104
@@ -931,9 +931,9 @@ NOTE: DATA statement used (Total process time):
       real time           0.00 seconds
       user cpu time       0.00 seconds
       system cpu time     0.00 seconds
-      memory              800.53k
-      OS Memory           38572.00k
-      Timestamp           10/24/2026 06:31:42 PM
+      memory              801.59k
+      OS Memory           38316.00k
+      Timestamp           10/24/2026 06:48:30 PM
       Step Count                        28  Switch Count  2
       Page Faults                       0
       Page Reclaims                     125
@@ -944,7 +944,7 @@ NOTE: DATA statement used (Total process time):
       Block Output Operations           272
       
 
-431        proc export data=work.reader_export outfile="~/mgxviz_1792866657_3269/edge_frequency.csv" dbms=csv replace;
+431        proc export data=work.reader_export outfile="~/mgxviz_1792867666_4576/edge_frequency.csv" dbms=csv replace;
 431      !                                                                                                            run;
 
 NOTE: Unable to open parameter catalog: SASUSER.PARMS.PARMS.SLIST in update mode. Temporary parameter values will be saved to 
@@ -960,7 +960,7 @@ WORK.PARMS.PARMS.SLIST.
 440            data _null_;
 441            %let _EFIERR_ = 0; /* set the ERROR detection macro variable */
 442            %let _EFIREC_ = 0;     /* clear export record count macro variable */
-443            file '~/mgxviz_1792866657_3269/edge_frequency.csv' delimiter=',' DSD DROPOVER lrecl=32767;
+443            file '~/mgxviz_1792867666_4576/edge_frequency.csv' delimiter=',' DSD DROPOVER lrecl=32767;
 444            if _n_ = 1 then        /* write column names or labels */
 445             do;
 446               put
@@ -998,13 +998,13 @@ WORK.PARMS.PARMS.SLIST.
 478            if EFIEOD then call symputx('_EFIREC_',EFIOUT);
 479            run;
 
-NOTE: The file '~/mgxviz_1792866657_3269/edge_frequency.csv' is:
-      Filename=<SAS_HOME>/mgxviz_1792866657_3269/edge_frequency.csv,
+NOTE: The file '~/mgxviz_1792867666_4576/edge_frequency.csv' is:
+      Filename=<SAS_HOME>/mgxviz_1792867666_4576/edge_frequency.csv,
       Owner Name=<SAS_USER>,Group Name=oda,
       Access Permission=-rw-r--r--,
-      Last Modified=24Oct2026:18:31:42
+      Last Modified=24Oct2026:18:48:30
 
-NOTE: 3 records were written to the file '~/mgxviz_1792866657_3269/edge_frequency.csv'.
+NOTE: 3 records were written to the file '~/mgxviz_1792867666_4576/edge_frequency.csv'.
       The minimum record length was 16.
       The maximum record length was 60.
 NOTE: There were 2 observations read from the data set WORK.READER_EXPORT.
@@ -1012,12 +1012,12 @@ NOTE: DATA statement used (Total process time):
       real time           0.00 seconds
       user cpu time       0.00 seconds
       system cpu time     0.00 seconds
-      memory              9155.40k
+      memory              9157.90k
       OS Memory           43548.00k
-      Timestamp           10/24/2026 06:31:42 PM
+      Timestamp           10/24/2026 06:48:30 PM
       Step Count                        29  Switch Count  0
       Page Faults                       0
-      Page Reclaims                     80
+      Page Reclaims                     84
       Page Swaps                        0
       Voluntary Context Switches        8
       Involuntary Context Switches      0
@@ -1025,23 +1025,23 @@ NOTE: DATA statement used (Total process time):
       Block Output Operations           8
       
 
-2 records created in ~/mgxviz_1792866657_3269/edge_frequency.csv from WORK.READER_EXPORT.
+2 records created in ~/mgxviz_1792867666_4576/edge_frequency.csv from WORK.READER_EXPORT.
   
   
-NOTE: "~/mgxviz_1792866657_3269/edge_frequency.csv" file was successfully created.
+NOTE: "~/mgxviz_1792867666_4576/edge_frequency.csv" file was successfully created.
 NOTE: PROCEDURE EXPORT used (Total process time):
       real time           0.02 seconds
       user cpu time       0.02 seconds
       system cpu time     0.00 seconds
-      memory              9155.40k
+      memory              9157.90k
       OS Memory           43808.00k
-      Timestamp           10/24/2026 06:31:42 PM
+      Timestamp           10/24/2026 06:48:30 PM
       Step Count                        29  Switch Count  7
       Page Faults                       0
-      Page Reclaims                     1089
+      Page Reclaims                     1104
       Page Swaps                        0
-      Voluntary Context Switches        42
-      Involuntary Context Switches      2
+      Voluntary Context Switches        41
+      Involuntary Context Switches      0
       Block Input Operations            0
       Block Output Operations           32
       
@@ -1054,20 +1054,20 @@ NOTE: DATA statement used (Total process time):
       real time           0.00 seconds
       user cpu time       0.00 seconds
       system cpu time     0.00 seconds
-      memory              799.93k
-      OS Memory           39852.00k
-      Timestamp           10/24/2026 06:31:42 PM
+      memory              801.59k
+      OS Memory           39596.00k
+      Timestamp           10/24/2026 06:48:30 PM
       Step Count                        30  Switch Count  2
       Page Faults                       0
       Page Reclaims                     121
       Page Swaps                        0
       Voluntary Context Switches        8
-      Involuntary Context Switches      0
+      Involuntary Context Switches      1
       Block Input Operations            0
       Block Output Operations           264
       
 
-481        proc export data=work.reader_export outfile="~/mgxviz_1792866657_3269/edge_burden.csv" dbms=csv replace;
+481        proc export data=work.reader_export outfile="~/mgxviz_1792867666_4576/edge_burden.csv" dbms=csv replace;
 481      !                                                                                                         run;
 
 NOTE: Unable to open parameter catalog: SASUSER.PARMS.PARMS.SLIST in update mode. Temporary parameter values will be saved to 
@@ -1083,7 +1083,7 @@ WORK.PARMS.PARMS.SLIST.
 490            data _null_;
 491            %let _EFIERR_ = 0; /* set the ERROR detection macro variable */
 492            %let _EFIREC_ = 0;     /* clear export record count macro variable */
-493            file '~/mgxviz_1792866657_3269/edge_burden.csv' delimiter=',' DSD DROPOVER lrecl=32767;
+493            file '~/mgxviz_1792867666_4576/edge_burden.csv' delimiter=',' DSD DROPOVER lrecl=32767;
 494            if _n_ = 1 then        /* write column names or labels */
 495             do;
 496               put
@@ -1117,13 +1117,13 @@ WORK.PARMS.PARMS.SLIST.
 524            if EFIEOD then call symputx('_EFIREC_',EFIOUT);
 525            run;
 
-NOTE: The file '~/mgxviz_1792866657_3269/edge_burden.csv' is:
-      Filename=<SAS_HOME>/mgxviz_1792866657_3269/edge_burden.csv,
+NOTE: The file '~/mgxviz_1792867666_4576/edge_burden.csv' is:
+      Filename=<SAS_HOME>/mgxviz_1792867666_4576/edge_burden.csv,
       Owner Name=<SAS_USER>,Group Name=oda,
       Access Permission=-rw-r--r--,
-      Last Modified=24Oct2026:18:31:42
+      Last Modified=24Oct2026:18:48:30
 
-NOTE: 3 records were written to the file '~/mgxviz_1792866657_3269/edge_burden.csv'.
+NOTE: 3 records were written to the file '~/mgxviz_1792867666_4576/edge_burden.csv'.
       The minimum record length was 13.
       The maximum record length was 43.
 NOTE: There were 2 observations read from the data set WORK.READER_EXPORT.
@@ -1131,12 +1131,12 @@ NOTE: DATA statement used (Total process time):
       real time           0.00 seconds
       user cpu time       0.00 seconds
       system cpu time     0.00 seconds
-      memory              9044.96k
-      OS Memory           43804.00k
-      Timestamp           10/24/2026 06:31:42 PM
+      memory              9042.78k
+      OS Memory           43548.00k
+      Timestamp           10/24/2026 06:48:30 PM
       Step Count                        31  Switch Count  0
       Page Faults                       0
-      Page Reclaims                     91
+      Page Reclaims                     89
       Page Swaps                        0
       Voluntary Context Switches        8
       Involuntary Context Switches      0
@@ -1144,23 +1144,23 @@ NOTE: DATA statement used (Total process time):
       Block Output Operations           16
       
 
-2 records created in ~/mgxviz_1792866657_3269/edge_burden.csv from WORK.READER_EXPORT.
+2 records created in ~/mgxviz_1792867666_4576/edge_burden.csv from WORK.READER_EXPORT.
   
   
-NOTE: "~/mgxviz_1792866657_3269/edge_burden.csv" file was successfully created.
+NOTE: "~/mgxviz_1792867666_4576/edge_burden.csv" file was successfully created.
 NOTE: PROCEDURE EXPORT used (Total process time):
       real time           0.02 seconds
       user cpu time       0.01 seconds
       system cpu time     0.01 seconds
-      memory              9044.96k
-      OS Memory           44064.00k
-      Timestamp           10/24/2026 06:31:42 PM
+      memory              9042.78k
+      OS Memory           43808.00k
+      Timestamp           10/24/2026 06:48:30 PM
       Step Count                        31  Switch Count  7
       Page Faults                       0
-      Page Reclaims                     843
+      Page Reclaims                     882
       Page Swaps                        0
-      Voluntary Context Switches        41
-      Involuntary Context Switches      1
+      Voluntary Context Switches        40
+      Involuntary Context Switches      0
       Block Input Operations            0
       Block Output Operations           32
       
@@ -1171,11 +1171,11 @@ NOTE: There were 3 observations read from the data set WORK.EDGE_GLYPHS.
 NOTE: The data set WORK.READER_EXPORT has 3 observations and 13 variables.
 NOTE: DATA statement used (Total process time):
       real time           0.00 seconds
-      user cpu time       0.00 seconds
+      user cpu time       0.01 seconds
       system cpu time     0.00 seconds
-      memory              808.56k
-      OS Memory           39852.00k
-      Timestamp           10/24/2026 06:31:42 PM
+      memory              809.53k
+      OS Memory           39340.00k
+      Timestamp           10/24/2026 06:48:30 PM
       Step Count                        32  Switch Count  2
       Page Faults                       0
       Page Reclaims                     121
@@ -1186,7 +1186,7 @@ NOTE: DATA statement used (Total process time):
       Block Output Operations           264
       
 
-527        proc export data=work.reader_export outfile="~/mgxviz_1792866657_3269/edge_glyphs.csv" dbms=csv replace;
+527        proc export data=work.reader_export outfile="~/mgxviz_1792867666_4576/edge_glyphs.csv" dbms=csv replace;
 527      !                                                                                                         run;
 
 NOTE: Unable to open parameter catalog: SASUSER.PARMS.PARMS.SLIST in update mode. Temporary parameter values will be saved to 
@@ -1202,7 +1202,7 @@ WORK.PARMS.PARMS.SLIST.
 536            data _null_;
 537            %let _EFIERR_ = 0; /* set the ERROR detection macro variable */
 538            %let _EFIREC_ = 0;     /* clear export record count macro variable */
-539            file '~/mgxviz_1792866657_3269/edge_glyphs.csv' delimiter=',' DSD DROPOVER lrecl=32767;
+539            file '~/mgxviz_1792867666_4576/edge_glyphs.csv' delimiter=',' DSD DROPOVER lrecl=32767;
 540            if _n_ = 1 then        /* write column names or labels */
 541             do;
 542               put
@@ -1268,13 +1268,13 @@ WORK.PARMS.PARMS.SLIST.
 602            if EFIEOD then call symputx('_EFIREC_',EFIOUT);
 603            run;
 
-NOTE: The file '~/mgxviz_1792866657_3269/edge_glyphs.csv' is:
-      Filename=<SAS_HOME>/mgxviz_1792866657_3269/edge_glyphs.csv,
+NOTE: The file '~/mgxviz_1792867666_4576/edge_glyphs.csv' is:
+      Filename=<SAS_HOME>/mgxviz_1792867666_4576/edge_glyphs.csv,
       Owner Name=<SAS_USER>,Group Name=oda,
       Access Permission=-rw-r--r--,
-      Last Modified=24Oct2026:18:31:42
+      Last Modified=24Oct2026:18:48:30
 
-NOTE: 4 records were written to the file '~/mgxviz_1792866657_3269/edge_glyphs.csv'.
+NOTE: 4 records were written to the file '~/mgxviz_1792867666_4576/edge_glyphs.csv'.
       The minimum record length was 49.
       The maximum record length was 138.
 NOTE: There were 3 observations read from the data set WORK.READER_EXPORT.
@@ -1282,12 +1282,12 @@ NOTE: DATA statement used (Total process time):
       real time           0.00 seconds
       user cpu time       0.00 seconds
       system cpu time     0.00 seconds
-      memory              9367.00k
+      memory              9368.37k
       OS Memory           44064.00k
-      Timestamp           10/24/2026 06:31:42 PM
+      Timestamp           10/24/2026 06:48:30 PM
       Step Count                        33  Switch Count  0
       Page Faults                       0
-      Page Reclaims                     87
+      Page Reclaims                     97
       Page Swaps                        0
       Voluntary Context Switches        8
       Involuntary Context Switches      0
@@ -1295,20 +1295,20 @@ NOTE: DATA statement used (Total process time):
       Block Output Operations           16
       
 
-3 records created in ~/mgxviz_1792866657_3269/edge_glyphs.csv from WORK.READER_EXPORT.
+3 records created in ~/mgxviz_1792867666_4576/edge_glyphs.csv from WORK.READER_EXPORT.
   
   
-NOTE: "~/mgxviz_1792866657_3269/edge_glyphs.csv" file was successfully created.
+NOTE: "~/mgxviz_1792867666_4576/edge_glyphs.csv" file was successfully created.
 NOTE: PROCEDURE EXPORT used (Total process time):
       real time           0.02 seconds
       user cpu time       0.02 seconds
       system cpu time     0.00 seconds
-      memory              9367.00k
+      memory              9368.37k
       OS Memory           44324.00k
-      Timestamp           10/24/2026 06:31:42 PM
+      Timestamp           10/24/2026 06:48:30 PM
       Step Count                        33  Switch Count  7
       Page Faults                       0
-      Page Reclaims                     891
+      Page Reclaims                     947
       Page Swaps                        0
       Voluntary Context Switches        42
       Involuntary Context Switches      1
@@ -1323,21 +1323,21 @@ NOTE: The data set WORK.READER_EXPORT has 13 observations and 33 variables.
 NOTE: DATA statement used (Total process time):
       real time           0.00 seconds
       user cpu time       0.00 seconds
-      system cpu time     0.01 seconds
-      memory              884.81k
-      OS Memory           40368.00k
-      Timestamp           10/24/2026 06:31:42 PM
+      system cpu time     0.00 seconds
+      memory              884.28k
+      OS Memory           40112.00k
+      Timestamp           10/24/2026 06:48:30 PM
       Step Count                        34  Switch Count  2
       Page Faults                       0
       Page Reclaims                     121
       Page Swaps                        0
-      Voluntary Context Switches        8
-      Involuntary Context Switches      0
+      Voluntary Context Switches        9
+      Involuntary Context Switches      1
       Block Input Operations            0
       Block Output Operations           264
       
 
-605        proc export data=work.reader_export outfile="~/mgxviz_1792866657_3269/edge_render.csv" dbms=csv replace;
+605        proc export data=work.reader_export outfile="~/mgxviz_1792867666_4576/edge_render.csv" dbms=csv replace;
 605      !                                                                                                         run;
 
 NOTE: Unable to open parameter catalog: SASUSER.PARMS.PARMS.SLIST in update mode. Temporary parameter values will be saved to 
@@ -1353,7 +1353,7 @@ WORK.PARMS.PARMS.SLIST.
 614            data _null_;
 615            %let _EFIERR_ = 0; /* set the ERROR detection macro variable */
 616            %let _EFIREC_ = 0;     /* clear export record count macro variable */
-617            file '~/mgxviz_1792866657_3269/edge_render.csv' delimiter=',' DSD DROPOVER lrecl=32767;
+617            file '~/mgxviz_1792867666_4576/edge_render.csv' delimiter=',' DSD DROPOVER lrecl=32767;
 618            if _n_ = 1 then        /* write column names or labels */
 619             do;
 620               put
@@ -1499,26 +1499,26 @@ WORK.PARMS.PARMS.SLIST.
 760            if EFIEOD then call symputx('_EFIREC_',EFIOUT);
 761            run;
 
-NOTE: The file '~/mgxviz_1792866657_3269/edge_render.csv' is:
-      Filename=<SAS_HOME>/mgxviz_1792866657_3269/edge_render.csv,
+NOTE: The file '~/mgxviz_1792867666_4576/edge_render.csv' is:
+      Filename=<SAS_HOME>/mgxviz_1792867666_4576/edge_render.csv,
       Owner Name=<SAS_USER>,Group Name=oda,
       Access Permission=-rw-r--r--,
-      Last Modified=24Oct2026:18:31:42
+      Last Modified=24Oct2026:18:48:30
 
-NOTE: 14 records were written to the file '~/mgxviz_1792866657_3269/edge_render.csv'.
+NOTE: 14 records were written to the file '~/mgxviz_1792867666_4576/edge_render.csv'.
       The minimum record length was 41.
       The maximum record length was 325.
 NOTE: There were 13 observations read from the data set WORK.READER_EXPORT.
 NOTE: DATA statement used (Total process time):
       real time           0.00 seconds
-      user cpu time       0.00 seconds
+      user cpu time       0.01 seconds
       system cpu time     0.00 seconds
-      memory              9324.34k
-      OS Memory           44320.00k
-      Timestamp           10/24/2026 06:31:42 PM
+      memory              9318.81k
+      OS Memory           44064.00k
+      Timestamp           10/24/2026 06:48:30 PM
       Step Count                        35  Switch Count  0
       Page Faults                       0
-      Page Reclaims                     79
+      Page Reclaims                     114
       Page Swaps                        0
       Voluntary Context Switches        8
       Involuntary Context Switches      0
@@ -1526,23 +1526,23 @@ NOTE: DATA statement used (Total process time):
       Block Output Operations           16
       
 
-13 records created in ~/mgxviz_1792866657_3269/edge_render.csv from WORK.READER_EXPORT.
+13 records created in ~/mgxviz_1792867666_4576/edge_render.csv from WORK.READER_EXPORT.
   
   
-NOTE: "~/mgxviz_1792866657_3269/edge_render.csv" file was successfully created.
+NOTE: "~/mgxviz_1792867666_4576/edge_render.csv" file was successfully created.
 NOTE: PROCEDURE EXPORT used (Total process time):
       real time           0.03 seconds
       user cpu time       0.02 seconds
-      system cpu time     0.00 seconds
-      memory              9324.34k
-      OS Memory           44580.00k
-      Timestamp           10/24/2026 06:31:42 PM
+      system cpu time     0.01 seconds
+      memory              9318.81k
+      OS Memory           44324.00k
+      Timestamp           10/24/2026 06:48:30 PM
       Step Count                        35  Switch Count  7
       Page Faults                       0
-      Page Reclaims                     812
+      Page Reclaims                     864
       Page Swaps                        0
-      Voluntary Context Switches        41
-      Involuntary Context Switches      3
+      Voluntary Context Switches        40
+      Involuntary Context Switches      7
       Block Input Operations            0
       Block Output Operations           40
       
@@ -1555,20 +1555,20 @@ NOTE: DATA statement used (Total process time):
       real time           0.00 seconds
       user cpu time       0.00 seconds
       system cpu time     0.00 seconds
-      memory              795.06k
-      OS Memory           40624.00k
-      Timestamp           10/24/2026 06:31:42 PM
+      memory              796.18k
+      OS Memory           40368.00k
+      Timestamp           10/24/2026 06:48:30 PM
       Step Count                        36  Switch Count  2
       Page Faults                       0
       Page Reclaims                     121
       Page Swaps                        0
-      Voluntary Context Switches        8
+      Voluntary Context Switches        9
       Involuntary Context Switches      0
       Block Input Operations            0
       Block Output Operations           264
       
 
-763        proc export data=work.reader_export outfile="~/mgxviz_1792866657_3269/edge_status.csv" dbms=csv replace;
+763        proc export data=work.reader_export outfile="~/mgxviz_1792867666_4576/edge_status.csv" dbms=csv replace;
 763      !                                                                                                         run;
 
 NOTE: Unable to open parameter catalog: SASUSER.PARMS.PARMS.SLIST in update mode. Temporary parameter values will be saved to 
@@ -1584,7 +1584,7 @@ WORK.PARMS.PARMS.SLIST.
 772            data _null_;
 773            %let _EFIERR_ = 0; /* set the ERROR detection macro variable */
 774            %let _EFIREC_ = 0;     /* clear export record count macro variable */
-775            file '~/mgxviz_1792866657_3269/edge_status.csv' delimiter=',' DSD DROPOVER lrecl=32767;
+775            file '~/mgxviz_1792867666_4576/edge_status.csv' delimiter=',' DSD DROPOVER lrecl=32767;
 776            if _n_ = 1 then        /* write column names or labels */
 777             do;
 778               put
@@ -1602,13 +1602,13 @@ WORK.PARMS.PARMS.SLIST.
 790            if EFIEOD then call symputx('_EFIREC_',EFIOUT);
 791            run;
 
-NOTE: The file '~/mgxviz_1792866657_3269/edge_status.csv' is:
-      Filename=<SAS_HOME>/mgxviz_1792866657_3269/edge_status.csv,
+NOTE: The file '~/mgxviz_1792867666_4576/edge_status.csv' is:
+      Filename=<SAS_HOME>/mgxviz_1792867666_4576/edge_status.csv,
       Owner Name=<SAS_USER>,Group Name=oda,
       Access Permission=-rw-r--r--,
-      Last Modified=24Oct2026:18:31:42
+      Last Modified=24Oct2026:18:48:30
 
-NOTE: 2 records were written to the file '~/mgxviz_1792866657_3269/edge_status.csv'.
+NOTE: 2 records were written to the file '~/mgxviz_1792867666_4576/edge_status.csv'.
       The minimum record length was 1.
       The maximum record length was 6.
 NOTE: There were 1 observations read from the data set WORK.READER_EXPORT.
@@ -1616,36 +1616,36 @@ NOTE: DATA statement used (Total process time):
       real time           0.00 seconds
       user cpu time       0.00 seconds
       system cpu time     0.00 seconds
-      memory              9031.75k
-      OS Memory           44320.00k
-      Timestamp           10/24/2026 06:31:42 PM
+      memory              9032.43k
+      OS Memory           44064.00k
+      Timestamp           10/24/2026 06:48:30 PM
       Step Count                        37  Switch Count  0
       Page Faults                       0
       Page Reclaims                     29
       Page Swaps                        0
       Voluntary Context Switches        8
-      Involuntary Context Switches      0
+      Involuntary Context Switches      1
       Block Input Operations            0
       Block Output Operations           8
       
 
-1 records created in ~/mgxviz_1792866657_3269/edge_status.csv from WORK.READER_EXPORT.
+1 records created in ~/mgxviz_1792867666_4576/edge_status.csv from WORK.READER_EXPORT.
   
   
-NOTE: "~/mgxviz_1792866657_3269/edge_status.csv" file was successfully created.
+NOTE: "~/mgxviz_1792867666_4576/edge_status.csv" file was successfully created.
 NOTE: PROCEDURE EXPORT used (Total process time):
       real time           0.02 seconds
-      user cpu time       0.01 seconds
+      user cpu time       0.02 seconds
       system cpu time     0.00 seconds
-      memory              9048.09k
-      OS Memory           44580.00k
-      Timestamp           10/24/2026 06:31:42 PM
+      memory              9049.71k
+      OS Memory           44324.00k
+      Timestamp           10/24/2026 06:48:30 PM
       Step Count                        37  Switch Count  7
       Page Faults                       0
-      Page Reclaims                     764
+      Page Reclaims                     775
       Page Swaps                        0
-      Voluntary Context Switches        41
-      Involuntary Context Switches      0
+      Voluntary Context Switches        40
+      Involuntary Context Switches      2
       Block Input Operations            0
       Block Output Operations           32
       
@@ -1658,20 +1658,20 @@ NOTE: DATA statement used (Total process time):
       real time           0.00 seconds
       user cpu time       0.00 seconds
       system cpu time     0.00 seconds
-      memory              517.96k
-      OS Memory           40364.00k
-      Timestamp           10/24/2026 06:31:42 PM
+      memory              516.78k
+      OS Memory           40108.00k
+      Timestamp           10/24/2026 06:48:30 PM
       Step Count                        38  Switch Count  2
       Page Faults                       0
       Page Reclaims                     87
       Page Swaps                        0
       Voluntary Context Switches        8
-      Involuntary Context Switches      1
+      Involuntary Context Switches      0
       Block Input Operations            0
       Block Output Operations           264
       
 
-793        proc export data=work.reader_environment outfile="~/mgxviz_1792866657_3269/environment.csv" dbms=csv replace;
+793        proc export data=work.reader_environment outfile="~/mgxviz_1792867666_4576/environment.csv" dbms=csv replace;
 793      !                                                                                                              run;
 
 NOTE: Unable to open parameter catalog: SASUSER.PARMS.PARMS.SLIST in update mode. Temporary parameter values will be saved to 
@@ -1687,7 +1687,7 @@ WORK.PARMS.PARMS.SLIST.
 802            data _null_;
 803            %let _EFIERR_ = 0; /* set the ERROR detection macro variable */
 804            %let _EFIREC_ = 0;     /* clear export record count macro variable */
-805            file '~/mgxviz_1792866657_3269/environment.csv' delimiter=',' DSD DROPOVER lrecl=32767;
+805            file '~/mgxviz_1792867666_4576/environment.csv' delimiter=',' DSD DROPOVER lrecl=32767;
 806            if _n_ = 1 then        /* write column names or labels */
 807             do;
 808               put
@@ -1713,13 +1713,13 @@ WORK.PARMS.PARMS.SLIST.
 828            if EFIEOD then call symputx('_EFIREC_',EFIOUT);
 829            run;
 
-NOTE: The file '~/mgxviz_1792866657_3269/environment.csv' is:
-      Filename=<SAS_HOME>/mgxviz_1792866657_3269/environment.csv,
+NOTE: The file '~/mgxviz_1792867666_4576/environment.csv' is:
+      Filename=<SAS_HOME>/mgxviz_1792867666_4576/environment.csv,
       Owner Name=<SAS_USER>,Group Name=oda,
       Access Permission=-rw-r--r--,
-      Last Modified=24Oct2026:18:31:42
+      Last Modified=24Oct2026:18:48:30
 
-NOTE: 2 records were written to the file '~/mgxviz_1792866657_3269/environment.csv'.
+NOTE: 2 records were written to the file '~/mgxviz_1792867666_4576/environment.csv'.
       The minimum record length was 31.
       The maximum record length was 57.
 NOTE: There were 1 observations read from the data set WORK.READER_ENVIRONMENT.
@@ -1727,33 +1727,33 @@ NOTE: DATA statement used (Total process time):
       real time           0.00 seconds
       user cpu time       0.00 seconds
       system cpu time     0.00 seconds
-      memory              9069.12k
-      OS Memory           44320.00k
-      Timestamp           10/24/2026 06:31:42 PM
+      memory              9072.53k
+      OS Memory           44064.00k
+      Timestamp           10/24/2026 06:48:30 PM
       Step Count                        39  Switch Count  0
       Page Faults                       0
-      Page Reclaims                     23
+      Page Reclaims                     27
       Page Swaps                        0
       Voluntary Context Switches        8
-      Involuntary Context Switches      1
+      Involuntary Context Switches      0
       Block Input Operations            0
       Block Output Operations           16
       
 
-1 records created in ~/mgxviz_1792866657_3269/environment.csv from WORK.READER_ENVIRONMENT.
+1 records created in ~/mgxviz_1792867666_4576/environment.csv from WORK.READER_ENVIRONMENT.
   
   
-NOTE: "~/mgxviz_1792866657_3269/environment.csv" file was successfully created.
+NOTE: "~/mgxviz_1792867666_4576/environment.csv" file was successfully created.
 NOTE: PROCEDURE EXPORT used (Total process time):
       real time           0.02 seconds
       user cpu time       0.02 seconds
-      system cpu time     0.00 seconds
-      memory              9069.12k
-      OS Memory           44580.00k
-      Timestamp           10/24/2026 06:31:42 PM
+      system cpu time     0.01 seconds
+      memory              9072.53k
+      OS Memory           44324.00k
+      Timestamp           10/24/2026 06:48:30 PM
       Step Count                        39  Switch Count  7
       Page Faults                       0
-      Page Reclaims                     752
+      Page Reclaims                     758
       Page Swaps                        0
       Voluntary Context Switches        41
       Involuntary Context Switches      2
@@ -1771,4 +1771,4 @@ NOTE: PROCEDURE EXPORT used (Total process time):
 835        
 
 === Output ===
-HTML output saved to: <NEW_BOOK>/.audit-local/phase3/runtime/SAS_Output_MCP4SAS_VCQidT/sas_res_28Nwr.html
+HTML output saved to: <NEW_BOOK>/.audit-local/phase3/runtime/SAS_Output_MCP4SAS_tPViYp/sas_res_hHxuc.html
