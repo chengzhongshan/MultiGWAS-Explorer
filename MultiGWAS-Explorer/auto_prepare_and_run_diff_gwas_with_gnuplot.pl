@@ -54,13 +54,20 @@ Options:
   --gwas-dir DIR                Auto-detect GWAS inputs in this directory.
   --input-merged FILE           Import a combined cohort/meta GWAS table directly.
   --spec-out FILE.json          Save the generated spec at this path for reuse.
+  --group-label ACCESSION=LABEL Repeat for accession-only inputs such as
+                                GCST90018574=EAS, GCST90018794=EUR+EAS.
   --plots LIST                  Plot families for a normal run. Comma list:
                                 manhattan,local_manhattan,local_gtf,forest
   --manhattan-all-snps          Include every coordinate-valid SNP in genome-wide Manhattan.
                                 Default: any displayed GWAS has P < 0.05.
   --include-x-chr               Include chromosome X / 23 in genomewide Manhattan.
                                 Default: autosomes only.
-  --[no-]compute-meta           Enable or disable fixed-effect meta-analysis calculation.
+  --[no-]compute-meta           Calculated meta-analysis is OFF by default;
+                                enable only for independent or covariance-modeled cohorts.
+  --[no-]exclude-strand-ambiguous
+                                Default: exclude A/T and C/G; opt in only after
+                                verifying allele orientation across inputs.
+  --max-eaf-abs-diff N|none     Default: none; ancestry differences need not be errors.
   --step NAME                   Render only this plot stage; repeat for several:
                                 plot_manhattan, plot_local_manhattan,
                                 plot_local_gtf, or plot_forest.
@@ -167,6 +174,7 @@ my $spec_file = '';
 my $gwas_dir = '';
 my $input_merged = '';
 my $spec_out = '';
+my @group_label_args;
 my $plots = 'manhattan,local_manhattan,local_gtf';
 my @step_args;
 my $force = 0;
@@ -178,10 +186,14 @@ my $exclude_manhattan_track_regex_override = '';
 my $manhattan_track_order_override = '';
 my $exclude_local_manhattan_tracks_override = '';
 my $local_manhattan_track_order_override = '';
-my $exclude_local_gtf_tracks_override = '';
+my $exclude_local_gtf_tracks_override;
 my $local_gtf_track_order_override = '';
 my $manhattan_differential_p_mode_override = '';
+# Keep ancestry-overlap decisions in the shared spec; gnuplot forwards an
+# explicit request but otherwise inherits the no-computed-meta default.
 my $compute_meta_override;
+my $exclude_strand_ambiguous_override;
+my $max_eaf_abs_diff_override;
 my $manhattan_all_snps;
 my $target_snps_override = '';
 my $target_snp_genes_override = '';
@@ -229,6 +241,7 @@ GetOptions(
     'gwas-dir=s'              => \$gwas_dir,
     'input-merged=s'          => \$input_merged,
     'spec-out=s'              => \$spec_out,
+    'group-label=s@' => \@group_label_args,
     'plots=s'                 => \$plots,
     'manhattan-all-snps!'     => \$manhattan_all_snps,
     'step=s@'                 => \@step_args,
@@ -245,23 +258,25 @@ GetOptions(
     'local-gtf-track-order|gtf-track-order=s' => \$local_gtf_track_order_override,
     'manhattan-differential-p-mode=s' => \$manhattan_differential_p_mode_override,
     'compute-meta!'             => \$compute_meta_override,
+    'exclude-strand-ambiguous!' => \$exclude_strand_ambiguous_override,
+    'max-eaf-abs-diff=s' => \$max_eaf_abs_diff_override,
     'remove-x-chr!'            => \$remove_x_chr,
     'include-x-chr!'           => \$include_x_chr,
     'target-snps=s'           => \$target_snps_override,
     'target-snp-genes=s'      => \$target_snp_genes_override,
-    'ld-snps=s'               => \$ld_snps_override,
-    'ld-audit-file=s'         => \$ld_audit_file_override,
-    'ld-cache=s'              => \$ld_cache_override,
-    'ld-reference-snp=s'      => \$ld_reference_snp_override,
-    'ld-population=s'         => \$ld_population_override,
-    'ld-r2-threshold=f'       => \$ld_r2_threshold_override,
-    'ld-web-fallback!'        => \$ld_web_fallback,
-    'highlight-high-ld-snps!' => \$highlight_high_ld_snps,
-    'ld-marker-symbol=s'      => \$ld_marker_symbol,
-    'ld-marker-color=s'       => \$ld_marker_color,
-    'ld-display-mode=s'       => \$ld_display_mode,
-    'ld-r2-values=s'          => \$ld_r2_values_override,
-    'ld-heatmap-colors=s'     => \$ld_heatmap_colors,
+    'ld-snps|local-ld-snps=s' => \$ld_snps_override,
+    'ld-audit-file|local-ld-audit-file=s' => \$ld_audit_file_override,
+    'ld-cache|local-ld-cache=s' => \$ld_cache_override,
+    'ld-reference-snp|local-ld-reference-snp=s' => \$ld_reference_snp_override,
+    'ld-population|local-ld-population=s' => \$ld_population_override,
+    'ld-r2-threshold|local-ld-r2-threshold=f' => \$ld_r2_threshold_override,
+    'ld-web-fallback|local-ld-web-fallback!' => \$ld_web_fallback,
+    'highlight-high-ld-snps|local-highlight-high-ld-snps!' => \$highlight_high_ld_snps,
+    'ld-marker-symbol|local-ld-marker-symbol=s' => \$ld_marker_symbol,
+    'ld-marker-color|local-ld-marker-color=s' => \$ld_marker_color,
+    'ld-display-mode|local-ld-display-mode=s' => \$ld_display_mode,
+    'ld-r2-values|local-ld-r2-values=s' => \$ld_r2_values_override,
+    'ld-heatmap-colors|local-ld-heatmap-colors=s' => \$ld_heatmap_colors,
     'get-common-associations:s' => \$get_common_associations,
     'common-association-top-hit-threshold=s' => \$common_association_top_hit_threshold,
     'reference-build=s'       => \$reference_build_override,
@@ -296,6 +311,8 @@ die "Choose only one of --spec, --gwas-dir, or --input-merged\n"
         || (length($input_merged) && length($gwas_dir));
 die "--spec-out requires --gwas-dir or --input-merged\n"
     if length($spec_out) && !length($input_merged) && !length($gwas_dir);
+die "--group-label applies only to --gwas-dir input\n"
+    if @group_label_args && !length($gwas_dir);
 if (length($input_merged) || length($gwas_dir)) {
     if (length $spec_out) {
         $spec_file = $spec_out;
@@ -311,6 +328,12 @@ if (length($input_merged) || length($gwas_dir)) {
         (length($input_merged) ? ('--input-merged', $input_merged) : ('--gwas-dir', $gwas_dir)),
         '--spec-out', $spec_file,
         '--generate-spec-only',
+        (map { ('--group-label', $_) } @group_label_args),
+        (defined($compute_meta_override) ? ($compute_meta_override ? '--compute-meta' : '--no-compute-meta') : ()),
+        (defined($exclude_strand_ambiguous_override) ? ($exclude_strand_ambiguous_override ? '--exclude-strand-ambiguous' : '--no-exclude-strand-ambiguous') : ()),
+        (defined($max_eaf_abs_diff_override) ? ('--max-eaf-abs-diff', $max_eaf_abs_diff_override) : ()),
+        (length($local_gtf_window_bp_override) ? ('--local-gtf-window-bp', $local_gtf_window_bp_override) : ()),
+        (defined($exclude_local_gtf_tracks_override) ? ('--exclude-local-gtf-tracks', $exclude_local_gtf_tracks_override) : ()),
     ], 'direct merged GWAS import');
     my $generated_spec = load_json($spec_file);
     $generated_spec->{configs_dir} = dirname(localize_path($spec_file));
@@ -426,6 +449,9 @@ my $preset_config_local = File::Spec->catfile($configs_dir_local, "auto_${artifa
 
 my $reused_existing_runner = 0;
 my $has_runner_override = 0;
+my $refresh_raw = raw_pairwise_manifest_needs_refresh(
+    $spec, $exclude_strand_ambiguous_override, $max_eaf_abs_diff_override,
+);
 for my $override_value (
     $display_gwas_override,
     $exclude_manhattan_tracks_override,
@@ -455,12 +481,15 @@ for my $override_value (
 }
 $has_runner_override = 1 if $local_max_hits_per_fig_override;
 $has_runner_override = 1 if defined $compute_meta_override;
+$has_runner_override = 1 if defined $exclude_local_gtf_tracks_override;
+$has_runner_override = 1 if defined $exclude_strand_ambiguous_override || defined $max_eaf_abs_diff_override;
+$has_runner_override = 1 if $refresh_raw;
 $has_runner_override = 1 if $manhattan_all_snps && ($spec->{source_mode} || '') ne 'merged_gwas_table';
 if (!$manhattan_all_snps && ($spec->{source_mode} || '') ne 'merged_gwas_table'
     && -f $runner_config_local) {
     my $cached_runner = load_json($runner_config_local);
     $has_runner_override = 1 if $cached_runner->{MANHATTAN_ALL_SNPS};
-    my $want_meta = exists($spec->{compute_meta}) ? $spec->{compute_meta} : 1;
+    my $want_meta = exists($spec->{compute_meta}) ? $spec->{compute_meta} : 0;
     my $has_meta = ($cached_runner->{DATA_GZ} || '') =~ /\.meta_ivw\.final\.tsv\.gz$/;
     $has_runner_override = 1 if !!$want_meta != !!$has_meta;
 }
@@ -512,7 +541,7 @@ if (!$force_upstream && !$has_runner_override && -f $runner_config_local) {
 if (!$reused_existing_runner) {
     run_upstream_preprocessing(
         spec_file                       => $spec_file,
-        force                           => $force_upstream,
+        force                           => ($force_upstream || $refresh_raw),
         step_heartbeat_seconds          => $step_heartbeat_seconds,
         manhattan_all_snps              => $manhattan_all_snps,
         include_x_chr                   => !$remove_x_chr,
@@ -526,6 +555,8 @@ if (!$reused_existing_runner) {
         local_gtf_track_order_override => $local_gtf_track_order_override,
         manhattan_differential_p_mode_override => $manhattan_differential_p_mode_override,
         compute_meta_override           => $compute_meta_override,
+        exclude_strand_ambiguous_override => $exclude_strand_ambiguous_override,
+        max_eaf_abs_diff_override => $max_eaf_abs_diff_override,
         target_snps_override            => $target_snps_override,
         target_snp_genes_override       => $target_snp_genes_override,
         get_common_associations         => $get_common_associations,
@@ -768,7 +799,7 @@ if ($requested{plot_local_manhattan}) {
 }
 
 if ($requested{plot_local_gtf}) {
-    my $gtf_window = $local_gtf_window_bp_override || ($runner->{LOCAL_GTF_WINDOW_BP} || '1e6');
+    my $gtf_window = $local_gtf_window_bp_override || ($runner->{LOCAL_GTF_WINDOW_BP} || '2.5e5');
     die "--local-gtf-window-bp must be a positive number of base pairs\n"
         unless $gtf_window =~ /^(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i
            && (0 + $gtf_window) > 0;
@@ -869,7 +900,7 @@ sub run_upstream_preprocessing {
         $^X,
         File::Spec->catfile($Bin, 'auto_prepare_and_run_diff_gwas.pl'),
         '--spec', $args{spec_file},
-        '--step', 'extract_wide_subset',
+        '--to-step', 'extract_wide_subset',
         '--local-ld-display-mode', 'none',
     );
     push @cmd, '--force' if $args{force};
@@ -894,18 +925,23 @@ sub run_upstream_preprocessing {
     for my $option (
         ['exclude-local-manhattan-tracks', 'exclude_local_manhattan_tracks_override'],
         ['local-manhattan-track-order', 'local_manhattan_track_order_override'],
-        ['exclude-local-gtf-tracks', 'exclude_local_gtf_tracks_override'],
         ['local-gtf-track-order', 'local_gtf_track_order_override'],
     ) {
         push @cmd, '--' . $option->[0], $args{ $option->[1] }
             if $args{ $option->[1] };
     }
+    push @cmd, '--exclude-local-gtf-tracks', $args{exclude_local_gtf_tracks_override}
+        if defined $args{exclude_local_gtf_tracks_override};
     if ($args{manhattan_differential_p_mode_override}) {
         push @cmd, '--manhattan-differential-p-mode',
           $args{manhattan_differential_p_mode_override};
     }
     push @cmd, ($args{compute_meta_override} ? '--compute-meta' : '--no-compute-meta')
         if defined $args{compute_meta_override};
+    push @cmd, ($args{exclude_strand_ambiguous_override} ? '--exclude-strand-ambiguous' : '--no-exclude-strand-ambiguous')
+        if defined $args{exclude_strand_ambiguous_override};
+    push @cmd, '--max-eaf-abs-diff', $args{max_eaf_abs_diff_override}
+        if defined $args{max_eaf_abs_diff_override};
     if ($args{target_snps_override}) {
         push @cmd, '--target-snps', $args{target_snps_override};
     }
@@ -950,6 +986,39 @@ sub run_upstream_preprocessing {
             ? 'upstream configuration for explicit local targets'
             : 'upstream preprocessing',
     );
+}
+
+sub raw_pairwise_manifest_needs_refresh {
+    my ($spec, $strand_override, $eaf_override) = @_;
+    return 0 unless ($spec->{source_mode} || '') eq 'raw_pgc_vcf_sumstats';
+    my $stem = $spec->{artifact_stem} || $spec->{project_tag} || '';
+    return 0 unless length $stem;
+    my $outdir = localize_path($spec->{output_dir} || $spec->{input_dir} || '');
+    my $manifest = File::Spec->catfile($outdir, "$stem.manifest.tsv");
+    return 0 unless -s $manifest;
+    open my $in, '<', $manifest or die "Cannot read $manifest: $!\n";
+    my %seen;
+    while (my $line = <$in>) {
+        chomp $line;
+        $line =~ s/\r$//;
+        my ($key, $value) = split /\t/, $line, 2;
+        $seen{$key} = $value if defined $key && defined $value;
+    }
+    close $in;
+    my $strand = defined($strand_override) ? !!$strand_override
+        : (exists($spec->{exclude_strand_ambiguous}) ? !!$spec->{exclude_strand_ambiguous} : 1);
+    my $eaf = defined($eaf_override) ? $eaf_override : ($spec->{max_eaf_abs_diff} // '');
+    $eaf = 'disabled' if !length($eaf) || lc($eaf) eq 'none';
+    my $pairs = join(',', map {
+        $_->{pair_tag} . '=' . $_->{group1} . ':' . $_->{group2}
+    } sort { $a->{pair_tag} cmp $b->{pair_tag} } @{ $spec->{pairs} || [] });
+    if (($seen{exclude_strand_ambiguous} // '') ne ($strand ? '1' : '0')
+        || ($seen{max_eaf_abs_diff} // '') ne $eaf
+        || ($seen{pairs} // '') ne $pairs) {
+        print "[info] Existing differential data use different ancestry labels or allele filters; rebuilding upstream before gnuplot.\n";
+        return 1;
+    }
+    return 0;
 }
 
 sub plot_manhattan {

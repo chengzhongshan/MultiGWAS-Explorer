@@ -1095,10 +1095,16 @@ if [[ "${ld_display_mode_normalized}" == "heatmap" || "${ld_display_mode_normali
           --populations "${ld_population}" --reference-build GRCh38_hg38 \
           --output "${ld_cache}" --quiet
       fi
-      awk -F '\t' -v query="${TARGET_SNP}" 'NR>1 && $1==query && $2!=query {found=1; exit} END {exit !found}' "${ld_cache}" \
-        || { echo "ERROR: No PLINK2 LD proxies were estimated for ${TARGET_SNP}." >&2; exit 2; }
-      GTF_LD_R2_CACHE="${ld_cache}"
-      echo "[prep] Using build-matched PLINK2 LD cache: ${GTF_LD_R2_CACHE}"
+      [[ -s "${ld_cache}" ]] || { echo "ERROR: PLINK2 LD cache is missing or empty for ${TARGET_SNP}: ${ld_cache}" >&2; exit 2; }
+      if awk -F '\t' -v query="${TARGET_SNP}" 'NR>1 && $1==query && $2!=query {found=1; exit} END {exit !found}' "${ld_cache}"; then
+        GTF_LD_R2_CACHE="${ld_cache}"
+        echo "[prep] Using build-matched PLINK2 LD cache: ${GTF_LD_R2_CACHE}"
+      else
+        echo "WARNING: No PLINK2 LD proxies were estimated for ${TARGET_SNP}; plotting Z-scores without LD colors." >&2
+        GTF_LD_DISPLAY_MODE=none
+        GTF_LD_R2_CACHE=""
+        GTF_COLORBAR_LABEL="$(infer_effect_metric_label_from_shell_words "${GTF_ZSCORE_VARS}")"
+      fi
       ;;
     hg19)
       ld_pfile="${TOP_HIT_LD_PFILE:-}"
@@ -1130,10 +1136,16 @@ if [[ "${ld_display_mode_normalized}" == "heatmap" || "${ld_display_mode_normali
           --min-r2 "${ld_min_r2}" --populations "${ld_population}" \
           --reference-build GRCh37_hg19 --output "${ld_cache}" --quiet
       fi
-      awk -F '\t' -v query="${TARGET_SNP}" 'NR>1 && $1==query && $2!=query {found=1; exit} END {exit !found}' "${ld_cache}" \
-        || { echo "ERROR: No PLINK2 LD proxies were estimated for ${TARGET_SNP}." >&2; exit 2; }
-      GTF_LD_R2_CACHE="${ld_cache}"
-      echo "[prep] Using build-matched PLINK2 LD cache: ${GTF_LD_R2_CACHE}"
+      [[ -s "${ld_cache}" ]] || { echo "ERROR: PLINK2 LD cache is missing or empty for ${TARGET_SNP}: ${ld_cache}" >&2; exit 2; }
+      if awk -F '\t' -v query="${TARGET_SNP}" 'NR>1 && $1==query && $2!=query {found=1; exit} END {exit !found}' "${ld_cache}"; then
+        GTF_LD_R2_CACHE="${ld_cache}"
+        echo "[prep] Using build-matched PLINK2 LD cache: ${GTF_LD_R2_CACHE}"
+      else
+        echo "WARNING: No PLINK2 LD proxies were estimated for ${TARGET_SNP}; plotting Z-scores without LD colors." >&2
+        GTF_LD_DISPLAY_MODE=none
+        GTF_LD_R2_CACHE=""
+        GTF_COLORBAR_LABEL="$(infer_effect_metric_label_from_shell_words "${GTF_ZSCORE_VARS}")"
+      fi
       ;;
     *)
       echo "ERROR: ${REFERENCE_BUILD} signed-LD GTF heatmap needs a PLINK2 LD cache; pass GTF_LD_R2_CACHE." >&2

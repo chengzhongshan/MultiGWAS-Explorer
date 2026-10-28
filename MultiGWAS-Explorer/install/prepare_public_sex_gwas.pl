@@ -68,7 +68,8 @@ my $spec={
  local_html_title=>'Schizophrenia GWAS by sex (European ancestry)',
  artifact_stem=>'public_scz_eur_sex',input_dir=>$input,output_dir=>$output,
  workdir=>abs_path("$Bin/.."),configs_dir=>"$output/configs",cygwin_bash=>'/bin/bash',reference_build=>'hg19',
- exclude_strand_ambiguous=>1,max_eaf_abs_diff=>0.2,threshold=>0.05,rho=>0,
+ # Female and male strata contain disjoint participants, so this demo opts in.
+ compute_meta=>1,exclude_strand_ambiguous=>1,max_eaf_abs_diff=>0.2,threshold=>0.05,rho=>0,
  manhattan_differential_p_mode=>'raw',top_hit_focus_prefix=>'EUR',
  top_hit_maf_threshold=>0.01,top_hit_selection_method=>'ld',
  top_hit_ld_source=>'PLINK2_1KG',top_hit_ld_populations=>'EUR',

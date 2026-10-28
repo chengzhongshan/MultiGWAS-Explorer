@@ -318,12 +318,12 @@ Before running a workflow, identify:
    genomic positions when merging SAS datasets.
    In this project, `--local-gtf-window-bp` now controls both the extracted GTF
    half-window and the displayed local GTF plot half-window.
-   Default that half-window to 1 Mb for newly generated runs and direct
+   Default that half-window to 250 kb for newly generated runs and direct
    single-SNP SAS ODA runs. Preserve an explicit user-requested window;
    local Manhattan has its own separate default. Older generated spec JSON
    files can still contain an explicit `5e6`; regenerate with
    `--gwas-dir DIR --generate-spec-only` or pass
-   `--local-gtf-window-bp 1e6` when a smaller window is intended.
+   `--local-gtf-window-bp 2.5e5` when a smaller window is intended.
    The subset upload path now gzip-compresses that local GTF table before
    transfer, and the SAS import block reads it through
    `filename ... zip ... gzip`. Start with the smallest half-window that
@@ -335,6 +335,21 @@ Before running a workflow, identify:
    for the actual helper exit code. Do not treat this case as a universal limit
    or repeat the identical large submit. Keep all local SNPs; nominal-`P < 0.05` selection belongs to
    genome-wide Manhattan plots only.
+   For EAS versus EUR+EAS anemia runs, inspect the differential manifest
+   before changing filters. The observed run skipped zero variants for
+   allele-frequency discordance and 1,737,232 strand-ambiguous variants;
+   its source files had no frequency column. Preserve `EUR+EAS` in labels,
+   keep calculated meta-analysis off for overlapping cohorts (the default), and
+   allow `--no-exclude-strand-ambiguous` only after allele orientation is
+   independently verified. If PLINK2 estimates no proxy LD for a target,
+   log the reason and use the Z-score view for that target.
+   GWAS Catalog harmonised `.h.tsv.gz` inputs use `base_pair_location`; accept
+   those files directly. Accession filenames alone do not identify ancestry,
+   so request `--group-label ACCESSION=LABEL` from study metadata. Do not
+   filter variants by cross-ancestry EAF difference by default; the
+   `--max-eaf-abs-diff` limit is an explicit QC choice. Enable computed
+   meta-analysis only with `--compute-meta` after checking sample independence
+   or modeling covariance with `rho`.
    AOA `rs145760339` lost its SAS ODA session at a 5 Mb half-window with
    `No SAS process attached` and no definitive SAS log. A later SASPy
    `getConnection`/logon error did not establish whether the initial failure

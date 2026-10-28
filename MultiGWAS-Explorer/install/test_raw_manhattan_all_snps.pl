@@ -40,6 +40,7 @@ my $spec = {
     workdir => "$Bin/..",
     reference_build => 'hg19',
     threshold => 0.05,
+    compute_meta => 1, # Explicit opt-in for the independent female/male fixture.
     manhattan_fig_height => 1875,
     top_hit_focus_prefix => 'TEST',
     top_hit_selection_method => 'distance',
@@ -66,7 +67,7 @@ is(manifest($filtered)->{rows_written}, 2,
     'default wide cache retains a SNP significant only in the computed meta-analysis');
 my $runner = decode_json(read_file("$dir/configs/auto_raw_all_test_runner.json"));
 like($runner->{DISPLAY_GWAS}, qr/(?:^|,)META(?:,|$)/,
-    'individual-GWAS inputs display the computed meta P track by default');
+    'individual-GWAS inputs display the explicitly requested meta P track');
 is($runner->{MANHATTAN_FIG_WIDTH}, 4500,
     'tall SAS Manhattan plots keep a wide chromosome-friendly aspect ratio');
 is($runner->{MANHATTAN_INCLUDE_X_CHR}, 0,
@@ -105,8 +106,8 @@ is($runner->{MANHATTAN_EXCLUDED_TRACKS}, 'TEST,META',
     'excluded track IDs are recorded in the runner');
 unlike(join(',', $runner->{MANHATTAN_P_VAR}, @{$runner->{MANHATTAN_OTHER_P_VARS}}),
     qr/(?:META_P|TEST_DIFF_P)/, 'excluded P columns are absent from genomewide Manhattan');
-like($runner->{GTF_ASSOC_PVARS}, qr/META_P/,
-    'genomewide exclusion leaves local GTF tracks intact');
+unlike($runner->{GTF_ASSOC_PVARS}, qr/META_P/,
+    'local GTF keeps its independent default Meta exclusion');
 is(system($^X, $driver, '--spec', $spec_path, '--step', 'plot_manhattan',
     '--manhattan-track-order', 'META,M', '--list-steps'),
     0, 'genomewide Manhattan accepts a partial multi-track order');
@@ -115,7 +116,7 @@ is($runner->{MANHATTAN_P_VAR}, 'META_P',
     'requested meta track becomes the first Manhattan panel');
 is($runner->{MANHATTAN_TRACK_ORDER}, 'META,M,TEST,F',
     'unlisted genomewide tracks follow in their original order');
-like($runner->{GTF_ASSOC_PVARS}, qr/^TEST_DIFF_P F_P M_P META_P$/,
+like($runner->{GTF_ASSOC_PVARS}, qr/^TEST_DIFF_P F_P M_P$/,
     'custom genomewide order does not reorder local GTF tracks');
 is(system($^X, $driver, '--spec', $spec_path, '--step', 'plot_local_manhattan',
     '--step', 'plot_local_gtf',

@@ -54,7 +54,7 @@ TOP_HIT_MAF_THRESHOLD="${TOP_HIT_MAF_THRESHOLD:-0.01}"
 TOP_HIT_GNOMAD_FREQ_FILE="${TOP_HIT_GNOMAD_FREQ_FILE:-}"
 TOP_HIT_GNOMAD_POP_MAP="${TOP_HIT_GNOMAD_POP_MAP:-}"
 LOCAL_WINDOW_BP="${LOCAL_WINDOW_BP:-1e7}"
-LOCAL_GTF_WINDOW_BP="${LOCAL_GTF_WINDOW_BP:-1e6}"
+LOCAL_GTF_WINDOW_BP="${LOCAL_GTF_WINDOW_BP:-2.5e5}"
 if ! perl -e 'my $v = shift // q{}; exit(($v =~ /^(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i && $v > 0) ? 0 : 1)' "${LOCAL_GTF_WINDOW_BP}"; then
   echo "ERROR: LOCAL_GTF_WINDOW_BP must be a positive number of base pairs: ${LOCAL_GTF_WINDOW_BP}" >&2
   exit 2

@@ -90,6 +90,55 @@ files. Upload and plot one locus at a time to limit SAS ODA storage and memory.
 
 ## Keep local SAS input small
 
+### Anemia EAS versus EUR+EAS: inspect the real filter before changing QC
+
+The anemia run's differential manifest reported `skipped_eaf_discordance=0`
+and `skipped_strand_ambiguous=1737232`. Its input tables have no allele
+frequency column, so the frequency threshold could not remove a SNP. The
+missing requested C/G (`rs1463426`) and A/T (`rs147587941`) markers were
+strand-ambiguous and absent from the differential output. Check the manifest
+and both source rows before assigning a cause. Retain such SNPs only after
+verifying reference build, alleles, strand, and effect direction, using
+`--no-exclude-strand-ambiguous` on a fresh run. Frequency-discordance filtering
+is off by default; use `--max-eaf-abs-diff N` only when justified by the study
+design and available frequency fields. Cross-ancestry frequency shifts alone
+are not evidence of allele mismatch.
+
+`EUR_plus_EAS.assoc.txt` now yields `EUR+EAS` labels. A comparison between
+EAS and EUR+EAS may reuse the same participants, so an independent-study
+`rho=0` assumption and a pooled meta-analysis require scientific review.
+Calculated meta-analysis is off by default for separate inputs; use
+`--compute-meta` only for independent or properly covariance-modeled cohorts.
+The generated spec preserves an explicit choice. Local GTF defaults to a 250 kb
+half-window and omits the meta track; older specs retain their own values.
+When PLINK2 finds no LD proxies for a target, the single-target SAS GTF
+runner reports the reason and uses Z-score colors for that locus.
+Existing differential files were produced under the old filter and group
+labels. Rebuild them once before requesting the previously excluded SNPs:
+
+```bash
+perl ../MultiGWAS-Explorer/MultiGWAS-Explorer/auto_prepare_and_run_diff_gwas.pl \
+  --gwas-dir . --no-compute-meta --no-exclude-strand-ambiguous \
+  --skip-plots --force
+```
+
+Run the local GTF target command afterwards using the newly generated spec.
+Without the rebuild, the existing differential and indexed long files still
+reflect the old strand filter; an explicit target plot cannot restore a row
+that was removed upstream.
+
+The original `GCST90018574.h.tsv.gz` and `GCST90018794.h.tsv.gz` share the
+GWAS Catalog harmonised header: `chromosome`, `base_pair_location`,
+`effect_allele`, `other_allele`, `beta`, `standard_error`,
+`effect_allele_frequency`, `p_value`, `variant_id`, and `rsid` (plus
+harmonisation fields). The old raw-header aliases omitted
+`base_pair_location`, so spec generation failed and prompted a manual column
+rewrite. The parser now accepts that header directly. The accession filename
+does not establish ancestry: generate a labeled spec with
+`--group-label GCST90018574=EAS --group-label GCST90018794=EUR+EAS` after
+checking the source metadata. See the
+[GWAS Catalog harmonisation documentation](https://www.ebi.ac.uk/gwas/docs/methods/summary-statistics/).
+
 The local Manhattan runner now extracts requested loci from the tabix-indexed
 merged-wide table before SAS upload when `TARGET_SNP_LIST` is set. This path
 retains all SNPs in the selected windows; the P < 0.05 genome-wide filter is

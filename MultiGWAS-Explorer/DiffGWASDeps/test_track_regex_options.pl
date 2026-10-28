@@ -30,6 +30,7 @@ my $spec = {
     configs_dir => $tmp,
     workdir => $root,
     reference_build => 'hg19',
+    compute_meta => 1, # Exercise explicit opt-in meta-track selection.
     groups => \@groups,
     pairs => \@pairs,
 };

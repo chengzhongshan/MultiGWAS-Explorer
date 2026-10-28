@@ -18,7 +18,9 @@ my $p_col = 'P';
 my $rho = 0;
 my $limit = 0;
 my $exclude_strand_ambiguous = 1;
-my $max_eaf_abs_diff = 0.20;
+# Cross-ancestry EAF shifts may mark real population-specific variants.
+# Require an explicit threshold before excluding SNPs on this criterion.
+my $max_eaf_abs_diff = '';
 
 GetOptions(
     'config=s'        => \$config_file,
@@ -32,7 +34,7 @@ GetOptions(
     'rho=f'           => \$rho,
     'limit=i'         => \$limit,
     'exclude-strand-ambiguous!' => \$exclude_strand_ambiguous,
-    'max-eaf-abs-diff=f' => \$max_eaf_abs_diff,
+    'max-eaf-abs-diff=s' => \$max_eaf_abs_diff,
 ) or die usage();
 
 die "--config is required\n" unless length $config_file;
@@ -49,6 +51,11 @@ $rho = cfg_or($cfg, 'rho', $rho);
 $limit = cfg_or($cfg, 'limit', $limit);
 $exclude_strand_ambiguous = cfg_or($cfg, 'exclude_strand_ambiguous', $exclude_strand_ambiguous) ? 1 : 0;
 $max_eaf_abs_diff = cfg_or($cfg, 'max_eaf_abs_diff', $max_eaf_abs_diff);
+$max_eaf_abs_diff = '' if lc($max_eaf_abs_diff) eq 'none';
+die "max_eaf_abs_diff must be between 0 and 1, or none\n"
+    if length($max_eaf_abs_diff)
+       && ($max_eaf_abs_diff !~ /^(?:\d+(?:\.\d*)?|\.\d+)$/
+           || $max_eaf_abs_diff > 1);
 
 die "Config $config_file must define input\n" unless length $input;
 die "Config $config_file must define output\n" unless length $output;
@@ -415,7 +422,7 @@ Options:
   --rho FLOAT           Correlation between paired betas. Default: 0
   --[no-]exclude-strand-ambiguous
                         Exclude A/T and C/G pairs. Default: enabled
-  --max-eaf-abs-diff F  Exclude pairs above aligned mean-EAF difference. Default: 0.20
+  --max-eaf-abs-diff F  Exclude pairs above aligned mean-EAF difference. Default: off
   --limit N             Optional output-pair limit for debugging
 USAGE
 }

@@ -93,7 +93,9 @@ track for plotting. Relative GWAS directories are resolved before generating
 plot paths, and concatenated gzip streams are read in full.
 
 When two separate cohort GWAS files provide allele-aligned BETA and positive
-SE values, the pipeline now adds a `META` track by default. Its BETA, SE, Z,
+SE values, the pipeline can add a `META` track with `--compute-meta`.
+Calculated meta-analysis is off by default because input cohorts may overlap.
+Its BETA, SE, Z,
 and two-sided P use inverse-variance fixed-effect meta-analysis for independent
 cohorts, as described by [GWAMA](https://pmc.ncbi.nlm.nih.gov/articles/PMC2893603/).
 When the spec sets a nonzero `rho` for correlated cohorts, the calculation
@@ -101,10 +103,54 @@ uses the corresponding two-study covariance matrix.
 The combined P can retain a SNP even when neither cohort P is below 0.05.
 Missing BETA or SE leaves that SNP's computed meta values blank. The merged
 AOA workflow continues to use supplied meta-analysis values without
-recalculation. Set `"compute_meta": 0` in a separate-cohort spec to disable
-the calculation, or pass `--no-compute-meta` for a single invocation. To keep
+recalculation. Set `"compute_meta": 1` in a separate-cohort spec to enable
+the calculation, or pass `--compute-meta` for a single invocation. To keep
 the computed values but omit them only from the genome-wide figure, pass
-`--exclude-manhattan-tracks META` instead.
+`--exclude-manhattan-tracks META` instead. For auto-generated specs, the
+`--compute-meta` or `--no-compute-meta` choice is saved for later `--spec` runs.
+
+GWAS Catalog harmonised `.h.tsv.gz` files can be passed directly to
+`--gwas-dir`: `base_pair_location`, `rsid`, and the other standard headers are
+resolved without rewriting or decompressing the input files. Accession-only
+filenames cannot identify study ancestry or sample overlap. For the anemia
+comparison, provide `--group-label GCST90018574=EAS` and
+`--group-label GCST90018794=EUR+EAS` when generating the spec. Both entry points accept
+these labels. Check the study metadata before assigning labels. The
+[GWAS Catalog harmonisation documentation](https://www.ebi.ac.uk/gwas/docs/methods/summary-statistics/)
+describes the harmonised file format. The Catalog metadata for
+[GCST90018574](https://ftp.ebi.ac.uk/pub/databases/gwas/summary_statistics/GCST90018001-GCST90019000/GCST90018574/harmonised/GCST90018574.h.tsv.gz-meta.yaml)
+and [GCST90018794](https://ftp.ebi.ac.uk/pub/databases/gwas/summary_statistics/GCST90018001-GCST90019000/GCST90018794/harmonised/GCST90018794.h.tsv.gz-meta.yaml)
+list East Asian participants in both studies, so treating the two inputs as
+independent would be unsafe without additional cohort provenance.
+
+```bash
+perl auto_prepare_and_run_diff_gwas.pl --gwas-dir /path/to/original_gz_only \
+  --group-label GCST90018574=EAS --group-label GCST90018794=EUR+EAS \
+  --generate-spec-only
+```
+
+For comparisons involving a combined cohort such as `EUR_plus_EAS.assoc.txt`,
+auto-detection retains the label `EUR+EAS` instead of shortening it to `EUR`.
+If `EAS` is also analyzed separately, the samples may overlap. Set a justified
+`rho` in the spec for differential testing; do not interpret an independent
+fixed-effect meta-analysis of overlapping groups as a valid new cohort.
+
+New local GTF plots use a 250 kb half-window and omit the `META` scatter track
+by default. An existing spec's explicit window or exclusion still takes
+precedence. Use `--local-gtf-window-bp N` to expand the locus, or set
+`"exclude_local_gtf_tracks": ""` in the spec to include `META` again.
+The gnuplot entry point accepts the same meta-analysis, strand filter,
+frequency filter, and `--local-ld-*` option names as the SAS entry point.
+
+The differential step excludes strand-ambiguous A/T and C/G SNPs by default.
+For a verified, allele-aligned comparison, pass
+`--no-exclude-strand-ambiguous` when generating the spec (or set
+`"exclude_strand_ambiguous": 0`). The optional allele-frequency difference
+filter is off by default because ancestry-specific frequency differences can
+be real biology. Use `--max-eaf-abs-diff 0.2` only when that QC rule is
+appropriate; it does nothing when neither source contains usable frequency
+fields. If PLINK2 reports no LD proxies for a target,
+the single-target SAS GTF runner logs a warning and draws the Z-score view.
 
 This is the combined-table format used by the old local AOA workflow: a
 tab-separated file (plain or gzip compressed) with `CHR`, `BP`, `SNP`, and at
@@ -3047,7 +3093,7 @@ Both wrappers now default `GTF_PCT4NEG_Y` to `1.4`, which keeps the bottom
 gene/exon track visibly larger in manuscript-scale figures and one-locus debug
 reruns alike.
 
-The default local-GTF half-window is 1 Mb (about 2 Mb total span) for both
+The default local-GTF half-window is 250 kb (about 500 kb total span) for both
 auto-generated runs and direct SAS ODA single-locus runs. Existing explicit
 `local_gtf_window_bp` settings and `--local-gtf-window-bp` overrides take
 precedence; the local Manhattan window remains separate.

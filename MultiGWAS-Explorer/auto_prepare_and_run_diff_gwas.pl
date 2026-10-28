@@ -55,6 +55,7 @@ my $gwas_dir = '';
 my $input_merged = '';
 my $spec_out = '';
 my $raw_column_alias_config = '';
+my @group_label_args;
 my $mode = 'full';
 my $skip_plots = 0;
 my $plots = 'manhattan,local_manhattan,local_gtf';
@@ -120,10 +121,12 @@ my $exclude_manhattan_track_regex_override = '';
 my $manhattan_track_order_override = '';
 my $exclude_local_manhattan_tracks_override = '';
 my $local_manhattan_track_order_override = '';
-my $exclude_local_gtf_tracks_override = '';
+my $exclude_local_gtf_tracks_override;
 my $local_gtf_track_order_override = '';
 my $manhattan_differential_p_mode_override = '';
 my $compute_meta_override;
+my $exclude_strand_ambiguous_override;
+my $max_eaf_abs_diff_override;
 my $manhattan_all_snps;
 my $include_x_chr;
 my $sas_oda_account_override = '';
@@ -188,6 +191,7 @@ GetOptions(
     'input-merged=s'      => \$input_merged,
     'spec-out=s'          => \$spec_out,
     'raw-column-alias-config=s' => \$raw_column_alias_config,
+    'group-label=s@' => \@group_label_args,
     'mode=s'              => \$mode,
     'skip-plots!'         => \$skip_plots,
     'plots=s'             => \$plots,
@@ -258,6 +262,8 @@ GetOptions(
     'local-gtf-track-order|gtf-track-order=s' => \$local_gtf_track_order_override,
     'manhattan-differential-p-mode=s' => \$manhattan_differential_p_mode_override,
     'compute-meta!' => \$compute_meta_override,
+    'exclude-strand-ambiguous!' => \$exclude_strand_ambiguous_override,
+    'max-eaf-abs-diff=s' => \$max_eaf_abs_diff_override,
     'sas-oda-account=s' => \$sas_oda_account_override,
     'sas-oda-password=s' => \$sas_oda_password_override,
     'prompt-sas-oda-auth!' => \$prompt_sas_oda_auth_override,
@@ -343,6 +349,22 @@ die "--local-ld-population must be AFR, AMR, ASN/EAS, EUR, MAJOR4, or a comma/pl
        && !valid_local_ld_population_spec($local_ld_population_override);
 
 my $cli_raw_column_aliases = load_alias_override_file($raw_column_alias_config);
+my %group_label_overrides;
+for my $item (@group_label_args) {
+    my ($file, $label) = split /=/, $item, 2;
+    die "--group-label requires FILE_OR_ACCESSION=LABEL\n"
+        unless defined($file) && length($file) && defined($label) && length($label);
+    $label =~ s/^\s+|\s+$//g;
+    die "--group-label needs a nonempty label\n" unless length $label;
+    $group_label_overrides{lc basename($file)} = $label;
+}
+die "--group-label applies only to --gwas-dir input\n"
+    if @group_label_args && !length($gwas_dir);
+die "--max-eaf-abs-diff must be a number between 0 and 1, or none\n"
+    if defined($max_eaf_abs_diff_override)
+       && lc($max_eaf_abs_diff_override) ne 'none'
+       && ($max_eaf_abs_diff_override !~ /^(?:\d+(?:\.\d*)?|\.\d+)$/
+           || $max_eaf_abs_diff_override < 0 || $max_eaf_abs_diff_override > 1);
 
 die "--input-merged cannot be combined with --spec or --gwas-dir\n"
     if length($input_merged) && (length($spec_file) || length($gwas_dir));
@@ -381,10 +403,21 @@ if (!length $spec_file && (length $gwas_dir || length $input_merged)) {
             project_tag_override  => $project_tag_override,
             artifact_stem_override => $artifact_stem_override,
             raw_column_aliases    => $cli_raw_column_aliases,
+            group_label_overrides => \%group_label_overrides,
         );
     }
     print STDERR "WARNING: The draft_path is undefined but the inferred draft spec is available in memory.\n"
       unless defined($draft_path) && length($draft_path) > 0;
+    $draft_spec->{compute_meta} = $compute_meta_override ? 1 : 0
+        if defined $compute_meta_override;
+    $draft_spec->{exclude_strand_ambiguous} = $exclude_strand_ambiguous_override ? 1 : 0
+        if defined $exclude_strand_ambiguous_override;
+    $draft_spec->{max_eaf_abs_diff} = lc($max_eaf_abs_diff_override) eq 'none' ? '' : $max_eaf_abs_diff_override
+        if defined $max_eaf_abs_diff_override;
+    $draft_spec->{local_gtf_window_bp} = $local_gtf_window_bp_override
+        if length $local_gtf_window_bp_override;
+    $draft_spec->{exclude_local_gtf_tracks} = $exclude_local_gtf_tracks_override
+        if defined $exclude_local_gtf_tracks_override;
     if ($preview_spec) {
         print pretty_json($draft_spec), "\n";
         exit 0 if $generate_spec_only || !length $spec_out;
@@ -405,6 +438,10 @@ die "--spec is required (or provide --gwas-dir or --input-merged to generate one
 my $spec = load_json($spec_file);
 $spec->{compute_meta} = $compute_meta_override ? 1 : 0
     if defined $compute_meta_override;
+$spec->{exclude_strand_ambiguous} = $exclude_strand_ambiguous_override ? 1 : 0
+    if defined $exclude_strand_ambiguous_override;
+$spec->{max_eaf_abs_diff} = lc($max_eaf_abs_diff_override) eq 'none' ? '' : $max_eaf_abs_diff_override
+    if defined $max_eaf_abs_diff_override;
 $manhattan_all_snps = defined($manhattan_all_snps)
     ? ($manhattan_all_snps ? 1 : 0)
     : (cfg_or($spec, 'manhattan_all_snps', 0) ? 1 : 0);
@@ -532,8 +569,10 @@ my $project_tag = cfg_or($spec, 'project_tag', $artifact_stem);
 my $input_dir = normalize_unix_path(cfg_or($spec, 'input_dir', ''));
 my $output_dir = normalize_unix_path(cfg_or($spec, 'output_dir', $input_dir || $workdir));
 my $source_mode = cfg_or($spec, 'source_mode', 'raw_pgc_vcf_sumstats');
+# EAS versus EAS+EUR illustrates why calculated meta-analysis must be opt-in:
+# one input can already contain participants from the other input.
 my $compute_meta = $source_mode ne 'merged_gwas_table'
-    && cfg_or($spec, 'compute_meta', 1) ? 1 : 0;
+    && cfg_or($spec, 'compute_meta', 0) ? 1 : 0;
 my $reference_build_profile = resolve_reference_build_profile_for_spec(
     spec               => $spec,
     reference_override => $reference_build_override,
@@ -609,7 +648,7 @@ my $top_hit_max_loci = defined($top_hit_max_loci_override)
     ? $top_hit_max_loci_override
     : cfg_or($spec, 'top_hit_max_loci', 0);
 my $local_window_bp = cfg_or($spec, 'local_window_bp', '1e7');
-my $local_gtf_window_bp = cfg_or($spec, 'local_gtf_window_bp', '1e6');
+my $local_gtf_window_bp = cfg_or($spec, 'local_gtf_window_bp', '2.5e5');
 die "--local-manhattan-window-bp must be a positive number of base pairs\n"
     unless $local_window_bp =~ /^(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i
        && (0 + $local_window_bp) > 0;
@@ -1009,7 +1048,7 @@ my $signed_ld_dispatch = !$local_sas_only
 if ($signed_ld_dispatch && %common_ld_artifacts) {
     my $output_html = $runner_cfg->{OUTPUT_HTML_BASENAME}
       || "${project_tag}_SAS_local_top_hits_with_gtf.html";
-    my $single_window = $runner_cfg->{LOCAL_GTF_WINDOW_BP} || '1e6';
+    my $single_window = $runner_cfg->{LOCAL_GTF_WINDOW_BP} || '2.5e5';
     my $legend_population = uc(trim($local_ld_population_override || 'EUR'));
     $local_gtf_command = qq{"$bash_path" -lc 'cd "$workdir" && RUNNER_CONFIG_JSON="$generated->{runner_config}" SESSION_ID="$runner_session" OPEN_RESULT="$open_result" perl "$deps_dir/run_selected_signed_ld_gtf.pl" --targets-csv "$common_ld_artifacts{leads}" --runner-config "$generated->{runner_config}" --output-html "$workdir/$output_html" --single-runner "$deps_dir/run_sas_oda_single_snp_with_gtf_download_html.sh" --window-bp "$single_window" --population "$legend_population" --mode "$local_ld_display_mode"'};
     @local_gtf_outputs = ("$Bin/$output_html");
@@ -1017,7 +1056,7 @@ if ($signed_ld_dispatch && %common_ld_artifacts) {
     print "[info] Automatic local-GTF plotting will use the PLINK2/1000 Genomes LD-pruned lead table: $common_ld_artifacts{leads}\n";
 }
 if (length($single_target_gtf_snp) && !$local_sas_only) {
-    my $single_window = $runner_cfg->{LOCAL_GTF_WINDOW_BP} || '1e6';
+    my $single_window = $runner_cfg->{LOCAL_GTF_WINDOW_BP} || '2.5e5';
     my $single_html = $runner_cfg->{OUTPUT_HTML_BASENAME} || "${project_tag}_SAS_local_top_hits_with_gtf.html";
     $local_gtf_command = qq{"$bash_path" -lc 'cd "$workdir" && RUNNER_CONFIG_JSON="$generated->{runner_config}" SESSION_ID="$runner_session" TARGET_SNP="$single_target_gtf_snp" LOCAL_WINDOW_BP="$single_window" OUTPUT_HTML_BASENAME="$single_html" SINGLE_SNP_ALLOW_GENERIC_OUTPUT_BASENAME=1 SINGLE_SNP_TOP_HITS_CSV_BASENAME="$local_gtf_expected_csv_basename" OPEN_RESULT="$open_result" CLEAN_ODA_INPUT="$clean_oda_input" CLEAN_ODA_MACROS=0 "$deps_dir/run_sas_oda_single_snp_with_gtf_download_html.sh"'};
     $local_gtf_description = 'Run the fast single-target GTF-backed SAS ODA plot';
@@ -1030,7 +1069,7 @@ elsif ($target_gtf_snp_count > 1
         || !grep { !length($local_ld_cache_by_snp{lc $_} // '') } @target_gtf_snps)) {
     my $output_html = $runner_cfg->{OUTPUT_HTML_BASENAME}
       || "${project_tag}_SAS_local_top_hits_with_gtf.html";
-    my $single_window = $runner_cfg->{LOCAL_GTF_WINDOW_BP} || '1e6';
+    my $single_window = $runner_cfg->{LOCAL_GTF_WINDOW_BP} || '2.5e5';
     for my $target_snp (@target_gtf_snps) {
         die "Unsafe target SNP for SAS command: $target_snp\n"
           unless $target_snp =~ /^[A-Za-z0-9_.:-]+$/;
@@ -1547,7 +1586,16 @@ sub infer_spec_from_gwas_dir {
     die "No candidate GWAS summary-statistics files found in $gwas_dir\n"
       unless @raw_files || @precomputed_files || @merged_files;
 
-    if (@precomputed_files) {
+    # A rerun of --gwas-dir commonly contains both original cohort files and
+    # our generated differential files. Keep the original cohorts as the source
+    # when at least two distinct raw groups are still present; an explicit
+    # --spec or --input-merged selects another source intentionally.
+    my %raw_group_tags = map { infer_group_tag_from_file($_, $study_prefix) => 1 } @raw_files;
+    my $prefer_raw = keys(%raw_group_tags) >= 2 ? 1 : 0;
+    progress_note('Original cohort inputs take precedence over generated differential/merged files on this rerun')
+        if $prefer_raw && (@precomputed_files || @merged_files);
+
+    if (@precomputed_files && !$prefer_raw) {
         progress_note("Checking precomputed differential GWAS candidates...");
         my ($pre_spec, $pre_path) = infer_precomputed_spec_from_dir(
             gwas_dir                => $gwas_dir,
@@ -1562,7 +1610,7 @@ sub infer_spec_from_gwas_dir {
         return ($pre_spec, $pre_path) if $pre_spec;
     }
 
-    if (@merged_files) {
+    if (@merged_files && !$prefer_raw) {
         progress_note("Checking merged wide GWAS candidates...");
         my ($merged_spec, $merged_path) = infer_merged_spec_from_dir(
             gwas_dir                => $gwas_dir,
@@ -1592,8 +1640,24 @@ sub infer_spec_from_gwas_dir {
             next;
         }
 
-        my $tag = infer_group_tag_from_file($path, $study_prefix);
-        my $label = infer_group_label_from_file($path, $tag);
+        my $base = lc basename($path);
+        my ($accession) = $base =~ /(gcst\d+)/;
+        my $label_map = $args{group_label_overrides} || {};
+        my $label_override = $label_map->{$base}
+            // ($accession ? $label_map->{$accession} : undef);
+        my ($tag, $label);
+        if (defined $label_override) {
+            $label = $label_override;
+            my $code = uc($label);
+            $code =~ s/\+/_PLUS_/g;
+            $code =~ s/[^A-Z0-9_]+/_/g;
+            $code =~ s/_+/_/g;
+            $code =~ s/^_+|_+$//g;
+            $tag = compose_group_tag($study_prefix, $code);
+        } else {
+            $tag = infer_group_tag_from_file($path, $study_prefix);
+            $label = infer_group_label_from_file($path, $tag);
+        }
         $groups_by_tag{$tag} ||= {
             tag   => $tag,
             label => $label,
@@ -1653,8 +1717,10 @@ sub infer_spec_from_gwas_dir {
         for my $j ($i + 1 .. $#groups) {
             my $g1 = $groups[$i];
             my $g2 = $groups[$j];
-            my $prefix = safe_name($g1->{label}) . '_' . safe_name($g2->{label});
-            $prefix = uc $prefix;
+            my $prefix = uc($g1->{label} . '_' . $g2->{label});
+            $prefix =~ s/\+/_PLUS_/g;
+            $prefix =~ s/[^A-Z0-9_]+/_/g;
+            $prefix =~ s/_+/_/g;
             my $base_prefix = $prefix;
             my $suffix = 2;
             while ($prefix_seen{$prefix}) {
@@ -1685,7 +1751,21 @@ sub infer_spec_from_gwas_dir {
           . join(', ', sort keys %format_class_seen)
           . '. Auto-generated comparisons may be technically runnable but should be checked for scientific comparability.';
     }
+    if (grep { ($_->{label} // '') =~ /^GCST\d+$/i } @groups) {
+        push @warnings, 'GCST accession filenames do not identify ancestry or sample overlap. Use --group-label GCST_ID=LABEL (for example EAS or EUR+EAS) when generating the spec, or edit the spec labels after checking study metadata.';
+    }
+    for my $g1 (@groups) {
+        for my $g2 (@groups) {
+            next if $g1->{tag} eq $g2->{tag};
+            my @members = split /\+/, $g2->{label};
+            next unless @members > 1;
+            if (grep { uc($_) eq uc($g1->{label}) } @members) {
+                push @warnings, "$g1->{label} appears within combined group $g2->{label}; differential tests need a justified correlation (rho), and meta-analysis of overlapping samples would double count participants.";
+            }
+        }
+    }
     push @warnings, @selection_warnings if @selection_warnings;
+    progress_note("Warning: $_") for @warnings;
     my $detected_build = detect_reference_build_profile(
         file_paths    => \@raw_files,
         default_build => 'hg38',
@@ -1708,7 +1788,10 @@ sub infer_spec_from_gwas_dir {
         top_hit_ld_r2_threshold => '0.1',
         top_hit_ld_population_rule => 'ANY',
         local_window_bp        => '1e7',
-        local_gtf_window_bp    => '1e6',
+        local_gtf_window_bp    => '2.5e5',
+        exclude_local_gtf_tracks => 'META',
+        compute_meta           => 0,
+        max_eaf_abs_diff       => '',
         include_non_protein_coding_genes_in_local_gtf => 0,
         open_result            => 0,
         clean_oda_input        => 1,
@@ -1987,7 +2070,8 @@ sub infer_merged_spec_from_dir {
         top_hit_ld_r2_threshold => '0.1',
         top_hit_ld_population_rule => 'ANY',
         local_window_bp       => '1e7',
-        local_gtf_window_bp   => '1e6',
+        local_gtf_window_bp   => '2.5e5',
+        exclude_local_gtf_tracks => 'META',
         include_non_protein_coding_genes_in_local_gtf => 0,
         open_result           => 0,
         clean_oda_input       => 1,
@@ -2371,7 +2455,8 @@ sub infer_precomputed_spec_from_dir {
         top_hit_ld_r2_threshold => '0.1',
         top_hit_ld_population_rule => 'ANY',
         local_window_bp       => '1e7',
-        local_gtf_window_bp   => '1e6',
+        local_gtf_window_bp   => '2.5e5',
+        exclude_local_gtf_tracks => 'META',
         include_non_protein_coding_genes_in_local_gtf => 0,
         open_result           => 0,
         clean_oda_input       => 1,
@@ -2524,11 +2609,14 @@ sub infer_group_label_from_file {
 
 sub infer_group_code_from_text {
     my ($text) = @_;
+    # Preserve combined ancestry labels before the single-ancestry rules below.
+    return 'EUR_PLUS_EAS' if $text =~ /(?:^|[^a-z0-9])eur(?:[_+.-]*plus|\+)[_+.-]*eas(?:[^a-z0-9]|$)/i;
     my @rules = (
         [ qr/female/, 'FEMALE' ],
         [ qr/\bfem\b|_fem_|female/, 'FEMALE' ],
         [ qr/\bmal\b|_mal_|male/, 'MALE' ],
         [ qr/afram|african|afr\b/, 'AFR' ],
+        [ qr/(?:^|[^a-z0-9])eas(?:[^a-z0-9]|$)|eastasian/, 'EAS' ],
         [ qr/asian|eastasian|asn\b/, 'ASN' ],
         [ qr/european|eur\b/, 'EUR' ],
         [ qr/latino|latam|lat\b|amr\b/, 'LAT' ],
@@ -2555,7 +2643,9 @@ sub expand_group_code {
     my %map = (
         AFR     => 'AFR',
         ASN     => 'ASN',
+        EAS     => 'EAS',
         EUR     => 'EUR',
+        EUR_PLUS_EAS => 'EUR+EAS',
         LAT     => 'LAT',
         FEMALE  => 'Female',
         MALE    => 'Male',
@@ -2793,7 +2883,7 @@ sub build_display_track_catalog {
 
     for my $group (sort keys %{ $pair_info->{group_rep} || {} }) {
         my $rep = $pair_info->{group_rep}{$group};
-        my $safe_label = safe_name($rep->{label});
+        my $safe_label = safe_track_column_name($rep->{label});
         my $entry = {
             id => $safe_label,
             kind => 'group',
@@ -2820,7 +2910,7 @@ sub build_display_track_catalog {
     }
 
     if (cfg_or($spec || {}, 'source_mode', 'raw_pgc_vcf_sumstats') ne 'merged_gwas_table'
-        && cfg_or($spec || {}, 'compute_meta', 1)) {
+        && cfg_or($spec || {}, 'compute_meta', 0)) {
         for my $prefix (@prefixes) {
             my $id = @prefixes == 1 ? 'META' : "${prefix}_META";
             my $label = @prefixes == 1 ? 'Meta' : "$prefix meta";
@@ -2969,6 +3059,12 @@ sub track_matches_name_regex {
     return 0;
 }
 
+sub is_meta_plot_track {
+    my ($track) = @_;
+    return 1 if ($track->{kind} // '') eq 'meta';
+    return normalize_display_gwas_token($track->{id} // '') =~ /(?:^|_)META(?:_|$)/;
+}
+
 sub resolve_plot_track_subset {
     my ($selected, $catalog, $lookup, $exclude_raw, $exclude_regex_raw,
         $order_raw, $plot_name) = @_;
@@ -2988,7 +3084,7 @@ sub resolve_plot_track_subset {
             next;
         }
         if ($normalized =~ /^(?:META|META_ANALYSIS|META_ANALYSIS_P)$/) {
-            $excluded{$_->{id}} = 1 for grep { $_->{kind} eq 'meta' } @{$selected};
+            $excluded{$_->{id}} = 1 for grep { is_meta_plot_track($_) } @{$selected};
             next;
         }
         my $entry = $lookup->{$normalized}
@@ -3027,7 +3123,7 @@ sub resolve_plot_track_subset {
                     @candidates = grep { $_->{kind} eq 'std' } @tracks;
                 }
                 elsif ($normalized =~ /^(?:META|META_ANALYSIS|META_ANALYSIS_P)$/) {
-                    @candidates = grep { $_->{kind} eq 'meta' } @tracks;
+                    @candidates = grep { is_meta_plot_track($_) } @tracks;
                 }
                 else {
                     my $entry = $lookup->{$normalized}
@@ -3140,7 +3236,7 @@ sub build_forest_group_tracks {
         my $sevar = $betavar;
         $sevar =~ s/_BETA$/_SE/ if length $sevar;
         push @forest_tracks, {
-            id        => safe_name($rep->{label}),
+            id        => safe_track_column_name($rep->{label}),
             group_key => $group_key,
             label     => $rep->{label},
             pvar      => $rep->{pvar},
@@ -3210,7 +3306,9 @@ sub build_diff_config {
         p_col         => 'P',
         rho           => cfg_or($spec, 'rho', 0),
         exclude_strand_ambiguous => cfg_or($spec, 'exclude_strand_ambiguous', 1),
-        max_eaf_abs_diff => cfg_or($spec, 'max_eaf_abs_diff', 0.2),
+        # Ancestry-specific frequency shifts are biological, not evidence of
+        # bad allele alignment. Filter them only when the user sets a limit.
+        max_eaf_abs_diff => cfg_or($spec, 'max_eaf_abs_diff', ''),
         pairs         => \%pairs,
     };
 }
@@ -3268,7 +3366,7 @@ sub build_preset_config {
         post_alias_map => build_post_alias_map($pair_info),
         pair_map       => $pair_info->{pair_map},
         prefix_order   => $pair_info->{prefix_order},
-        compute_meta   => cfg_or($spec, 'compute_meta', 1) ? 1 : 0,
+        compute_meta   => cfg_or($spec, 'compute_meta', 0) ? 1 : 0,
         meta_rho       => cfg_or($spec, 'rho', 0),
     };
 }
@@ -3409,9 +3507,9 @@ sub build_runner_config {
     my $local_manhattan_track_order = length($args{local_manhattan_track_order_override} // '')
         ? $args{local_manhattan_track_order_override}
         : cfg_or($spec, 'local_manhattan_track_order', '');
-    my $exclude_local_gtf_tracks = length($args{exclude_local_gtf_tracks_override} // '')
+    my $exclude_local_gtf_tracks = defined($args{exclude_local_gtf_tracks_override})
         ? $args{exclude_local_gtf_tracks_override}
-        : cfg_or($spec, 'exclude_local_gtf_tracks', '');
+        : cfg_or($spec, 'exclude_local_gtf_tracks', 'META');
     my $local_gtf_track_order = length($args{local_gtf_track_order_override} // '')
         ? $args{local_gtf_track_order_override}
         : cfg_or($spec, 'local_gtf_track_order', '');
@@ -3444,6 +3542,14 @@ sub build_runner_config {
         display_gwas_override => $display_gwas_override,
     );
     my @selected_tracks = @{ $selection->{tracks} || [] };
+    if ($selection->{explicit}
+        && !defined($args{exclude_local_gtf_tracks_override})
+        && uc($exclude_local_gtf_tracks) eq 'META'
+        && @selected_tracks
+        && !grep { !is_meta_plot_track($_) } @selected_tracks) {
+        print "[tracks] Explicit Meta-only display selection keeps the Meta local GTF track.\n";
+        $exclude_local_gtf_tracks = '';
+    }
     my ($catalog, $track_lookup) = build_display_track_catalog($pair_info, $spec);
     my ($manhattan_tracks, $excluded_manhattan_ids, $priority_order) =
         resolve_plot_track_subset(\@selected_tracks, $catalog, $track_lookup,
@@ -3924,7 +4030,7 @@ sub build_alias_map {
     my ($pair_info) = @_;
     my %map = map { $_ . '_STD_P' => $_ . '_STD_DIFF_P' } @{ $pair_info->{prefix_order} };
     for my $group (sort keys %{ $pair_info->{group_rep} }) {
-        my $label = safe_name($pair_info->{group_rep}{$group}{label});
+        my $label = safe_track_column_name($pair_info->{group_rep}{$group}{label});
         $map{$label . '_P'} = $pair_info->{group_rep}{$group}{pvar};
     }
     return \%map;
@@ -3934,7 +4040,7 @@ sub build_post_alias_map {
     my ($pair_info) = @_;
     my %map = map { $_ . '_STD_Z' => $_ . '_STD_DIFF_Z' } @{ $pair_info->{prefix_order} };
     for my $group (sort keys %{ $pair_info->{group_rep} }) {
-        my $label = safe_name($pair_info->{group_rep}{$group}{label});
+        my $label = safe_track_column_name($pair_info->{group_rep}{$group}{label});
         $map{$label . '_Z'} = $pair_info->{group_rep}{$group}{zvar};
     }
     return \%map;
@@ -4836,6 +4942,16 @@ sub safe_name {
     return $text;
 }
 
+sub safe_track_column_name {
+    my ($label) = @_;
+    $label = '' unless defined $label;
+    $label =~ s/\+/_PLUS_/g;
+    $label =~ s/[^A-Za-z0-9_]+/_/g;
+    $label =~ s/_+/_/g;
+    $label =~ s/^_+|_+$//g;
+    return $label || 'GROUP';
+}
+
 sub trim {
     my ($value) = @_;
     return '' unless defined $value;
@@ -5106,6 +5222,9 @@ Options:
   --raw-column-alias-config FILE.json
                        Optional JSON mapping canonical raw columns like ID/POS/PVAL
                        to extra header aliases for new GWAS formats
+  --group-label FILE_OR_ACCESSION=LABEL
+                       Repeat to label accession-only inputs, for example
+                       GCST90018574=EAS and GCST90018794=EUR+EAS.
   --preview-spec        Print the inferred spec JSON to STDOUT before writing it
   --mode MODE           full|configs . Default: full
   --skip-plots          Generate/prepare data but do not call SAS ODA runners
@@ -5115,7 +5234,15 @@ Options:
                         instead of the default any-displayed-GWAS P < 0.05 filter.
   --include-x-chr       Include chromosome X / 23 in genomewide Manhattan.
                         Default: X / 23 excluded; --manhattan-all-snps does not change this.
-  --[no-]compute-meta   Enable or disable fixed-effect meta-analysis calculation.
+  --[no-]compute-meta   Calculated meta-analysis is OFF by default. Enable it
+                       only when cohorts do not overlap, or supply a justified rho.
+                       Supplied meta tracks in merged input remain available.
+  --[no-]exclude-strand-ambiguous
+                       Default: exclude A/T and C/G pairs. Disable only after
+                       verifying effect-allele orientation across input studies.
+  --max-eaf-abs-diff N|none
+                       Default: none. Frequency differences between ancestries
+                       can be real; request a limit only for justified QC.
   --exclude-manhattan-tracks LIST  Remove comma-separated genomewide scatter tracks.
   --exclude-manhattan-track-regex PATTERN
                         Remove genomewide tracks matching a Perl regular expression.
@@ -5284,7 +5411,7 @@ Options:
                        SNP top-label font size in points (default: 10).
   --local-gtf-window-bp BP
                        Override the genomic half-window used only for the local
-                       GTF plot stage (default: 1e6). Values above 5e6 warn
+                       GTF plot stage (default: 2.5e5). Values above 5e6 warn
                        about possible SAS ODA failure (exit 73 or 74).
                        This does not change local Manhattan.
   --local-ld-snps rs1,rs2
@@ -5669,7 +5796,7 @@ sub sample_spec_json {
   "top_hit_focus_prefix": "ASN_EUR",
   "top_hit_signal_thrshd": "1e-6",
   "local_window_bp": "1e7",
-  "local_gtf_window_bp": "1e6",
+  "local_gtf_window_bp": "2.5e5",
   "include_non_protein_coding_genes_in_local_gtf": 0,
   "groups": [
     {

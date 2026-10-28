@@ -38,8 +38,8 @@ my $relative_status = system($^X, $driver, '--gwas-dir', basename($relative_dir)
 chdir $previous_cwd or die $!;
 is($relative_status, 0, 'relative --gwas-dir generates a spec');
 my $relative_spec = read_json($relative_spec_path);
-is($relative_spec->{local_gtf_window_bp}, '1e6',
-    'auto-detected local GTF half-window defaults to 1 Mb');
+is($relative_spec->{local_gtf_window_bp}, '2.5e5',
+    'auto-detected local GTF half-window defaults to 250 kb');
 is(abs_path($relative_spec->{output_dir}), abs_path($relative_dir),
     'auto-detected output directory is absolute and independent of the script location');
 $relative_spec->{configs_dir} = "$dir/relative_configs";
@@ -66,6 +66,13 @@ is(system($^X, $driver, '--spec', $spec_path, '--skip-plots', '--list-steps'), 0
 my $runner_path = "$dir/configs/auto_meta_test_runner.json";
 is(system($^X, $driver, '--spec', $spec_path, '--step', 'plot_local_gtf',
     '--list-steps'), 0, 'automatic-hit local GTF configuration is generated');
+is(read_json($runner_path)->{GTF_EXCLUDED_TRACKS}, 'META',
+    'default local GTF exclusion removes a supplied merged-table meta track');
+is(system($^X, $driver, '--spec', $spec_path, '--step', 'plot_local_gtf',
+    '--exclude-local-gtf-tracks', '', '--list-steps'), 0,
+    'explicit empty exclusion restores the local GTF meta track');
+is(read_json($runner_path)->{GTF_EXCLUDED_TRACKS}, '',
+    'explicit empty exclusion reaches local GTF runner');
 is(read_json($runner_path)->{GTF_LD_DISPLAY_MODE}, 'heatmap',
     'automatically selected GTF loci default to signed-LD heatmaps');
 is(system($^X, $driver, '--spec', $spec_path, '--step', 'plot_local_gtf',

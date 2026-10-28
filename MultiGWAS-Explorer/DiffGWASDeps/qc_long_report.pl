@@ -10,16 +10,21 @@ my $candidate_p = 1e-5;
 my $bin_width = 1e-4;
 my $max_chisq = 10;
 my $exclude_strand_ambiguous = 1;
-my $max_eaf_abs_diff = 0.20;
+my $max_eaf_abs_diff = '';
 GetOptions(
     'input=s'                    => \$input,
     'outdir=s'                   => \$outdir,
     'candidate-p=f'              => \$candidate_p,
     'exclude-strand-ambiguous!'  => \$exclude_strand_ambiguous,
-    'max-eaf-abs-diff=f'         => \$max_eaf_abs_diff,
+    'max-eaf-abs-diff=s'         => \$max_eaf_abs_diff,
 ) or die "Invalid options\n";
-die "Usage: $0 --input standardized_long.tsv.gz --outdir DIR [--candidate-p 1e-5] [--[no-]exclude-strand-ambiguous] [--max-eaf-abs-diff 0.2]\n"
+die "Usage: $0 --input standardized_long.tsv.gz --outdir DIR [--candidate-p 1e-5] [--[no-]exclude-strand-ambiguous] [--max-eaf-abs-diff 0.2|none]\n"
     unless defined $input && defined $outdir;
+$max_eaf_abs_diff = '' if lc($max_eaf_abs_diff) eq 'none';
+die "--max-eaf-abs-diff must be between 0 and 1, or none\n"
+    if length($max_eaf_abs_diff)
+       && ($max_eaf_abs_diff !~ /^(?:\d+(?:\.\d*)?|\.\d+)$/
+           || $max_eaf_abs_diff > 1);
 make_path($outdir) unless -d $outdir;
 
 my $fh;
@@ -87,7 +92,8 @@ sub finish_pair {
             $median, $lambda, $bin_width, $counts{$pair}{source} // 0, $counts{$pair}{total} // 0,
             $counts{$pair}{autosomal} // 0, $counts{$pair}{x} // 0,
             $counts{$pair}{excluded_ambiguous} // 0, $counts{$pair}{excluded_frequency} // 0,
-            $max_eaf_abs_diff, 'full_unfiltered_harmonization_eligible_autosomes_for_lambda'
+            (length($max_eaf_abs_diff) ? $max_eaf_abs_diff : 'disabled'),
+            'full_unfiltered_harmonization_eligible_autosomes_for_lambda'
         ), "\n";
     }
 }
@@ -128,7 +134,8 @@ while (my $line = <$fh>) {
     if ($has_frequency_fields) {
         my $eaf1 = mean_numeric(@f[@idx{qw(GROUP1_FRQ_A GROUP1_FRQ_U)}]);
         my $eaf2 = mean_numeric(@f[@idx{qw(GROUP2_FRQ_A GROUP2_FRQ_U)}]);
-        if (defined($eaf1) && defined($eaf2) && abs($eaf1 - $eaf2) > $max_eaf_abs_diff) {
+        if (length($max_eaf_abs_diff) && defined($eaf1) && defined($eaf2)
+            && abs($eaf1 - $eaf2) > $max_eaf_abs_diff) {
             ++$counts{$pair}{excluded_frequency};
             next;
         }
