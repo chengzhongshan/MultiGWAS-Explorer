@@ -969,6 +969,10 @@ sub extract_requested_numeric {
     if ($requested =~ /^(.*)_STD_Z$/) {
         return beta_se_to_z($1 . '_DIFF_BETA', $1 . '_DIFF_SE', $row, $idx);
     }
+    if ($requested =~ /^(.*)_(GROUP[12])_Z$/) {
+        return beta_se_to_z($1 . '_' . $2 . '_BETA',
+            $1 . '_' . $2 . '_SE', $row, $idx);
+    }
     return undef;
 }
 

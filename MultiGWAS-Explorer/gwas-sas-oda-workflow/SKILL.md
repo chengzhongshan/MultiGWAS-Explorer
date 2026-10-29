@@ -20,9 +20,23 @@ Use this skill as the workflow brain. Keep MCP tools small and reliable.
   track's source P column within the exact locus window. A different track's
   missing P values must not gate the row before plotting; merged-wide allele
   rows can have meta P and differential P on separate rows.
+- For raw paired inputs, local gnuplot columns use `PREFIX_GROUP1_P` and
+  `PREFIX_GROUP2_P` even when plot labels are `EAS_P` or `EUR_P`. Resolve
+  runner P and Z aliases from the generated preset for every source mode.
+  Use `--standardized-p-tracks` only when the reader needs an additional
+  standardized differential P panel across genome, local, and GTF figures;
+  it is off by default and does not change raw-P top-hit thresholds.
 - Before trusting SAS local Manhattan output, check chromosome-X input is
   numeric `23`, verify one lead entry per requested SNP, and inspect the
   downloaded panels and their SNP, gene, and chromosome labels.
+- For automatic SAS local GTF plots, select candidate coordinates before
+  extracting an indexed local GTF subset. With `TOP_HIT_LD_SOURCE=PLINK2_1KG`,
+  clump automatic hits locally with build-matched 1KG PLINK2 data and send
+  each selected locus separately to SAS ODA. An explicit HaploReg/SAS prep
+  path must write its status HTML only after `ODS HTML5` releases that output
+  path. A missing `indexed local GTF subset` upload entry or `REGION_CHRS`
+  keyword error means that combined prep path reached an incompatible legacy
+  full-GTF downloader.
 
 ## Required Context
 

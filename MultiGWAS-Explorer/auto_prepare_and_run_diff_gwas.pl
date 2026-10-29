@@ -126,6 +126,7 @@ my $local_manhattan_track_order_override = '';
 my $exclude_local_gtf_tracks_override;
 my $local_gtf_track_order_override = '';
 my $manhattan_differential_p_mode_override = '';
+my $standardized_p_tracks_override;
 my $compute_meta_override;
 my $exclude_strand_ambiguous_override;
 my $max_eaf_abs_diff_override;
@@ -264,6 +265,7 @@ GetOptions(
     'exclude-local-gtf-tracks|exclude-gtf-tracks=s' => \$exclude_local_gtf_tracks_override,
     'local-gtf-track-order|gtf-track-order=s' => \$local_gtf_track_order_override,
     'manhattan-differential-p-mode=s' => \$manhattan_differential_p_mode_override,
+    'standardized-p-tracks!' => \$standardized_p_tracks_override,
     'compute-meta!' => \$compute_meta_override,
     'exclude-strand-ambiguous!' => \$exclude_strand_ambiguous_override,
     'max-eaf-abs-diff=s' => \$max_eaf_abs_diff_override,
@@ -432,6 +434,8 @@ if ($generated_spec_input) {
         if length $local_gtf_window_bp_override;
     $draft_spec->{exclude_local_gtf_tracks} = $exclude_local_gtf_tracks_override
         if defined $exclude_local_gtf_tracks_override;
+    $draft_spec->{standardized_p_tracks} = $standardized_p_tracks_override ? 1 : 0
+        if defined $standardized_p_tracks_override;
     if ($preview_spec) {
         print pretty_json($draft_spec), "\n";
         exit 0 if $generate_spec_only || !length $spec_out;
@@ -517,6 +521,16 @@ my $manhattan_differential_p_mode = lc(
 die "--manhattan-differential-p-mode must be raw or standardized\n"
     unless $manhattan_differential_p_mode =~ /^(?:raw|standardized)$/;
 $spec->{manhattan_differential_p_mode} = $manhattan_differential_p_mode;
+$spec->{standardized_p_tracks} = $standardized_p_tracks_override ? 1 : 0
+    if defined $standardized_p_tracks_override;
+if ((defined($standardized_p_tracks_override) || $spec->{standardized_p_tracks})
+    && $manhattan_differential_p_mode eq 'standardized') {
+    die "--[no-]standardized-p-tracks conflicts with explicit --manhattan-differential-p-mode standardized\n"
+        if length($manhattan_differential_p_mode_override);
+    $manhattan_differential_p_mode = 'raw';
+    $spec->{manhattan_differential_p_mode} = 'raw';
+    print "[tracks] Standardized P switch uses separate tracks; restored raw differential P as the primary track.\n";
+}
 $spec->{clip_lower_quantile} = $clip_lower_quantile_override
   if defined $clip_lower_quantile_override && length $clip_lower_quantile_override;
 $spec->{clip_upper_quantile} = $clip_upper_quantile_override
@@ -2865,6 +2879,7 @@ sub build_display_track_catalog {
     my $differential_p_label = $differential_p_mode eq 'standardized'
         ? ' standardized differential P'
         : ' raw differential P';
+    my $show_standardized_p = cfg_or($spec || {}, 'standardized_p_tracks', 0) ? 1 : 0;
 
     for my $i (0 .. $#prefixes) {
         my $prefix = $prefixes[$i];
@@ -2889,13 +2904,29 @@ sub build_display_track_catalog {
             $prefix . '_DIFF',
             $prefix . '_DIFF_P',
             $prefix . '_STD',
-            $prefix . '_STD_P',
+            ($show_standardized_p && $differential_p_mode eq 'raw' ? () : ($prefix . '_STD_P')),
             $prefix . '_STD_Z',
             $label,
             $label . ' diff',
             $label . ' standardized diff',
             $gtf_label,
         );
+        if ($show_standardized_p && $differential_p_mode eq 'raw') {
+            my $standardized_entry = {
+                id => $prefix . '_STD_P',
+                kind => 'standardized_p',
+                prefix => $prefix,
+                pvar => $prefix . '_STD_P',
+                manhattan_pvar => $prefix . '_STD_P',
+                zvar => $prefix . '_STD_Z',
+                betavar => '',
+                manhattan_label => $label . ' standardized differential P',
+                gtf_label => safe_name($gtf_label . '_standardized_P'),
+            };
+            push @catalog, $standardized_entry;
+            add_display_track_aliases(\%lookup, $standardized_entry,
+                $standardized_entry->{id}, $label . ' standardized P');
+        }
     }
 
     for my $group (sort keys %{ $pair_info->{group_rep} || {} }) {
@@ -3796,6 +3827,7 @@ sub build_runner_config {
         MANHATTAN_DIFFERENTIAL_P_MODE => uc(cfg_or(
             $spec, 'manhattan_differential_p_mode', 'raw'
         )),
+        STANDARDIZED_P_TRACKS => (cfg_or($spec, 'standardized_p_tracks', 0) ? 1 : 0),
         MANHATTAN_P_VAR => ($manhattan_tracks[0]{manhattan_pvar} || $manhattan_tracks[0]{pvar}),
         MANHATTAN_OTHER_P_VARS => [
             map { $_->{manhattan_pvar} || $_->{pvar} } @manhattan_tracks[1 .. $#manhattan_tracks],
@@ -5274,6 +5306,9 @@ Options:
                        A SNP missing from either group cannot form a paired
                        differential result even with these filters off.
   --exclude-manhattan-tracks LIST  Remove comma-separated genomewide scatter tracks.
+  --[no-]standardized-p-tracks
+                       Add/remove standardized differential P tracks in genomewide
+                       Manhattan, local Manhattan, and local GTF plots. Default: off.
   --exclude-manhattan-track-regex PATTERN
                         Remove genomewide tracks matching a Perl regular expression.
   --manhattan-track-order LIST     Put listed genomewide tracks first, bottom to top.

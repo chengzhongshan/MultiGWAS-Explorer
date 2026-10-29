@@ -913,6 +913,9 @@ run;
   %local query_snp_labels;
   %let query_snp_labels=;
   %if %sysevalf(&prep_only,boolean) %then %do;
+    /* ODS owns this output path until closed; the DATA step writes its small
+       prep status page to the same path. Close ODS before opening FILE. */
+    ods html5 close;
     data _null_;
       file "~/__OUTPUT_HTML__" lrecl=32767;
       put '<!doctype html>';
@@ -922,7 +925,6 @@ run;
       put "<p>Exported top-hit CSV: &local_top_hits_csv_basename</p>";
       put '</body></html>';
     run;
-    ods html5 close;
     %put NOTE: Prep-only mode complete, exported local top-hit CSV, and skipped GTF plotting.;
     %return;
   %end;
@@ -1010,6 +1012,7 @@ run;
 
   %if %superq(top_snps)= %then %do;
     %put ERROR: No valid local-GTF plot queries remain after filtering invalid targets.;
+    ods html5 close;
     data _null_;
       file "~/__OUTPUT_HTML__" lrecl=32767;
       put '<!doctype html>';
@@ -1019,7 +1022,6 @@ run;
       put '<p>No valid local-GTF plot queries remained after filtering invalid targets.</p>';
       put '</body></html>';
     run;
-    ods html5 close;
     %return;
   %end;
 

@@ -3003,6 +3003,13 @@ both SAS ODA and gnuplot is `--manhattan-differential-p-mode raw`.
 selection and inferential thresholds continue to use raw differential P
 values in either plotting mode.
 
+To show standardized differential P beside the raw differential and cohort
+tracks in genome-wide Manhattan, local Manhattan, and local GTF plots, pass
+`--standardized-p-tracks` to either pipeline entry point. It is off by default;
+`--no-standardized-p-tracks` turns it off explicitly. This changes displayed
+tracks, not top-hit selection. The added track has ID `PREFIX_STD_P`, so the
+existing track order and exclusion options can place or remove it separately.
+
 The default remains `none`; no LD query or overlay is performed unless the
 user requests `markers`, `heatmap`, or `both`. Explicit proxy lists can supply
 values with `--local-ld-r2-values rs1:0.92,rs2:0.81`. The gnuplot equivalent is

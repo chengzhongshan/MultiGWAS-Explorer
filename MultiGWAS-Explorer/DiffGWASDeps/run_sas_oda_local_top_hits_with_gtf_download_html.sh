@@ -42,6 +42,9 @@ TOP_HIT_FILTER_EXPR="${TOP_HIT_FILTER_EXPR:-((ASN_STD_P>0) and (ASN_STD_P<1E-6))
 TOP_HIT_SIGNAL_THRSHD="${TOP_HIT_SIGNAL_THRSHD:-1e-6}"
 TOP_HIT_DIST_BP="${TOP_HIT_DIST_BP:-1e6}"
 TOP_HIT_SELECTION_METHOD="${TOP_HIT_SELECTION_METHOD:-ld}"
+TOP_HIT_LD_SOURCE="${TOP_HIT_LD_SOURCE:-PLINK2_1KG}"
+TOP_HIT_LD_PFILE="${TOP_HIT_LD_PFILE:-${WORKDIR}/cache/plink2_1kg_phase3/all_phase3}"
+TOP_HIT_LD_PLINK2="${TOP_HIT_LD_PLINK2:-${WORKDIR}/cache/plink2_bin/plink2.exe}"
 TOP_HIT_LD_R2_THRESHOLD="${TOP_HIT_LD_R2_THRESHOLD:-0.1}"
 TOP_HIT_LD_POPULATIONS="${TOP_HIT_LD_POPULATIONS:-EUR ASN}"
 TOP_HIT_LD_POPULATION_RULE="${TOP_HIT_LD_POPULATION_RULE:-ANY}"
@@ -1579,6 +1582,82 @@ if [[ "${SOURCE_MODE:-}" == "merged_gwas_table" \
   echo "[prep] SAS local-GTF GWAS upload contains only the selected locus windows: ${DATA_GZ}"
 fi
 
+# For automatic differential top hits, obtain candidate coordinates before
+# building the GTF subset. The explicit HaploReg route may still use a later
+# SAS prep pass; the default PLINK2 route clumps these candidates locally.
+# Without it, the prep pass falls back to the legacy full-GTF SAS macro, whose
+# interface does not accept the region_chrs/starts/ends parameters.
+if [[ -z "${TARGET_SNP_LIST}" && "${LOCAL_TOP_HITS_CSV_PREGENERATED}" != "1" ]]; then
+  if generate_requested_top_hits_csv_locally && [[ -s "${CSV_OUT}" ]]; then
+    LOCAL_TOP_HITS_CSV_PREGENERATED=1
+    echo "[prep] Using locally selected candidate coordinates for the GTF subset before SAS LD clumping: ${CSV_OUT}"
+  else
+    echo "ERROR: Could not select candidate coordinates for local GTF extraction; refusing the full-GTF SAS fallback." >&2
+    exit 1
+  fi
+fi
+
+# The PLINK2/1KG choice must select independent leads locally. In particular,
+# hg38 needs its chromosome-specific 1KG files rather than the hg19 all_phase3
+# fileset. Keep this step before every SAS upload, then hand the selected loci
+# to the existing one-locus-at-a-time signed-LD dispatcher.
+if [[ -z "${TARGET_SNP_LIST}" \
+    && "$(printf '%s' "${TOP_HIT_SELECTION_METHOD}" | tr '[:lower:]' '[:upper:]')" == "LD" \
+    && "$(printf '%s' "${TOP_HIT_LD_SOURCE}" | tr '[:lower:]' '[:upper:]')" == "PLINK2_1KG" \
+    && "${LOCAL_SAS_DEBUG_ONLY}" != "1" \
+    && "${ODA_TRANSFER_MANIFEST_ONLY:-0}" != "1" ]]; then
+  if [[ ! -s "${TOP_HIT_LD_LEADS_TSV}" ]]; then
+    ld_clump_key="$(stable_hash_text \
+      "$(stable_hash_file "${CSV_OUT}")" "${REFERENCE_BUILD}" \
+      "${TOP_HIT_LD_POPULATIONS}" "${TOP_HIT_LD_POPULATION_RULE}" \
+      "${TOP_HIT_LD_R2_THRESHOLD}" "${TOP_HIT_LD_WINDOW_KB:-1000}" \
+      "${TOP_HIT_MAX_LOCI}" "${TOP_HIT_LD_PLINK2:-}" \
+      "${TOP_HIT_LD_PFILE:-}")"
+    ld_clump_dir="${WORKDIR}/cache/top_hit_ld"
+    mkdir -p "${ld_clump_dir}"
+    ld_clump_base="${ld_clump_dir}/${SAFE_PROJECT_TAG}_${ld_clump_key}"
+    TOP_HIT_LD_LEADS_TSV="${ld_clump_base}.leads.csv"
+    if [[ -s "${TOP_HIT_LD_LEADS_TSV}" && -s "${ld_clump_base}.audit.tsv" \
+        && -s "${ld_clump_base}.cache.tsv" && -s "${ld_clump_base}.status.tsv" ]]; then
+      echo "[skip] Reusing local PLINK2/1KG LD-clumped top hits: ${TOP_HIT_LD_LEADS_TSV}"
+    else
+      ld_clump_args=(
+        --candidates "${CSV_OUT}" --build "${REFERENCE_BUILD}"
+        --plink2 "${TOP_HIT_LD_PLINK2:-${WORKDIR}/cache/plink2_bin/plink2.exe}"
+        --populations "${TOP_HIT_LD_POPULATIONS}"
+        --population-rule "${TOP_HIT_LD_POPULATION_RULE}"
+        --r2-threshold "${TOP_HIT_LD_R2_THRESHOLD}"
+        --window-kb "${TOP_HIT_LD_WINDOW_KB:-1000}"
+        --max-leads "${TOP_HIT_MAX_LOCI}"
+        --output-leads "${TOP_HIT_LD_LEADS_TSV}"
+        --output-audit "${ld_clump_base}.audit.tsv"
+        --output-cache "${ld_clump_base}.cache.tsv"
+        --output-status "${ld_clump_base}.status.tsv"
+      )
+      if [[ "${REFERENCE_BUILD}" == "hg38" ]]; then
+        ld_clump_args+=(--panel-dir "${WORKDIR}/cache/plink2_1kg_hg38")
+      else
+        ld_clump_args+=(--pfile "${TOP_HIT_LD_PFILE}")
+      fi
+      echo "[prep] LD-clumping automatic top hits locally with build-matched PLINK2/1KG genotypes."
+      perl "${DEPS_DIR}/clump_top_hits_by_build.pl" "${ld_clump_args[@]}"
+    fi
+  fi
+  [[ -s "${TOP_HIT_LD_LEADS_TSV}" ]] || {
+    echo "ERROR: Local PLINK2/1KG LD clumping did not produce a lead table." >&2
+    exit 1
+  }
+  if [[ "${GTF_LD_DISPLAY_MODE_NORMALIZED}" == "heatmap" \
+      || "${GTF_LD_DISPLAY_MODE_NORMALIZED}" == "both" ]]; then
+    echo "[prep] Dispatching local PLINK2/1KG leads one locus at a time to SAS ODA."
+    dispatch_selected_signed_ld_gtf
+    exit 0
+  fi
+  cp -f "${TOP_HIT_LD_LEADS_TSV}" "${CSV_OUT}"
+  LOCAL_TOP_HITS_CSV_PREGENERATED=1
+  LOCAL_TOP_HITS_INPUT_CSV_BASENAME="${LOCAL_TOP_HITS_CSV_BASENAME}"
+fi
+
 schema_import_extra_args=()
 if [[ -s "${GTF_LD_R2_CACHE}" ]]; then
   schema_import_extra_args+=(--extra-numeric-cols LD_R2)
@@ -2283,7 +2362,8 @@ fi
 GTF_SUBMIT_MAX_ATTEMPTS="${GTF_SUBMIT_MAX_ATTEMPTS:-5}"
 GTF_SUBMIT_RETRY_SLEEP_SECONDS="${GTF_SUBMIT_RETRY_SLEEP_SECONDS:-10}"
 BATCH_SIZE="${LOCAL_MAX_HITS_PER_FIG:-4}"
-if [[ "$(printf '%s' "${TOP_HIT_SELECTION_METHOD}" | tr '[:lower:]' '[:upper:]')" == "LD" && -z "${TARGET_SNP_LIST}" ]]; then
+if [[ "$(printf '%s' "${TOP_HIT_SELECTION_METHOD}" | tr '[:lower:]' '[:upper:]')" == "LD" \
+    && -z "${TARGET_SNP_LIST}" && ! -s "${TOP_HIT_LD_LEADS_TSV}" ]]; then
   echo "[prep] Running LD clumping before local-GTF batching."
   if [[ ( "${GTF_LD_DISPLAY_MODE_NORMALIZED}" == "heatmap" || "${GTF_LD_DISPLAY_MODE_NORMALIZED}" == "both" ) \
       && "${LOCAL_SAS_DEBUG_ONLY}" != "1" \

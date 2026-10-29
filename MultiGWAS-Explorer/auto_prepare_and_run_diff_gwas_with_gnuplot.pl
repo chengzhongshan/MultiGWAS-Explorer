@@ -106,6 +106,10 @@ Options:
                                 META/DIFFERENTIAL, and /PATTERN/[imsx] regexes.
   --manhattan-differential-p-mode MODE
                                 raw or standardized. Default: raw.
+  --[no-]standardized-p-tracks
+                                Add/remove standardized differential P tracks
+                                in all three Manhattan/GTF plot families.
+                                Default: off.
   --remove-X-chr / --no-remove-X-chr
                                 Legacy aliases controlling X in gnuplot figures.
                                 --no-remove-X-chr includes X, like --include-x-chr.
@@ -200,6 +204,7 @@ my $local_manhattan_track_order_override = '';
 my $exclude_local_gtf_tracks_override;
 my $local_gtf_track_order_override = '';
 my $manhattan_differential_p_mode_override = '';
+my $standardized_p_tracks_override;
 # Keep ancestry-overlap decisions in the shared spec; gnuplot forwards an
 # explicit request but otherwise inherits the no-computed-meta default.
 my $compute_meta_override;
@@ -268,6 +273,7 @@ GetOptions(
     'exclude-local-gtf-tracks|exclude-gtf-tracks=s' => \$exclude_local_gtf_tracks_override,
     'local-gtf-track-order|gtf-track-order=s' => \$local_gtf_track_order_override,
     'manhattan-differential-p-mode=s' => \$manhattan_differential_p_mode_override,
+    'standardized-p-tracks!' => \$standardized_p_tracks_override,
     'compute-meta!'             => \$compute_meta_override,
     'exclude-strand-ambiguous!' => \$exclude_strand_ambiguous_override,
     'max-eaf-abs-diff=s' => \$max_eaf_abs_diff_override,
@@ -345,6 +351,8 @@ if (length($input_merged) || length($gwas_dir)) {
         (defined($max_eaf_abs_diff_override) ? ('--max-eaf-abs-diff', $max_eaf_abs_diff_override) : ()),
         (length($local_gtf_window_bp_override) ? ('--local-gtf-window-bp', $local_gtf_window_bp_override) : ()),
         (defined($exclude_local_gtf_tracks_override) ? ('--exclude-local-gtf-tracks', $exclude_local_gtf_tracks_override) : ()),
+        (defined($standardized_p_tracks_override)
+            ? ($standardized_p_tracks_override ? '--standardized-p-tracks' : '--no-standardized-p-tracks') : ()),
     ], 'direct merged GWAS import');
     my $generated_spec = load_json($spec_file);
     $generated_spec->{configs_dir} = dirname(localize_path($spec_file));
@@ -501,6 +509,7 @@ for my $override_value (
 }
 $has_runner_override = 1 if $local_max_hits_per_fig_override;
 $has_runner_override = 1 if defined $compute_meta_override;
+$has_runner_override = 1 if defined $standardized_p_tracks_override;
 $has_runner_override = 1 if defined $exclude_local_gtf_tracks_override;
 $has_runner_override = 1 if defined $exclude_strand_ambiguous_override || defined $max_eaf_abs_diff_override;
 $has_runner_override = 1 if $refresh_raw;
@@ -515,6 +524,10 @@ if (!$manhattan_all_snps && ($spec->{source_mode} || '') ne 'merged_gwas_table'
 }
 if (-f $runner_config_local) {
     my $cached_runner = load_json($runner_config_local);
+    my $requested_std_tracks = defined($standardized_p_tracks_override)
+        ? $standardized_p_tracks_override : ($spec->{standardized_p_tracks} || 0);
+    $has_runner_override = 1
+        if !!$requested_std_tracks != !!($cached_runner->{STANDARDIZED_P_TRACKS} || 0);
     $has_runner_override = 1
         if !!($cached_runner->{MANHATTAN_INCLUDE_X_CHR} || 0) != !!(!$remove_x_chr);
     my $requested_exclusions = length($exclude_manhattan_tracks_override)
@@ -574,6 +587,7 @@ if (!$reused_existing_runner) {
         exclude_local_gtf_tracks_override => $exclude_local_gtf_tracks_override,
         local_gtf_track_order_override => $local_gtf_track_order_override,
         manhattan_differential_p_mode_override => $manhattan_differential_p_mode_override,
+        standardized_p_tracks_override => $standardized_p_tracks_override,
         compute_meta_override           => $compute_meta_override,
         exclude_strand_ambiguous_override => $exclude_strand_ambiguous_override,
         max_eaf_abs_diff_override => $max_eaf_abs_diff_override,
@@ -600,7 +614,7 @@ my @manhattan_source_pcols = (
     @{ ref($runner->{MANHATTAN_OTHER_P_VARS}) eq 'ARRAY' ? $runner->{MANHATTAN_OTHER_P_VARS} : [] },
 );
 my $plot_runner_config_local = $runner_config_local;
-if (($spec->{source_mode} || '') eq 'merged_gwas_table' && -f $preset_config_local) {
+if (-f $preset_config_local) {
     my $preset = load_json($preset_config_local);
     my %alias = (
         %{ $preset->{alias_map} || {} },
@@ -621,7 +635,7 @@ if (($spec->{source_mode} || '') eq 'merged_gwas_table' && -f $preset_config_loc
                 map { $alias{$_} || $_ } @{ $runner->{LOCAL_MANHATTAN_OTHER_P_VARS} }
             ];
         }
-        for my $key (qw(GTF_ASSOC_PVARS GTF_ZSCORE_VARS)) {
+        for my $key (qw(GTF_ASSOC_PVARS GTF_ZSCORE_VARS COMMON_ASSOC_P_VARS COMMON_ASSOC_BETA_VARS)) {
             $runner->{$key} = join(' ', map { $alias{$_} || $_ }
                 grep { length } split /\s+/, ($runner->{$key} || ''));
         }
@@ -956,6 +970,9 @@ sub run_upstream_preprocessing {
         push @cmd, '--manhattan-differential-p-mode',
           $args{manhattan_differential_p_mode_override};
     }
+    push @cmd, ($args{standardized_p_tracks_override}
+        ? '--standardized-p-tracks' : '--no-standardized-p-tracks')
+        if defined $args{standardized_p_tracks_override};
     push @cmd, ($args{compute_meta_override} ? '--compute-meta' : '--no-compute-meta')
         if defined $args{compute_meta_override};
     push @cmd, ($args{exclude_strand_ambiguous_override} ? '--exclude-strand-ambiguous' : '--no-exclude-strand-ambiguous')

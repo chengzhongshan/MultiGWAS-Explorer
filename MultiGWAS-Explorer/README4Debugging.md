@@ -90,6 +90,40 @@ files. Upload and plot one locus at a time to limit SAS ODA storage and memory.
 
 ## Keep local SAS input small
 
+### Anemia automatic local GTF prep: HTML lock and missing region interface
+
+In the 2026-10-29 EAS versus EUR+EAS rerun, `plot_local_gtf` first failed with
+`ERROR: File is in use, ...local_top_hits_with_gtf.prep.html`. The prep-only
+SAS program had opened that path with `ODS HTML5` and then tried to write the
+same path through `DATA _NULL_` `FILE`. Close the ODS destination before the
+DATA step writes the prep status page. Apply the same ordering to the local
+GTF error page.
+
+The next prep attempt reached an older GTF downloader and reported
+`REGION_CHRS`, `REGION_STARTS`, and `REGION_ENDS` as undefined keyword
+parameters. Automatic differential-hit candidates had been selected **after**
+GTF region preparation, so no indexed local GTF subset was available. Select
+candidate coordinates locally before the GTF subset stage, then use the
+tabix-derived subset when a combined SAS pass is needed. When
+`TOP_HIT_LD_SOURCE=PLINK2_1KG`, the automatic GTF path now clumps candidates
+locally in Perl with build-matched 1KG genotype data, then dispatches selected
+loci one at a time. It does not need the SAS LD prep pass. PLINK2 2.0 requires
+an explicit `--nonfounders` or `--ac-founders` for `--freq counts` and `--mac`;
+the local clumper uses `--nonfounders` to include the reference samples. Its
+temporary files live beside its output because native Windows PLINK2 could
+not open Cygwin's Anaconda-hosted temporary directory. If a combined SAS pass
+is requested, the log should show `indexed local GTF subset` in its upload
+manifest; a missing line warrants checking the candidate CSV before another
+SAS submit.
+
+From `Anemia_EAS_EUR_GWAS`, rerun only the failed stage with the saved spec:
+
+```bash
+perl ../MultiGWAS-Explorer/MultiGWAS-Explorer/auto_prepare_and_run_diff_gwas.pl \
+  --spec ../MultiGWAS-Explorer/MultiGWAS-Explorer/configs/auto_Anemia_EAS_EUR_GWAS_diff_effects_from_dir.spec.json \
+  --step plot_local_gtf --no-compute-meta
+```
+
 ### Anemia EAS versus EUR+EAS: inspect the real filter before changing QC
 
 The anemia run's differential manifest reported `skipped_eaf_discordance=0`
@@ -210,6 +244,12 @@ a changed target set or width creates a new subset. The runner downloads plots
 and removes its successful temporary SAS ODA files afterward.
 
 ## Verification before publishing figures
+
+If a gnuplot local plot reports `Required column missing from input: EAS_P`
+while the header has `PREFIX_GROUP1_P`, inspect the generated preset alias map.
+The gnuplot runner must apply that map to raw as well as merged-wide inputs;
+the compact Manhattan preprocessor already does. Recheck the local GTF and
+Manhattan P columns after switching `--standardized-p-tracks` on or off.
 
 1. Confirm the wide table and manifest are nonempty and the manifest matches
    the current source/spec. Confirm the compact Manhattan count and that Meta

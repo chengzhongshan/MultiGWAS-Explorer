@@ -70,7 +70,9 @@ if (defined($work_prefix) && length($work_prefix)) {
     $work_dir = dirname(File::Spec->rel2abs($work_prefix));
     make_path($work_dir) unless -d $work_dir;
 } else {
-    $tmp_obj = tempdir('plink2_1kg_top_hits.XXXXXX', TMPDIR => 1, CLEANUP => !$keep_work);
+    make_path(dirname($output_cache)) unless -d dirname($output_cache);
+    $tmp_obj = tempdir('plink2_1kg_top_hits.XXXXXX',
+        DIR => dirname($output_cache), CLEANUP => !$keep_work);
     $work_prefix = File::Spec->catfile($tmp_obj, 'top_hits');
     $work_dir = $tmp_obj;
 }
@@ -100,7 +102,7 @@ for my $pop (@pops) {
     my $tag = lc($pop);
     my $freq_prefix = "$work_prefix.$tag.freq";
     my @freq_cmd = (plink_executable(), '--pfile', native_path($subset),
-        '--keep-if', 'SuperPop', '==', $pop, '--freq', 'counts',
+        '--keep-if', 'SuperPop', '==', $pop, '--nonfounders', '--freq', 'counts',
         '--threads', $threads, '--out', native_path($freq_prefix));
     run_cmd(@freq_cmd);
     my %frequency = read_acount("$freq_prefix.acount");
@@ -132,7 +134,7 @@ for my $pop (@pops) {
     next unless keys(%estimable) > 1;
     my $ld_prefix = "$work_prefix.$tag.ld";
     my @ld_cmd = (plink_executable(), '--pfile', native_path($subset),
-        '--keep-if', 'SuperPop', '==', $pop, '--mac', 1,
+        '--keep-if', 'SuperPop', '==', $pop, '--nonfounders', '--mac', 1,
         '--r2-phased', 'allow-ambiguous-allele', 'cols=chrom,pos,id',
         '--ld-window-kb', $window_kb, '--ld-window-r2', $r2_threshold,
         '--threads', $threads, '--out', native_path($ld_prefix));
