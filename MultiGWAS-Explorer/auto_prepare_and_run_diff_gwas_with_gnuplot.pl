@@ -1097,10 +1097,12 @@ sub plot_manhattan {
     $thin_mod = 1 if $args{all_snps};
     my $plot_manifest = $out_prefix_path . '.manifest.tsv';
     my $prior = -s $plot_manifest ? read_manifest_tsv($plot_manifest) : {};
+    my $reference_p = $args{runner}{MANHATTAN_REFERENCE_P} || '5e-8';
     my $plot_reusable = !$args{force}
         && ($prior->{input} || '') eq $compact_data
         && ($prior->{pcols} || '') eq join(',', @{ $args{pcols} || [] })
         && ($prior->{labels} || '') eq join('|', @{ $args{labels} || [] })
+        && ($prior->{reference_p} || '') eq $reference_p
         && target_is_newer_than_inputs($png_path, $compact_data,
             File::Spec->catfile($Bin, 'DiffGWASDeps', 'gnuplot', 'pdl_gnuplot_manhattan.pl'));
     if (!$plot_reusable) {
@@ -1113,7 +1115,7 @@ sub plot_manhattan {
             '--labels', join('|', @{ $args{labels} || [] }),
             '--width', ($args{runner}{MANHATTAN_FIG_WIDTH} || 1800),
             '--height', ($args{runner}{MANHATTAN_FIG_HEIGHT} || 1250),
-            '--sig', ($args{runner}{TOP_HIT_SIGNAL_THRSHD} || '1e-6'),
+            '--sig', $reference_p,
             '--min-logp', $min_logp,
             '--keep-all-logp', $keep_all_logp,
             '--thin-mod', $thin_mod,

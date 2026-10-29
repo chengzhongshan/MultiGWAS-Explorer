@@ -21,7 +21,7 @@ Options:
   --width N                 PNG width. Default: 1800
   --height N                PNG height. Default: 1250
   --top-logp FLOAT          Per-track cap. Default: 12
-  --sig FLOAT               Significance threshold. Default: 1e-6
+  --sig FLOAT               Genomewide reference P line on every track. Default: 5e-8
   --min-logp FLOAT          Drop points below this. Default: 0.5
   --keep-all-logp FLOAT     Keep all points above this. Default: 3
   --thin-mod N              Background thinning factor. Default: 40
@@ -35,7 +35,7 @@ my %opt = (
     width         => 1800,
     height        => 1250,
     top_logp      => 12,
-    sig           => '1e-6',
+    sig           => '5e-8',
     min_logp      => 0.5,
     keep_all_logp => 3,
     thin_mod      => 40,
@@ -63,6 +63,10 @@ GetOptions(
 
 die usage() unless $opt{data} && $opt{out_prefix};
 die "Input file not found: $opt{data}\n" unless -s $opt{data};
+die "--sig must be a P value greater than zero and at most one\n"
+    unless defined(numeric($opt{sig})) && $opt{sig} > 0 && $opt{sig} <= 1;
+die "--top-logp must exceed -log10(--sig) so the reference line stays inside each track\n"
+    unless $opt{top_logp} > safe_neglog10($opt{sig});
 
 my @pcols = grep { length } map { trim($_) } split /,/, ($opt{pcols} // '');
 die "--pcols is required\n" unless @pcols;
@@ -139,6 +143,7 @@ print {$mf} join("\t", 'title', $opt{title}), "\n";
 print {$mf} join("\t", 'pcols', join(',', @pcols)), "\n";
 print {$mf} join("\t", 'resolved_pcols', join(',', @resolved_pcols)), "\n";
 print {$mf} join("\t", 'labels', join('|', @labels)), "\n";
+print {$mf} join("\t", 'reference_p', $opt{sig}), "\n";
 print {$mf} join("\t", 'remove_x_chr', ($opt{remove_x_chr} ? 1 : 0)), "\n";
 print {$mf} join("\t", 'rows_scanned', $rows_scanned), "\n";
 print {$mf} join("\t", 'rows_kept', $rows_kept), "\n";

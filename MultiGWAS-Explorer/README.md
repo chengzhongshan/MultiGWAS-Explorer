@@ -3003,6 +3003,11 @@ both SAS ODA and gnuplot is `--manhattan-differential-p-mode raw`.
 selection and inferential thresholds continue to use raw differential P
 values in either plotting mode.
 
+Gnuplot genome-wide Manhattan figures draw a `P = 5e-8` reference line in
+every displayed track. The reference is independent of the top-hit selection
+cutoff. A runner config can override it with `MANHATTAN_REFERENCE_P`; direct
+calls to `pdl_gnuplot_manhattan.pl` can use `--sig`.
+
 To show standardized differential P beside the raw differential and cohort
 tracks in genome-wide Manhattan, local Manhattan, and local GTF plots, pass
 `--standardized-p-tracks` to either pipeline entry point. It is off by default;
