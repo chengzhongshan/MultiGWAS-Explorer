@@ -132,14 +132,18 @@ Before running a workflow, identify:
    - `GROUP2_FRQ_U`
    - `GROUP1_INFO`
    - `GROUP2_INFO`
-   Then apply the top-hit safeguard:
+   For an explicitly requested top-hit MAF cutoff, apply the safeguard:
    - use GWAS-derived MAF first
    - fall back to a local gnomAD lookup only when GWAS frequency columns are
      absent
-   - if neither source is available, expect `maf_source=UNKNOWN` and
-     conservative filtering at the default threshold
-   - keep hits only when `MAF > 0.01`, unless the user requests a different
-     threshold through `top_hit_maf_threshold`
+   - if neither source is available, expect `maf_source=UNKNOWN`; keep the
+     candidate with the default zero cutoff rather than losing every hit
+   - apply `MAF > 0.01` only when the user explicitly sets
+     `top_hit_maf_threshold` to `0.01` (or another justified cutoff)
+   If optional local top-hit selection produces no CSV, check file existence
+   before SAS `PROC IMPORT` and let the internal selector run. In a SAS SQL
+   export that joins hit tables, qualify dynamic columns with their source
+   alias and exclude `hit_order` and other columns selected explicitly.
    The requested top-hit CSVs should preserve:
    - `selected_maf`
    - `maf_source`

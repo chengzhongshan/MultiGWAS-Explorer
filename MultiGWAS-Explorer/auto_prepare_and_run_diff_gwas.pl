@@ -3823,7 +3823,9 @@ sub build_runner_config {
               ? $top_hit_max_loci
               : 0
         ),
-        TOP_HIT_MAF_THRESHOLD => cfg_or($spec, 'top_hit_maf_threshold', ($source_mode eq 'merged_gwas_table' ? 0 : 0.01)),
+        # Many harmonised studies provide no usable MAF in the plotting table.
+        # An implicit positive cutoff would silently discard every top hit.
+        TOP_HIT_MAF_THRESHOLD => cfg_or($spec, 'top_hit_maf_threshold', 0),
         TOP_HIT_GNOMAD_FREQ_FILE => cfg_or($spec, 'gnomad_freq_file', ''),
         TOP_HIT_GNOMAD_POP_MAP => population_map_to_string(cfg_or($spec, 'gnomad_population_map', '')),
         TARGET_SNP_LIST => (

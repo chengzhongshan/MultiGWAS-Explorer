@@ -1301,7 +1301,7 @@ sub collect_top_hits {
 
 sub runner_maf_threshold {
     my ($runner) = @_;
-    return 0.01 unless ref($runner) eq 'HASH' && exists $runner->{TOP_HIT_MAF_THRESHOLD};
+    return 0 unless ref($runner) eq 'HASH' && exists $runner->{TOP_HIT_MAF_THRESHOLD};
     my $value = $runner->{TOP_HIT_MAF_THRESHOLD};
     return 0 if defined $value && $value =~ /^(?:0|0\.0+)?$/;
     return $value if defined $value && $value ne '';

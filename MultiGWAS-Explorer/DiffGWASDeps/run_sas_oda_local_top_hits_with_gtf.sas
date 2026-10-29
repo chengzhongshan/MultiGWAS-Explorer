@@ -865,12 +865,14 @@ run;
 );
 
 proc sql noprint;
-  select name into: top_hit_export_extra_vars separated by ', '
+  select cats('t.', name) into: top_hit_export_extra_vars separated by ', '
   from dictionary.columns
   where libname='WORK'
     and memname='TOP_HIT4DIFFP'
     and upcase(name) not in (
-      'CHR','BP','SNP','GENE','SNP_GENE','A1','A2','REQUESTED_HIT_ORDER'
+      'CHR','BP','SNP','GENE','SNP_GENE','A1','A2','REQUESTED_HIT_ORDER',
+      'HIT_ORDER','PANEL_INDEX','FOCUS_SIGNAL',
+      'EFFECT_ALLELE','OTHER_ALLELE','REFERENCE_ALLELE','ALTERNATIVE_ALLELE'
     )
   order by varnum
   ;
@@ -889,9 +891,9 @@ proc sql;
          t.A1 as ALTERNATIVE_ALLELE length=8,
          t.gene,
          t.snp_gene,
-         t.&top_hit_focus_pvar as focus_signal,
+         t.&top_hit_focus_pvar as focus_signal
          %if %superq(top_hit_export_extra_vars) ne %then %do;
-         &top_hit_export_extra_vars
+         , &top_hit_export_extra_vars
          %end;
   from top_hit4diffp as t
   inner join top_hit_groups as g

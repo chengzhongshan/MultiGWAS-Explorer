@@ -104,6 +104,24 @@ is off by default; use `--max-eaf-abs-diff N` only when justified by the study
 design and available frequency fields. Cross-ancestry frequency shifts alone
 are not evidence of allele mismatch.
 
+The October 28 local Manhattan failure had a separate cause: the generated
+wide table had no usable frequency values, but the former implicit
+`top_hit_maf_threshold=0.01` rejected every otherwise significant candidate.
+The local selector produced no requested CSV; SAS then attempted `PROC IMPORT`
+on that absent file and reported `ERROR: Physical file does not exist`.
+New pipeline runs default the top-hit MAF cutoff to zero, and the SAS macro
+checks file existence before optional import. A positive MAF cutoff remains an
+explicit spec choice. Check both the local selector's `MAF_UNKNOWN` count and
+the saved SAS log before diagnosing an upload or connection problem.
+Once the CSV was supplied, SAS exposed a second issue: both joined top-hit
+tables contained `hit_order`, and the dynamically exported column list used
+an unqualified `hit_order`. Qualify extra columns with the top-hit table alias
+and exclude fields already selected in the export. Check the SAS log after
+each fix, since removing an early error can reveal a later one.
+The corrected Anemia rerun selected two candidates, completed the SAS local
+Manhattan step with zero `ERROR` lines, and downloaded the PNG, HTML, hit CSV,
+and LD audit.
+
 `EUR_plus_EAS.assoc.txt` now yields `EUR+EAS` labels. A comparison between
 EAS and EUR+EAS may reuse the same participants, so an independent-study
 `rho=0` assumption and a pooled meta-analysis require scientific review.

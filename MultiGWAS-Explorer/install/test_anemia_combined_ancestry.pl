@@ -33,6 +33,8 @@ is(system($^X, $driver, '--spec', $default_spec_path,
     '--step', 'plot_manhattan', '--list-steps'), 0,
     'default no-meta spec builds plot configuration');
 my $default_runner = read_json("$dir/default_configs/auto_$default_spec->{artifact_stem}_runner.json");
+is($default_runner->{TOP_HIT_MAF_THRESHOLD}, 0,
+    'unknown GWAS MAF does not silently exclude every automatic top hit');
 unlike($default_runner->{DISPLAY_GWAS}, qr/(?:^|,)\w*_?META(?:,|$)/,
     'default separate-input display does not contain a computed Meta track');
 my $spec_path = "$dir/anemia.spec.json";

@@ -216,10 +216,11 @@ merged input table instead of recycling derived files.
 
 ## Top-Hit MAF Safeguard
 
-Top common or differential SNP selection now applies a minor-allele-frequency
+Top common or differential SNP selection supports an optional minor-allele-frequency
 safeguard before the local Manhattan and local GTF plotting stages:
 
-- default rule: keep only top-hit candidates with `MAF > 0.01`
+- default rule: do not filter top-hit candidates by MAF when no cutoff was
+  requested; studies without frequency data otherwise lose every candidate
 - first choice: use the matching GWAS frequency columns already carried through
   the standardized and wide differential tables, such as
   `*_GROUP1_FRQ_A`, `*_GROUP1_FRQ_U`, `*_GROUP2_FRQ_A`, and
@@ -228,10 +229,12 @@ safeguard before the local Manhattan and local GTF plotting stages:
   gnomAD lookup table provided through:
   - spec key `gnomad_freq_file`
   - spec key `gnomad_population_map`
-- conservative edge case: if both GWAS frequencies and a configured gnomAD
-  lookup are unavailable for a candidate, the selector marks it
-  `maf_source=UNKNOWN` and filters it out at the default safeguard threshold
-- override: change the cutoff through spec key `top_hit_maf_threshold`
+- if both GWAS frequencies and a configured gnomAD lookup are unavailable,
+  the selector marks `maf_source=UNKNOWN` and retains the candidate at the
+  default zero cutoff
+- optional safeguard: set `top_hit_maf_threshold` to `0.01` (or another
+  justified cutoff) in the spec; with a positive cutoff, unknown-MAF
+  candidates are filtered
 
 The SAS ODA local-top-hit wrappers now generate the requested top-hit CSV
 locally with `DiffGWASDeps/generate_requested_top_hits_csv.pl` before the SAS
