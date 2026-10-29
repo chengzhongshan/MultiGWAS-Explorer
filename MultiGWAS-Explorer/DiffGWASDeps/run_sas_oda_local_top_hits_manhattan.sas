@@ -757,8 +757,11 @@ quit;
 
 /* Render SNP, gene, and chromosome as adjacent vertical group labels. */
 data top_hit4diffp;
-  set top_hit4diffp;
-  length chr_label $8;
+  /* PROC IMPORT can infer a short SNP/gene label width. Rename the imported
+     value so the final SNP:gene:chr label gets a fresh 128-character field. */
+  length snp_gene $128 chr_label $8;
+  set top_hit4diffp(rename=(snp_gene=_imported_snp_gene));
+  drop _imported_snp_gene;
   if CHR=23 then chr_label='chrX';
   else if CHR=24 then chr_label='chrY';
   else chr_label=cats('chr',strip(put(CHR,best32.)));

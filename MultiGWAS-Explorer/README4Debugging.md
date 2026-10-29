@@ -121,6 +121,13 @@ each fix, since removing an early error can reveal a later one.
 The corrected Anemia rerun selected two candidates, completed the SAS local
 Manhattan step with zero `ERROR` lines, and downloaded the PNG, HTML, hit CSV,
 and LD audit.
+Visual review found that the longer `rsID:gene:chr` label was blank even though
+the hit was present. SAS had inferred `snp_gene` from the shorter imported CSV
+value; `CATX` returned blank when the longer label exceeded that width. Declare
+`snp_gene $128` before the `SET` statement and rename the imported
+`snp_gene` during `SET`; simply enlarging a variable with the same name did
+not preserve the `:chr` suffix. Verify labels in both the downloaded CSV and
+PNG.
 
 `EUR_plus_EAS.assoc.txt` now yields `EUR+EAS` labels. A comparison between
 EAS and EUR+EAS may reuse the same participants, so an independent-study
