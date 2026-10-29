@@ -43,6 +43,7 @@ use GenomeBuildProfile qw(
   canonicalize_reference_build
   detect_reference_build_profile
 );
+use StudyDesignFilters qw(cross_ancestry_filter_advisory);
 
 BEGIN {
     my $old = select STDERR;
@@ -68,6 +69,7 @@ my $to_step = '';
 my $list_steps = 0;
 my $print_spec_example = 0;
 my $print_columns_help = 0;
+my $help = 0;
 my $generate_spec_only = 0;
 my $preview_spec = 0;
 my $project_tag_override = '';
@@ -205,6 +207,7 @@ GetOptions(
     'list-steps!'         => \$list_steps,
     'print-spec-example!' => \$print_spec_example,
     'print-columns-help!' => \$print_columns_help,
+    'help!' => \$help,
     'generate-spec-only!' => \$generate_spec_only,
     'preview-spec!'       => \$preview_spec,
     'project-tag=s'       => \$project_tag_override,
@@ -304,6 +307,11 @@ GetOptions(
     'cleanup-shared-plot-data!' => \$step_flag{cleanup_shared_plot_data},
 ) or die usage();
 
+if ($help) {
+    print usage();
+    exit 0;
+}
+
 $force_requested = $force;
 die "--step-heartbeat-seconds must be zero or a positive integer\n"
     if $step_heartbeat_seconds < 0;
@@ -369,7 +377,8 @@ die "--max-eaf-abs-diff must be a number between 0 and 1, or none\n"
 die "--input-merged cannot be combined with --spec or --gwas-dir\n"
     if length($input_merged) && (length($spec_file) || length($gwas_dir));
 
-if (!length $spec_file && (length $gwas_dir || length $input_merged)) {
+my $generated_spec_input = !length($spec_file) && (length($gwas_dir) || length($input_merged));
+if ($generated_spec_input) {
     my $draft_spec;my $draft_path;
     if (length $input_merged) {
         my $local_input = cygpath_to_win($input_merged);
@@ -414,6 +423,11 @@ if (!length $spec_file && (length $gwas_dir || length $input_merged)) {
         if defined $exclude_strand_ambiguous_override;
     $draft_spec->{max_eaf_abs_diff} = lc($max_eaf_abs_diff_override) eq 'none' ? '' : $max_eaf_abs_diff_override
         if defined $max_eaf_abs_diff_override;
+    if (my $advisory = cross_ancestry_filter_advisory($draft_spec)) {
+        $draft_spec->{auto_detect_summary}{warnings} ||= [];
+        push @{ $draft_spec->{auto_detect_summary}{warnings} }, $advisory;
+        print STDERR "[science] $advisory\n";
+    }
     $draft_spec->{local_gtf_window_bp} = $local_gtf_window_bp_override
         if length $local_gtf_window_bp_override;
     $draft_spec->{exclude_local_gtf_tracks} = $exclude_local_gtf_tracks_override
@@ -442,6 +456,9 @@ $spec->{exclude_strand_ambiguous} = $exclude_strand_ambiguous_override ? 1 : 0
     if defined $exclude_strand_ambiguous_override;
 $spec->{max_eaf_abs_diff} = lc($max_eaf_abs_diff_override) eq 'none' ? '' : $max_eaf_abs_diff_override
     if defined $max_eaf_abs_diff_override;
+if (!$generated_spec_input && (my $advisory = cross_ancestry_filter_advisory($spec))) {
+    print STDERR "[science] $advisory\n";
+}
 $manhattan_all_snps = defined($manhattan_all_snps)
     ? ($manhattan_all_snps ? 1 : 0)
     : (cfg_or($spec, 'manhattan_all_snps', 0) ? 1 : 0);
@@ -5240,11 +5257,22 @@ Options:
                        only when cohorts do not overlap, or supply a justified rho.
                        Supplied meta tracks in merged input remain available.
   --[no-]exclude-strand-ambiguous
-                       Default: exclude A/T and C/G pairs. Disable only after
-                       verifying effect-allele orientation across input studies.
+                       Default: exclude A/T and C/G pairs with uncertain strand.
+                       This can remove real hits; inspect exclusion counts.
+                       Disable only after independent allele-orientation checks.
   --max-eaf-abs-diff N|none
-                       Default: none. Frequency differences between ancestries
-                       can be real; request a limit only for justified QC.
+                       Difference in effect-allele frequency across paired GWASs.
+                       Default: none. A positive limit may remove real
+                       ancestry-enriched SNPs; use only for justified QC after
+                       harmonizing effect alleles and checking frequency sources.
+  Spec key top_hit_maf_threshold
+                       Default: 0; no top-hit MAF filter, unknown MAF retained.
+                       Positive cutoffs exclude unknown MAF and can remove
+                       population-specific signals with low MAF in one group.
+                       The schizophrenia female/male demo uses 0.01 within EUR;
+                       that threshold is not a cross-ancestry default.
+                       A SNP missing from either group cannot form a paired
+                       differential result even with these filters off.
   --exclude-manhattan-tracks LIST  Remove comma-separated genomewide scatter tracks.
   --exclude-manhattan-track-regex PATTERN
                         Remove genomewide tracks matching a Perl regular expression.
@@ -5503,6 +5531,7 @@ Options:
   --artifact-stem TEXT  Optional override for inferred artifact_stem during auto-spec generation
   --print-spec-example  Print a full JSON spec example and exit
   --print-columns-help  Print required-column help and exit
+  --help                Print options and their scientific filter guidance
 
 The spec can describe:
   - raw_pgc_vcf_sumstats    : merge raw group files, sort, diff, standardize, extract, plot

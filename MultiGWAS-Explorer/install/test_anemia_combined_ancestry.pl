@@ -8,6 +8,8 @@ use IO::Compress::Gzip qw(gzip $GzipError);
 use IO::Uncompress::Gunzip qw(gunzip $GunzipError);
 use JSON::PP qw(decode_json encode_json);
 use Test::More;
+use lib "$Bin/../DiffGWASDeps";
+use StudyDesignFilters qw(cross_ancestry_filter_advisory);
 
 my $dir = tempdir('multigwas anemia XXXXX', TMPDIR => 1, CLEANUP => 1);
 for my $name ('SAA_EAS', 'SAA_EUR_plus_EAS') {
@@ -25,6 +27,9 @@ is(system($^X, $driver, '--gwas-dir', $dir, '--spec-out', $default_spec_path,
 my $default_spec = read_json($default_spec_path);
 is($default_spec->{compute_meta}, 0, 'computed meta-analysis is off by default');
 is($default_spec->{max_eaf_abs_diff}, '', 'frequency-discordance filtering is off by default');
+like(join(' ', @{ $default_spec->{auto_detect_summary}{warnings} || [] }),
+    qr/Cross-ancestry comparison.*max_eaf_abs_diff=none.*top_hit_maf_threshold=0.*population-specific/i,
+    'inferred cross-ancestry spec warns about both default filters and real population-specific signals');
 $default_spec->{configs_dir} = "$dir/default_configs";
 open my $default_out, '>', $default_spec_path or die $!;
 print {$default_out} encode_json($default_spec);
@@ -54,6 +59,14 @@ is($spec->{pairs}[0]{prefix}, 'EAS_EUR_PLUS_EAS', 'comparison prefix is safe for
 is($spec->{groups}[1]{tag}, 'GWAS_EUR_PLUS_EAS', 'combined ancestry gets a distinct group tag');
 like(join(' ', @{ $spec->{auto_detect_summary}{warnings} || [] }), qr/overlapping samples|double count/i,
     'overlapping cohort comparison has a scientific warning');
+my $sex_spec = { pairs => [{ group1_label => 'EUR_FEMALE', group2_label => 'EUR_MALE' }] };
+is(cross_ancestry_filter_advisory($sex_spec), '',
+    'female versus male within EUR is not mislabeled cross-ancestry');
+$sex_spec->{pairs}[0]{group2_label} = 'EAS_MALE';
+$sex_spec->{max_eaf_abs_diff} = 0.2;
+$sex_spec->{top_hit_maf_threshold} = 0.01;
+like(cross_ancestry_filter_advisory($sex_spec), qr/max_eaf_abs_diff=0\.2.*top_hit_maf_threshold=0\.01/,
+    'explicit cutoffs in cross-ancestry comparison appear in the advisory');
 $spec->{configs_dir} = "$dir/configs";
 open my $spec_out, '>', $spec_path or die $!;
 print {$spec_out} encode_json($spec);

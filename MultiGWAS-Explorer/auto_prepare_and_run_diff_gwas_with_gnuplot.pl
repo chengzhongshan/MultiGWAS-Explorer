@@ -37,6 +37,7 @@ use Time::HiRes qw(time);
 use IO::Uncompress::Gunzip qw($GunzipError);
 use lib File::Spec->catdir($Bin, 'DiffGWASDeps');
 use ChromosomeBounds qw(locus_window);
+use StudyDesignFilters qw(cross_ancestry_filter_advisory);
 
 sub usage {
     return <<"USAGE";
@@ -64,10 +65,20 @@ Options:
                                 Default: autosomes only.
   --[no-]compute-meta           Calculated meta-analysis is OFF by default;
                                 enable only for independent or covariance-modeled cohorts.
+                                EAS versus EUR+EAS overlaps; justify rho first.
   --[no-]exclude-strand-ambiguous
-                                Default: exclude A/T and C/G; opt in only after
-                                verifying allele orientation across inputs.
-  --max-eaf-abs-diff N|none     Default: none; ancestry differences need not be errors.
+                                Default: exclude A/T and C/G with uncertain strand;
+                                inspect losses. Disable only after allele checks.
+  --max-eaf-abs-diff N|none     Paired-GWAS effect-allele frequency difference.
+                                Default: none. A positive limit may remove real
+                                ancestry-enriched SNPs; harmonize alleles first.
+  Spec key top_hit_maf_threshold
+                                Default: 0; unknown-MAF top hits retained.
+                                Positive cutoffs exclude unknown MAF and may
+                                remove signals rare in one ancestry. The 0.01
+                                EUR female/male demo cutoff is study-specific.
+                                Missing-in-one-group SNPs cannot yield a paired
+                                differential result even with filters off.
   --step NAME                   Render only this plot stage; repeat for several:
                                 plot_manhattan, plot_local_manhattan,
                                 plot_local_gtf, or plot_forest.
@@ -389,6 +400,15 @@ die "No gnuplot plot steps were requested.\n" unless grep { $requested{$_} } qw(
 my $spec = load_json($spec_file);
 $spec->{compute_meta} = $compute_meta_override ? 1 : 0
     if defined $compute_meta_override;
+if (!length($input_merged) && !length($gwas_dir)) {
+    $spec->{exclude_strand_ambiguous} = $exclude_strand_ambiguous_override ? 1 : 0
+        if defined $exclude_strand_ambiguous_override;
+    $spec->{max_eaf_abs_diff} = lc($max_eaf_abs_diff_override) eq 'none' ? '' : $max_eaf_abs_diff_override
+        if defined $max_eaf_abs_diff_override;
+    if (my $advisory = cross_ancestry_filter_advisory($spec)) {
+        print STDERR "[science] $advisory\n";
+    }
+}
 my $explicit_target_local_only = length(trim(
     $target_snps_override || $spec->{target_snps} || ''
 ))
