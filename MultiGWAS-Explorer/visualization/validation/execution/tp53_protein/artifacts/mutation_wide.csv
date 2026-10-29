@@ -1,0 +1,7 @@
+marker,chr,pos,p_BRCA,p_LUAD,present_BRCA,present_LUAD,se_BRCA,se_LUAD
+R175H,1,175,0.5,0.5,1,1,,
+R248Q,1,248,0.5,,1,,,
+R273H,1,273,0.5,0.5,1,1,,
+R342Ter,1,342,0.5,0.5,1,1,,
+W53Ter,1,53,,0.5,,1,,
+Y220C,1,220,0.5,0.5,1,1,,

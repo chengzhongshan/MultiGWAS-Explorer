@@ -1,0 +1,17 @@
+name: SAS visualization evidence
+on:
+  push:
+    paths: ['MultiGWAS-Explorer/visualization/**', '.github/workflows/sas_visualizations.yml']
+  pull_request:
+    paths: ['MultiGWAS-Explorer/visualization/**', '.github/workflows/sas_visualizations.yml']
+permissions:
+  contents: read
+jobs:
+  archived-evidence:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y libwww-perl libtext-csv-perl libxml-libxml-perl
+      - name: Validate pinned sources and recorded scientific results
+        working-directory: MultiGWAS-Explorer/visualization
+        run: perl tests/validate_visualization.pl

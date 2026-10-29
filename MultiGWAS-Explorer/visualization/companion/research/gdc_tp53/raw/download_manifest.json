@@ -1,0 +1,95 @@
+{
+   "files" : [
+      {
+         "bytes" : 221,
+         "file" : "gdc_status.json",
+         "http_status" : 200,
+         "method" : "GET",
+         "retrieved_utc" : "2026-10-23T17:56:55Z",
+         "sha256" : "a8b1c69f9cfc678486e1c897aee6d878f47fab9cb4c60eb6818598bbe30a7139",
+         "url" : "https://api.gdc.cancer.gov/status"
+      },
+      {
+         "bytes" : 1268,
+         "file" : "tp53_gene.json",
+         "http_status" : 200,
+         "method" : "GET",
+         "retrieved_utc" : "2026-10-23T17:56:55Z",
+         "sha256" : "4f647d2e2d29c36279600fca8ae0cff4765c905a522f597d418dd4d583abd264",
+         "url" : "https://api.gdc.cancer.gov/genes/ENSG00000141510"
+      },
+      {
+         "bytes" : 1413899,
+         "file" : "TCGA-BRCA_ssms.json",
+         "http_status" : 200,
+         "method" : "POST",
+         "retrieved_utc" : "2026-10-23T17:56:59Z",
+         "sha256" : "16aca90be7411d956aa8a50e41b98f139f3d44e1fa29721c00bde9a715878003",
+         "url" : "https://api.gdc.cancer.gov/ssms"
+      },
+      {
+         "bytes" : 1397699,
+         "file" : "TCGA-LUAD_ssms.json",
+         "http_status" : 200,
+         "method" : "POST",
+         "retrieved_utc" : "2026-10-23T17:57:24Z",
+         "sha256" : "2befd7eb6295fcb50093f4c9cf5b8b2eb1a2e4a679e013eed36c2366eac36d8e",
+         "url" : "https://api.gdc.cancer.gov/ssms"
+      },
+      {
+         "bytes" : 137,
+         "file" : "TCGA-NO-SUCH-PROJECT_ssms.json",
+         "http_status" : 200,
+         "method" : "POST",
+         "retrieved_utc" : "2026-10-23T17:57:45Z",
+         "sha256" : "96caad2dfe69407a7aac4a351175c103923988083df313cf74507550742ce162",
+         "url" : "https://api.gdc.cancer.gov/ssms"
+      },
+      {
+         "bytes" : 112841,
+         "file" : "tp53_exons.json",
+         "http_status" : 200,
+         "method" : "GET",
+         "retrieved_utc" : "2026-10-23T17:57:47Z",
+         "sha256" : "68b5273aabf0586a928d25ebe85e29b8a95c5b901f56ca36a26f09890eb57d88",
+         "url" : "https://rest.ensembl.org/overlap/id/ENST00000269305?feature=exon;content-type=application/json"
+      },
+      {
+         "bytes" : 89415,
+         "file" : "tp53_cds.json",
+         "http_status" : 200,
+         "method" : "GET",
+         "retrieved_utc" : "2026-10-23T17:57:49Z",
+         "sha256" : "a5d9cbb1d71d6bf947065fd31c45fa563101b6dd8d3c6e9fdef8fb79f3ea4737",
+         "url" : "https://rest.ensembl.org/overlap/id/ENST00000269305?feature=cds;content-type=application/json"
+      },
+      {
+         "bytes" : 19175,
+         "file" : "tp53_reference.json",
+         "http_status" : 200,
+         "method" : "GET",
+         "retrieved_utc" : "2026-10-23T17:57:50Z",
+         "sha256" : "78713e97ea8fd8ead501e79f010ce76e3caa0ddc9dcfb6062bc2416facd0f172",
+         "url" : "https://rest.ensembl.org/sequence/region/human/17:7668421..7687490:1?content-type=application/json"
+      },
+      {
+         "bytes" : 18,
+         "file" : "ensembl_info.json",
+         "http_status" : 200,
+         "method" : "GET",
+         "retrieved_utc" : "2026-10-23T17:57:50Z",
+         "sha256" : "86e87c46ae1a424702676493d024d0508ce60f6c951b0b2803ce10269e09c20c",
+         "url" : "https://rest.ensembl.org/info/data?content-type=application/json"
+      },
+      {
+         "bytes" : 874741,
+         "file" : "tp53_uniprot.json",
+         "http_status" : 200,
+         "method" : "GET",
+         "retrieved_utc" : "2026-10-23T17:57:53Z",
+         "sha256" : "6bdb471fae5b0d4c92a1e2fd63f35b49e3826188e82ff54fcddec70c4e63e114",
+         "url" : "https://rest.uniprot.org/uniprotkb/P04637.json"
+      }
+   ],
+   "scope" : "Public somatic variant analysis API and public reference annotations. No controlled data, participant-level genotypes or full MAF downloaded. Snapshot queries and all response bytes retained."
+}

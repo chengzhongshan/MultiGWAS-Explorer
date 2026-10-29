@@ -1,0 +1,14 @@
+sample,sample_index,cohort,gene,gene_index,callable,n_variants,truncating,splice,inframe,missense,n_callable,n_mutated,pct_mutated,count_label,variant_id,mutation_class,event_order,event_class,event_x,glyph_height,glyph_low,glyph_high,burden_x,n_events,burden_zero,background_class,tile_y,freq_y,zero,label_x,cohort_x,strip_y
+C1,1,ArmA,GENE1,1,1,2,1,0,0,1,,,,,,,,,,,,,,,,No variant detected,1,,,,,
+C1,1,ArmA,GENE2,2,0,0,0,0,0,0,,,,,,,,,,,,,,,,Not assessable,2,,,,,
+C2,2,ArmB,GENE1,1,1,1,0,1,0,0,,,,,,,,,,,,,,,,No variant detected,1,,,,,
+C2,2,ArmB,GENE2,2,,0,0,0,0,0,,,,,,,,,,,,,,,,Not assessable,2,,,,,
+,,,GENE1,1,,,,,,,2,2,100,2/2,,,,,,,,,,,,,,1,0,103,,
+,,,GENE2,2,,,,,,,0,0,,0/0,,,,,,,,,,,,,,2,0,3,,
+C1,1,ArmA,,,,,,,,,,,,,,,,,,,,,,,,,,,,,1,1
+C2,2,ArmB,,,,,,,,,,,,,,,,,,,,,,,,,,,,,2,1
+C1,1,,GENE1,1,,2,,,,,,,,,e1,Missense,1,Missense,1,0.4,0.62,0.98,,,,,,,,,,
+C1,1,,GENE1,1,,2,,,,,,,,,e2,Truncating,2,Truncating,1,0.4,1.02,1.38,,,,,,,,,,
+C2,2,,GENE1,1,,1,,,,,,,,,e3,Splice,1,Splice,2,0.8,0.64,1.36,,,,,,,,,,
+C1,,ArmA,,,,,,,,,,,,,,,,,,,,,1,2,0,,,,,,,
+C2,,ArmB,,,,,,,,,,,,,,,,,,,,,2,1,0,,,,,,,

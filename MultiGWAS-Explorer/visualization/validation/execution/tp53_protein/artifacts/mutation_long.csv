@@ -1,0 +1,11 @@
+marker,panel,mutation_type,chr,pos,present,se,p
+W53Ter,LUAD,Nonsense,1,53,1,,0.5
+R175H,BRCA,Missense,1,175,1,,0.5
+R175H,LUAD,Missense,1,175,1,,0.5
+Y220C,BRCA,Missense,1,220,1,,0.5
+Y220C,LUAD,Missense,1,220,1,,0.5
+R248Q,BRCA,Missense,1,248,1,,0.5
+R273H,BRCA,Missense,1,273,1,,0.5
+R273H,LUAD,Missense,1,273,1,,0.5
+R342Ter,BRCA,Nonsense,1,342,1,,0.5
+R342Ter,LUAD,Nonsense,1,342,1,,0.5

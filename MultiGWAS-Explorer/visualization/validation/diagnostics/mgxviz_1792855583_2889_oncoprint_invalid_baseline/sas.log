@@ -1,0 +1,1020 @@
+
+=== Submitted SAS Codes or file ===
+<NEW_BOOK>/.audit-local/phase3/runtime/tmpTFFiUX/input.sas
+
+
+=== Output Directory ===
+<NEW_BOOK>/.audit-local/phase3/runtime/SAS_Output_MCP4SAS_xcql7n
+
+=== Dependency Logs ===
+Injected targeted remote macro loader for: to
+Global importallmacros_ue bootstrap disabled via SAS_ODA_AUTOLOAD_MACROS=0 for this submit.
+
+=== Macro Bootstrap Diagnostics ===
+Bootstrap Warning: 0
+
+=== Include Preflight ===
+Target: &template_file
+Could not access a local copy for preflight analysis.
+
+=== Status Snapshot ===
+state: running
+phase: submit_returned
+message: SAS submit returned to the wrapper
+last_update: 2026-10-24 10:27:06
+
+=== Error ===
+SAS log contains fatal errors: ERROR: MGX_ONCOPRINT cannot open input work.absent
+
+=== SAS Log ===
+5                                                          The SAS System                     Saturday, October 24, 2026 03:27:00 PM
+
+24         ods listing close;ods html5 (id=saspy_internal) file=_tomods1 options(bitmap_mode='inline') device=svg style=HTMLBlue;
+24       ! ods graphics on / outputfmt=png;
+25         
+26         %let _home=%sysfunc(pathname(HOME));
+27         %let _macro_home=%sysfunc(pathname(HOME))/Macros;
+28         
+29         %macro _pipeline_load_macro_tmp;
+30         %let _pipeline_targeted_macro_path=;
+31         
+32         %if %sysfunc(fileexist("&_home/to.sas")) %then %do;
+33             %let _pipeline_targeted_macro_path=&_home/to.sas;
+34         %end;
+35         
+36         %if %length(&_pipeline_targeted_macro_path)=0 %then %do;
+37             %if %sysfunc(fileexist("&_macro_home/to.sas")) %then %let _pipeline_targeted_macro_path=&_macro_home/to.sas;
+38         %end;
+39         %if %length(&_pipeline_targeted_macro_path) > 0 %then %do;
+40             %include "&_pipeline_targeted_macro_path";
+41         %end;
+42         %mend;
+43         %_pipeline_load_macro_tmp;
+44         
+45         options dlcreatedir notes source nodate nonumber;
+46         libname bookout "~/mgxviz_1792855583_2889";
+NOTE: Library BOOKOUT was created.
+NOTE: Libref BOOKOUT was successfully assigned as follows: 
+      Engine:        V9 
+      Physical Name: <SAS_HOME>/mgxviz_1792855583_2889
+47         libname bookout clear;
+NOTE: Libref BOOKOUT has been deassigned.
+48         %let BOOK_OUT=%sysget(HOME)/mgxviz_1792855583_2889;
+49         %let P2_OUT=%sysget(HOME)/mgxviz_1792855583_2889;
+50         %let P3_OUT=%sysget(HOME)/mgxviz_1792855583_2889;
+51         %let AF_OUT=%sysget(HOME)/mgxviz_1792855583_2889;
+52         %let AF_REMOTE=mgxviz_1792855583_2889;
+53         
+54         /* Zhongshan Cheng. Reusable form of the book's event-glyph oncoprint.
+55            GPL-3.0. Fixed input schema is documented beside the example.
+56            Temporary WORK._MGXO_* tables are reserved; caller inputs are never replaced. */
+57         %macro MGXOncoPrint(samples=,genes=,callability=,variants=,
+58          outlib=work,prefix=mgx_onco,outdir=,image=oncoprint,
+59          width=7.6,height=5.4,dpi=450,template_file=);
+60         %local i ds did rc field col type bad ns ng maxburden sample_ticks gene_ticks;
+61         %local bad_samples bad_genes bad_call_keys bad_calls bad_events bad_event_classes uncallable_events;
+62         %global MGX_ONCOPRINT_RC;
+63         %let MGX_ONCOPRINT_RC=1;
+64         %if %length(%superq(prefix))=0 or %length(%superq(prefix))>20 %then %do;
+65          %put ERROR: MGX_ONCOPRINT prefix must be a V7 name of at most 20 characters.;%return;
+66         %end;
+67         %if not %sysfunc(nvalid(%superq(prefix),v7)) or not %sysfunc(nvalid(%superq(image),v7)) %then %do;
+68          %put ERROR: MGX_ONCOPRINT prefix and image must be V7 names.;%return;
+69         %end;
+70         %if %sysfunc(libref(&outlib)) ne 0 %then %do;
+71          %put ERROR: MGX_ONCOPRINT outlib is not assigned.;%return;
+72         %end;
+73         %if %length(%superq(outdir))=0 %then %let outdir=%sysfunc(pathname(work));
+74         %if %length(%superq(template_file))=0 %then %do;
+75          %put ERROR: MGX_ONCOPRINT template_file is required.;%return;
+76         %end;
+77         %let template_file=%sysfunc(dequote(%superq(template_file)));
+78         data _null_;
+79          length p $2048;p=symget('template_file');
+80          if substr(p,1,2)='~/' then p=cats(sysget('HOME'),substr(p,2));
+81          call symputx('template_file',p,'L');
+82         run;
+83         %if not %sysfunc(fileexist(%superq(template_file))) %then %do;
+84          %put ERROR: MGX_ONCOPRINT cannot read template_file.;%return;
+85         %end;
+86         %if %sysevalf(&width<=0 or &height<=0 or &dpi<=0) %then %do;
+87          %put ERROR: MGX_ONCOPRINT width height and dpi must be positive.;%return;
+88         %end;
+89         /* Check required column types before any SQL query uses them. */
+90         %do i=1 %to 4;
+91          %if &i=1 %then %let ds=&samples;
+92          %else %if &i=2 %then %let ds=&genes;
+93          %else %if &i=3 %then %let ds=&callability;
+94          %else %let ds=&variants;
+95          %if %length(%superq(ds))=0 %then %do;
+96           %put ERROR: MGX_ONCOPRINT all four input datasets are required.;%return;
+97          %end;
+98          %let did=%sysfunc(open(&ds,i));
+99          %if &did=0 %then %do;
+100          %put ERROR: MGX_ONCOPRINT cannot open input &ds.;%return;
+101         %end;
+102         %if &i=1 %then %let field=sample:C sample_index:N cohort:C;
+103         %else %if &i=2 %then %let field=gene:C gene_index:N;
+104         %else %if &i=3 %then %let field=sample:C gene_index:N callable:N;
+105         %else %let field=sample:C gene:C variant_id:C mutation_class:C;
+106         %let bad=0;
+107         %do rc=1 %to %sysfunc(countw(%superq(field),%str( )));
+108          %let col=%scan(%scan(%superq(field),&rc,%str( )),1,:);
+109          %let type=%scan(%scan(%superq(field),&rc,%str( )),2,:);
+110          %let ds=%sysfunc(varnum(&did,&col));
+111          %if &ds=0 %then %let bad=1;
+112          %else %if %sysfunc(vartype(&did,&ds)) ne &type %then %let bad=1;
+113         %end;
+114         %let rc=%sysfunc(close(&did));
+115         %if &bad %then %do;
+116          %put ERROR: MGX_ONCOPRINT required input column missing or wrong type.;%return;
+117         %end;
+118        %end;
+119        data work._mgxo_samples;set &samples;keep sample sample_index cohort;run;
+120        data work._mgxo_genes;set &genes;keep gene gene_index;run;
+121        data work._mgxo_callability;set &callability;keep sample gene_index callable;run;
+122        data work._mgxo_variants;set &variants;keep sample gene variant_id mutation_class;run;
+123        proc sql noprint;
+124         select count(*) into :ns trimmed from work._mgxo_samples;
+125         select count(*) into :ng trimmed from work._mgxo_genes;
+126         select count(*)-count(distinct sample)+sum(missing(sample) or missing(cohort))
+127          +count(*)-count(distinct sample_index)
+128          +sum(sample_index ne int(sample_index) or sample_index<1 or sample_index>&ns)
+129         into :bad_samples trimmed from work._mgxo_samples;
+130         select count(*)-count(distinct gene)+sum(missing(gene))
+131          +count(*)-count(distinct gene_index)
+132          +sum(gene_index ne int(gene_index) or gene_index<1 or gene_index>&ng)
+133         into :bad_genes trimmed from work._mgxo_genes;
+134         create table work._mgxo_bad_keys as select sample,gene_index,count(*) as n
+135          from work._mgxo_callability group by sample,gene_index having calculated n>1;
+136         select count(*) into :bad_call_keys trimmed from work._mgxo_bad_keys;
+137         select count(*) into :bad_calls trimmed from work._mgxo_callability as c
+138          left join work._mgxo_samples as s on c.sample=s.sample
+139          left join work._mgxo_genes as g on c.gene_index=g.gene_index
+140          where missing(s.sample) or missing(g.gene) or c.callable not in (0,1);
+141         select count(*) into :bad_events trimmed from work._mgxo_variants as v
+142          left join work._mgxo_samples as s on v.sample=s.sample
+143          left join work._mgxo_genes as g on v.gene=g.gene
+144          where missing(s.sample) or missing(g.gene) or missing(v.variant_id)
+145          or v.mutation_class not in ('Missense','Truncating','Splice','Inframe');
+146         create table work._mgxo_conflicts as select sample,gene,variant_id,
+147          count(distinct mutation_class) as n_classes from work._mgxo_variants
+148          group by sample,gene,variant_id having calculated n_classes>1;
+149         select count(*) into :bad_event_classes trimmed from work._mgxo_conflicts;
+150         select count(*) into :uncallable_events trimmed from work._mgxo_variants as v
+151          left join work._mgxo_genes as g on v.gene=g.gene
+152          left join work._mgxo_callability as c on v.sample=c.sample and g.gene_index=c.gene_index
+153          where missing(c.callable) or c.callable ne 1;
+154        quit;
+155        %if %sysevalf(&ns=0 or &ng=0 or &bad_samples>0 or &bad_genes>0 or &bad_call_keys>0 or &bad_calls>0 or &bad_events>0 or
+155      ! &bad_event_classes>0 or &uncallable_events>0,boolean) %then %do;
+156         %put ERROR: MGX_ONCOPRINT invalid keys indices callability event identities or mutation classes.;
+157         %return;
+158        %end;
+159        proc sort data=work._mgxo_variants out=work._mgxo_unique nodupkey;
+160         by sample gene variant_id mutation_class;run;
+161        proc sql;
+162         create table work._mgxo_counts as select sample,gene,count(*) as n_variants,
+163          max(mutation_class='Truncating') as truncating,max(mutation_class='Splice') as splice,
+164          max(mutation_class='Inframe') as inframe,max(mutation_class='Missense') as missense
+165          from work._mgxo_unique group by sample,gene;
+166         create table &outlib..&prefix._tiles as
+167         select s.sample,s.sample_index,s.cohort,g.gene,g.gene_index,c.callable,
+168          coalesce(m.n_variants,0) as n_variants,coalesce(m.truncating,0) as truncating,
+169          coalesce(m.splice,0) as splice,coalesce(m.inframe,0) as inframe,coalesce(m.missense,0) as missense
+170         from work._mgxo_samples as s cross join work._mgxo_genes as g
+171         left join work._mgxo_callability as c on s.sample=c.sample and g.gene_index=c.gene_index
+172         left join work._mgxo_counts as m on s.sample=m.sample and g.gene=m.gene;
+173         create table &outlib..&prefix._frequency as select gene,gene_index,
+174          sum(callable=1) as n_callable,sum(callable=1 and n_variants>0) as n_mutated,
+175          case when calculated n_callable>0 then 100*calculated n_mutated/calculated n_callable else . end as pct_mutated
+176         from &outlib..&prefix._tiles group by gene,gene_index;
+177         create table work._mgxo_events as select v.*,s.sample_index,g.gene_index,t.n_variants
+178         from work._mgxo_unique as v inner join work._mgxo_samples as s on v.sample=s.sample
+179         inner join work._mgxo_genes as g on v.gene=g.gene
+180         inner join &outlib..&prefix._tiles as t on v.sample=t.sample and v.gene=t.gene;
+181         create table &outlib..&prefix._burden as select s.sample,s.sample_index as burden_x,
+182          count(v.variant_id) as n_events,0 as burden_zero from work._mgxo_samples as s
+183         left join work._mgxo_unique as v on s.sample=v.sample group by s.sample,s.sample_index;
+184         select max(1,coalesce(max(n_events),0)) into :maxburden trimmed from &outlib..&prefix._burden;
+185         create table work._mgxo_cohorts as select distinct cohort from work._mgxo_samples order by cohort;
+186         select sample_index into :sample_ticks separated by ' ' from work._mgxo_samples order by sample_index;
+187         select gene_index into :gene_ticks separated by ' ' from work._mgxo_genes order by gene_index;
+188        quit;
+189        data &outlib..&prefix._frequency;set &outlib..&prefix._frequency;
+190         length count_label $32;count_label=cats(n_mutated,'/',n_callable);run;
+191        proc sort data=work._mgxo_events;by sample gene variant_id;run;
+192        data &outlib..&prefix._glyphs;
+193         set work._mgxo_events;by sample gene;retain event_order;length event_class $24;
+194         if first.gene then event_order=0;event_order+1;
+195         event_x=sample_index;event_class=mutation_class;glyph_height=.8/n_variants;
+196         glyph_low=gene_index-.4+(event_order-1)*glyph_height+.05*glyph_height;
+197         glyph_high=glyph_low+.9*glyph_height;
+198        run;
+199        data &outlib..&prefix._render;
+200         set &outlib..&prefix._tiles(in=grid) &outlib..&prefix._frequency(in=bar)
+201             work._mgxo_samples(in=annotation) &outlib..&prefix._glyphs &outlib..&prefix._burden;
+202         length background_class $24;
+203         if grid then do;tile_y=gene_index;
+204          if callable=1 then background_class='No variant detected';else background_class='Not assessable';end;
+205         if bar then do;freq_y=gene_index;zero=0;label_x=pct_mutated+3;end;
+206         if annotation then do;cohort_x=sample_index;strip_y=1;end;
+207        run;
+208        /* CNTLIN preserves arbitrary labels without constructing quoted SAS source. */
+209        data work._mgxo_formats;
+210         length fmtname $32 type $1 label $256;type='N';
+211         set work._mgxo_samples(in=s) work._mgxo_genes(in=g);
+212         if s then do;fmtname='mgxsample';start=sample_index;label=sample;end;
+213         if g then do;fmtname='mgxgene';start=gene_index;label=gene;end;keep fmtname type start label;
+214        run;
+215        proc format cntlin=work._mgxo_formats;run;
+216        data _null_;
+217         set work._mgxo_cohorts end=last;
+218         file "&outdir/&prefix._cohorts.sas" lrecl=32767;
+219         length color $8 quoted $300;
+220         array colors[8] $8 _temporary_ ('CX006B8C' 'CXADB5BD' 'CX009E73' 'CXCC79A7' 'CXE69F00' 'CX56B4E9' 'CXD55E00' 'CX332288')
+220      ! ;
+221         if _n_=1 then put "discreteattrmap name='cohortcolors';";
+222         color=colors[mod(_n_-1,8)+1];quoted=quote(trim(cohort),"'");
+223         if cohort='AML' then color='CX006B8C';
+224         if cohort='ALL' then color='CXADB5BD';
+225         put 'value ' quoted ' / fillattrs=(color=' color ');';
+226         if last then put 'enddiscreteattrmap;';
+227        run;
+228        proc template;%include "&template_file";run;
+229        ods listing gpath="&outdir" image_dpi=&dpi;
+230        ods graphics / reset=index imagename="&image" imagefmt=png width=&width.in height=&height.in;
+231        proc sgrender data=&outlib..&prefix._render template=MGXOncoTemplate;run;
+232        ods listing gpath="&outdir" image_dpi=96;
+233        ods graphics / reset=index imagename="&image" imagefmt=svg width=&width.in height=&height.in;
+234        proc sgrender data=&outlib..&prefix._render template=MGXOncoTemplate;run;
+235        %let MGX_ONCOPRINT_RC=0;
+236        %put NOTE: MGX_ONCOPRINT_COMPLETE samples=&ns genes=&ng.;
+237        %mend;
+238        
+239        
+240        ods listing gpath="&BOOK_OUT";
+241        
+242        /* LESSON_BEGIN */
+243        data work.samples;
+244         length sample $3 cohort $8;
+245         input sample $ cohort $;
+246         sample_index=input(substr(sample,2),best.);
+247         datalines;
+
+NOTE: The data set WORK.SAMPLES has 12 observations and 3 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.00 seconds
+      user cpu time       0.00 seconds
+      system cpu time     0.00 seconds
+      memory              527.43k
+      OS Memory           18852.00k
+      Timestamp           10/24/2026 03:27:05 PM
+      Step Count                        2  Switch Count  2
+      Page Faults                       0
+      Page Reclaims                     179
+      Page Swaps                        0
+      Voluntary Context Switches        8
+      Involuntary Context Switches      0
+      Block Input Operations            0
+      Block Output Operations           264
+      
+
+260        ;
+261        run;
+262        
+263        data work.genes;
+264         length gene $8;
+265         input gene $ gene_index;
+266         datalines;
+
+NOTE: The data set WORK.GENES has 8 observations and 2 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.00 seconds
+      user cpu time       0.01 seconds
+      system cpu time     0.00 seconds
+      memory              523.00k
+      OS Memory           18852.00k
+      Timestamp           10/24/2026 03:27:05 PM
+      Step Count                        3  Switch Count  2
+      Page Faults                       0
+      Page Reclaims                     92
+      Page Swaps                        0
+      Voluntary Context Switches        8
+      Involuntary Context Switches      0
+      Block Input Operations            0
+      Block Output Operations           264
+      
+
+275        ;
+276        run;
+277        
+278        /* CALLABLE=1 means assessable; zero means unavailable in this fixture. */
+279        data work.callability;
+280         set work.samples;
+281         do gene_index=1 to 8;
+282           callable=1;
+283           if (sample='S04' and gene_index=8) or
+284              (sample='S10' and gene_index=2) then callable=0;
+285           output;
+286         end;
+287         keep sample gene_index callable;
+288        run;
+
+NOTE: There were 12 observations read from the data set WORK.SAMPLES.
+NOTE: The data set WORK.CALLABILITY has 96 observations and 3 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.00 seconds
+      user cpu time       0.00 seconds
+      system cpu time     0.00 seconds
+      memory              798.65k
+      OS Memory           19112.00k
+      Timestamp           10/24/2026 03:27:05 PM
+      Step Count                        4  Switch Count  2
+      Page Faults                       0
+      Page Reclaims                     129
+      Page Swaps                        0
+      Voluntary Context Switches        8
+      Involuntary Context Switches      0
+      Block Input Operations            0
+      Block Output Operations           264
+      
+
+289        
+290        /* Event table preserves individual records before collapsing. */
+291        data work.variants;
+292         length sample $3 gene $8 variant_id $10 mutation_class $12;
+293         input sample $ gene $ variant_id $ mutation_class $;
+294         datalines;
+
+NOTE: The data set WORK.VARIANTS has 32 observations and 4 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.00 seconds
+      user cpu time       0.00 seconds
+      system cpu time     0.00 seconds
+      memory              522.96k
+      OS Memory           18852.00k
+      Timestamp           10/24/2026 03:27:05 PM
+      Step Count                        5  Switch Count  2
+      Page Faults                       0
+      Page Reclaims                     90
+      Page Swaps                        0
+      Voluntary Context Switches        8
+      Involuntary Context Switches      0
+      Block Input Operations            0
+      Block Output Operations           264
+      
+
+327        ;
+328        run;
+329        
+330        
+331        %MGXOncoPrint(samples=work.absent,genes=work.genes,
+332         callability=work.callability,variants=work.variants,outdir=&BOOK_OUT,
+333         template_file="~/mgxviz_1792855583_2889_oncoprint_template.sas");
+
+NOTE: DATA statement used (Total process time):
+      real time           0.00 seconds
+      user cpu time       0.00 seconds
+      system cpu time     0.00 seconds
+      memory              428.53k
+      OS Memory           18592.00k
+      Timestamp           10/24/2026 03:27:05 PM
+      Step Count                        6  Switch Count  0
+      Page Faults                       0
+      Page Reclaims                     51
+      Page Swaps                        0
+      Voluntary Context Switches        0
+      Involuntary Context Switches      0
+      Block Input Operations            0
+      Block Output Operations           0
+      
+
+ERROR: MGX_ONCOPRINT cannot open input work.absent
+334        data work.mgx_negative_status;length test $40;test='Missing dataset';status=&MGX_ONCOPRINT_RC;output;run;
+
+NOTE: The data set WORK.MGX_NEGATIVE_STATUS has 1 observations and 2 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.00 seconds
+      user cpu time       0.00 seconds
+      system cpu time     0.00 seconds
+      memory              515.96k
+      OS Memory           18852.00k
+      Timestamp           10/24/2026 03:27:05 PM
+      Step Count                        7  Switch Count  2
+      Page Faults                       0
+      Page Reclaims                     89
+      Page Swaps                        0
+      Voluntary Context Switches        8
+      Involuntary Context Switches      0
+      Block Input Operations            0
+      Block Output Operations           264
+      
+
+335        data work.bad_variants;set work.variants;if _n_=1 then mutation_class='Unsupported';run;
+
+NOTE: There were 32 observations read from the data set WORK.VARIANTS.
+NOTE: The data set WORK.BAD_VARIANTS has 32 observations and 4 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.00 seconds
+      user cpu time       0.01 seconds
+      system cpu time     0.00 seconds
+      memory              796.84k
+      OS Memory           19112.00k
+      Timestamp           10/24/2026 03:27:05 PM
+      Step Count                        8  Switch Count  2
+      Page Faults                       0
+      Page Reclaims                     121
+      Page Swaps                        0
+      Voluntary Context Switches        8
+      Involuntary Context Switches      0
+      Block Input Operations            0
+      Block Output Operations           264
+      
+
+336        %MGXOncoPrint(samples=work.samples,genes=work.genes,
+337         callability=work.callability,variants=work.bad_variants,outdir=&BOOK_OUT,
+338         template_file="~/mgxviz_1792855583_2889_oncoprint_template.sas");
+
+NOTE: DATA statement used (Total process time):
+      real time           0.00 seconds
+      user cpu time       0.00 seconds
+      system cpu time     0.00 seconds
+      memory              428.53k
+      OS Memory           18592.00k
+      Timestamp           10/24/2026 03:27:05 PM
+      Step Count                        9  Switch Count  0
+      Page Faults                       0
+      Page Reclaims                     29
+      Page Swaps                        0
+      Voluntary Context Switches        0
+      Involuntary Context Switches      0
+      Block Input Operations            0
+      Block Output Operations           0
+      
+
+
+NOTE: There were 12 observations read from the data set WORK.SAMPLES.
+NOTE: The data set WORK._MGXO_SAMPLES has 12 observations and 3 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.00 seconds
+      user cpu time       0.00 seconds
+      system cpu time     0.00 seconds
+      memory              797.84k
+      OS Memory           19112.00k
+      Timestamp           10/24/2026 03:27:05 PM
+      Step Count                        10  Switch Count  2
+      Page Faults                       0
+      Page Reclaims                     122
+      Page Swaps                        0
+      Voluntary Context Switches        8
+      Involuntary Context Switches      0
+      Block Input Operations            0
+      Block Output Operations           264
+      
+
+
+NOTE: There were 8 observations read from the data set WORK.GENES.
+NOTE: The data set WORK._MGXO_GENES has 8 observations and 2 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.00 seconds
+      user cpu time       0.00 seconds
+      system cpu time     0.01 seconds
+      memory              794.84k
+      OS Memory           19112.00k
+      Timestamp           10/24/2026 03:27:05 PM
+      Step Count                        11  Switch Count  2
+      Page Faults                       0
+      Page Reclaims                     121
+      Page Swaps                        0
+      Voluntary Context Switches        8
+      Involuntary Context Switches      0
+      Block Input Operations            0
+      Block Output Operations           264
+      
+
+
+NOTE: There were 96 observations read from the data set WORK.CALLABILITY.
+NOTE: The data set WORK._MGXO_CALLABILITY has 96 observations and 3 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.00 seconds
+      user cpu time       0.00 seconds
+      system cpu time     0.00 seconds
+      memory              795.84k
+      OS Memory           19112.00k
+      Timestamp           10/24/2026 03:27:05 PM
+      Step Count                        12  Switch Count  2
+      Page Faults                       0
+      Page Reclaims                     121
+      Page Swaps                        0
+      Voluntary Context Switches        8
+      Involuntary Context Switches      1
+      Block Input Operations            0
+      Block Output Operations           264
+      
+
+
+NOTE: There were 32 observations read from the data set WORK.BAD_VARIANTS.
+NOTE: The data set WORK._MGXO_VARIANTS has 32 observations and 4 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.00 seconds
+      user cpu time       0.01 seconds
+      system cpu time     0.00 seconds
+      memory              796.84k
+      OS Memory           19112.00k
+      Timestamp           10/24/2026 03:27:05 PM
+      Step Count                        13  Switch Count  2
+      Page Faults                       0
+      Page Reclaims                     121
+      Page Swaps                        0
+      Voluntary Context Switches        9
+      Involuntary Context Switches      0
+      Block Input Operations            0
+      Block Output Operations           264
+      
+
+NOTE: Table WORK._MGXO_BAD_KEYS created, with 0 rows and 3 columns.
+
+NOTE: Table WORK._MGXO_CONFLICTS created, with 0 rows and 4 columns.
+
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.03 seconds
+      user cpu time       0.01 seconds
+      system cpu time     0.01 seconds
+      memory              7716.85k
+      OS Memory           27832.00k
+      Timestamp           10/24/2026 03:27:05 PM
+      Step Count                        14  Switch Count  4
+      Page Faults                       0
+      Page Reclaims                     2102
+      Page Swaps                        0
+      Voluntary Context Switches        49
+      Involuntary Context Switches      5
+      Block Input Operations            0
+      Block Output Operations           656
+      
+
+ERROR: MGX_ONCOPRINT invalid keys indices callability event identities or mutation classes.
+339        data work._mgx_status;length test $40;test='Invalid mutation class';status=&MGX_ONCOPRINT_RC;run;
+
+NOTE: The data set WORK._MGX_STATUS has 1 observations and 2 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.00 seconds
+      user cpu time       0.00 seconds
+      system cpu time     0.00 seconds
+      memory              523.34k
+      OS Memory           22180.00k
+      Timestamp           10/24/2026 03:27:05 PM
+      Step Count                        15  Switch Count  2
+      Page Faults                       0
+      Page Reclaims                     87
+      Page Swaps                        0
+      Voluntary Context Switches        8
+      Involuntary Context Switches      1
+      Block Input Operations            0
+      Block Output Operations           264
+      
+
+340        proc append base=work.mgx_negative_status data=work._mgx_status;run;
+
+NOTE: Appending WORK._MGX_STATUS to WORK.MGX_NEGATIVE_STATUS.
+NOTE: There were 1 observations read from the data set WORK._MGX_STATUS.
+NOTE: 1 observations added.
+NOTE: The data set WORK.MGX_NEGATIVE_STATUS has 2 observations and 2 variables.
+NOTE: PROCEDURE APPEND used (Total process time):
+      real time           0.00 seconds
+      user cpu time       0.00 seconds
+      system cpu time     0.00 seconds
+      memory              855.37k
+      OS Memory           22700.00k
+      Timestamp           10/24/2026 03:27:05 PM
+      Step Count                        16  Switch Count  0
+      Page Faults                       0
+      Page Reclaims                     138
+      Page Swaps                        0
+      Voluntary Context Switches        0
+      Involuntary Context Switches      0
+      Block Input Operations            0
+      Block Output Operations           8
+      
+
+341        data work.bad_calls;set work.callability;if sample='S01' and gene_index=8 then callable=0;run;
+
+NOTE: There were 96 observations read from the data set WORK.CALLABILITY.
+NOTE: The data set WORK.BAD_CALLS has 96 observations and 3 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.00 seconds
+      user cpu time       0.00 seconds
+      system cpu time     0.00 seconds
+      memory              803.50k
+      OS Memory           22440.00k
+      Timestamp           10/24/2026 03:27:05 PM
+      Step Count                        17  Switch Count  2
+      Page Faults                       0
+      Page Reclaims                     121
+      Page Swaps                        0
+      Voluntary Context Switches        8
+      Involuntary Context Switches      0
+      Block Input Operations            0
+      Block Output Operations           264
+      
+
+342        %MGXOncoPrint(samples=work.samples,genes=work.genes,
+343         callability=work.bad_calls,variants=work.variants,outdir=&BOOK_OUT,
+344         template_file="~/mgxviz_1792855583_2889_oncoprint_template.sas");
+
+NOTE: DATA statement used (Total process time):
+      real time           0.00 seconds
+      user cpu time       0.00 seconds
+      system cpu time     0.00 seconds
+      memory              435.90k
+      OS Memory           21920.00k
+      Timestamp           10/24/2026 03:27:05 PM
+      Step Count                        18  Switch Count  0
+      Page Faults                       0
+      Page Reclaims                     23
+      Page Swaps                        0
+      Voluntary Context Switches        0
+      Involuntary Context Switches      0
+      Block Input Operations            0
+      Block Output Operations           0
+      
+
+
+NOTE: There were 12 observations read from the data set WORK.SAMPLES.
+NOTE: The data set WORK._MGXO_SAMPLES has 12 observations and 3 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.00 seconds
+      user cpu time       0.00 seconds
+      system cpu time     0.00 seconds
+      memory              803.96k
+      OS Memory           22440.00k
+      Timestamp           10/24/2026 03:27:05 PM
+      Step Count                        19  Switch Count  2
+      Page Faults                       0
+      Page Reclaims                     121
+      Page Swaps                        0
+      Voluntary Context Switches        8
+      Involuntary Context Switches      0
+      Block Input Operations            0
+      Block Output Operations           264
+      
+
+
+NOTE: There were 8 observations read from the data set WORK.GENES.
+NOTE: The data set WORK._MGXO_GENES has 8 observations and 2 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.00 seconds
+      user cpu time       0.00 seconds
+      system cpu time     0.01 seconds
+      memory              801.21k
+      OS Memory           22440.00k
+      Timestamp           10/24/2026 03:27:05 PM
+      Step Count                        20  Switch Count  2
+      Page Faults                       0
+      Page Reclaims                     121
+      Page Swaps                        0
+      Voluntary Context Switches        8
+      Involuntary Context Switches      1
+      Block Input Operations            0
+      Block Output Operations           264
+      
+
+
+NOTE: There were 96 observations read from the data set WORK.BAD_CALLS.
+NOTE: The data set WORK._MGXO_CALLABILITY has 96 observations and 3 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.00 seconds
+      user cpu time       0.00 seconds
+      system cpu time     0.00 seconds
+      memory              801.96k
+      OS Memory           22440.00k
+      Timestamp           10/24/2026 03:27:05 PM
+      Step Count                        21  Switch Count  2
+      Page Faults                       0
+      Page Reclaims                     121
+      Page Swaps                        0
+      Voluntary Context Switches        8
+      Involuntary Context Switches      0
+      Block Input Operations            0
+      Block Output Operations           264
+      
+
+
+NOTE: There were 32 observations read from the data set WORK.VARIANTS.
+NOTE: The data set WORK._MGXO_VARIANTS has 32 observations and 4 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.00 seconds
+      user cpu time       0.00 seconds
+      system cpu time     0.00 seconds
+      memory              802.96k
+      OS Memory           22440.00k
+      Timestamp           10/24/2026 03:27:05 PM
+      Step Count                        22  Switch Count  2
+      Page Faults                       0
+      Page Reclaims                     121
+      Page Swaps                        0
+      Voluntary Context Switches        8
+      Involuntary Context Switches      0
+      Block Input Operations            0
+      Block Output Operations           264
+      
+
+NOTE: Table WORK._MGXO_BAD_KEYS created, with 0 rows and 3 columns.
+
+NOTE: Table WORK._MGXO_CONFLICTS created, with 0 rows and 4 columns.
+
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.02 seconds
+      user cpu time       0.01 seconds
+      system cpu time     0.01 seconds
+      memory              7473.17k
+      OS Memory           28080.00k
+      Timestamp           10/24/2026 03:27:05 PM
+      Step Count                        23  Switch Count  4
+      Page Faults                       0
+      Page Reclaims                     1560
+      Page Swaps                        0
+      Voluntary Context Switches        50
+      Involuntary Context Switches      5
+      Block Input Operations            0
+      Block Output Operations           656
+      
+
+ERROR: MGX_ONCOPRINT invalid keys indices callability event identities or mutation classes.
+345        data work._mgx_status;length test $40;test='Event in unassessable pair';status=&MGX_ONCOPRINT_RC;run;
+
+NOTE: The data set WORK._MGX_STATUS has 1 observations and 2 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.00 seconds
+      user cpu time       0.00 seconds
+      system cpu time     0.00 seconds
+      memory              523.34k
+      OS Memory           22436.00k
+      Timestamp           10/24/2026 03:27:05 PM
+      Step Count                        24  Switch Count  2
+      Page Faults                       0
+      Page Reclaims                     87
+      Page Swaps                        0
+      Voluntary Context Switches        8
+      Involuntary Context Switches      1
+      Block Input Operations            0
+      Block Output Operations           264
+      
+
+346        proc append base=work.mgx_negative_status data=work._mgx_status;run;
+
+NOTE: Appending WORK._MGX_STATUS to WORK.MGX_NEGATIVE_STATUS.
+NOTE: There were 1 observations read from the data set WORK._MGX_STATUS.
+NOTE: 1 observations added.
+NOTE: The data set WORK.MGX_NEGATIVE_STATUS has 3 observations and 2 variables.
+NOTE: PROCEDURE APPEND used (Total process time):
+      real time           0.00 seconds
+      user cpu time       0.00 seconds
+      system cpu time     0.00 seconds
+      memory              860.70k
+      OS Memory           22956.00k
+      Timestamp           10/24/2026 03:27:05 PM
+      Step Count                        25  Switch Count  0
+      Page Faults                       0
+      Page Reclaims                     120
+      Page Swaps                        0
+      Voluntary Context Switches        0
+      Involuntary Context Switches      0
+      Block Input Operations            0
+      Block Output Operations           8
+      
+
+347        
+348        /* LESSON_END */
+349        
+350        /* Reader capture: export values without changing the analysis. */
+351        data work.reader_export;set work.mgx_negative_status;format _numeric_ best32.;run;
+
+NOTE: There were 3 observations read from the data set WORK.MGX_NEGATIVE_STATUS.
+NOTE: The data set WORK.READER_EXPORT has 3 observations and 2 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.00 seconds
+      user cpu time       0.00 seconds
+      system cpu time     0.00 seconds
+      memory              800.96k
+      OS Memory           22696.00k
+      Timestamp           10/24/2026 03:27:05 PM
+      Step Count                        26  Switch Count  2
+      Page Faults                       0
+      Page Reclaims                     121
+      Page Swaps                        0
+      Voluntary Context Switches        8
+      Involuntary Context Switches      0
+      Block Input Operations            0
+      Block Output Operations           264
+      
+
+352        proc export data=work.reader_export outfile="~/mgxviz_1792855583_2889/mgx_negative_status.csv" dbms=csv replace;
+352      !                                                                                                                 run;
+
+NOTE: Unable to open parameter catalog: SASUSER.PARMS.PARMS.SLIST in update mode. Temporary parameter values will be saved to 
+WORK.PARMS.PARMS.SLIST.
+353         /**********************************************************************
+354         *   PRODUCT:   SAS
+355         *   VERSION:   9.4
+356         *   CREATOR:   External File Interface
+357         *   DATE:      24OCT26
+358         *   DESC:      Generated SAS Datastep Code
+359         *   TEMPLATE SOURCE:  (None Specified.)
+360         ***********************************************************************/
+361            data _null_;
+362            %let _EFIERR_ = 0; /* set the ERROR detection macro variable */
+363            %let _EFIREC_ = 0;     /* clear export record count macro variable */
+364            file '~/mgxviz_1792855583_2889/mgx_negative_status.csv' delimiter=',' DSD DROPOVER lrecl=32767;
+365            if _n_ = 1 then        /* write column names or labels */
+366             do;
+367               put
+368                  "test"
+369               ','
+370                  "status"
+371               ;
+372             end;
+373           set  WORK.READER_EXPORT   end=EFIEOD;
+374               format test $40. ;
+375               format status best32. ;
+376             do;
+377               EFIOUT + 1;
+378               put test $ @;
+379               put status ;
+380               ;
+381             end;
+382            if _ERROR_ then call symputx('_EFIERR_',1);  /* set ERROR detection macro variable */
+383            if EFIEOD then call symputx('_EFIREC_',EFIOUT);
+384            run;
+
+NOTE: The file '~/mgxviz_1792855583_2889/mgx_negative_status.csv' is:
+      Filename=<SAS_HOME>/mgxviz_1792855583_2889/mgx_negative_status.csv,
+      Owner Name=<SAS_USER>,Group Name=oda,
+      Access Permission=-rw-r--r--,
+      Last Modified=24Oct2026:15:27:05
+
+NOTE: 4 records were written to the file '~/mgxviz_1792855583_2889/mgx_negative_status.csv'.
+      The minimum record length was 11.
+      The maximum record length was 28.
+NOTE: There were 3 observations read from the data set WORK.READER_EXPORT.
+NOTE: DATA statement used (Total process time):
+      real time           0.00 seconds
+      user cpu time       0.00 seconds
+      system cpu time     0.00 seconds
+      memory              10312.81k
+      OS Memory           29980.00k
+      Timestamp           10/24/2026 03:27:05 PM
+      Step Count                        27  Switch Count  0
+      Page Faults                       0
+      Page Reclaims                     113
+      Page Swaps                        0
+      Voluntary Context Switches        8
+      Involuntary Context Switches      0
+      Block Input Operations            0
+      Block Output Operations           16
+      
+
+3 records created in ~/mgxviz_1792855583_2889/mgx_negative_status.csv from WORK.READER_EXPORT.
+  
+  
+NOTE: "~/mgxviz_1792855583_2889/mgx_negative_status.csv" file was successfully created.
+NOTE: PROCEDURE EXPORT used (Total process time):
+      real time           0.04 seconds
+      user cpu time       0.02 seconds
+      system cpu time     0.01 seconds
+      memory              10320.18k
+      OS Memory           30240.00k
+      Timestamp           10/24/2026 03:27:05 PM
+      Step Count                        27  Switch Count  7
+      Page Faults                       0
+      Page Reclaims                     2194
+      Page Swaps                        0
+      Voluntary Context Switches        56
+      Involuntary Context Switches      2
+      Block Input Operations            0
+      Block Output Operations           104
+      
+
+385        data work.reader_environment;length sas_version $64 platform $32 process_id $40; sas_version="&sysvlong";
+385      ! platform="&sysscp";process_id="&sysprocessid";run;
+
+NOTE: The data set WORK.READER_ENVIRONMENT has 1 observations and 3 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.00 seconds
+      user cpu time       0.01 seconds
+      system cpu time     0.00 seconds
+      memory              525.65k
+      OS Memory           24744.00k
+      Timestamp           10/24/2026 03:27:05 PM
+      Step Count                        28  Switch Count  2
+      Page Faults                       0
+      Page Reclaims                     91
+      Page Swaps                        0
+      Voluntary Context Switches        8
+      Involuntary Context Switches      0
+      Block Input Operations            0
+      Block Output Operations           264
+      
+
+386        proc export data=work.reader_environment outfile="~/mgxviz_1792855583_2889/environment.csv" dbms=csv replace;
+386      !                                                                                                              run;
+
+NOTE: Unable to open parameter catalog: SASUSER.PARMS.PARMS.SLIST in update mode. Temporary parameter values will be saved to 
+WORK.PARMS.PARMS.SLIST.
+387         /**********************************************************************
+388         *   PRODUCT:   SAS
+389         *   VERSION:   9.4
+390         *   CREATOR:   External File Interface
+391         *   DATE:      24OCT26
+392         *   DESC:      Generated SAS Datastep Code
+393         *   TEMPLATE SOURCE:  (None Specified.)
+394         ***********************************************************************/
+395            data _null_;
+396            %let _EFIERR_ = 0; /* set the ERROR detection macro variable */
+397            %let _EFIREC_ = 0;     /* clear export record count macro variable */
+398            file '~/mgxviz_1792855583_2889/environment.csv' delimiter=',' DSD DROPOVER lrecl=32767;
+399            if _n_ = 1 then        /* write column names or labels */
+400             do;
+401               put
+402                  "sas_version"
+403               ','
+404                  "platform"
+405               ','
+406                  "process_id"
+407               ;
+408             end;
+409           set  WORK.READER_ENVIRONMENT   end=EFIEOD;
+410               format sas_version $64. ;
+411               format platform $32. ;
+412               format process_id $40. ;
+413             do;
+414               EFIOUT + 1;
+415               put sas_version $ @;
+416               put platform $ @;
+417               put process_id $ ;
+418               ;
+419             end;
+420            if _ERROR_ then call symputx('_EFIERR_',1);  /* set ERROR detection macro variable */
+421            if EFIEOD then call symputx('_EFIREC_',EFIOUT);
+422            run;
+
+NOTE: The file '~/mgxviz_1792855583_2889/environment.csv' is:
+      Filename=<SAS_HOME>/mgxviz_1792855583_2889/environment.csv,
+      Owner Name=<SAS_USER>,Group Name=oda,
+      Access Permission=-rw-r--r--,
+      Last Modified=24Oct2026:15:27:05
+
+NOTE: 2 records were written to the file '~/mgxviz_1792855583_2889/environment.csv'.
+      The minimum record length was 31.
+      The maximum record length was 57.
+NOTE: There were 1 observations read from the data set WORK.READER_ENVIRONMENT.
+NOTE: DATA statement used (Total process time):
+      real time           0.00 seconds
+      user cpu time       0.00 seconds
+      system cpu time     0.00 seconds
+      memory              9175.75k
+      OS Memory           29724.00k
+      Timestamp           10/24/2026 03:27:05 PM
+      Step Count                        29  Switch Count  0
+      Page Faults                       0
+      Page Reclaims                     105
+      Page Swaps                        0
+      Voluntary Context Switches        8
+      Involuntary Context Switches      0
+      Block Input Operations            0
+      Block Output Operations           8
+      
+
+1 records created in ~/mgxviz_1792855583_2889/environment.csv from WORK.READER_ENVIRONMENT.
+  
+  
+NOTE: "~/mgxviz_1792855583_2889/environment.csv" file was successfully created.
+NOTE: PROCEDURE EXPORT used (Total process time):
+      real time           0.02 seconds
+      user cpu time       0.01 seconds
+      system cpu time     0.01 seconds
+      memory              9175.75k
+      OS Memory           29984.00k
+      Timestamp           10/24/2026 03:27:05 PM
+      Step Count                        29  Switch Count  7
+      Page Faults                       0
+      Page Reclaims                     1216
+      Page Swaps                        0
+      Voluntary Context Switches        41
+      Involuntary Context Switches      2
+      Block Input Operations            0
+      Block Output Operations           32
+      
+
+423        
+424        
+425        
+426        ods html5 (id=saspy_internal) close;ods listing;
+427        
+                                                           The SAS System
+
+428        
+
+=== Output ===
+

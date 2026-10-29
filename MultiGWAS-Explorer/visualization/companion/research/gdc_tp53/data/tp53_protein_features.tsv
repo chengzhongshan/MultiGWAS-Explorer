@@ -1,0 +1,5 @@
+chr	st	end	type	genesymbol	protein_coding
+1	1	393	gene	TP53	1
+1	1	44	exon	TP53	1
+1	102	292	exon	TP53	1
+1	325	356	exon	TP53	1

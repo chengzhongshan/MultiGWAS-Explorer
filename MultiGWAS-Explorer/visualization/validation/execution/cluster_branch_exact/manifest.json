@@ -1,0 +1,238 @@
+{
+   "artifacts" : [
+      {
+         "bytes" : 3596,
+         "name" : "cg_tpm.csv",
+         "sha256" : "2643f591b11ee5c71b2d2ed8dcf233374a802bbfac5fa27fd2d739e75356827a"
+      },
+      {
+         "bytes" : 6708,
+         "name" : "cg_log2.csv",
+         "sha256" : "5506de388cf16f72ca73c05d48ec183faa19140de86b2452ff555af2eca501bf"
+      },
+      {
+         "bytes" : 7363,
+         "name" : "cg_rowz.csv",
+         "sha256" : "049ef1b07f466f923e0d36ea9f3f71bbc470c2cfb38694338b30b132e9e9e413"
+      },
+      {
+         "bytes" : 15940,
+         "name" : "cg_plot.csv",
+         "sha256" : "c66d0202a964985bbfe9def8acea6c97a28f143c3cb6394f63cd8d0f4e2b448f"
+      },
+      {
+         "bytes" : 1546,
+         "name" : "cg_tree.csv",
+         "sha256" : "839e2f5b7b5053e5edc3088e1d17973ab6b8a2e4a7f07c03becceaa6b83b5c60"
+      },
+      {
+         "bytes" : 375,
+         "name" : "cg_tissue_tree.csv",
+         "sha256" : "a9bc7d4e0241a58b9a9f0b1b11368f6854ac7f46e6508c1694ef870d0293f097"
+      },
+      {
+         "bytes" : 3438,
+         "name" : "cg_review.csv",
+         "sha256" : "68394edbc9e0191dd1697b84b895afc8dfd243f5df8b836a646561b7940ccf87"
+      },
+      {
+         "bytes" : 3280,
+         "name" : "cg_review_display.csv",
+         "sha256" : "74cf983ef5ba7ae66e1a8ec8037e51f49ab65b9644f59960e1b2a5bdbdba4fcb"
+      },
+      {
+         "bytes" : 800,
+         "name" : "cg_order.csv",
+         "sha256" : "6d917593953667cb9a692cab66978deb140fd727209aaef7d966a313e9b8e54a"
+      },
+      {
+         "bytes" : 282,
+         "name" : "cg_branches.csv",
+         "sha256" : "aa2f719fc59feff8dcd2432e5a427966550cc4098d348d7435d4594158699b22"
+      },
+      {
+         "bytes" : 575,
+         "name" : "cg_subtree.csv",
+         "sha256" : "4bd991153d3d20ca5d23f829da4441d59c9e8e75ad3f8522c005326dca5b038a"
+      },
+      {
+         "bytes" : 567,
+         "name" : "cg_subtree_native.csv",
+         "sha256" : "09b53230cf0a9947c659c631ea91550f8cddd2a9d7cc3c077e9db9dcfcfcc5a4"
+      },
+      {
+         "bytes" : 44,
+         "name" : "cg_members.csv",
+         "sha256" : "df26cabc0b71716aa8dd6e1dbee2dc542648099295aaa808b0c6f1d2ad2e13ab"
+      },
+      {
+         "bytes" : 1526,
+         "name" : "cg_selected_values.csv",
+         "sha256" : "6646b221e92fe910463f4fd5c1d94687c76e0d975756c818cbe2c53590d73557"
+      },
+      {
+         "bytes" : 229,
+         "name" : "cg_selected_heights.csv",
+         "sha256" : "fd313e4351b8cf78c9c0bdc539f806fbe2e3c70419d7b1a1c7932d24f305708c"
+      },
+      {
+         "bytes" : 229,
+         "name" : "cg_expected_heights.csv",
+         "sha256" : "fd313e4351b8cf78c9c0bdc539f806fbe2e3c70419d7b1a1c7932d24f305708c"
+      },
+      {
+         "bytes" : 221,
+         "name" : "cg_native_heights.csv",
+         "sha256" : "69fda552867114c3c935441f9cf6d4fa05e77462600990ab368a58db74a2dd89"
+      },
+      {
+         "bytes" : 73,
+         "name" : "cg_branch_check.csv",
+         "sha256" : "ffd815a809b99af74e0a4807a3274d421a949b49e112a0333e4f17ce8e281ed0"
+      },
+      {
+         "bytes" : 3379,
+         "name" : "cg_branch_plot.csv",
+         "sha256" : "a8232c75fe0282277163ecadcfc091fac04b4aa42a6564f03d583c2ab9a1c38a"
+      },
+      {
+         "bytes" : 90,
+         "name" : "environment.csv",
+         "sha256" : "865b5569638b876f65aed77e446ee8dbc5d93647314df4e42f78b8ee1457431f"
+      },
+      {
+         "bytes" : 235525,
+         "name" : "cluster40.png",
+         "sha256" : "691ae2e999b298552682a339a668bd397f14a47ebf0221404d067387b6d8b4c5"
+      },
+      {
+         "bytes" : 103186,
+         "name" : "cluster40.svg",
+         "sha256" : "c8cf4f2b41a481e6f022a95c7f9285c8a244d1105556e3a895b2066158ac99b1"
+      },
+      {
+         "bytes" : 1552,
+         "name" : "cluster40_template_original.sas",
+         "sha256" : "edcf663b8b97edfbceeaa45244fd9a97b36ff31cd9bf0a9016818cd45872c9f6"
+      },
+      {
+         "bytes" : 1591,
+         "name" : "cluster40_template.sas",
+         "sha256" : "ddc5d7707bfe677f2874bf73a6b3273eafbc31aa5edc32a68ad2d0f7f9a7acfb"
+      },
+      {
+         "bytes" : 211540,
+         "name" : "gene_branch_review_clean.png",
+         "sha256" : "329fc8b8a6a093f55f358132554eac90c778d9c23ac4ea9da863a00b84aeb5b5"
+      },
+      {
+         "bytes" : 69728,
+         "name" : "gene_branch_review.svg",
+         "sha256" : "c0b1489f9fdf498d25949b0e4b70ac65d7e592a2cc5408c850d8e9d97086553c"
+      },
+      {
+         "bytes" : 2587,
+         "name" : "branch_review_template.sas",
+         "sha256" : "444f155737c07f926278737fe33605d9eb049b24bb32042a985ab3955ae7bc7e"
+      },
+      {
+         "bytes" : 40547,
+         "name" : "selected_tree.png",
+         "sha256" : "21bf2f954d9cd42b83e90aa4c7c9ab4c17630fa3424be676f55f6a0d3900e1ec"
+      },
+      {
+         "bytes" : 87108,
+         "name" : "cluster_selected.png",
+         "sha256" : "30f84e74069cf0253dbdf690a8ef933bd787d099da47ac7200579107da2125c0"
+      },
+      {
+         "bytes" : 50074,
+         "name" : "cluster_selected.svg",
+         "sha256" : "7b34d919c414bf19925b322f889c1d8da695581eebc6c6158225ea6503e36b04"
+      }
+   ],
+   "capture_complete" : true,
+   "client_sha256" : "2804db52325187308f632e893ab49609e7565805325d3fe6abcb6fa187b61662",
+   "dependencies" : [
+      {
+         "file" : "companion/research/clustergram_branches/definitions/RandBetween.sas",
+         "sha256" : "8e9dbed502eb2cf97c52aa93a88b184e6ff0021f7c1142003909e9bd0df25039"
+      },
+      {
+         "file" : "companion/research/clustergram_branches/definitions/Rename_Add_Prefix.sas",
+         "sha256" : "37c532338554bda36c39f35090904b23bed336ee1dcdf9d5bcb8bb94c693a893"
+      },
+      {
+         "file" : "companion/research/clustergram_branches/definitions/check_col_orders.sas",
+         "sha256" : "6a573fc884c529d69f4ba4bc1939a7f7d22a9bd3b407b918a97235ebcf1b3528"
+      },
+      {
+         "file" : "companion/research/clustergram_branches/definitions/clustergram4sas.sas",
+         "sha256" : "83aa32dc3594d8714c94356b47c3c50b48df8262543bf98e98e55aaf24b1f1f8"
+      },
+      {
+         "file" : "companion/research/clustergram_branches/definitions/review_tree_branches.sas",
+         "sha256" : "1c6f659d8002209c749d6e815949cd32511c80275b3ed3306e9d30fb19d47020"
+      },
+      {
+         "file" : "companion/research/clustergram_branches/definitions/subbranches.sas",
+         "sha256" : "431206c3827b6c51b0ca49f6bd7c80ef5f25a035744e7aa9b212c70125eab131"
+      },
+      {
+         "file" : "companion/research/clustergram_branches/definitions/tanspose_table.sas",
+         "sha256" : "3dde83b474a3cb8160fa4bedd581860a30e54f3308f8d4ef054ec069cee112b6"
+      },
+      {
+         "file" : "companion/research/clustergram_branches/definitions/totobsindsd.sas",
+         "sha256" : "f939d195a59ed0d4ff6770b0cbffe25ad815d79c66ca48e02ede732582ad7219"
+      },
+      {
+         "file" : "companion/research/clustergram_branches/definitions/tree_CL_positions.sas",
+         "sha256" : "2d678fb826de9aa31e1dfe36d61f2253e6bd803fee9f91920bcd57996e9bb9aa"
+      },
+      {
+         "file" : "companion/research/clustergram_branches/definitions/treeorder.sas",
+         "sha256" : "474058510022a9c4ea4bbfd3cedc41faae011da9a4d15e6501ef6712673c08ee"
+      }
+   ],
+   "endpoint" : "http://127.0.0.1:18841/mcp",
+   "exit_code" : 0,
+   "expected" : "COMPLETE",
+   "expected_outcome_observed" : true,
+   "inputs" : [
+      {
+         "remote" : "~/mgxviz_1792854923_2673_expression40.tsv",
+         "sha256" : "672ff88cbf7e21564b0e944aae2a2fa0242778689247f2b3c086dcfb3b8ea511",
+         "source" : "companion/research/clustergram_branches/data/expression40.tsv"
+      }
+   ],
+   "job_pid" : 2719,
+   "lesson" : "cluster_branch_exact",
+   "log_sha256" : "282c838b36c55f77aae18b053fdf789e9f26c28fa8f4e15b505c4b1476ccbee3",
+   "persistent" : false,
+   "remote_output" : "~/mgxviz_1792854923_2673",
+   "rpc" : [
+      "rpc_1.json",
+      "rpc_2.json",
+      "rpc_3.json",
+      "rpc_4.json",
+      "rpc_5.json",
+      "rpc_6.json",
+      "rpc_7.json",
+      "rpc_8.json",
+      "rpc_9.json",
+      "rpc_10.json",
+      "rpc_11.json",
+      "rpc_12.json",
+      "rpc_13.json",
+      "rpc_14.json",
+      "rpc_15.json"
+   ],
+   "scope" : "Actual plotting/teaching submission; no upstream study or native IDE transcript implied",
+   "source" : "companion/research/clustergram_branches/programs/cluster_branch.sas",
+   "source_sha256" : "4642f75a3ba877f58377badf6f8ebe21fe13257b6ab5a32bcdf117b638cacffd",
+   "status" : "COMPLETE",
+   "submitted_sha256" : "0df6dfeca241cd2bf9026a9eb75e16d3b287467ec7ec29e614b8e74f00a48565",
+   "target" : "oda",
+   "variant" : "baseline"
+}

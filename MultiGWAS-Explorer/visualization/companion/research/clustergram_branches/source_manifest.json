@@ -1,0 +1,110 @@
+{
+   "date" : "2026-10-21",
+   "files" : [
+      {
+         "definition" : "companion/research/clustergram_branches/definitions/clustergram4sas.sas",
+         "definition_sha256" : "83aa32dc3594d8714c94356b47c3c50b48df8262543bf98e98e55aaf24b1f1f8",
+         "full_source" : "companion/research/clustergram_branches/sources/clustergram4sas.sas",
+         "matching_archived_commit" : "4fa6fa710b8506b4aa410c0dfed304d447e41c8a",
+         "matching_archived_full_source" : "companion/research/advanced_macros/vendor/clustergram4sas.sas",
+         "name" : "clustergram4sas",
+         "original_library_relative" : "Macros/clustergram4sas.sas",
+         "scope" : "Unmodified author-supplied local library snapshot. Git attribution only where full bytes match the preserved pinned archive. Exact prefix through balanced outer MEND, including nested macros; trailing demonstrations preserved but not executed.",
+         "sha256" : "c91f07d3903eb8c7e59485fd18892269fe2985a489e62b7329805f1b5d2529ee"
+      },
+      {
+         "definition" : "companion/research/clustergram_branches/definitions/review_tree_branches.sas",
+         "definition_sha256" : "1c6f659d8002209c749d6e815949cd32511c80275b3ed3306e9d30fb19d47020",
+         "full_source" : "companion/research/clustergram_branches/sources/review_tree_branches.sas",
+         "name" : "review_tree_branches",
+         "original_library_relative" : "Macros/review_tree_branches.sas",
+         "scope" : "Unmodified author-supplied local library snapshot. Git attribution only where full bytes match the preserved pinned archive. Exact prefix through balanced outer MEND, including nested macros; trailing demonstrations preserved but not executed.",
+         "sha256" : "5572fe5db3331b5aa7483b258fa81a2622bd8a8063ff99352c6f3b7b0cac66e0"
+      },
+      {
+         "definition" : "companion/research/clustergram_branches/definitions/subbranches.sas",
+         "definition_sha256" : "431206c3827b6c51b0ca49f6bd7c80ef5f25a035744e7aa9b212c70125eab131",
+         "full_source" : "companion/research/clustergram_branches/sources/subbranches.sas",
+         "name" : "subbranches",
+         "original_library_relative" : "Macros/subbranches.sas",
+         "scope" : "Unmodified author-supplied local library snapshot. Git attribution only where full bytes match the preserved pinned archive. Exact prefix through balanced outer MEND, including nested macros; trailing demonstrations preserved but not executed.",
+         "sha256" : "32f9a97b99268a69c05495ae62b3a559596d56b3a7322c52b4a57d4d428ac348"
+      },
+      {
+         "definition" : "companion/research/clustergram_branches/definitions/tree_CL_positions.sas",
+         "definition_sha256" : "2d678fb826de9aa31e1dfe36d61f2253e6bd803fee9f91920bcd57996e9bb9aa",
+         "full_source" : "companion/research/clustergram_branches/sources/tree_CL_positions.sas",
+         "name" : "tree_CL_positions",
+         "original_library_relative" : "Macros/tree_CL_positions.sas",
+         "scope" : "Unmodified author-supplied local library snapshot. Git attribution only where full bytes match the preserved pinned archive. Exact prefix through balanced outer MEND, including nested macros; trailing demonstrations preserved but not executed.",
+         "sha256" : "dae5717eb22f0e52ed6a9695eb46b3fc0f1680214414b59e3d2a116f95d92fb2"
+      },
+      {
+         "definition" : "companion/research/clustergram_branches/definitions/treeorder.sas",
+         "definition_sha256" : "474058510022a9c4ea4bbfd3cedc41faae011da9a4d15e6501ef6712673c08ee",
+         "full_source" : "companion/research/clustergram_branches/sources/treeorder.sas",
+         "name" : "treeorder",
+         "original_library_relative" : "Macros/treeorder.sas",
+         "scope" : "Unmodified author-supplied local library snapshot. Git attribution only where full bytes match the preserved pinned archive. Exact prefix through balanced outer MEND, including nested macros; trailing demonstrations preserved but not executed.",
+         "sha256" : "1badcdb395ed9bb7cc42bed17958acc69c0aa9660f57b4373b71934a181db54a"
+      },
+      {
+         "definition" : "companion/research/clustergram_branches/definitions/Rename_Add_Prefix.sas",
+         "definition_sha256" : "37c532338554bda36c39f35090904b23bed336ee1dcdf9d5bcb8bb94c693a893",
+         "full_source" : "companion/research/clustergram_branches/sources/Rename_Add_Prefix.sas",
+         "matching_archived_commit" : "4fa6fa710b8506b4aa410c0dfed304d447e41c8a",
+         "matching_archived_full_source" : "companion/research/advanced_macros/vendor/Rename_Add_Prefix.sas",
+         "name" : "Rename_Add_Prefix",
+         "original_library_relative" : "Macros/Rename_Add_Prefix.sas",
+         "scope" : "Unmodified author-supplied local library snapshot. Git attribution only where full bytes match the preserved pinned archive. Exact prefix through balanced outer MEND, including nested macros; trailing demonstrations preserved but not executed.",
+         "sha256" : "9310a8aeb2ead60ca25bd931032210af58664565cc74cd8964acf49df1054c64"
+      },
+      {
+         "definition" : "companion/research/clustergram_branches/definitions/RandBetween.sas",
+         "definition_sha256" : "8e9dbed502eb2cf97c52aa93a88b184e6ff0021f7c1142003909e9bd0df25039",
+         "full_source" : "companion/research/clustergram_branches/sources/RandBetween.sas",
+         "matching_archived_commit" : "4fa6fa710b8506b4aa410c0dfed304d447e41c8a",
+         "matching_archived_full_source" : "companion/research/advanced_macros/vendor/RandBetween.sas",
+         "name" : "RandBetween",
+         "original_library_relative" : "Macros/RandBetween.sas",
+         "scope" : "Unmodified author-supplied local library snapshot. Git attribution only where full bytes match the preserved pinned archive. Exact prefix through balanced outer MEND, including nested macros; trailing demonstrations preserved but not executed.",
+         "sha256" : "37bd9d00aa45c3f69e86171dc2c402de0022ba108782ad5e412c6d6e0e3cfe5e"
+      },
+      {
+         "definition" : "companion/research/clustergram_branches/definitions/tanspose_table.sas",
+         "definition_sha256" : "3dde83b474a3cb8160fa4bedd581860a30e54f3308f8d4ef054ec069cee112b6",
+         "full_source" : "companion/research/clustergram_branches/sources/tanspose_table.sas",
+         "matching_archived_commit" : "4fa6fa710b8506b4aa410c0dfed304d447e41c8a",
+         "matching_archived_full_source" : "companion/research/advanced_macros/vendor/tanspose_table.sas",
+         "name" : "tanspose_table",
+         "original_library_relative" : "Macros/tanspose_table.sas",
+         "scope" : "Unmodified author-supplied local library snapshot. Git attribution only where full bytes match the preserved pinned archive. Exact prefix through balanced outer MEND, including nested macros; trailing demonstrations preserved but not executed.",
+         "sha256" : "64079a50a98ef33e8cb3b5fccfd4b709380713cb40b443e7d79c80ff2fdf8fa7"
+      },
+      {
+         "definition" : "companion/research/clustergram_branches/definitions/check_col_orders.sas",
+         "definition_sha256" : "6a573fc884c529d69f4ba4bc1939a7f7d22a9bd3b407b918a97235ebcf1b3528",
+         "full_source" : "companion/research/clustergram_branches/sources/check_col_orders.sas",
+         "matching_archived_commit" : "4fa6fa710b8506b4aa410c0dfed304d447e41c8a",
+         "matching_archived_full_source" : "companion/research/advanced_macros/vendor/check_col_orders.sas",
+         "name" : "check_col_orders",
+         "original_library_relative" : "Macros/check_col_orders.sas",
+         "scope" : "Unmodified author-supplied local library snapshot. Git attribution only where full bytes match the preserved pinned archive. Exact prefix through balanced outer MEND, including nested macros; trailing demonstrations preserved but not executed.",
+         "sha256" : "43abf559306c39a498bcfca13b297d170bc6ae60cd1cf2d8c28adf49b9c3fc54"
+      },
+      {
+         "definition" : "companion/research/clustergram_branches/definitions/totobsindsd.sas",
+         "definition_sha256" : "f939d195a59ed0d4ff6770b0cbffe25ad815d79c66ca48e02ede732582ad7219",
+         "full_source" : "companion/research/clustergram_branches/sources/totobsindsd.sas",
+         "matching_archived_commit" : "4fa6fa710b8506b4aa410c0dfed304d447e41c8a",
+         "matching_archived_full_source" : "companion/research/advanced_macros/vendor/totobsindsd.sas",
+         "name" : "totobsindsd",
+         "original_library_relative" : "Macros/totobsindsd.sas",
+         "scope" : "Unmodified author-supplied local library snapshot. Git attribution only where full bytes match the preserved pinned archive. Exact prefix through balanced outer MEND, including nested macros; trailing demonstrations preserved but not executed.",
+         "sha256" : "2d781c4c87b30a7326f58fe4259a6127f87104af623a283b078871b75b33af68"
+      }
+   ],
+   "relationship" : "clustergram4sas builds the heatmap/tree; review_tree_branches calls tree_CL_positions and treeorder; subbranches selects one branch with treeorder. Existing original book/research sources remain unchanged.",
+   "source" : "Author-supplied SAS-Useful-Codes/Macros local library",
+   "version_kind" : "Local file SHA256 snapshots; source directory is not a Git checkout"
+}

@@ -3603,3 +3603,7 @@ package and are intentionally not versioned in this source repository.
 ## SAS ODA reliability and cleanup
 
 See [SAS ODA reliability and cleanup](docs/sas_oda_reliability_and_cleanup.md) for automatic scratch cleanup, debug retention, tested fixes, and Perl/Cygwin validation commands.
+
+## Expression and mutation displays
+
+The optional [visualization module](visualization/README.md) adds the author's clustergram and branch-review macros, aligned gene/protein mutation tracks, and MGXOncoPrint with callability-aware frequencies. Run its standalone examples in a separate SAS session; the GWAS pipeline does not automatically load its pinned dependency snapshots.

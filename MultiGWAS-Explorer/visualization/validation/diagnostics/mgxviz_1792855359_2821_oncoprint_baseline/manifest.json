@@ -1,0 +1,43 @@
+{
+   "capture_complete" : false,
+   "client_sha256" : "2804db52325187308f632e893ab49609e7565805325d3fe6abcb6fa187b61662",
+   "dependencies" : [
+      {
+         "file" : "companion/research/multigwas_port/MGXOncoPrint.sas",
+         "sha256" : "c9fe52e41419beb6ecad248e64c78df87fb9e9c6dbd45ab80b690b99bb6c890c"
+      }
+   ],
+   "endpoint" : "http://127.0.0.1:18841/mcp",
+   "exit_code" : 1,
+   "expected" : "COMPLETE",
+   "expected_outcome_observed" : false,
+   "inputs" : [
+      {
+         "remote" : "~/mgxviz_1792855359_2821_oncoprint_template.sas",
+         "sha256" : "cd5272a2a414b8ae1337ee5806ce47eae5e7f753eed2114e394ec8c62b359b05",
+         "source" : "companion/research/multigwas_port/oncoprint_template.sas"
+      }
+   ],
+   "job_pid" : 2843,
+   "lesson" : "oncoprint",
+   "log_sha256" : "aff1712c0195153056fc0a017beccf1ce196bab0d63c88da213b61c56777fbb4",
+   "persistent" : false,
+   "remote_output" : "~/mgxviz_1792855359_2821",
+   "rpc" : [
+      "rpc_1.json",
+      "rpc_2.json",
+      "rpc_3.json",
+      "rpc_4.json",
+      "rpc_5.json",
+      "rpc_6.json",
+      "rpc_7.json",
+      "rpc_8.json"
+   ],
+   "scope" : "Actual plotting/teaching submission; no upstream study or native IDE transcript implied",
+   "source" : "companion/research/multigwas_port/oncoprint_demo.sas",
+   "source_sha256" : "c65b78272c17764444d788046e155589376193cb61b04fed403177e091b8b563",
+   "status" : "FAILED",
+   "submitted_sha256" : "ee840480ca00d8b90425ef28feb8c8a0aa30394ebb255b0b8c7c157bf44d0bdf",
+   "target" : "oda",
+   "variant" : "baseline"
+}

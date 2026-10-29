@@ -1,0 +1,4 @@
+sample,gene,variant_id,mutation_class,sample_index,gene_index,n_variants,event_order,event_class,event_x,glyph_height,glyph_low,glyph_high
+C1,GENE1,e1,Missense,1,1,2,1,Missense,1,0.4,0.62,0.98
+C1,GENE1,e2,Truncating,1,1,2,2,Truncating,1,0.4,1.02,1.38
+C2,GENE1,e3,Splice,2,1,1,1,Splice,2,0.8,0.64,1.36

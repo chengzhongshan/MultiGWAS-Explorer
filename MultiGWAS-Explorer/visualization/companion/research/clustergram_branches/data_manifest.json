@@ -1,0 +1,116 @@
+{
+   "cells" : 400,
+   "files" : [
+      {
+         "file" : "companion/research/clustergram_branches/data/expression40.tsv",
+         "sha256" : "672ff88cbf7e21564b0e944aae2a2fa0242778689247f2b3c086dcfb3b8ea511"
+      },
+      {
+         "file" : "companion/research/clustergram_branches/data/expression40_long.tsv",
+         "sha256" : "7c496968599c58218c953953b77d3d1852088af4194a978ea01516dacfaf0bba"
+      }
+   ],
+   "genes" : [
+      "CD55",
+      "MAP3K19",
+      "ALB",
+      "APOA1",
+      "APOA2",
+      "FGA",
+      "FGB",
+      "FGG",
+      "TTR",
+      "CYP3A4",
+      "INS",
+      "GCG",
+      "IAPP",
+      "REG1A",
+      "PRSS1",
+      "AMY2A",
+      "CPA1",
+      "PNLIP",
+      "SFTPA1",
+      "SFTPA2",
+      "SFTPB",
+      "SFTPC",
+      "SCGB1A1",
+      "FOXJ1",
+      "MS4A1",
+      "CD3D",
+      "CD3E",
+      "CD79A",
+      "HBB",
+      "HBA1",
+      "MBP",
+      "GFAP",
+      "SNAP25",
+      "SLC17A7",
+      "GRIN1",
+      "MYH1",
+      "ACTA1",
+      "TNNT3",
+      "MYH7",
+      "TNNT2"
+   ],
+   "release" : "GTEx v8, GENCODE v26, GRCh38/hg38 identifiers",
+   "requests" : [
+      {
+         "file" : "companion/research/clustergram_branches/data/gtex_v26_genes.json",
+         "retrieved_utc" : "2026-10-22T01:10:03Z",
+         "sha256" : "47b219d42fe2702862857fcf521703b766afec61b1146dae999a71e91f31d184",
+         "url" : "https://gtexportal.org/api/v2/reference/gene?geneId=CD55&geneId=MAP3K19&geneId=ALB&geneId=APOA1&geneId=APOA2&geneId=FGA&geneId=FGB&geneId=FGG&geneId=TTR&geneId=CYP3A4&geneId=INS&geneId=GCG&geneId=IAPP&geneId=REG1A&geneId=PRSS1&geneId=AMY2A&geneId=CPA1&geneId=PNLIP&geneId=SFTPA1&geneId=SFTPA2&geneId=SFTPB&geneId=SFTPC&geneId=SCGB1A1&geneId=FOXJ1&geneId=MS4A1&geneId=CD3D&geneId=CD3E&geneId=CD79A&geneId=HBB&geneId=HBA1&geneId=MBP&geneId=GFAP&geneId=SNAP25&geneId=SLC17A7&geneId=GRIN1&geneId=MYH1&geneId=ACTA1&geneId=TNNT3&geneId=MYH7&geneId=TNNT2&gencodeVersion=v26&genomeBuild=GRCh38%2Fhg38&itemsPerPage=1000&page=0"
+      },
+      {
+         "file" : "companion/research/clustergram_branches/data/gtex_v8_medians.json",
+         "retrieved_utc" : "2026-10-22T01:10:03Z",
+         "sha256" : "a575610e5ff2c07f61aa4935e3b7fb76621a9d40fedef10c78306403d4776dd2",
+         "url" : "https://gtexportal.org/api/v2/expression/medianGeneExpression?gencodeId=ENSG00000196352.14&gencodeId=ENSG00000176601.12&gencodeId=ENSG00000163631.16&gencodeId=ENSG00000118137.9&gencodeId=ENSG00000158874.11&gencodeId=ENSG00000171560.14&gencodeId=ENSG00000171564.11&gencodeId=ENSG00000171557.16&gencodeId=ENSG00000118271.9&gencodeId=ENSG00000160868.14&gencodeId=ENSG00000254647.6&gencodeId=ENSG00000115263.14&gencodeId=ENSG00000121351.7&gencodeId=ENSG00000115386.5&gencodeId=ENSG00000204983.13&gencodeId=ENSG00000243480.7&gencodeId=ENSG00000091704.9&gencodeId=ENSG00000175535.6&gencodeId=ENSG00000122852.14&gencodeId=ENSG00000185303.16&gencodeId=ENSG00000168878.16&gencodeId=ENSG00000168484.12&gencodeId=ENSG00000149021.6&gencodeId=ENSG00000129654.7&gencodeId=ENSG00000156738.17&gencodeId=ENSG00000167286.9&gencodeId=ENSG00000198851.9&gencodeId=ENSG00000105369.9&gencodeId=ENSG00000244734.3&gencodeId=ENSG00000206172.8&gencodeId=ENSG00000197971.14&gencodeId=ENSG00000131095.12&gencodeId=ENSG00000132639.12&gencodeId=ENSG00000104888.9&gencodeId=ENSG00000176884.14&gencodeId=ENSG00000109061.9&gencodeId=ENSG00000143632.14&gencodeId=ENSG00000130595.17&gencodeId=ENSG00000092054.12&gencodeId=ENSG00000118194.18&datasetId=gtex_v8&tissueSiteDetailId=Lung&tissueSiteDetailId=Whole_Blood&tissueSiteDetailId=Brain_Cortex&tissueSiteDetailId=Liver&tissueSiteDetailId=Muscle_Skeletal&tissueSiteDetailId=Heart_Left_Ventricle&tissueSiteDetailId=Pancreas&tissueSiteDetailId=Skin_Not_Sun_Exposed_Suprapubic&tissueSiteDetailId=Kidney_Cortex&tissueSiteDetailId=Spleen&itemsPerPage=1000&page=0"
+      }
+   ],
+   "rows" : 40,
+   "selection" : "Fixed illustrative panel chosen before querying, including CD55 and genes with varied tissue expression. Not genome-wide, random, inferential or selected by a newly fitted statistical test.",
+   "tissues" : [
+      [
+         "Lung",
+         "Lung"
+      ],
+      [
+         "Blood",
+         "Whole_Blood"
+      ],
+      [
+         "Cortex",
+         "Brain_Cortex"
+      ],
+      [
+         "Liver",
+         "Liver"
+      ],
+      [
+         "Muscle",
+         "Muscle_Skeletal"
+      ],
+      [
+         "Heart",
+         "Heart_Left_Ventricle"
+      ],
+      [
+         "Pancreas",
+         "Pancreas"
+      ],
+      [
+         "Skin",
+         "Skin_Not_Sun_Exposed_Suprapubic"
+      ],
+      [
+         "Kidney",
+         "Kidney_Cortex"
+      ],
+      [
+         "Spleen",
+         "Spleen"
+      ]
+   ],
+   "transformation" : "SAS will calculate log2(median TPM + 1), then within-gene sample-standardized values across these 10 tissue medians. Those are display transformations of tissue summaries, not GTEx normalization or donor-level Z statistics.",
+   "unit" : "Median gene-level TPM by tissue, not donor-level measurements"
+}
