@@ -126,6 +126,7 @@ my $local_manhattan_track_order_override = '';
 my $exclude_local_gtf_tracks_override;
 my $local_gtf_track_order_override = '';
 my $manhattan_differential_p_mode_override = '';
+my $manhattan_top_logp_override;
 my $standardized_p_tracks_override;
 my $compute_meta_override;
 my $exclude_strand_ambiguous_override;
@@ -265,6 +266,7 @@ GetOptions(
     'exclude-local-gtf-tracks|exclude-gtf-tracks=s' => \$exclude_local_gtf_tracks_override,
     'local-gtf-track-order|gtf-track-order=s' => \$local_gtf_track_order_override,
     'manhattan-differential-p-mode=s' => \$manhattan_differential_p_mode_override,
+    'manhattan-top-logp|genomewide-logp-cap=i' => \$manhattan_top_logp_override,
     'standardized-p-tracks!' => \$standardized_p_tracks_override,
     'compute-meta!' => \$compute_meta_override,
     'exclude-strand-ambiguous!' => \$exclude_strand_ambiguous_override,
@@ -317,6 +319,8 @@ if ($help) {
 $force_requested = $force;
 die "--step-heartbeat-seconds must be zero or a positive integer\n"
     if $step_heartbeat_seconds < 0;
+die "--manhattan-top-logp must be an integer of at least 8\n"
+    if defined($manhattan_top_logp_override) && $manhattan_top_logp_override < 8;
 
 if ($print_spec_example || $print_columns_help) {
     print full_help(
@@ -436,6 +440,8 @@ if ($generated_spec_input) {
         if defined $exclude_local_gtf_tracks_override;
     $draft_spec->{standardized_p_tracks} = $standardized_p_tracks_override ? 1 : 0
         if defined $standardized_p_tracks_override;
+    $draft_spec->{manhattan_top_logp} = $manhattan_top_logp_override
+        if defined $manhattan_top_logp_override;
     if ($preview_spec) {
         print pretty_json($draft_spec), "\n";
         exit 0 if $generate_spec_only || !length $spec_out;
@@ -521,6 +527,12 @@ my $manhattan_differential_p_mode = lc(
 die "--manhattan-differential-p-mode must be raw or standardized\n"
     unless $manhattan_differential_p_mode =~ /^(?:raw|standardized)$/;
 $spec->{manhattan_differential_p_mode} = $manhattan_differential_p_mode;
+$spec->{manhattan_top_logp} = $manhattan_top_logp_override
+    if defined $manhattan_top_logp_override;
+my $manhattan_top_logp = cfg_or($spec, 'manhattan_top_logp', 8);
+die "--manhattan-top-logp must be an integer of at least 8 to keep the 5e-8 reference line visible\n"
+    unless defined($manhattan_top_logp)
+       && $manhattan_top_logp =~ /^(?:[89]|[1-9][0-9]+)$/;
 $spec->{standardized_p_tracks} = $standardized_p_tracks_override ? 1 : 0
     if defined $standardized_p_tracks_override;
 if ((defined($standardized_p_tracks_override) || $spec->{standardized_p_tracks})
@@ -3827,6 +3839,7 @@ sub build_runner_config {
         MANHATTAN_DIFFERENTIAL_P_MODE => uc(cfg_or(
             $spec, 'manhattan_differential_p_mode', 'raw'
         )),
+        MANHATTAN_TOP_LOGP => cfg_or($spec, 'manhattan_top_logp', 8),
         STANDARDIZED_P_TRACKS => (cfg_or($spec, 'standardized_p_tracks', 0) ? 1 : 0),
         MANHATTAN_P_VAR => ($manhattan_tracks[0]{manhattan_pvar} || $manhattan_tracks[0]{pvar}),
         MANHATTAN_OTHER_P_VARS => [
@@ -5306,6 +5319,8 @@ Options:
                        A SNP missing from either group cannot form a paired
                        differential result even with these filters off.
   --exclude-manhattan-tracks LIST  Remove comma-separated genomewide scatter tracks.
+  --manhattan-top-logp N  Cap -log10(P) in each genomewide Manhattan track.
+                         N is an integer of at least 8; default: 8.
   --[no-]standardized-p-tracks
                        Add/remove standardized differential P tracks in genomewide
                        Manhattan, local Manhattan, and local GTF plots. Default: off.

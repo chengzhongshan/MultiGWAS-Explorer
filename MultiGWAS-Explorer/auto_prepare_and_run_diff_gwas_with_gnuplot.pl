@@ -61,6 +61,8 @@ Options:
                                 manhattan,local_manhattan,local_gtf,forest
   --manhattan-all-snps          Include every coordinate-valid SNP in genome-wide Manhattan.
                                 Default: any displayed GWAS has P < 0.05.
+  --manhattan-top-logp N        Cap -log10(P) in every genomewide track at N.
+                                N is an integer of at least 8; default: 8.
   --include-x-chr               Include chromosome X / 23 in genomewide Manhattan.
                                 Default: autosomes only.
   --[no-]compute-meta           Calculated meta-analysis is OFF by default;
@@ -204,6 +206,7 @@ my $local_manhattan_track_order_override = '';
 my $exclude_local_gtf_tracks_override;
 my $local_gtf_track_order_override = '';
 my $manhattan_differential_p_mode_override = '';
+my $manhattan_top_logp_override;
 my $standardized_p_tracks_override;
 # Keep ancestry-overlap decisions in the shared spec; gnuplot forwards an
 # explicit request but otherwise inherits the no-computed-meta default.
@@ -273,6 +276,7 @@ GetOptions(
     'exclude-local-gtf-tracks|exclude-gtf-tracks=s' => \$exclude_local_gtf_tracks_override,
     'local-gtf-track-order|gtf-track-order=s' => \$local_gtf_track_order_override,
     'manhattan-differential-p-mode=s' => \$manhattan_differential_p_mode_override,
+    'manhattan-top-logp|genomewide-logp-cap=i' => \$manhattan_top_logp_override,
     'standardized-p-tracks!' => \$standardized_p_tracks_override,
     'compute-meta!'             => \$compute_meta_override,
     'exclude-strand-ambiguous!' => \$exclude_strand_ambiguous_override,
@@ -330,6 +334,8 @@ die "--spec-out requires --gwas-dir or --input-merged\n"
     if length($spec_out) && !length($input_merged) && !length($gwas_dir);
 die "--group-label applies only to --gwas-dir input\n"
     if @group_label_args && !length($gwas_dir);
+die "--manhattan-top-logp must be an integer of at least 8\n"
+    if defined($manhattan_top_logp_override) && $manhattan_top_logp_override < 8;
 if (length($input_merged) || length($gwas_dir)) {
     if (length $spec_out) {
         $spec_file = $spec_out;
@@ -353,6 +359,8 @@ if (length($input_merged) || length($gwas_dir)) {
         (defined($exclude_local_gtf_tracks_override) ? ('--exclude-local-gtf-tracks', $exclude_local_gtf_tracks_override) : ()),
         (defined($standardized_p_tracks_override)
             ? ($standardized_p_tracks_override ? '--standardized-p-tracks' : '--no-standardized-p-tracks') : ()),
+        (defined($manhattan_top_logp_override)
+            ? ('--manhattan-top-logp', $manhattan_top_logp_override) : ()),
     ], 'direct merged GWAS import');
     my $generated_spec = load_json($spec_file);
     $generated_spec->{configs_dir} = dirname(localize_path($spec_file));
@@ -510,6 +518,7 @@ for my $override_value (
 $has_runner_override = 1 if $local_max_hits_per_fig_override;
 $has_runner_override = 1 if defined $compute_meta_override;
 $has_runner_override = 1 if defined $standardized_p_tracks_override;
+$has_runner_override = 1 if defined $manhattan_top_logp_override;
 $has_runner_override = 1 if defined $exclude_local_gtf_tracks_override;
 $has_runner_override = 1 if defined $exclude_strand_ambiguous_override || defined $max_eaf_abs_diff_override;
 $has_runner_override = 1 if $refresh_raw;
@@ -528,6 +537,10 @@ if (-f $runner_config_local) {
         ? $standardized_p_tracks_override : ($spec->{standardized_p_tracks} || 0);
     $has_runner_override = 1
         if !!$requested_std_tracks != !!($cached_runner->{STANDARDIZED_P_TRACKS} || 0);
+    my $requested_top_logp = defined($manhattan_top_logp_override)
+        ? $manhattan_top_logp_override : ($spec->{manhattan_top_logp} // 8);
+    $has_runner_override = 1
+        if "$requested_top_logp" ne ("" . ($cached_runner->{MANHATTAN_TOP_LOGP} // 8));
     $has_runner_override = 1
         if !!($cached_runner->{MANHATTAN_INCLUDE_X_CHR} || 0) != !!(!$remove_x_chr);
     my $requested_exclusions = length($exclude_manhattan_tracks_override)
@@ -588,6 +601,7 @@ if (!$reused_existing_runner) {
         local_gtf_track_order_override => $local_gtf_track_order_override,
         manhattan_differential_p_mode_override => $manhattan_differential_p_mode_override,
         standardized_p_tracks_override => $standardized_p_tracks_override,
+        manhattan_top_logp_override => $manhattan_top_logp_override,
         compute_meta_override           => $compute_meta_override,
         exclude_strand_ambiguous_override => $exclude_strand_ambiguous_override,
         max_eaf_abs_diff_override => $max_eaf_abs_diff_override,
@@ -737,6 +751,7 @@ if ($requested{plot_manhattan}) {
             labels     => \@new_manhattan_labels,
             remove_x_chr => $remove_x_chr,
             all_snps   => $manhattan_all_snps,
+            top_logp   => $manhattan_top_logp_override,
             force      => $force,
         ),
     );
@@ -973,6 +988,8 @@ sub run_upstream_preprocessing {
     push @cmd, ($args{standardized_p_tracks_override}
         ? '--standardized-p-tracks' : '--no-standardized-p-tracks')
         if defined $args{standardized_p_tracks_override};
+    push @cmd, '--manhattan-top-logp', $args{manhattan_top_logp_override}
+        if defined $args{manhattan_top_logp_override};
     push @cmd, ($args{compute_meta_override} ? '--compute-meta' : '--no-compute-meta')
         if defined $args{compute_meta_override};
     push @cmd, ($args{exclude_strand_ambiguous_override} ? '--exclude-strand-ambiguous' : '--no-exclude-strand-ambiguous')
@@ -1098,11 +1115,17 @@ sub plot_manhattan {
     my $plot_manifest = $out_prefix_path . '.manifest.tsv';
     my $prior = -s $plot_manifest ? read_manifest_tsv($plot_manifest) : {};
     my $reference_p = $args{runner}{MANHATTAN_REFERENCE_P} || '5e-8';
+    my $top_logp = defined($args{top_logp})
+        ? $args{top_logp}
+        : ($args{runner}{MANHATTAN_TOP_LOGP} // 8);
+    die "--manhattan-top-logp must be an integer of at least 8\n"
+        unless defined($top_logp) && $top_logp =~ /^(?:[89]|[1-9][0-9]+)$/;
     my $plot_reusable = !$args{force}
         && ($prior->{input} || '') eq $compact_data
         && ($prior->{pcols} || '') eq join(',', @{ $args{pcols} || [] })
         && ($prior->{labels} || '') eq join('|', @{ $args{labels} || [] })
         && ($prior->{reference_p} || '') eq $reference_p
+        && ($prior->{top_logp} || '') eq "$top_logp"
         && target_is_newer_than_inputs($png_path, $compact_data,
             File::Spec->catfile($Bin, 'DiffGWASDeps', 'gnuplot', 'pdl_gnuplot_manhattan.pl'));
     if (!$plot_reusable) {
@@ -1116,6 +1139,7 @@ sub plot_manhattan {
             '--width', ($args{runner}{MANHATTAN_FIG_WIDTH} || 1800),
             '--height', ($args{runner}{MANHATTAN_FIG_HEIGHT} || 1250),
             '--sig', $reference_p,
+            '--top-logp', $top_logp,
             '--min-logp', $min_logp,
             '--keep-all-logp', $keep_all_logp,
             '--thin-mod', $thin_mod,

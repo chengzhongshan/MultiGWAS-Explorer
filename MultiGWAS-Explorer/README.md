@@ -3007,6 +3007,11 @@ Gnuplot genome-wide Manhattan figures draw a `P = 5e-8` reference line in
 every displayed track. The reference is independent of the top-hit selection
 cutoff. A runner config can override it with `MANHATTAN_REFERENCE_P`; direct
 calls to `pdl_gnuplot_manhattan.pl` can use `--sig`.
+Both the SAS ODA and gnuplot entry points accept `--manhattan-top-logp N` to
+draw any larger `-log10(P)` value at `N` in each genome-wide track. The default
+is `8`; `N` must be an integer of at least `8` so the reference line remains
+visible. The same setting can be saved as `"manhattan_top_logp": 10` in a
+comparison spec. It does not change local plot caps or top-hit selection.
 
 To show standardized differential P beside the raw differential and cohort
 tracks in genome-wide Manhattan, local Manhattan, and local GTF plots, pass

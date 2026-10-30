@@ -20,7 +20,7 @@ Options:
   --title TEXT              Optional plot title. Default: none.
   --width N                 PNG width. Default: 1800
   --height N                PNG height. Default: 1250
-  --top-logp FLOAT          Per-track cap. Default: 12
+  --top-logp FLOAT          Cap -log10(P) in every genomewide track. Default: 8
   --sig FLOAT               Genomewide reference P line on every track. Default: 5e-8
   --min-logp FLOAT          Drop points below this. Default: 0.5
   --keep-all-logp FLOAT     Keep all points above this. Default: 3
@@ -34,7 +34,7 @@ USAGE
 my %opt = (
     width         => 1800,
     height        => 1250,
-    top_logp      => 12,
+    top_logp      => 8,
     sig           => '5e-8',
     min_logp      => 0.5,
     keep_all_logp => 3,
@@ -144,6 +144,7 @@ print {$mf} join("\t", 'pcols', join(',', @pcols)), "\n";
 print {$mf} join("\t", 'resolved_pcols', join(',', @resolved_pcols)), "\n";
 print {$mf} join("\t", 'labels', join('|', @labels)), "\n";
 print {$mf} join("\t", 'reference_p', $opt{sig}), "\n";
+print {$mf} join("\t", 'top_logp', $opt{top_logp}), "\n";
 print {$mf} join("\t", 'remove_x_chr', ($opt{remove_x_chr} ? 1 : 0)), "\n";
 print {$mf} join("\t", 'rows_scanned', $rows_scanned), "\n";
 print {$mf} join("\t", 'rows_kept', $rows_kept), "\n";
@@ -325,7 +326,8 @@ sub write_gnuplot {
         $arrow_id++;
     }
     for my $i (0 .. $#{ $args{labels} }) {
-        my $panel_y = $i * $args{top_logp} + $args{top_logp} - 0.95;
+        my $label_gap = $args{top_logp} <= 8.5 ? 1.5 : 0.95;
+        my $panel_y = $i * $args{top_logp} + $args{top_logp} - $label_gap;
         my $xmid = $args{max_x} / 2;
         print {$gp} "set label " . (100 + $i) . " \"" . escape_gp($args{labels}[$i]) . "\" at $xmid,$panel_y center font ',18'\n";
     }
@@ -339,8 +341,8 @@ sub repeated_panel_ytics_manhattan {
     my @ticks;
     for my $i (0 .. ($track_count - 1)) {
         my $base = $i * $top_logp;
-        for my $tick (0, 2, 4, 6, 8) {
-            next if $tick > $top_logp;
+        for (my $tick = 0; $tick <= $top_logp; $tick += 2) {
+            next if $tick == $top_logp && $i < $track_count - 1;
             push @ticks, sprintf('"%d" %.3f', $tick, $base + $tick);
         }
     }
