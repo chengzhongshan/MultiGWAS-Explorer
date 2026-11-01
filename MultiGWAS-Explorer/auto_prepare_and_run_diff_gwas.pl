@@ -388,7 +388,7 @@ if ($generated_spec_input) {
     my $draft_spec;my $draft_path;
     if (length $input_merged) {
         my $local_input = cygpath_to_win($input_merged);
-        die "Merged GWAS input does not exist: $input_merged\n" unless -f $local_input;
+        die "Merged GWAS input does not exist: $input_merged. Check the path; see --help under 'If automatic spec generation fails'.\n" unless -f $local_input;
         my $input_path = $local_input;
         if ($^O eq 'cygwin' && $input_path =~ /^([A-Za-z]):[\\\/](.*)$/) {
             my ($drive, $rest) = (lc($1), $2);
@@ -407,7 +407,7 @@ if ($generated_spec_input) {
             spec_out => $spec_out,
             files => [$input_path],
         );
-        die "Cannot import merged GWAS input $input_merged: expected CHR/BP/SNP and at least two cohort BETA/SE/P blocks; supplied meta-analysis tracks are optional\n"
+        die "Cannot import merged GWAS input $input_merged: expected CHR/BP/SNP and at least two cohort BETA/SE/P blocks; supplied meta-analysis tracks are optional. See --help under 'If automatic spec generation fails'.\n"
             unless $draft_spec;
     }
     else {
@@ -1611,7 +1611,7 @@ sub infer_spec_from_gwas_dir {
     if ($^O eq 'cygwin' && $gwas_dir =~ /^([A-Za-z]):\/(.*)$/) {
         $gwas_dir = '/cygdrive/' . lc($1) . '/' . $2;
     }
-    die "GWAS directory does not exist: $gwas_dir\n" unless -d $gwas_dir;
+    die "GWAS directory does not exist: $gwas_dir. Check the path; see --help under 'If automatic spec generation fails'.\n" unless -d $gwas_dir;
     $gwas_dir = normalize_unix_path(abs_path($gwas_dir));
     my $workdir = normalize_unix_path($args{workdir} // script_root_dir());
     my $configs_dir = "$workdir/configs";
@@ -1626,7 +1626,7 @@ sub infer_spec_from_gwas_dir {
         . ", precomputed=" . scalar(@precomputed_files)
         . ", merged=" . scalar(@merged_files)
     );
-    die "No candidate GWAS summary-statistics files found in $gwas_dir\n"
+    die "No candidate GWAS summary-statistics files found in $gwas_dir. Check the directory and file extensions; see --help under 'If automatic spec generation fails'.\n"
       unless @raw_files || @precomputed_files || @merged_files;
 
     # A rerun of --gwas-dir commonly contains both original cohort files and
@@ -1748,7 +1748,7 @@ sub infer_spec_from_gwas_dir {
             files                   => \@precomputed_files,
         );
         return ($pre_spec, $pre_path) if $pre_spec;
-        die "Need at least two valid raw GWAS groups or one valid precomputed diff/stdized table in $gwas_dir\n";
+        die "Need at least two valid raw GWAS groups or one valid precomputed diff/stdized table in $gwas_dir. Review the preceding 'Skipped' reasons; see --help under 'If automatic spec generation fails'.\n";
     }
 
     my $project_tag = safe_name($args{project_tag_override} || infer_project_tag_from_dir($gwas_dir, \@groups));
@@ -5588,6 +5588,28 @@ The spec can describe:
   - precomputed_diff        : standardize, extract, plot
   - precomputed_diff_stdized: extract, plot
   - merged_gwas_table       : normalize one merged-wide GWAS table, then plot
+
+If automatic spec generation fails (before plotting starts):
+  1. Run --gwas-dir DIR --generate-spec-only and read the candidate counts,
+     'Skipped' reasons, accepted groups, and selected source printed above
+     the error. The scan reads files directly inside DIR. Check that it
+     contains the original summary-statistics files with supported extensions;
+     generated output files are not valid substitutes for missing inputs.
+  2. Check the first header row: gzip -dc FILE.gz | head -n 1 (or head -n 1
+     FILE.tsv). Raw inputs need chromosome, SNP ID, position, effect/non-effect
+     alleles, BETA or OR, SE, and P; run --print-columns-help for all modes.
+     Files must share genome build and allele conventions. A directory needs
+     two distinguishable, compatible raw groups or one valid precomputed table.
+  3. For unfamiliar raw header names, map aliases in a JSON file, e.g.
+     {"ID":["MARKER_ID"],"POS":["GENOMIC_POS"],"PVAL":["PVALUE_LRT"]}
+     and rerun with --raw-column-alias-config aliases.json. For accession-only
+     filenames, add --group-label GCST_ID=EAS (repeat per group). Check the
+     generated group labels, pairs, reference build, and sample overlap.
+  4. For a combined wide table, use --input-merged FILE.gz; it needs CHR/BP/SNP
+     and at least two cohort BETA/SE/P blocks. Supplied meta tracks are optional.
+     If detection still fails, use --print-spec-example to create a reviewed
+     spec JSON, then run --spec FILE.json. Use --spec-out FILE.json to save a
+     successful inferred spec for later runs.
 
 Recommended interactive pattern:
   - open this repository in VS Code

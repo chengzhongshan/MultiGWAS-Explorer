@@ -180,6 +180,30 @@ Options:
   --local-manhattan-annotation MODE  Under-column annotation for combined local Manhattan: labels, gtf, auto, none
                                      Default: gtf
 
+If automatic spec generation fails (before gnuplot starts):
+  1. Run the shared spec generator by itself to see candidate counts and
+     'Skipped' reasons:
+       perl auto_prepare_and_run_diff_gwas.pl --gwas-dir DIR --generate-spec-only
+     Confirm DIR contains the original GWAS files, not just generated outputs.
+  2. Check the first header row: gzip -dc FILE.gz | head -n 1 (or head -n 1
+     FILE.tsv). Raw inputs need chromosome, SNP ID, position, effect/non-effect
+     alleles, BETA or OR, SE, and P. Run the shared script with
+     --print-columns-help for required columns in every supported input mode.
+     A directory needs two compatible, distinguishable raw groups or one
+     valid precomputed differential table.
+  3. If raw headers use unfamiliar names, save aliases as JSON, e.g.
+     {"ID":["MARKER_ID"],"POS":["GENOMIC_POS"],"PVAL":["PVALUE_LRT"]}
+     Then run the shared generator with --raw-column-alias-config aliases.json
+     --spec-out FILE.json --generate-spec-only, followed by this script with
+     --spec FILE.json. For accession-only names use --group-label GCST_ID=EAS
+     (repeat for each group). Review inferred labels, pairs, genome build,
+     and sample overlap before plotting.
+  4. For one combined wide table use --input-merged FILE.gz; it needs
+     CHR/BP/SNP plus at least two cohort BETA/SE/P blocks. If inference still
+     fails, use the shared script's --print-spec-example to create a reviewed
+     spec JSON, then run this script with --spec FILE.json. Save successful
+     inference with --spec-out FILE.json for reuse.
+
 Recommended interactive pattern:
   open this repository in VS Code, use the integrated shell for the current
   platform, and keep Codex in the same workspace if you are driving the local
@@ -361,7 +385,7 @@ if (length($input_merged) || length($gwas_dir)) {
             ? ($standardized_p_tracks_override ? '--standardized-p-tracks' : '--no-standardized-p-tracks') : ()),
         (defined($manhattan_top_logp_override)
             ? ('--manhattan-top-logp', $manhattan_top_logp_override) : ()),
-    ], 'direct merged GWAS import');
+    ], 'auto-generate GWAS comparison spec');
     my $generated_spec = load_json($spec_file);
     $generated_spec->{configs_dir} = dirname(localize_path($spec_file));
     open my $generated_fh, '>', $spec_file
@@ -3943,7 +3967,11 @@ sub run_cmd {
     print "  " . join(' ', map { quote_for_log($_) } @{$cmd}) . "\n";
     system @{$cmd};
     my $exit = $? >> 8;
-    die "Command failed for $label (exit $exit)\n" if $exit != 0;
+    if ($exit != 0) {
+        die "Command failed for $label (exit $exit). See --help under 'If automatic spec generation fails'.\n"
+            if $label eq 'auto-generate GWAS comparison spec';
+        die "Command failed for $label (exit $exit)\n";
+    }
 }
 
 sub format_elapsed_seconds {
