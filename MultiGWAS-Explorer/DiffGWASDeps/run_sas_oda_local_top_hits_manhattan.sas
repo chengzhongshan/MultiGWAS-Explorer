@@ -191,6 +191,16 @@ quit;
 
   %if %superq(requested_top_hits_csv_basename)= %then %return;
 
+  /* The local selector is optional. Avoid a fatal PROC IMPORT when it found
+     no qualifying hits and therefore did not upload a CSV. */
+  filename _reqhits "~/&requested_top_hits_csv_basename";
+  %if not %sysfunc(fexist(_reqhits)) %then %do;
+    %put NOTE: Requested top-hit CSV is absent, selecting hits inside SAS.;
+    filename _reqhits clear;
+    %return;
+  %end;
+  filename _reqhits clear;
+
   proc import datafile="~/&requested_top_hits_csv_basename"
     out=&outdsd
     dbms=csv
@@ -747,8 +757,11 @@ quit;
 
 /* Render SNP, gene, and chromosome as adjacent vertical group labels. */
 data top_hit4diffp;
-  set top_hit4diffp;
-  length chr_label $8;
+  /* PROC IMPORT can infer a short SNP/gene label width. Rename the imported
+     value so the final SNP:gene:chr label gets a fresh 128-character field. */
+  length snp_gene $128 chr_label $8;
+  set top_hit4diffp(rename=(snp_gene=_imported_snp_gene));
+  drop _imported_snp_gene;
   if CHR=23 then chr_label='chrX';
   else if CHR=24 then chr_label='chrY';
   else chr_label=cats('chr',strip(put(CHR,best32.)));
@@ -799,12 +812,14 @@ data top_hit_groups;
 run;
 
 proc sql noprint;
-  select name into: top_hit_export_extra_vars separated by ', '
+  select cats('t.', name) into: top_hit_export_extra_vars separated by ', '
   from dictionary.columns
   where libname='WORK'
     and memname='TOP_HIT4DIFFP'
     and upcase(name) not in (
-      'CHR','BP','SNP','GENE','SNP_GENE','A1','A2','REQUESTED_HIT_ORDER'
+      'CHR','BP','SNP','GENE','SNP_GENE','A1','A2','REQUESTED_HIT_ORDER',
+      'HIT_ORDER','PANEL_INDEX','FOCUS_SIGNAL',
+      'EFFECT_ALLELE','OTHER_ALLELE','REFERENCE_ALLELE','ALTERNATIVE_ALLELE'
     )
   order by varnum
   ;

@@ -37,6 +37,7 @@ use Time::HiRes qw(time);
 use IO::Uncompress::Gunzip qw($GunzipError);
 use lib File::Spec->catdir($Bin, 'DiffGWASDeps');
 use ChromosomeBounds qw(locus_window);
+use StudyDesignFilters qw(cross_ancestry_filter_advisory);
 
 sub usage {
     return <<"USAGE";
@@ -54,20 +55,36 @@ Options:
   --gwas-dir DIR                Auto-detect GWAS inputs in this directory.
   --input-merged FILE           Import a combined cohort/meta GWAS table directly.
   --spec-out FILE.json          Save the generated spec at this path for reuse.
+  --raw-column-alias-config FILE.json
+                                With --gwas-dir, map unfamiliar raw headers to
+                                canonical keys such as CHROM, ID, POS, BETA,
+                                SE, PVAL. Example: {"ID":["MARKER_ID"]}.
   --group-label ACCESSION=LABEL Repeat for accession-only inputs such as
                                 GCST90018574=EAS, GCST90018794=EUR+EAS.
   --plots LIST                  Plot families for a normal run. Comma list:
                                 manhattan,local_manhattan,local_gtf,forest
   --manhattan-all-snps          Include every coordinate-valid SNP in genome-wide Manhattan.
                                 Default: any displayed GWAS has P < 0.05.
+  --manhattan-top-logp N        Cap -log10(P) in every genomewide track at N.
+                                N is an integer of at least 8; default: 8.
   --include-x-chr               Include chromosome X / 23 in genomewide Manhattan.
                                 Default: autosomes only.
   --[no-]compute-meta           Calculated meta-analysis is OFF by default;
                                 enable only for independent or covariance-modeled cohorts.
+                                EAS versus EUR+EAS overlaps; justify rho first.
   --[no-]exclude-strand-ambiguous
-                                Default: exclude A/T and C/G; opt in only after
-                                verifying allele orientation across inputs.
-  --max-eaf-abs-diff N|none     Default: none; ancestry differences need not be errors.
+                                Default: exclude A/T and C/G with uncertain strand;
+                                inspect losses. Disable only after allele checks.
+  --max-eaf-abs-diff N|none     Paired-GWAS effect-allele frequency difference.
+                                Default: none. A positive limit may remove real
+                                ancestry-enriched SNPs; harmonize alleles first.
+  Spec key top_hit_maf_threshold
+                                Default: 0; unknown-MAF top hits retained.
+                                Positive cutoffs exclude unknown MAF and may
+                                remove signals rare in one ancestry. The 0.01
+                                EUR female/male demo cutoff is study-specific.
+                                Missing-in-one-group SNPs cannot yield a paired
+                                differential result even with filters off.
   --step NAME                   Render only this plot stage; repeat for several:
                                 plot_manhattan, plot_local_manhattan,
                                 plot_local_gtf, or plot_forest.
@@ -95,6 +112,10 @@ Options:
                                 META/DIFFERENTIAL, and /PATTERN/[imsx] regexes.
   --manhattan-differential-p-mode MODE
                                 raw or standardized. Default: raw.
+  --[no-]standardized-p-tracks
+                                Add/remove standardized differential P tracks
+                                in all three Manhattan/GTF plot families.
+                                Default: off.
   --remove-X-chr / --no-remove-X-chr
                                 Legacy aliases controlling X in gnuplot figures.
                                 --no-remove-X-chr includes X, like --include-x-chr.
@@ -163,6 +184,31 @@ Options:
   --local-manhattan-annotation MODE  Under-column annotation for combined local Manhattan: labels, gtf, auto, none
                                      Default: gtf
 
+If automatic spec generation fails (before gnuplot starts):
+  1. Run the shared spec generator by itself to see candidate counts and
+     'Skipped' reasons:
+       perl auto_prepare_and_run_diff_gwas.pl --gwas-dir DIR --generate-spec-only
+     Confirm DIR contains the original GWAS files, not just generated outputs.
+  2. Check the first header row: gzip -dc FILE.gz | head -n 1 (or head -n 1
+     FILE.tsv). Raw inputs need chromosome, SNP ID, position, effect/non-effect
+     alleles, BETA or OR, SE, and P. Run the shared script with
+     --print-columns-help for required columns in every supported input mode.
+     A directory needs two compatible, distinguishable raw groups or one
+     valid precomputed differential table.
+  3. If raw headers use unfamiliar names, save aliases as JSON, e.g.
+     {"ID":["MARKER_ID"],"POS":["GENOMIC_POS"],"PVAL":["PVALUE_LRT"]}
+     Rerun this script with --gwas-dir DIR
+     --raw-column-alias-config aliases.json --spec-out FILE.json. Alternatively,
+     run the shared generator with those options plus --generate-spec-only,
+     then run this script with --spec FILE.json. For accession-only names use
+     --group-label GCST_ID=EAS (repeat for each group). Review inferred labels,
+     pairs, genome build, and sample overlap before plotting.
+  4. For one combined wide table use --input-merged FILE.gz; it needs
+     CHR/BP/SNP plus at least two cohort BETA/SE/P blocks. If inference still
+     fails, use the shared script's --print-spec-example to create a reviewed
+     spec JSON, then run this script with --spec FILE.json. Save successful
+     inference with --spec-out FILE.json for reuse.
+
 Recommended interactive pattern:
   open this repository in VS Code, use the integrated shell for the current
   platform, and keep Codex in the same workspace if you are driving the local
@@ -174,6 +220,7 @@ my $spec_file = '';
 my $gwas_dir = '';
 my $input_merged = '';
 my $spec_out = '';
+my $raw_column_alias_config = '';
 my @group_label_args;
 my $plots = 'manhattan,local_manhattan,local_gtf';
 my @step_args;
@@ -189,6 +236,8 @@ my $local_manhattan_track_order_override = '';
 my $exclude_local_gtf_tracks_override;
 my $local_gtf_track_order_override = '';
 my $manhattan_differential_p_mode_override = '';
+my $manhattan_top_logp_override;
+my $standardized_p_tracks_override;
 # Keep ancestry-overlap decisions in the shared spec; gnuplot forwards an
 # explicit request but otherwise inherits the no-computed-meta default.
 my $compute_meta_override;
@@ -241,6 +290,7 @@ GetOptions(
     'gwas-dir=s'              => \$gwas_dir,
     'input-merged=s'          => \$input_merged,
     'spec-out=s'              => \$spec_out,
+    'raw-column-alias-config=s' => \$raw_column_alias_config,
     'group-label=s@' => \@group_label_args,
     'plots=s'                 => \$plots,
     'manhattan-all-snps!'     => \$manhattan_all_snps,
@@ -257,6 +307,8 @@ GetOptions(
     'exclude-local-gtf-tracks|exclude-gtf-tracks=s' => \$exclude_local_gtf_tracks_override,
     'local-gtf-track-order|gtf-track-order=s' => \$local_gtf_track_order_override,
     'manhattan-differential-p-mode=s' => \$manhattan_differential_p_mode_override,
+    'manhattan-top-logp|genomewide-logp-cap=i' => \$manhattan_top_logp_override,
+    'standardized-p-tracks!' => \$standardized_p_tracks_override,
     'compute-meta!'             => \$compute_meta_override,
     'exclude-strand-ambiguous!' => \$exclude_strand_ambiguous_override,
     'max-eaf-abs-diff=s' => \$max_eaf_abs_diff_override,
@@ -313,6 +365,10 @@ die "--spec-out requires --gwas-dir or --input-merged\n"
     if length($spec_out) && !length($input_merged) && !length($gwas_dir);
 die "--group-label applies only to --gwas-dir input\n"
     if @group_label_args && !length($gwas_dir);
+die "--raw-column-alias-config applies only to --gwas-dir raw inputs; for --spec add raw_column_aliases to the spec JSON\n"
+    if length($raw_column_alias_config) && !length($gwas_dir);
+die "--manhattan-top-logp must be an integer of at least 8\n"
+    if defined($manhattan_top_logp_override) && $manhattan_top_logp_override < 8;
 if (length($input_merged) || length($gwas_dir)) {
     if (length $spec_out) {
         $spec_file = $spec_out;
@@ -328,13 +384,18 @@ if (length($input_merged) || length($gwas_dir)) {
         (length($input_merged) ? ('--input-merged', $input_merged) : ('--gwas-dir', $gwas_dir)),
         '--spec-out', $spec_file,
         '--generate-spec-only',
+        (length($raw_column_alias_config) ? ('--raw-column-alias-config', $raw_column_alias_config) : ()),
         (map { ('--group-label', $_) } @group_label_args),
         (defined($compute_meta_override) ? ($compute_meta_override ? '--compute-meta' : '--no-compute-meta') : ()),
         (defined($exclude_strand_ambiguous_override) ? ($exclude_strand_ambiguous_override ? '--exclude-strand-ambiguous' : '--no-exclude-strand-ambiguous') : ()),
         (defined($max_eaf_abs_diff_override) ? ('--max-eaf-abs-diff', $max_eaf_abs_diff_override) : ()),
         (length($local_gtf_window_bp_override) ? ('--local-gtf-window-bp', $local_gtf_window_bp_override) : ()),
         (defined($exclude_local_gtf_tracks_override) ? ('--exclude-local-gtf-tracks', $exclude_local_gtf_tracks_override) : ()),
-    ], 'direct merged GWAS import');
+        (defined($standardized_p_tracks_override)
+            ? ($standardized_p_tracks_override ? '--standardized-p-tracks' : '--no-standardized-p-tracks') : ()),
+        (defined($manhattan_top_logp_override)
+            ? ('--manhattan-top-logp', $manhattan_top_logp_override) : ()),
+    ], 'auto-generate GWAS comparison spec');
     my $generated_spec = load_json($spec_file);
     $generated_spec->{configs_dir} = dirname(localize_path($spec_file));
     open my $generated_fh, '>', $spec_file
@@ -389,6 +450,15 @@ die "No gnuplot plot steps were requested.\n" unless grep { $requested{$_} } qw(
 my $spec = load_json($spec_file);
 $spec->{compute_meta} = $compute_meta_override ? 1 : 0
     if defined $compute_meta_override;
+if (!length($input_merged) && !length($gwas_dir)) {
+    $spec->{exclude_strand_ambiguous} = $exclude_strand_ambiguous_override ? 1 : 0
+        if defined $exclude_strand_ambiguous_override;
+    $spec->{max_eaf_abs_diff} = lc($max_eaf_abs_diff_override) eq 'none' ? '' : $max_eaf_abs_diff_override
+        if defined $max_eaf_abs_diff_override;
+    if (my $advisory = cross_ancestry_filter_advisory($spec)) {
+        print STDERR "[science] $advisory\n";
+    }
+}
 my $explicit_target_local_only = length(trim(
     $target_snps_override || $spec->{target_snps} || ''
 ))
@@ -481,6 +551,8 @@ for my $override_value (
 }
 $has_runner_override = 1 if $local_max_hits_per_fig_override;
 $has_runner_override = 1 if defined $compute_meta_override;
+$has_runner_override = 1 if defined $standardized_p_tracks_override;
+$has_runner_override = 1 if defined $manhattan_top_logp_override;
 $has_runner_override = 1 if defined $exclude_local_gtf_tracks_override;
 $has_runner_override = 1 if defined $exclude_strand_ambiguous_override || defined $max_eaf_abs_diff_override;
 $has_runner_override = 1 if $refresh_raw;
@@ -495,6 +567,14 @@ if (!$manhattan_all_snps && ($spec->{source_mode} || '') ne 'merged_gwas_table'
 }
 if (-f $runner_config_local) {
     my $cached_runner = load_json($runner_config_local);
+    my $requested_std_tracks = defined($standardized_p_tracks_override)
+        ? $standardized_p_tracks_override : ($spec->{standardized_p_tracks} || 0);
+    $has_runner_override = 1
+        if !!$requested_std_tracks != !!($cached_runner->{STANDARDIZED_P_TRACKS} || 0);
+    my $requested_top_logp = defined($manhattan_top_logp_override)
+        ? $manhattan_top_logp_override : ($spec->{manhattan_top_logp} // 8);
+    $has_runner_override = 1
+        if "$requested_top_logp" ne ("" . ($cached_runner->{MANHATTAN_TOP_LOGP} // 8));
     $has_runner_override = 1
         if !!($cached_runner->{MANHATTAN_INCLUDE_X_CHR} || 0) != !!(!$remove_x_chr);
     my $requested_exclusions = length($exclude_manhattan_tracks_override)
@@ -554,6 +634,8 @@ if (!$reused_existing_runner) {
         exclude_local_gtf_tracks_override => $exclude_local_gtf_tracks_override,
         local_gtf_track_order_override => $local_gtf_track_order_override,
         manhattan_differential_p_mode_override => $manhattan_differential_p_mode_override,
+        standardized_p_tracks_override => $standardized_p_tracks_override,
+        manhattan_top_logp_override => $manhattan_top_logp_override,
         compute_meta_override           => $compute_meta_override,
         exclude_strand_ambiguous_override => $exclude_strand_ambiguous_override,
         max_eaf_abs_diff_override => $max_eaf_abs_diff_override,
@@ -580,7 +662,7 @@ my @manhattan_source_pcols = (
     @{ ref($runner->{MANHATTAN_OTHER_P_VARS}) eq 'ARRAY' ? $runner->{MANHATTAN_OTHER_P_VARS} : [] },
 );
 my $plot_runner_config_local = $runner_config_local;
-if (($spec->{source_mode} || '') eq 'merged_gwas_table' && -f $preset_config_local) {
+if (-f $preset_config_local) {
     my $preset = load_json($preset_config_local);
     my %alias = (
         %{ $preset->{alias_map} || {} },
@@ -601,7 +683,7 @@ if (($spec->{source_mode} || '') eq 'merged_gwas_table' && -f $preset_config_loc
                 map { $alias{$_} || $_ } @{ $runner->{LOCAL_MANHATTAN_OTHER_P_VARS} }
             ];
         }
-        for my $key (qw(GTF_ASSOC_PVARS GTF_ZSCORE_VARS)) {
+        for my $key (qw(GTF_ASSOC_PVARS GTF_ZSCORE_VARS COMMON_ASSOC_P_VARS COMMON_ASSOC_BETA_VARS)) {
             $runner->{$key} = join(' ', map { $alias{$_} || $_ }
                 grep { length } split /\s+/, ($runner->{$key} || ''));
         }
@@ -703,6 +785,7 @@ if ($requested{plot_manhattan}) {
             labels     => \@new_manhattan_labels,
             remove_x_chr => $remove_x_chr,
             all_snps   => $manhattan_all_snps,
+            top_logp   => $manhattan_top_logp_override,
             force      => $force,
         ),
     );
@@ -936,6 +1019,11 @@ sub run_upstream_preprocessing {
         push @cmd, '--manhattan-differential-p-mode',
           $args{manhattan_differential_p_mode_override};
     }
+    push @cmd, ($args{standardized_p_tracks_override}
+        ? '--standardized-p-tracks' : '--no-standardized-p-tracks')
+        if defined $args{standardized_p_tracks_override};
+    push @cmd, '--manhattan-top-logp', $args{manhattan_top_logp_override}
+        if defined $args{manhattan_top_logp_override};
     push @cmd, ($args{compute_meta_override} ? '--compute-meta' : '--no-compute-meta')
         if defined $args{compute_meta_override};
     push @cmd, ($args{exclude_strand_ambiguous_override} ? '--exclude-strand-ambiguous' : '--no-exclude-strand-ambiguous')
@@ -1060,10 +1148,18 @@ sub plot_manhattan {
     $thin_mod = 1 if $args{all_snps};
     my $plot_manifest = $out_prefix_path . '.manifest.tsv';
     my $prior = -s $plot_manifest ? read_manifest_tsv($plot_manifest) : {};
+    my $reference_p = $args{runner}{MANHATTAN_REFERENCE_P} || '5e-8';
+    my $top_logp = defined($args{top_logp})
+        ? $args{top_logp}
+        : ($args{runner}{MANHATTAN_TOP_LOGP} // 8);
+    die "--manhattan-top-logp must be an integer of at least 8\n"
+        unless defined($top_logp) && $top_logp =~ /^(?:[89]|[1-9][0-9]+)$/;
     my $plot_reusable = !$args{force}
         && ($prior->{input} || '') eq $compact_data
         && ($prior->{pcols} || '') eq join(',', @{ $args{pcols} || [] })
         && ($prior->{labels} || '') eq join('|', @{ $args{labels} || [] })
+        && ($prior->{reference_p} || '') eq $reference_p
+        && ($prior->{top_logp} || '') eq "$top_logp"
         && target_is_newer_than_inputs($png_path, $compact_data,
             File::Spec->catfile($Bin, 'DiffGWASDeps', 'gnuplot', 'pdl_gnuplot_manhattan.pl'));
     if (!$plot_reusable) {
@@ -1076,7 +1172,8 @@ sub plot_manhattan {
             '--labels', join('|', @{ $args{labels} || [] }),
             '--width', ($args{runner}{MANHATTAN_FIG_WIDTH} || 1800),
             '--height', ($args{runner}{MANHATTAN_FIG_HEIGHT} || 1250),
-            '--sig', ($args{runner}{TOP_HIT_SIGNAL_THRSHD} || '1e-6'),
+            '--sig', $reference_p,
+            '--top-logp', $top_logp,
             '--min-logp', $min_logp,
             '--keep-all-logp', $keep_all_logp,
             '--thin-mod', $thin_mod,
@@ -1301,7 +1398,7 @@ sub collect_top_hits {
 
 sub runner_maf_threshold {
     my ($runner) = @_;
-    return 0.01 unless ref($runner) eq 'HASH' && exists $runner->{TOP_HIT_MAF_THRESHOLD};
+    return 0 unless ref($runner) eq 'HASH' && exists $runner->{TOP_HIT_MAF_THRESHOLD};
     my $value = $runner->{TOP_HIT_MAF_THRESHOLD};
     return 0 if defined $value && $value =~ /^(?:0|0\.0+)?$/;
     return $value if defined $value && $value ne '';
@@ -3880,7 +3977,11 @@ sub run_cmd {
     print "  " . join(' ', map { quote_for_log($_) } @{$cmd}) . "\n";
     system @{$cmd};
     my $exit = $? >> 8;
-    die "Command failed for $label (exit $exit)\n" if $exit != 0;
+    if ($exit != 0) {
+        die "Command failed for $label (exit $exit). See --help under 'If automatic spec generation fails'.\n"
+            if $label eq 'auto-generate GWAS comparison spec';
+        die "Command failed for $label (exit $exit)\n";
+    }
 }
 
 sub format_elapsed_seconds {

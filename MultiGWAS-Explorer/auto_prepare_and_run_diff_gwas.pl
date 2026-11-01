@@ -43,6 +43,7 @@ use GenomeBuildProfile qw(
   canonicalize_reference_build
   detect_reference_build_profile
 );
+use StudyDesignFilters qw(cross_ancestry_filter_advisory);
 
 BEGIN {
     my $old = select STDERR;
@@ -68,6 +69,7 @@ my $to_step = '';
 my $list_steps = 0;
 my $print_spec_example = 0;
 my $print_columns_help = 0;
+my $help = 0;
 my $generate_spec_only = 0;
 my $preview_spec = 0;
 my $project_tag_override = '';
@@ -124,6 +126,8 @@ my $local_manhattan_track_order_override = '';
 my $exclude_local_gtf_tracks_override;
 my $local_gtf_track_order_override = '';
 my $manhattan_differential_p_mode_override = '';
+my $manhattan_top_logp_override;
+my $standardized_p_tracks_override;
 my $compute_meta_override;
 my $exclude_strand_ambiguous_override;
 my $max_eaf_abs_diff_override;
@@ -205,6 +209,7 @@ GetOptions(
     'list-steps!'         => \$list_steps,
     'print-spec-example!' => \$print_spec_example,
     'print-columns-help!' => \$print_columns_help,
+    'help!' => \$help,
     'generate-spec-only!' => \$generate_spec_only,
     'preview-spec!'       => \$preview_spec,
     'project-tag=s'       => \$project_tag_override,
@@ -261,6 +266,8 @@ GetOptions(
     'exclude-local-gtf-tracks|exclude-gtf-tracks=s' => \$exclude_local_gtf_tracks_override,
     'local-gtf-track-order|gtf-track-order=s' => \$local_gtf_track_order_override,
     'manhattan-differential-p-mode=s' => \$manhattan_differential_p_mode_override,
+    'manhattan-top-logp|genomewide-logp-cap=i' => \$manhattan_top_logp_override,
+    'standardized-p-tracks!' => \$standardized_p_tracks_override,
     'compute-meta!' => \$compute_meta_override,
     'exclude-strand-ambiguous!' => \$exclude_strand_ambiguous_override,
     'max-eaf-abs-diff=s' => \$max_eaf_abs_diff_override,
@@ -304,9 +311,16 @@ GetOptions(
     'cleanup-shared-plot-data!' => \$step_flag{cleanup_shared_plot_data},
 ) or die usage();
 
+if ($help) {
+    print usage();
+    exit 0;
+}
+
 $force_requested = $force;
 die "--step-heartbeat-seconds must be zero or a positive integer\n"
     if $step_heartbeat_seconds < 0;
+die "--manhattan-top-logp must be an integer of at least 8\n"
+    if defined($manhattan_top_logp_override) && $manhattan_top_logp_override < 8;
 
 if ($print_spec_example || $print_columns_help) {
     print full_help(
@@ -369,11 +383,12 @@ die "--max-eaf-abs-diff must be a number between 0 and 1, or none\n"
 die "--input-merged cannot be combined with --spec or --gwas-dir\n"
     if length($input_merged) && (length($spec_file) || length($gwas_dir));
 
-if (!length $spec_file && (length $gwas_dir || length $input_merged)) {
+my $generated_spec_input = !length($spec_file) && (length($gwas_dir) || length($input_merged));
+if ($generated_spec_input) {
     my $draft_spec;my $draft_path;
     if (length $input_merged) {
         my $local_input = cygpath_to_win($input_merged);
-        die "Merged GWAS input does not exist: $input_merged\n" unless -f $local_input;
+        die "Merged GWAS input does not exist: $input_merged. Check the path; see --help under 'If automatic spec generation fails'.\n" unless -f $local_input;
         my $input_path = $local_input;
         if ($^O eq 'cygwin' && $input_path =~ /^([A-Za-z]):[\\\/](.*)$/) {
             my ($drive, $rest) = (lc($1), $2);
@@ -392,7 +407,7 @@ if (!length $spec_file && (length $gwas_dir || length $input_merged)) {
             spec_out => $spec_out,
             files => [$input_path],
         );
-        die "Cannot import merged GWAS input $input_merged: expected CHR/BP/SNP and at least two cohort BETA/SE/P blocks; supplied meta-analysis tracks are optional\n"
+        die "Cannot import merged GWAS input $input_merged: expected CHR/BP/SNP and at least two cohort BETA/SE/P blocks; supplied meta-analysis tracks are optional. See --help under 'If automatic spec generation fails'.\n"
             unless $draft_spec;
     }
     else {
@@ -414,10 +429,19 @@ if (!length $spec_file && (length $gwas_dir || length $input_merged)) {
         if defined $exclude_strand_ambiguous_override;
     $draft_spec->{max_eaf_abs_diff} = lc($max_eaf_abs_diff_override) eq 'none' ? '' : $max_eaf_abs_diff_override
         if defined $max_eaf_abs_diff_override;
+    if (my $advisory = cross_ancestry_filter_advisory($draft_spec)) {
+        $draft_spec->{auto_detect_summary}{warnings} ||= [];
+        push @{ $draft_spec->{auto_detect_summary}{warnings} }, $advisory;
+        print STDERR "[science] $advisory\n";
+    }
     $draft_spec->{local_gtf_window_bp} = $local_gtf_window_bp_override
         if length $local_gtf_window_bp_override;
     $draft_spec->{exclude_local_gtf_tracks} = $exclude_local_gtf_tracks_override
         if defined $exclude_local_gtf_tracks_override;
+    $draft_spec->{standardized_p_tracks} = $standardized_p_tracks_override ? 1 : 0
+        if defined $standardized_p_tracks_override;
+    $draft_spec->{manhattan_top_logp} = $manhattan_top_logp_override
+        if defined $manhattan_top_logp_override;
     if ($preview_spec) {
         print pretty_json($draft_spec), "\n";
         exit 0 if $generate_spec_only || !length $spec_out;
@@ -442,6 +466,9 @@ $spec->{exclude_strand_ambiguous} = $exclude_strand_ambiguous_override ? 1 : 0
     if defined $exclude_strand_ambiguous_override;
 $spec->{max_eaf_abs_diff} = lc($max_eaf_abs_diff_override) eq 'none' ? '' : $max_eaf_abs_diff_override
     if defined $max_eaf_abs_diff_override;
+if (!$generated_spec_input && (my $advisory = cross_ancestry_filter_advisory($spec))) {
+    print STDERR "[science] $advisory\n";
+}
 $manhattan_all_snps = defined($manhattan_all_snps)
     ? ($manhattan_all_snps ? 1 : 0)
     : (cfg_or($spec, 'manhattan_all_snps', 0) ? 1 : 0);
@@ -500,6 +527,22 @@ my $manhattan_differential_p_mode = lc(
 die "--manhattan-differential-p-mode must be raw or standardized\n"
     unless $manhattan_differential_p_mode =~ /^(?:raw|standardized)$/;
 $spec->{manhattan_differential_p_mode} = $manhattan_differential_p_mode;
+$spec->{manhattan_top_logp} = $manhattan_top_logp_override
+    if defined $manhattan_top_logp_override;
+my $manhattan_top_logp = cfg_or($spec, 'manhattan_top_logp', 8);
+die "--manhattan-top-logp must be an integer of at least 8 to keep the 5e-8 reference line visible\n"
+    unless defined($manhattan_top_logp)
+       && $manhattan_top_logp =~ /^(?:[89]|[1-9][0-9]+)$/;
+$spec->{standardized_p_tracks} = $standardized_p_tracks_override ? 1 : 0
+    if defined $standardized_p_tracks_override;
+if ((defined($standardized_p_tracks_override) || $spec->{standardized_p_tracks})
+    && $manhattan_differential_p_mode eq 'standardized') {
+    die "--[no-]standardized-p-tracks conflicts with explicit --manhattan-differential-p-mode standardized\n"
+        if length($manhattan_differential_p_mode_override);
+    $manhattan_differential_p_mode = 'raw';
+    $spec->{manhattan_differential_p_mode} = 'raw';
+    print "[tracks] Standardized P switch uses separate tracks; restored raw differential P as the primary track.\n";
+}
 $spec->{clip_lower_quantile} = $clip_lower_quantile_override
   if defined $clip_lower_quantile_override && length $clip_lower_quantile_override;
 $spec->{clip_upper_quantile} = $clip_upper_quantile_override
@@ -1568,7 +1611,7 @@ sub infer_spec_from_gwas_dir {
     if ($^O eq 'cygwin' && $gwas_dir =~ /^([A-Za-z]):\/(.*)$/) {
         $gwas_dir = '/cygdrive/' . lc($1) . '/' . $2;
     }
-    die "GWAS directory does not exist: $gwas_dir\n" unless -d $gwas_dir;
+    die "GWAS directory does not exist: $gwas_dir. Check the path; see --help under 'If automatic spec generation fails'.\n" unless -d $gwas_dir;
     $gwas_dir = normalize_unix_path(abs_path($gwas_dir));
     my $workdir = normalize_unix_path($args{workdir} // script_root_dir());
     my $configs_dir = "$workdir/configs";
@@ -1583,7 +1626,7 @@ sub infer_spec_from_gwas_dir {
         . ", precomputed=" . scalar(@precomputed_files)
         . ", merged=" . scalar(@merged_files)
     );
-    die "No candidate GWAS summary-statistics files found in $gwas_dir\n"
+    die "No candidate GWAS summary-statistics files found in $gwas_dir. Check the directory and file extensions; see --help under 'If automatic spec generation fails'.\n"
       unless @raw_files || @precomputed_files || @merged_files;
 
     # A rerun of --gwas-dir commonly contains both original cohort files and
@@ -1705,7 +1748,7 @@ sub infer_spec_from_gwas_dir {
             files                   => \@precomputed_files,
         );
         return ($pre_spec, $pre_path) if $pre_spec;
-        die "Need at least two valid raw GWAS groups or one valid precomputed diff/stdized table in $gwas_dir\n";
+        die "Need at least two valid raw GWAS groups or one valid precomputed diff/stdized table in $gwas_dir. Review the preceding 'Skipped' reasons; see --help under 'If automatic spec generation fails'.\n";
     }
 
     my $project_tag = safe_name($args{project_tag_override} || infer_project_tag_from_dir($gwas_dir, \@groups));
@@ -2848,6 +2891,7 @@ sub build_display_track_catalog {
     my $differential_p_label = $differential_p_mode eq 'standardized'
         ? ' standardized differential P'
         : ' raw differential P';
+    my $show_standardized_p = cfg_or($spec || {}, 'standardized_p_tracks', 0) ? 1 : 0;
 
     for my $i (0 .. $#prefixes) {
         my $prefix = $prefixes[$i];
@@ -2872,13 +2916,29 @@ sub build_display_track_catalog {
             $prefix . '_DIFF',
             $prefix . '_DIFF_P',
             $prefix . '_STD',
-            $prefix . '_STD_P',
+            ($show_standardized_p && $differential_p_mode eq 'raw' ? () : ($prefix . '_STD_P')),
             $prefix . '_STD_Z',
             $label,
             $label . ' diff',
             $label . ' standardized diff',
             $gtf_label,
         );
+        if ($show_standardized_p && $differential_p_mode eq 'raw') {
+            my $standardized_entry = {
+                id => $prefix . '_STD_P',
+                kind => 'standardized_p',
+                prefix => $prefix,
+                pvar => $prefix . '_STD_P',
+                manhattan_pvar => $prefix . '_STD_P',
+                zvar => $prefix . '_STD_Z',
+                betavar => '',
+                manhattan_label => $label . ' standardized differential P',
+                gtf_label => safe_name($gtf_label . '_standardized_P'),
+            };
+            push @catalog, $standardized_entry;
+            add_display_track_aliases(\%lookup, $standardized_entry,
+                $standardized_entry->{id}, $label . ' standardized P');
+        }
     }
 
     for my $group (sort keys %{ $pair_info->{group_rep} || {} }) {
@@ -3779,6 +3839,8 @@ sub build_runner_config {
         MANHATTAN_DIFFERENTIAL_P_MODE => uc(cfg_or(
             $spec, 'manhattan_differential_p_mode', 'raw'
         )),
+        MANHATTAN_TOP_LOGP => cfg_or($spec, 'manhattan_top_logp', 8),
+        STANDARDIZED_P_TRACKS => (cfg_or($spec, 'standardized_p_tracks', 0) ? 1 : 0),
         MANHATTAN_P_VAR => ($manhattan_tracks[0]{manhattan_pvar} || $manhattan_tracks[0]{pvar}),
         MANHATTAN_OTHER_P_VARS => [
             map { $_->{manhattan_pvar} || $_->{pvar} } @manhattan_tracks[1 .. $#manhattan_tracks],
@@ -3823,7 +3885,9 @@ sub build_runner_config {
               ? $top_hit_max_loci
               : 0
         ),
-        TOP_HIT_MAF_THRESHOLD => cfg_or($spec, 'top_hit_maf_threshold', ($source_mode eq 'merged_gwas_table' ? 0 : 0.01)),
+        # Many harmonised studies provide no usable MAF in the plotting table.
+        # An implicit positive cutoff would silently discard every top hit.
+        TOP_HIT_MAF_THRESHOLD => cfg_or($spec, 'top_hit_maf_threshold', 0),
         TOP_HIT_GNOMAD_FREQ_FILE => cfg_or($spec, 'gnomad_freq_file', ''),
         TOP_HIT_GNOMAD_POP_MAP => population_map_to_string(cfg_or($spec, 'gnomad_population_map', '')),
         TARGET_SNP_LIST => (
@@ -5221,7 +5285,9 @@ Options:
   --spec-out FILE.json  Where to write the auto-generated spec JSON
   --raw-column-alias-config FILE.json
                        Optional JSON mapping canonical raw columns like ID/POS/PVAL
-                       to extra header aliases for new GWAS formats
+                       to exact input header names for new GWAS formats.
+                       On failure, the skipped-file message lists mapped and
+                       missing required fields and prints a JSON template.
   --group-label FILE_OR_ACCESSION=LABEL
                        Repeat to label accession-only inputs, for example
                        GCST90018574=EAS and GCST90018794=EUR+EAS.
@@ -5238,12 +5304,28 @@ Options:
                        only when cohorts do not overlap, or supply a justified rho.
                        Supplied meta tracks in merged input remain available.
   --[no-]exclude-strand-ambiguous
-                       Default: exclude A/T and C/G pairs. Disable only after
-                       verifying effect-allele orientation across input studies.
+                       Default: exclude A/T and C/G pairs with uncertain strand.
+                       This can remove real hits; inspect exclusion counts.
+                       Disable only after independent allele-orientation checks.
   --max-eaf-abs-diff N|none
-                       Default: none. Frequency differences between ancestries
-                       can be real; request a limit only for justified QC.
+                       Difference in effect-allele frequency across paired GWASs.
+                       Default: none. A positive limit may remove real
+                       ancestry-enriched SNPs; use only for justified QC after
+                       harmonizing effect alleles and checking frequency sources.
+  Spec key top_hit_maf_threshold
+                       Default: 0; no top-hit MAF filter, unknown MAF retained.
+                       Positive cutoffs exclude unknown MAF and can remove
+                       population-specific signals with low MAF in one group.
+                       The schizophrenia female/male demo uses 0.01 within EUR;
+                       that threshold is not a cross-ancestry default.
+                       A SNP missing from either group cannot form a paired
+                       differential result even with these filters off.
   --exclude-manhattan-tracks LIST  Remove comma-separated genomewide scatter tracks.
+  --manhattan-top-logp N  Cap -log10(P) in each genomewide Manhattan track.
+                         N is an integer of at least 8; default: 8.
+  --[no-]standardized-p-tracks
+                       Add/remove standardized differential P tracks in genomewide
+                       Manhattan, local Manhattan, and local GTF plots. Default: off.
   --exclude-manhattan-track-regex PATTERN
                         Remove genomewide tracks matching a Perl regular expression.
   --manhattan-track-order LIST     Put listed genomewide tracks first, bottom to top.
@@ -5501,12 +5583,38 @@ Options:
   --artifact-stem TEXT  Optional override for inferred artifact_stem during auto-spec generation
   --print-spec-example  Print a full JSON spec example and exit
   --print-columns-help  Print required-column help and exit
+  --help                Print options and their scientific filter guidance
 
 The spec can describe:
   - raw_pgc_vcf_sumstats    : merge raw group files, sort, diff, standardize, extract, plot
   - precomputed_diff        : standardize, extract, plot
   - precomputed_diff_stdized: extract, plot
   - merged_gwas_table       : normalize one merged-wide GWAS table, then plot
+
+If automatic spec generation fails (before plotting starts):
+  1. Run --gwas-dir DIR --generate-spec-only and read the candidate counts,
+     'Skipped' reasons, accepted groups, and selected source printed above
+     the error. The scan reads files directly inside DIR. Check that it
+     contains the original summary-statistics files with supported extensions;
+     generated output files are not valid substitutes for missing inputs.
+  2. Check the first header row: gzip -dc FILE.gz | head -n 1 (or head -n 1
+     FILE.tsv). Raw inputs need chromosome, SNP ID, position, effect/non-effect
+     alleles, BETA or OR, SE, and P; run --print-columns-help for all modes.
+     Files must share genome build and allele conventions. A directory needs
+     two distinguishable, compatible raw groups or one valid precomputed table.
+  3. For unfamiliar raw header names, map aliases in a JSON file, e.g.
+     {"ID":["MARKER_ID"],"POS":["GENOMIC_POS"],"PVAL":["PVALUE_LRT"]}
+     Use only keys reported as missing and replace each value with the exact
+     corresponding input header name; do not rename columns in the data file.
+     Save the file as aliases.json and rerun with
+     --raw-column-alias-config aliases.json. For accession-only
+     filenames, add --group-label GCST_ID=EAS (repeat per group). Check the
+     generated group labels, pairs, reference build, and sample overlap.
+  4. For a combined wide table, use --input-merged FILE.gz; it needs CHR/BP/SNP
+     and at least two cohort BETA/SE/P blocks. Supplied meta tracks are optional.
+     If detection still fails, use --print-spec-example to create a reviewed
+     spec JSON, then run --spec FILE.json. Use --spec-out FILE.json to save a
+     successful inferred spec for later runs.
 
 Recommended interactive pattern:
   - open this repository in VS Code

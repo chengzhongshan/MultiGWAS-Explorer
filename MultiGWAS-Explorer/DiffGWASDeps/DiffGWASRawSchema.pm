@@ -57,6 +57,7 @@ sub resolve_raw_header_aliases {
     my @required = qw(CHROM ID POS A1 A2 BETA SE PVAL);
     my @optional = qw(FCAS FCON IMPINFO NCAS NCON NEFF);
 
+    my @missing;
     for my $canon (@required, @optional) {
         my $actual = '';
         for my $alias (@{ $aliases->{$canon} || [] }) {
@@ -73,8 +74,23 @@ sub resolve_raw_header_aliases {
             $resolved{$canon} = $idx->{$actual};
         }
         elsif (grep { $_ eq $canon } @required) {
-            die "Required column $canon not found in $source_file header.\nHeader was: $header\n";
+            push @missing, $canon;
         }
+    }
+
+    if (@missing) {
+        my @mapped = map { "$_ <- " . $cols->[ $resolved{$_} ] }
+            grep { exists $resolved{$_} } @required;
+        my $template = '{' . join(',', map { qq("$_":["REPLACE_WITH_HEADER_NAME"]) } @missing) . '}';
+        die "Required raw GWAS column(s) not found in $source_file: "
+          . join(', ', @missing) . "\n"
+          . "Automatically mapped: " . (@mapped ? join('; ', @mapped) : '(none)') . "\n"
+          . "Header was: $header\n"
+          . "To assign aliases, save this JSON template after replacing each placeholder with the exact header name above:\n"
+          . "$template\n"
+          . "Rerun with --gwas-dir DIR --raw-column-alias-config aliases.json --generate-spec-only. "
+          . "For --spec, put the same object under raw_column_aliases in the spec JSON. "
+          . "Aliases map canonical keys to input header names; see --print-columns-help.\n";
     }
 
     return %resolved;

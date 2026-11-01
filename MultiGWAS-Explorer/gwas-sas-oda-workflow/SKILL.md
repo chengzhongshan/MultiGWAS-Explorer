@@ -20,9 +20,23 @@ Use this skill as the workflow brain. Keep MCP tools small and reliable.
   track's source P column within the exact locus window. A different track's
   missing P values must not gate the row before plotting; merged-wide allele
   rows can have meta P and differential P on separate rows.
+- For raw paired inputs, local gnuplot columns use `PREFIX_GROUP1_P` and
+  `PREFIX_GROUP2_P` even when plot labels are `EAS_P` or `EUR_P`. Resolve
+  runner P and Z aliases from the generated preset for every source mode.
+  Use `--standardized-p-tracks` only when the reader needs an additional
+  standardized differential P panel across genome, local, and GTF figures;
+  it is off by default and does not change raw-P top-hit thresholds.
 - Before trusting SAS local Manhattan output, check chromosome-X input is
   numeric `23`, verify one lead entry per requested SNP, and inspect the
   downloaded panels and their SNP, gene, and chromosome labels.
+- For automatic SAS local GTF plots, select candidate coordinates before
+  extracting an indexed local GTF subset. With `TOP_HIT_LD_SOURCE=PLINK2_1KG`,
+  clump automatic hits locally with build-matched 1KG PLINK2 data and send
+  each selected locus separately to SAS ODA. An explicit HaploReg/SAS prep
+  path must write its status HTML only after `ODS HTML5` releases that output
+  path. A missing `indexed local GTF subset` upload entry or `REGION_CHRS`
+  keyword error means that combined prep path reached an incompatible legacy
+  full-GTF downloader.
 
 ## Required Context
 
@@ -34,11 +48,10 @@ Before running a workflow, identify:
   `BETA_*` / `SE_*` / `P_*` blocks.
 - Column mapping for chromosome, position, alleles, SNP ID, beta or OR, SE, P, and dataset tag.
 - Whether chrX files must be vertically combined with sex/population-matched autosomal files.
-- Whether the GWAS tables already contain allele-frequency columns that can be
-  used for top-hit MAF filtering, and if not, whether a local gnomAD lookup
-  file is available. If neither is available, the current safeguard will
-  conservatively drop those candidates instead of keeping them without an MAF
-  check.
+- Whether the GWAS tables contain allele-frequency columns for top-hit MAF
+  filtering, and whether a suitable population-matched lookup is available.
+  With the default zero MAF cutoff, unknown-MAF candidates are retained;
+  a requested positive cutoff excludes candidates with unknown MAF.
 - Desired final products: long merged table, tabix-indexed coordinate table,
   differential effects, Manhattan subset, local GTF plot, forest plot, and
   SAS ODA or gnuplot PNG/HTML outputs.
@@ -54,6 +67,38 @@ Before running a workflow, identify:
   installer with `-AllowInsecureDownloads` so phase-2 repo-local downloads use
   `PIPELINE_CURL_INSECURE=1`.
 - SAS ODA size limits; avoid uploading large raw GWAS files.
+
+## Choose SNP filters for the comparison design
+
+Record the ancestry, sample overlap, genome build, effect-allele convention,
+frequency source, and chromosome scope of **each** input before choosing filters.
+Do not transfer thresholds from one comparison to another merely because the
+same pipeline renders both. Inspect the differential manifest's exclusion counts
+and the top-hit CSV's `maf_filter_decision`, `maf_filter_reason`, and `maf_source`
+after each run.
+
+| Comparison | Filter choice and interpretation |
+| --- | --- |
+| Female versus male within one ancestry, as in the public schizophrenia sex-stratified demo | Comparable ancestry makes a study-justified allele-frequency discordance check more interpretable after allele harmonization. The demo explicitly uses `max_eaf_abs_diff=0.2` and `top_hit_maf_threshold=0.01`; neither value is a universal default. Check sex-specific QC and treat chromosome X separately because ploidy differs. |
+| Different ancestries, including EAS versus EUR+EAS | Keep the default `max_eaf_abs_diff=none` and `top_hit_maf_threshold=0` unless a documented analysis requires a filter. Large frequency differences and low MAF in one ancestry can be genuine, so positive cutoffs can remove population-enriched signals. Compare effect-allele frequencies only after allele alignment and against appropriate ancestry-matched reference data; inspect imputation INFO and sample size. |
+| One group contained within another, such as EAS versus EUR+EAS | Do not calculate an independent-samples meta-analysis by default. Set `rho` only from a justified covariance model for the differential test. A positive frequency or MAF cutoff does not correct sample overlap. |
+
+`--max-eaf-abs-diff` gates variants by the absolute difference in effect-allele
+frequency across paired GWAS inputs. `top_hit_maf_threshold` is a **spec JSON**
+setting for automatic top-hit selection; its positive cutoff tests the minimum
+available MAF across the paired groups and excludes unknown-MAF candidates.
+The default `--exclude-strand-ambiguous` separately removes A/T and C/G pairs
+whose strand cannot be resolved from alleles alone; quantify their loss and
+only disable it after independent orientation checks. Even with these filters
+off, a variant present in only one GWAS cannot yield a paired differential
+effect: inspect the manifest's `skipped_no_pair` count and each cohort's
+association track to find such signals. Genome-wide Manhattan's default
+`P < 0.05` subset is a plotting filter, not a differential or local-locus QC
+rule.
+
+Evidence: [sex-stratified GWAS QC and chromosome-X considerations](https://pmc.ncbi.nlm.nih.gov/articles/PMC10266536/),
+[ancestry-specific association and frequency differences](https://www.nature.com/articles/s41467-024-47399-x),
+and [GWAS Catalog allele/frequency harmonization](https://www.ebi.ac.uk/gwas/docs/methods/summary-statistics/).
 
 ## Workflow
 
@@ -132,14 +177,18 @@ Before running a workflow, identify:
    - `GROUP2_FRQ_U`
    - `GROUP1_INFO`
    - `GROUP2_INFO`
-   Then apply the top-hit safeguard:
+   For an explicitly requested top-hit MAF cutoff, apply the safeguard:
    - use GWAS-derived MAF first
    - fall back to a local gnomAD lookup only when GWAS frequency columns are
      absent
-   - if neither source is available, expect `maf_source=UNKNOWN` and
-     conservative filtering at the default threshold
-   - keep hits only when `MAF > 0.01`, unless the user requests a different
-     threshold through `top_hit_maf_threshold`
+   - if neither source is available, expect `maf_source=UNKNOWN`; keep the
+     candidate with the default zero cutoff rather than losing every hit
+   - apply `MAF > 0.01` only when the user explicitly sets
+     `top_hit_maf_threshold` to `0.01` (or another justified cutoff)
+   If optional local top-hit selection produces no CSV, check file existence
+   before SAS `PROC IMPORT` and let the internal selector run. In a SAS SQL
+   export that joins hit tables, qualify dynamic columns with their source
+   alias and exclude `hit_order` and other columns selected explicitly.
    The requested top-hit CSVs should preserve:
    - `selected_maf`
    - `maf_source`

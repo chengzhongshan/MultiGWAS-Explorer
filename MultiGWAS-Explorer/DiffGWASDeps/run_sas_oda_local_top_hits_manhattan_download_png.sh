@@ -203,7 +203,7 @@ LOCAL_MANHATTAN_YOFFSET_BOTTOM="${LOCAL_MANHATTAN_YOFFSET_BOTTOM:-}"
 LOCAL_MANHATTAN_FONTSIZE="${LOCAL_MANHATTAN_FONTSIZE:-}"
 LOCAL_MANHATTAN_Y_AXIS_LABEL_SIZE="${LOCAL_MANHATTAN_Y_AXIS_LABEL_SIZE:-}"
 LOCAL_MANHATTAN_Y_AXIS_VALUE_SIZE="${LOCAL_MANHATTAN_Y_AXIS_VALUE_SIZE:-}"
-TOP_HIT_MAF_THRESHOLD="${TOP_HIT_MAF_THRESHOLD:-0.01}"
+TOP_HIT_MAF_THRESHOLD="${TOP_HIT_MAF_THRESHOLD:-0}"
 TOP_HIT_MAX_LOCI="${TOP_HIT_MAX_LOCI:-0}"
 
 open_html_result() {
@@ -1028,7 +1028,8 @@ EOF
 perl -0pi -e 's/__GET_GTF_MACRO_NAME__/\Q'"${GET_GTF_MACRO_NAME}"'\E/g' "${GET_GTF_MACRO_UPLOAD}"
 
 if [[ "${LOCAL_TOP_HITS_CSV_PREGENERATED:-0}" != "1" ]] && ! generate_requested_top_hits_csv_locally; then
-  echo "WARNING: Local MAF-aware top-hit CSV generation did not succeed. The SAS script will fall back to its internal top-hit selection." >&2
+  rm -f "${REQUESTED_CSV_OUT}" "${REQUESTED_CSV_OUT}.request.md5"
+  echo "WARNING: Local top-hit CSV generation did not succeed. The SAS script will use its internal top-hit selection; no requested CSV will be imported." >&2
 fi
 
 if [[ "${EMIT_LOCAL_SAS_DEBUG}" == "1" || "${LOCAL_SAS_DEBUG_ONLY}" == "1" ]]; then

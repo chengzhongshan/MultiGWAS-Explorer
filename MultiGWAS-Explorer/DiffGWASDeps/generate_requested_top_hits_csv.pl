@@ -86,7 +86,7 @@ my $top_hit_dist_bp = first_nonempty(
 );
 my $maf_threshold = length($opt{maf_threshold} // '')
     ? $opt{maf_threshold}
-    : first_nonempty($runner->{TOP_HIT_MAF_THRESHOLD}, 0.01);
+    : first_nonempty($runner->{TOP_HIT_MAF_THRESHOLD}, 0);
 my $gnomad_freq_file = first_nonempty(
     $opt{gnomad_freq_file},
     $runner->{TOP_HIT_GNOMAD_FREQ_FILE},

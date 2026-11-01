@@ -241,10 +241,11 @@ merged input table instead of recycling derived files.
 
 ## Top-Hit MAF Safeguard
 
-Top common or differential SNP selection now applies a minor-allele-frequency
+Top common or differential SNP selection supports an optional minor-allele-frequency
 safeguard before the local Manhattan and local GTF plotting stages:
 
-- default rule: keep only top-hit candidates with `MAF > 0.01`
+- default rule: do not filter top-hit candidates by MAF when no cutoff was
+  requested; studies without frequency data otherwise lose every candidate
 - first choice: use the matching GWAS frequency columns already carried through
   the standardized and wide differential tables, such as
   `*_GROUP1_FRQ_A`, `*_GROUP1_FRQ_U`, `*_GROUP2_FRQ_A`, and
@@ -253,10 +254,12 @@ safeguard before the local Manhattan and local GTF plotting stages:
   gnomAD lookup table provided through:
   - spec key `gnomad_freq_file`
   - spec key `gnomad_population_map`
-- conservative edge case: if both GWAS frequencies and a configured gnomAD
-  lookup are unavailable for a candidate, the selector marks it
-  `maf_source=UNKNOWN` and filters it out at the default safeguard threshold
-- override: change the cutoff through spec key `top_hit_maf_threshold`
+- if both GWAS frequencies and a configured gnomAD lookup are unavailable,
+  the selector marks `maf_source=UNKNOWN` and retains the candidate at the
+  default zero cutoff
+- optional safeguard: set `top_hit_maf_threshold` to `0.01` (or another
+  justified cutoff) in the spec; with a positive cutoff, unknown-MAF
+  candidates are filtered
 
 The SAS ODA local-top-hit wrappers now generate the requested top-hit CSV
 locally with `DiffGWASDeps/generate_requested_top_hits_csv.pl` before the SAS
@@ -3024,6 +3027,23 @@ both SAS ODA and gnuplot is `--manhattan-differential-p-mode raw`.
 `standardized` is available only to reproduce legacy visualizations; top-hit
 selection and inferential thresholds continue to use raw differential P
 values in either plotting mode.
+
+Gnuplot genome-wide Manhattan figures draw a `P = 5e-8` reference line in
+every displayed track. The reference is independent of the top-hit selection
+cutoff. A runner config can override it with `MANHATTAN_REFERENCE_P`; direct
+calls to `pdl_gnuplot_manhattan.pl` can use `--sig`.
+Both the SAS ODA and gnuplot entry points accept `--manhattan-top-logp N` to
+draw any larger `-log10(P)` value at `N` in each genome-wide track. The default
+is `8`; `N` must be an integer of at least `8` so the reference line remains
+visible. The same setting can be saved as `"manhattan_top_logp": 10` in a
+comparison spec. It does not change local plot caps or top-hit selection.
+
+To show standardized differential P beside the raw differential and cohort
+tracks in genome-wide Manhattan, local Manhattan, and local GTF plots, pass
+`--standardized-p-tracks` to either pipeline entry point. It is off by default;
+`--no-standardized-p-tracks` turns it off explicitly. This changes displayed
+tracks, not top-hit selection. The added track has ID `PREFIX_STD_P`, so the
+existing track order and exclusion options can place or remove it separately.
 
 The default remains `none`; no LD query or overlay is performed unless the
 user requests `markers`, `heatmap`, or `both`. Explicit proxy lists can supply

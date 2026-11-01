@@ -66,7 +66,11 @@ my ($rows, $header, $sep) = load_candidates();
 die "No candidates passed the signal filter\n" unless @$rows;
 my %by_snp = map { $_->{key} => $_ } @$rows;
 
-my $tmp = tempdir('plink2_1kg_greedy_clump.XXXXXX', TMPDIR => 1, CLEANUP => 1);
+# Native Windows PLINK2 cannot reliably open Cygwin's TMPDIR when it resolves
+# inside Anaconda. Use the caller's output directory, which both runtimes use.
+make_path(dirname($output_leads)) unless -d dirname($output_leads);
+my $tmp = tempdir('plink2_1kg_greedy_clump.XXXXXX',
+    DIR => dirname($output_leads), CLEANUP => 1);
 my $ids = File::Spec->catfile($tmp, 'candidates.ids.txt');
 open my $id_fh, '>:raw', $ids or die "Cannot write $ids: $!\n";
 print {$id_fh} "$_->{snp}\n" for @$rows;
@@ -82,7 +86,7 @@ my %frequency;
 for my $pop (@pops) {
     my $prefix = File::Spec->catfile($tmp, lc($pop) . '.freq');
     run(plink_exe(), '--pfile', native_path($subset), '--keep-if', 'SuperPop',
-        '==', $pop, '--freq', 'counts', '--threads', $threads,
+        '==', $pop, '--nonfounders', '--freq', 'counts', '--threads', $threads,
         '--out', native_path($prefix));
     $frequency{$pop} = read_acount("$prefix.acount");
 }
@@ -107,7 +111,7 @@ for my $lead (@$rows) {
             'PLINK2_1KG_DIRECT'), "\n" if $cache_fh;
         my $prefix = File::Spec->catfile($tmp, sprintf('lead_%05d_%s', $lead_rank, lc($pop)));
         run(plink_exe(), '--pfile', native_path($subset), '--keep-if', 'SuperPop',
-            '==', $pop, '--mac', 1, '--ld-snp', $lead->{snp},
+            '==', $pop, '--nonfounders', '--mac', 1, '--ld-snp', $lead->{snp},
             '--r2-phased', 'allow-ambiguous-allele', 'cols=chrom,pos,id',
             '--ld-window-kb', $window_kb, '--ld-window-r2', $r2_threshold,
             '--threads', $threads, '--out', native_path($prefix), '--silent');

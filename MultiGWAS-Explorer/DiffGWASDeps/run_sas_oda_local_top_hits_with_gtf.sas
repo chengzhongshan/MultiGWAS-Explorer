@@ -865,12 +865,14 @@ run;
 );
 
 proc sql noprint;
-  select name into: top_hit_export_extra_vars separated by ', '
+  select cats('t.', name) into: top_hit_export_extra_vars separated by ', '
   from dictionary.columns
   where libname='WORK'
     and memname='TOP_HIT4DIFFP'
     and upcase(name) not in (
-      'CHR','BP','SNP','GENE','SNP_GENE','A1','A2','REQUESTED_HIT_ORDER'
+      'CHR','BP','SNP','GENE','SNP_GENE','A1','A2','REQUESTED_HIT_ORDER',
+      'HIT_ORDER','PANEL_INDEX','FOCUS_SIGNAL',
+      'EFFECT_ALLELE','OTHER_ALLELE','REFERENCE_ALLELE','ALTERNATIVE_ALLELE'
     )
   order by varnum
   ;
@@ -889,9 +891,9 @@ proc sql;
          t.A1 as ALTERNATIVE_ALLELE length=8,
          t.gene,
          t.snp_gene,
-         t.&top_hit_focus_pvar as focus_signal,
+         t.&top_hit_focus_pvar as focus_signal
          %if %superq(top_hit_export_extra_vars) ne %then %do;
-         &top_hit_export_extra_vars
+         , &top_hit_export_extra_vars
          %end;
   from top_hit4diffp as t
   inner join top_hit_groups as g
@@ -911,6 +913,9 @@ run;
   %local query_snp_labels;
   %let query_snp_labels=;
   %if %sysevalf(&prep_only,boolean) %then %do;
+    /* ODS owns this output path until closed; the DATA step writes its small
+       prep status page to the same path. Close ODS before opening FILE. */
+    ods html5 close;
     data _null_;
       file "~/__OUTPUT_HTML__" lrecl=32767;
       put '<!doctype html>';
@@ -920,7 +925,6 @@ run;
       put "<p>Exported top-hit CSV: &local_top_hits_csv_basename</p>";
       put '</body></html>';
     run;
-    ods html5 close;
     %put NOTE: Prep-only mode complete, exported local top-hit CSV, and skipped GTF plotting.;
     %return;
   %end;
@@ -1008,6 +1012,7 @@ run;
 
   %if %superq(top_snps)= %then %do;
     %put ERROR: No valid local-GTF plot queries remain after filtering invalid targets.;
+    ods html5 close;
     data _null_;
       file "~/__OUTPUT_HTML__" lrecl=32767;
       put '<!doctype html>';
@@ -1017,7 +1022,6 @@ run;
       put '<p>No valid local-GTF plot queries remained after filtering invalid targets.</p>';
       put '</body></html>';
     run;
-    ods html5 close;
     %return;
   %end;
 
