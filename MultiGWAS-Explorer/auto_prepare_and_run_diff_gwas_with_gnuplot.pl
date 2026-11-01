@@ -55,6 +55,10 @@ Options:
   --gwas-dir DIR                Auto-detect GWAS inputs in this directory.
   --input-merged FILE           Import a combined cohort/meta GWAS table directly.
   --spec-out FILE.json          Save the generated spec at this path for reuse.
+  --raw-column-alias-config FILE.json
+                                With --gwas-dir, map unfamiliar raw headers to
+                                canonical keys such as CHROM, ID, POS, BETA,
+                                SE, PVAL. Example: {"ID":["MARKER_ID"]}.
   --group-label ACCESSION=LABEL Repeat for accession-only inputs such as
                                 GCST90018574=EAS, GCST90018794=EUR+EAS.
   --plots LIST                  Plot families for a normal run. Comma list:
@@ -193,11 +197,12 @@ If automatic spec generation fails (before gnuplot starts):
      valid precomputed differential table.
   3. If raw headers use unfamiliar names, save aliases as JSON, e.g.
      {"ID":["MARKER_ID"],"POS":["GENOMIC_POS"],"PVAL":["PVALUE_LRT"]}
-     Then run the shared generator with --raw-column-alias-config aliases.json
-     --spec-out FILE.json --generate-spec-only, followed by this script with
-     --spec FILE.json. For accession-only names use --group-label GCST_ID=EAS
-     (repeat for each group). Review inferred labels, pairs, genome build,
-     and sample overlap before plotting.
+     Rerun this script with --gwas-dir DIR
+     --raw-column-alias-config aliases.json --spec-out FILE.json. Alternatively,
+     run the shared generator with those options plus --generate-spec-only,
+     then run this script with --spec FILE.json. For accession-only names use
+     --group-label GCST_ID=EAS (repeat for each group). Review inferred labels,
+     pairs, genome build, and sample overlap before plotting.
   4. For one combined wide table use --input-merged FILE.gz; it needs
      CHR/BP/SNP plus at least two cohort BETA/SE/P blocks. If inference still
      fails, use the shared script's --print-spec-example to create a reviewed
@@ -215,6 +220,7 @@ my $spec_file = '';
 my $gwas_dir = '';
 my $input_merged = '';
 my $spec_out = '';
+my $raw_column_alias_config = '';
 my @group_label_args;
 my $plots = 'manhattan,local_manhattan,local_gtf';
 my @step_args;
@@ -284,6 +290,7 @@ GetOptions(
     'gwas-dir=s'              => \$gwas_dir,
     'input-merged=s'          => \$input_merged,
     'spec-out=s'              => \$spec_out,
+    'raw-column-alias-config=s' => \$raw_column_alias_config,
     'group-label=s@' => \@group_label_args,
     'plots=s'                 => \$plots,
     'manhattan-all-snps!'     => \$manhattan_all_snps,
@@ -358,6 +365,8 @@ die "--spec-out requires --gwas-dir or --input-merged\n"
     if length($spec_out) && !length($input_merged) && !length($gwas_dir);
 die "--group-label applies only to --gwas-dir input\n"
     if @group_label_args && !length($gwas_dir);
+die "--raw-column-alias-config applies only to --gwas-dir raw inputs; for --spec add raw_column_aliases to the spec JSON\n"
+    if length($raw_column_alias_config) && !length($gwas_dir);
 die "--manhattan-top-logp must be an integer of at least 8\n"
     if defined($manhattan_top_logp_override) && $manhattan_top_logp_override < 8;
 if (length($input_merged) || length($gwas_dir)) {
@@ -375,6 +384,7 @@ if (length($input_merged) || length($gwas_dir)) {
         (length($input_merged) ? ('--input-merged', $input_merged) : ('--gwas-dir', $gwas_dir)),
         '--spec-out', $spec_file,
         '--generate-spec-only',
+        (length($raw_column_alias_config) ? ('--raw-column-alias-config', $raw_column_alias_config) : ()),
         (map { ('--group-label', $_) } @group_label_args),
         (defined($compute_meta_override) ? ($compute_meta_override ? '--compute-meta' : '--no-compute-meta') : ()),
         (defined($exclude_strand_ambiguous_override) ? ($exclude_strand_ambiguous_override ? '--exclude-strand-ambiguous' : '--no-exclude-strand-ambiguous') : ()),

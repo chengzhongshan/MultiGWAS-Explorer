@@ -5285,7 +5285,9 @@ Options:
   --spec-out FILE.json  Where to write the auto-generated spec JSON
   --raw-column-alias-config FILE.json
                        Optional JSON mapping canonical raw columns like ID/POS/PVAL
-                       to extra header aliases for new GWAS formats
+                       to exact input header names for new GWAS formats.
+                       On failure, the skipped-file message lists mapped and
+                       missing required fields and prints a JSON template.
   --group-label FILE_OR_ACCESSION=LABEL
                        Repeat to label accession-only inputs, for example
                        GCST90018574=EAS and GCST90018794=EUR+EAS.
@@ -5602,7 +5604,10 @@ If automatic spec generation fails (before plotting starts):
      two distinguishable, compatible raw groups or one valid precomputed table.
   3. For unfamiliar raw header names, map aliases in a JSON file, e.g.
      {"ID":["MARKER_ID"],"POS":["GENOMIC_POS"],"PVAL":["PVALUE_LRT"]}
-     and rerun with --raw-column-alias-config aliases.json. For accession-only
+     Use only keys reported as missing and replace each value with the exact
+     corresponding input header name; do not rename columns in the data file.
+     Save the file as aliases.json and rerun with
+     --raw-column-alias-config aliases.json. For accession-only
      filenames, add --group-label GCST_ID=EAS (repeat per group). Check the
      generated group labels, pairs, reference build, and sample overlap.
   4. For a combined wide table, use --input-merged FILE.gz; it needs CHR/BP/SNP
