@@ -721,7 +721,7 @@ $server->tool(
                                  { type => 'string' },
                                  { type => 'array', items => { type => 'string' } }
                                ],
-                               description => 'Optional regex pattern or list of regex patterns used to delete multiple remote files after listing delete_dir. Regexes match both bare filenames and resolved remote paths such as ~/plot.png.'
+                               description => 'Optional regex pattern or list of regex patterns used to delete matching remote files and recursively delete matching immediate-child directories after listing delete_dir. Regexes match both bare names and resolved remote paths such as ~/plot.png.'
                              },
             delete_dir => { type => 'string',
                                description => 'Remote parent scanned by delete_file_rgx or delete_directory_rgx. Default: ~' },

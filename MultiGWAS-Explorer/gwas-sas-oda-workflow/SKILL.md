@@ -687,6 +687,10 @@ For a new project, copy/adapt the script templates in this skill's `scripts/` fo
   unquoted PRX literal, for example `prxmatch(/\s*&linker\s*/,&value)`. The
   shared source analyzer recognizes that lexical context; preserve its focused
   regression cases when changing preflight parsing.
+- SASPy directory listings mark directories with a trailing `/`. For
+  `--delete-file-rgx`, route those matches through guarded recursive cleanup;
+  never send them to file-only `fdelete`. Require the recursive matched/deleted
+  summary and rerun the regex to verify no targets remain.
 - For `run_sas_codes_or_script_in_ODA.pl` incidents, prefer this quick AI
   debug ladder before moving into `%include` or plotting macros:
   - `perl DiffGWASDeps/run_sas_codes_or_script_in_ODA.pl --check-sas-oda-login-only`

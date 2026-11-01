@@ -256,6 +256,13 @@ block-comment terminator. Seven source-derived cases from
 `COVID19_GWAS_Analyzer` protect this behavior while preflight still rejects a
 genuine stray `*/`.
 
+Regex deletion results must be treated as typed entries. SASPy marks listed
+directories with a trailing `/`; `--delete-file-rgx` now separates those from
+regular files, recursively deletes exact matched directory basenames through
+the guarded cleanup workflow, and requires a matched/deleted verification
+summary before reporting success. Regular files continue through the bulk
+`fdelete` path.
+
 The canonical runner, source-analysis module, regression tests, smoke
 example, and this documentation were synchronized to the three active
 pipeline copies. Generated PGC configuration overrides, LD caches, and

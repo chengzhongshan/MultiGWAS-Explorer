@@ -2048,6 +2048,10 @@ Regex-based deletes now match both:
 - the bare basename, such as `plot.png`
 - the resolved remote path, such as `~/plot.png`
 
+Matched regular files are bulk-deleted. Matched immediate-child directories
+and all of their contents are deleted recursively through the guarded
+`Del_Dir_Recursive` workflow. Explicit `--delete-file` remains file-only.
+
 So both of these are valid:
 
 ```bash

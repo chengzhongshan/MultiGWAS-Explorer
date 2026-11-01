@@ -5,6 +5,8 @@ use FindBin qw($Bin);
 use File::Spec;
 
 # Compatibility entry point; keep all SAS ODA logic in the canonical runner.
+# The canonical --delete-file-rgx deletes matching files and recursively
+# deletes matching immediate-child directories.
 my $runner = File::Spec->catfile($Bin, 'run_sas_codes_or_script_in_ODA.pl');
 die "Cannot find SAS ODA runner: $runner\n" unless -f $runner;
 exec { $^X } $^X, $runner, @ARGV;
