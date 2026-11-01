@@ -233,6 +233,8 @@ sub run_sas_oda_tool {
     push @runner_args, map { ('--download-local-path', $_) } as_list($args->{download_local_path});
     push @runner_args, map { ('--delete-file', $_) } as_list($args->{delete_file});
     push @runner_args, map { ('--delete-file-rgx', $_) } as_list($args->{delete_file_rgx});
+    push @runner_args, map { ('--delete-directory-rgx', $_) } as_list($args->{delete_directory_rgx});
+    push @runner_args, '--delete-directory-dry-run' if is_truthy($args->{delete_directory_dry_run});
     push @runner_args, ('--delete-dir', $args->{delete_dir}) if defined($args->{delete_dir}) && length($args->{delete_dir});
     push @runner_args, map { ('--file-info', $_) } as_list($args->{file_info});
     push @runner_args, ('--classify-sas-log', $args->{classify_sas_log})

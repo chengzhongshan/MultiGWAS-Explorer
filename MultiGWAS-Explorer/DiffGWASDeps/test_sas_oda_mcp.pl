@@ -35,9 +35,13 @@ my $fake = "$root/fake_runner.pl";
 open my $fh, '>', $fake or die $!;
 print {$fh} <<'RUNNER';
 use strict; use warnings;
+use JSON::PP qw(encode_json);
+my @received=@ARGV;
 my $dir;
 while (@ARGV) { my $arg=shift; $dir=shift if $arg eq '--output-prefix' }
 die 'Missing directory' unless $dir;
+open my $args, '>', "$dir/runner_args.json" or die $!;
+print {$args} encode_json(\@received); close $args;
 open my $log, '>', "$dir/output.html.info.txt" or die $!;
 print {$log} "=== SAS Log ===\n";
 print {$log} $ENV{ODA_TEST_FAIL} ? "ERROR: Intentional missing table\n" : "NOTE: Result ready\n";
@@ -78,6 +82,28 @@ chdir $root or die $!;
         my @scratch = grep { /^tmp[A-Za-z0-9_]+$/ } readdir $dh; closedir $dh;
         is(scalar @scratch, 0, 'worker scratch removed');
     }
+}
+{
+    no warnings 'redefine';
+    local *SAS_ODA_MCP::runner_path = sub { $fake };
+    local $ENV{ODA_TEST_FAIL}=0;
+    my $started=SAS_ODA_MCP::run_sas_oda_tool({
+        delete_directory_rgx=>['^tmp_','^old_'], delete_directory_dry_run=>JSON::PP::true,
+        delete_dir=>'~', persistent=>0,
+    });
+    my ($pid)=$started->{content}[0]{text}=~/PID: (\d+)/;
+    my ($dir)=$started->{content}[0]{text}=~/Results directory: ([^\r\n]+)/;
+    ok($pid && $dir,'directory-only MCP operation starts without SAS code');
+    waitpid($pid,0);
+    open my $args,'<',"$dir/runner_args.json" or die $!;
+    my $received=JSON::PP::decode_json(do {local $/; <$args>}); close $args;
+    my @patterns;
+    for my $i (0..$#$received-1) {push @patterns,$received->[$i+1] if $received->[$i] eq '--delete-directory-rgx';}
+    is_deeply(\@patterns,['^tmp_','^old_'],'MCP forwards all directory regexes');
+    ok(grep($_ eq '--delete-directory-dry-run',@$received),'MCP forwards boolean preview');
+    ok(grep($_ eq '~',@$received),'remote home is preserved without shell expansion');
+    my $done=SAS_ODA_MCP::run_sas_oda_tool({pid=>$pid});
+    is($done->{structuredContent}{status},'COMPLETE','directory-only worker uses standard completion reporting');
 }
 chdir $original or die $!;
 done_testing();

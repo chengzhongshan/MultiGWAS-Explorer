@@ -58,6 +58,31 @@ it does not clean remote SAS ODA storage. Keep the run directories when
 investigating a failed run. The script does not detect running jobs; do not
 invoke cleanup concurrently with the pipeline.
 
+### Clean nonempty directories in SAS ODA
+
+Preview matching immediate child directories under remote home:
+
+```bash
+perl run_sas_codes_or_files_in_SAS_ODA.pl \
+  --delete-dir '~' --delete-directory-rgx '^tmp_.*$' \
+  --delete-directory-dry-run --persistent --session-id cleanup
+```
+
+Remove `--delete-directory-dry-run` to recursively delete the matching
+directories and their contents. The canonical
+`run_sas_codes_or_script_in_ODA.pl` supports the same options. Quote remote
+`~` paths so the local shell does not expand them. Patterns use SAS PRX
+syntax and match directory basenames; matching regular files are excluded.
+Repeat `--delete-directory-rgx` to combine patterns. Run cleanup separately
+from `--code` or `--file`.
+
+The helper explicitly loads `~/Macros/Del_Dir_Recursive.sas`, uses a parent
+lock, refuses an existing `_DELETE_` staging path, and verifies removal.
+MCP accepts `delete_directory_rgx` (string or array), `delete_dir` (default
+`~`), and `delete_directory_dry_run` (boolean). See
+[SAS ODA reliability and cleanup](docs/sas_oda_reliability_and_cleanup.md)
+for commands, safeguards and live verification.
+
 ## Main Entry Points
 
 ### Import an existing AOA combined / meta-analysis table

@@ -724,7 +724,18 @@ $server->tool(
                                description => 'Optional regex pattern or list of regex patterns used to delete multiple remote files after listing delete_dir. Regexes match both bare filenames and resolved remote paths such as ~/plot.png.'
                              },
             delete_dir => { type => 'string',
-                               description => 'Optional remote directory to scan before applying delete_file_rgx. Default: ~' },
+                               description => 'Remote parent scanned by delete_file_rgx or delete_directory_rgx. Default: ~' },
+            delete_directory_rgx => {
+                oneOf => [
+                    { type => 'string' },
+                    { type => 'array', items => { type => 'string' } }
+                ],
+                description => 'Recursively delete matching immediate child directory basenames in delete_dir using ~/Macros/Del_Dir_Recursive.sas. SAS PRX regex; run separately from code/file submission.'
+            },
+            delete_directory_dry_run => {
+                type => 'boolean',
+                description => 'Preview matching directory names without deleting. Requires delete_directory_rgx.'
+            },
             download_file => {
                                oneOf => [
                                  { type => 'string' },

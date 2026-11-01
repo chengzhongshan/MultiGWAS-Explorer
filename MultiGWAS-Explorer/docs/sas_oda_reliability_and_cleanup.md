@@ -493,3 +493,81 @@ The final complete MCP run passed **100/100 validations** in
 Its four remote include fixtures were deleted successfully. The report
 also retains the discovery run's 94/100 result and distinguishes runner
 repairs from corrected example assertions and SAS syntax assumptions.
+
+## Recursive removal of nonempty ODA directories (October 31, 2026)
+
+Both `run_sas_codes_or_files_in_SAS_ODA.pl` and the canonical
+`run_sas_codes_or_script_in_ODA.pl` now support the tested MCP4SAS option:
+
+```bash
+export PATH=/usr/bin:$PATH
+# Preview; quote ~ so it refers to SAS ODA home, not local Bash home.
+perl run_sas_codes_or_files_in_SAS_ODA.pl \
+  --delete-dir '~' --delete-directory-rgx '^tmp_.*$' \
+  --delete-directory-dry-run --persistent --session-id cleanup
+
+# Delete the matching directories and all their contents.
+perl run_sas_codes_or_files_in_SAS_ODA.pl \
+  --delete-dir '~' --delete-directory-rgx '^tmp_.*$' \
+  --persistent --session-id cleanup
+```
+
+The shared Perl generator lives in `DiffGWASDeps/SAS_ODA_Directory_Cleanup.pm`.
+It matches immediate child directory basenames using SAS PRX expressions;
+repeat the regex flag to combine patterns. Matching regular files are
+preserved. Cleanup runs separately from code/file submission. The operation
+includes the online `~/Macros/Del_Dir_Recursive.sas` explicitly and calls its
+positional parameters, providing its supporting recursiveDelete definition.
+No local macro copy is uploaded or substituted. Direct calls also receive
+the explicit, case-correct remote loader, independently of global autoload.
+
+The user's macro uses a fixed `_DELETE_` staging name. A parent-directory
+lock serializes cleanup operations and an existing staging path blocks the
+operation. Protected or macro-unsafe directory names are rejected. The
+helper verifies that each selected path and its staging path disappear and
+releases only its own lock. The original macro determines recursive content
+traversal. Generated cleanup code keeps runtime errors in the primary SAS
+log so a refused or unverified deletion produces a failure exit status.
+
+MCP tool arguments, with the existing background PID/poll workflow:
+
+```json
+{
+  "delete_directory_rgx": ["^tmp_.*$", "^old_run_[0-9]+$"],
+  "delete_dir": "~",
+  "delete_directory_dry_run": true,
+  "persistent": "true",
+  "session_id": "cleanup"
+}
+```
+
+Set the preview boolean to false to delete. Both the public server schema
+and `DiffGWASDeps/SAS_ODA_MCP.pm` forward these options. The MCP worker test
+verifies regex arrays, the preview boolean, unexpanded remote home and
+completion reporting for a directory-only operation without SAS code.
+
+```bash
+prove tests/test_macro_quoting_preflight.pl tests/test_format_name_advisory.pl \
+  tests/test_sas_log_diagnostics.pl tests/test_quoted_filename_upload.pl \
+  DiffGWASDeps/test_sas_oda_mcp.pl \
+  DiffGWASDeps/test_sas_include_preflight_lookup.pl \
+  DiffGWASDeps/test_sas_log_and_labels.pl \
+  DiffGWASDeps/test_sas_oda_upload_timeout.pl \
+  tests/test_deferred_macro_literals.pl tests/test_printto_status_guard.pl \
+  tests/test_fileref_name_advisory.pl tests/test_deferred_include_paths.pl \
+  tests/test_include_file_lists.pl tests/test_remote_directory_cleanup.pl
+perl tests/test_live_remote_directory_cleanup.pl --live
+```
+
+The offline suite passed **202 assertions across 14 Perl files**. The actual
+public-wrapper live run passed **18/18 assertions**, exit 0, in
+`SAS_Output_remote_directory_cleanup_5t5Ncd`. It created only a unique test
+parent under remote HOME, two matching nonempty directory trees (one with
+a nested file), an unmatched directory/file and a matching regular file.
+It verified preview preservation, a nonzero exit for an owned `_DELETE_`
+collision, preservation of that collision sentinel and original contents,
+recursive removal of the matching directories, survival of unmatched files,
+lock release, explicit no-match success, and removal of all owned fixtures
+and their parent. No existing user directory was selected.
+
+Programs and CLI/SAS logs remain in the ignored owned run directory.
