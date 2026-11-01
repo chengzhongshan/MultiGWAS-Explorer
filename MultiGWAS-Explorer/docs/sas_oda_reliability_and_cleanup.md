@@ -571,3 +571,40 @@ lock release, explicit no-match success, and removal of all owned fixtures
 and their parent. No existing user directory was selected.
 
 Programs and CLI/SAS logs remain in the ignored owned run directory.
+
+## Case-insensitive targeted macro source lookup
+
+The shared targeted loader first checks exact-case `.sas` paths in both
+search folders. If neither exists, it scans the folders in priority order
+and matches the full filename case-insensitively, including its extension.
+A unique match is included using the actual Linux spelling. More than one
+folded match in the selected folder produces an ERROR and no candidate
+from that lookup is included. Directories named with a `.sas` extension
+are excluded; source files are never renamed or replaced.
+
+Ordinary macro lookup retains `~` before `~/Macros`; Del_Dir_Recursive
+retains its Macros-first preference. Exact matches across both folders
+precede folded matches, preserving the old exact-path behavior. This does
+not guess typos or infer macros stored under unrelated filenames. The
+change applies to the targeted path, not the global importer's own rules.
+Resolution diagnostics remain visible with SAS NONOTES enabled.
+
+```bash
+export PATH=/usr/bin:$PATH
+prove tests/test_case_insensitive_macro_lookup.pl tests/test_remote_directory_cleanup.pl
+perl tests/test_live_case_insensitive_macro_lookup.pl --live
+# Explicitly exercise targeted loading for an ordinary program:
+SAS_ODA_AUTOLOAD_MACROS=0 perl run_sas_codes_or_files_in_SAS_ODA.pl \
+  --file my_program.sas --persistent --session-id case_lookup
+```
+
+The public-wrapper live test passed **21/21 assertions**, exit 0, in
+`SAS_Output_macro_case_uArZC1`. Eight uniquely named macro files covered
+mixed basename/extension case, exact preference, cross-folder precedence
+and ambiguity. Computed values verified the selected source and cleanup
+verified deletion of only the owned files. The final offline suite passed
+**220 assertions across 15 Perl files**, after updating two assertions tied
+to the old generated-code layout. Programs and logs remain in ignored run
+folders; suite/terminal outputs are retained in `SAS_Output_macro_case_validation/`.
+The companion source report records the fixture and NONOTES diagnostic
+corrections observed during MCP4SAS verification.

@@ -83,6 +83,12 @@ MCP accepts `delete_directory_rgx` (string or array), `delete_dir` (default
 [SAS ODA reliability and cleanup](docs/sas_oda_reliability_and_cleanup.md)
 for commands, safeguards and live verification.
 
+Targeted macro loading also resolves case-only filename differences:
+`%my_macro` can load `My_Macro.SAS` from remote home or `~/Macros`.
+Exact-case paths are preferred; otherwise a unique case-insensitive match
+is included using its actual Linux spelling. Ambiguous matches are reported
+as errors. See the cleanup guide for search precedence and live checks.
+
 ## Main Entry Points
 
 ### Import an existing AOA combined / meta-analysis table
