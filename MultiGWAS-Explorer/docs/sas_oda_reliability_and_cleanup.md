@@ -222,7 +222,7 @@ inline-data terminators and genuine quote/comment/macro errors remain
 detectable. Analysis preserves source locations and does not modify the
 SAS program submitted to ODA.
 
-The following Cygwin regressions passed 45 assertions (8, 24, and 13):
+The following Cygwin regressions passed 53 assertions (8, 24, and 21):
 
 ```bash
 export PATH=/usr/bin:$PATH
@@ -248,6 +248,13 @@ and WARNING lines. Its local log is
 `SAS_Output_preflight_smoke/output.html.info.txt`; the generated HTML is
 `SAS_Output_preflight_smoke/sas_res_wsfdc.html`. Artifact names can vary on
 rerun. An additional live check of the quoted-token case also passed.
+
+Unquoted macro-language PRX expressions are classified before comment
+diagnostics. A boundary such as `prxmatch(/\s*&linker\s*/,&value)` contains
+`*/` where a greedy regex quantifier meets its closing delimiter; it is not a
+block-comment terminator. Seven source-derived cases from
+`COVID19_GWAS_Analyzer` protect this behavior while preflight still rejects a
+genuine stray `*/`.
 
 The canonical runner, source-analysis module, regression tests, smoke
 example, and this documentation were synchronized to the three active

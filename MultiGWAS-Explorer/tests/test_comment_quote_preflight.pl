@@ -37,4 +37,22 @@ for my $entry (qw(run_sas_codes_or_script_in_ODA.pl)) {
     is(length($mask),length($commented),'mask preserves source offsets');
     is(($mask =~ tr/\n//),($commented =~ tr/\n//),'mask preserves source line count');
 }
+
+my @covid19_prx_boundaries=(
+    q{%let x=%sysfunc(prxchange(s/^(\s?\S+\s?){3}.*/$1/,-1,&value));},
+    q{%let x=%sysfunc(prxchange(s/^[\-\d\.]+\s*//,-1,&value));},
+    q{%if %sysfunc(prxmatch(/\s*&linker\s*/,&value)) %then %do;},
+    q{%let x=%sysfunc(prxchange(s/^(\d+)\s*-\s*(\d+)\D*.*/$1-$2/,1,&value));},
+    q{%let x=%sysfunc(prxchange(s/^[^-]+\s+(\d+)\s*-\s*(\d+)\D*.*/$1-$2/,1,&value));},
+    q{%let x=%sysfunc(prxchange(s/^([^ ]+ ?){2}(([^ ]+ ?){3}).*/$2/,-1,&value));},
+    q{%let x=%sysfunc(prxchange(s/^([A-Z]+)\s*.*/$1/,-1,&value));},
+);
+for my $index (0..$#covid19_prx_boundaries) {
+    my @close=grep {$_->{type} eq 'unexpected_comment_close'}
+      @{SAS_Source_Analysis::analyze_source($covid19_prx_boundaries[$index])->{findings}};
+    is(scalar @close,0,'COVID19 GWAS PRX boundary '.($index+1).' is not a comment close');
+}
+my @stray_close=grep {$_->{type} eq 'unexpected_comment_close'}
+  @{SAS_Source_Analysis::analyze_source('data x; */ run;')->{findings}};
+is(scalar @stray_close,1,'a genuine stray block-comment close remains an error');
 done_testing();

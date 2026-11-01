@@ -683,6 +683,10 @@ For a new project, copy/adapt the script templates in this skill's `scripts/` fo
   literal semicolon followed by prose on the same `%put` line as a compile
   blocker, because SAS terminates `%put` at that semicolon and otherwise
   reports `ERROR 180-322` only after the remote job has started.
+- Do not diagnose `*/` as a stray comment close when it is the boundary of an
+  unquoted PRX literal, for example `prxmatch(/\s*&linker\s*/,&value)`. The
+  shared source analyzer recognizes that lexical context; preserve its focused
+  regression cases when changing preflight parsing.
 - For `run_sas_codes_or_script_in_ODA.pl` incidents, prefer this quick AI
   debug ladder before moving into `%include` or plotting macros:
   - `perl DiffGWASDeps/run_sas_codes_or_script_in_ODA.pl --check-sas-oda-login-only`
