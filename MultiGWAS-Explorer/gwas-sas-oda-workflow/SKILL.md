@@ -37,6 +37,15 @@ Use this skill as the workflow brain. Keep MCP tools small and reliable.
   path. A missing `indexed local GTF subset` upload entry or `REGION_CHRS`
   keyword error means that combined prep path reached an incompatible legacy
   full-GTF downloader.
+- For automatic SAS combined local Manhattan plots with
+  `TOP_HIT_LD_SOURCE=PLINK2_1KG`, keep the full MAF-passing candidate CSV in
+  the local cache, LD-clump it with the build-matched 1KG panel, and upload
+  only the selected lead CSV. Reuse the local clump cache on reruns. Do not
+  send thousands of candidates to SAS for HaploReg clumping or call an
+  unresolved reference variant LD independent; inspect the local LD audit.
+  `--top-hit-differential-p-mode standardized` selects with the physical
+  `PREFIX_STD_DIFF_P` column, which is present in both the wide table and the
+  locally selected CSV. The `PREFIX_STD_P` name is only a SAS display alias.
 
 ## Required Context
 

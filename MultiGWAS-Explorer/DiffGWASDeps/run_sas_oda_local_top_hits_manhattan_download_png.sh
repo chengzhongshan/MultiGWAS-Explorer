@@ -37,9 +37,15 @@ TOP_HIT_FILTER_EXPR="${TOP_HIT_FILTER_EXPR:-((ASN_STD_P>0) and (ASN_STD_P<1E-6))
 TOP_HIT_SIGNAL_THRSHD="${TOP_HIT_SIGNAL_THRSHD:-1e-6}"
 TOP_HIT_DIST_BP="${TOP_HIT_DIST_BP:-1e6}"
 TOP_HIT_SELECTION_METHOD="${TOP_HIT_SELECTION_METHOD:-ld}"
+TOP_HIT_LD_SOURCE="${TOP_HIT_LD_SOURCE:-PLINK2_1KG}"
+TOP_HIT_LD_PFILE="${TOP_HIT_LD_PFILE:-${WORKDIR}/cache/plink2_1kg_phase3/all_phase3}"
+TOP_HIT_LD_PLINK2="${TOP_HIT_LD_PLINK2:-${WORKDIR}/cache/plink2_bin/plink2.exe}"
 TOP_HIT_LD_R2_THRESHOLD="${TOP_HIT_LD_R2_THRESHOLD:-0.1}"
 TOP_HIT_LD_POPULATIONS="${TOP_HIT_LD_POPULATIONS:-EUR ASN}"
 TOP_HIT_LD_POPULATION_RULE="${TOP_HIT_LD_POPULATION_RULE:-ANY}"
+TOP_HIT_LD_WINDOW_KB="${TOP_HIT_LD_WINDOW_KB:-1000}"
+TOP_HIT_LD_LEADS_TSV="${TOP_HIT_LD_LEADS_TSV:-}"
+TOP_HIT_LD_PRECLUMPED=0
 TOP_HIT_LD_QUERY_FAILURE_ACTION="${TOP_HIT_LD_QUERY_FAILURE_ACTION:-DISTANCE}"
 TOP_HIT_LD_CACHE_TSV="${TOP_HIT_LD_CACHE_TSV:-}"
 TOP_HIT_LD_CACHE_MIN_R2="${TOP_HIT_LD_CACHE_MIN_R2:-0.2}"
@@ -311,6 +317,7 @@ PNG_OUT="${WORKDIR}/${LOCAL_OUTPUT_PREFIX}.png"
 HTML_OUT="${WORKDIR}/${LOCAL_OUTPUT_PREFIX}.html"
 CSV_OUT="${WORKDIR}/${LOCAL_TOP_HITS_CSV_BASENAME}"
 REQUESTED_CSV_OUT="${WORKDIR}/cache/requested_top_hits/${REQUESTED_TOP_HITS_CSV_BASENAME}"
+CANDIDATE_CSV_OUT="${REQUESTED_CSV_OUT%.csv}_candidates.csv"
 LD_AUDIT_OUT="${WORKDIR}/${TOP_HIT_LD_AUDIT_BASENAME}"
 TOP_HIT_LD_CACHE_BASENAME=""
 if [[ -n "${TOP_HIT_LD_CACHE_TSV}" ]]; then
@@ -650,19 +657,25 @@ upload_data_with_integrity_check() {
 
 generate_requested_top_hits_csv_locally() {
   [[ -x "${LOCAL_TOP_HITS_CSV_HELPER}" || -f "${LOCAL_TOP_HITS_CSV_HELPER}" ]] || return 1
-  mkdir -p "$(dirname "${REQUESTED_CSV_OUT}")"
+  local output_csv="${REQUESTED_CSV_OUT}"
+  if [[ -z "${TARGET_SNP_LIST}" && "${TOP_HIT_SELECTION_METHOD^^}" == "LD" \
+      && "${TOP_HIT_LD_SOURCE^^}" == "PLINK2_1KG" \
+      && "${LOCAL_SAS_DEBUG_ONLY}" != "1" && "${ODA_TRANSFER_MANIFEST_ONLY:-0}" != "1" ]]; then
+    output_csv="${CANDIDATE_CSV_OUT}"
+  fi
+  mkdir -p "$(dirname "${output_csv}")"
   echo "[prep] Preparing requested local-top-hit CSV locally..."
   local candidate_dist_bp="${TOP_HIT_DIST_BP}"
   local candidate_max_hits="${TOP_HIT_MAX_LOCI}"
   if [[ "$(printf '%s' "${TOP_HIT_SELECTION_METHOD}" | tr '[:lower:]' '[:upper:]')" == "LD" && -z "${TARGET_SNP_LIST}" ]]; then
     candidate_dist_bp="0"
     candidate_max_hits="0"
-    echo "[prep] Preparing all MAF-passing significant candidates for SAS LD clumping."
+    echo "[prep] Preparing all MAF-passing significant candidates for LD clumping."
   fi
   local -a cmd=(
     perl "${LOCAL_TOP_HITS_CSV_HELPER}"
     --input "${DATA_GZ}"
-    --output "${REQUESTED_CSV_OUT}"
+    --output "${output_csv}"
     --reuse-cache
     --top-hit-mode "${TOP_HIT_MODE:-differential}"
     --top-hit-focus-pvar "${TOP_HIT_FOCUS_PVAR}"
@@ -692,6 +705,57 @@ generate_requested_top_hits_csv_locally() {
 
 stable_hash_text() {
   perl -MDigest::MD5=md5_hex -e 'print md5_hex(join("\0", @ARGV));' "$@"
+}
+
+stable_hash_file() {
+  perl -MDigest::MD5 -e 'open my $fh, q{<:raw}, $ARGV[0] or die $!; print Digest::MD5->new->addfile($fh)->hexdigest' "$1"
+}
+
+clump_requested_top_hits_locally() {
+  [[ -z "${TARGET_SNP_LIST}" ]] || return 0
+  [[ "${TOP_HIT_SELECTION_METHOD^^}" == "LD" && "${TOP_HIT_LD_SOURCE^^}" == "PLINK2_1KG" ]] || return 0
+  [[ "${LOCAL_SAS_DEBUG_ONLY}" != "1" && "${ODA_TRANSFER_MANIFEST_ONLY:-0}" != "1" ]] || return 0
+  [[ -s "${CANDIDATE_CSV_OUT}" ]] || { echo "ERROR: Missing local LD candidate CSV: ${CANDIDATE_CSV_OUT}" >&2; return 1; }
+
+  local ld_key ld_dir ld_base
+  ld_key="$(stable_hash_text "$(stable_hash_file "${CANDIDATE_CSV_OUT}")" "${REFERENCE_BUILD}" \
+    "${TOP_HIT_LD_POPULATIONS}" "${TOP_HIT_LD_POPULATION_RULE}" \
+    "${TOP_HIT_LD_R2_THRESHOLD}" "${TOP_HIT_LD_WINDOW_KB}" \
+    "${TOP_HIT_MAX_LOCI}" "${TOP_HIT_LD_PLINK2}" "${TOP_HIT_LD_PFILE}")"
+  ld_dir="${WORKDIR}/cache/top_hit_ld"
+  mkdir -p "${ld_dir}"
+  ld_base="${ld_dir}/${SAFE_PROJECT_TAG}_${ld_key}"
+  TOP_HIT_LD_LEADS_TSV="${ld_base}.leads.csv"
+  if [[ -s "${TOP_HIT_LD_LEADS_TSV}" && -s "${ld_base}.audit.tsv" \
+      && -s "${ld_base}.cache.tsv" && -s "${ld_base}.status.tsv" ]]; then
+    echo "[skip] Reusing local PLINK2/1KG LD-clumped top hits: ${TOP_HIT_LD_LEADS_TSV}"
+  else
+    local -a ld_args=(
+      --candidates "${CANDIDATE_CSV_OUT}" --build "${REFERENCE_BUILD}"
+      --plink2 "${TOP_HIT_LD_PLINK2}"
+      --populations "${TOP_HIT_LD_POPULATIONS}"
+      --population-rule "${TOP_HIT_LD_POPULATION_RULE}"
+      --r2-threshold "${TOP_HIT_LD_R2_THRESHOLD}"
+      --window-kb "${TOP_HIT_LD_WINDOW_KB}"
+      --max-leads "${TOP_HIT_MAX_LOCI}"
+      --output-leads "${TOP_HIT_LD_LEADS_TSV}"
+      --output-audit "${ld_base}.audit.tsv"
+      --output-cache "${ld_base}.cache.tsv"
+      --output-status "${ld_base}.status.tsv"
+    )
+    if [[ "${REFERENCE_BUILD}" == "hg38" ]]; then
+      ld_args+=(--panel-dir "${WORKDIR}/cache/plink2_1kg_hg38")
+    else
+      ld_args+=(--pfile "${TOP_HIT_LD_PFILE}")
+    fi
+    echo "[prep] LD-clumping local Manhattan top hits with build-matched PLINK2/1KG genotypes."
+    perl "${DEPS_DIR}/clump_top_hits_by_build.pl" "${ld_args[@]}"
+  fi
+  [[ -s "${TOP_HIT_LD_LEADS_TSV}" ]] || { echo "ERROR: Local LD clumping produced no lead table." >&2; return 1; }
+  cp -f "${TOP_HIT_LD_LEADS_TSV}" "${REQUESTED_CSV_OUT}"
+  cp -f "${ld_base}.audit.tsv" "${LD_AUDIT_OUT}"
+  TOP_HIT_LD_PRECLUMPED=1
+  echo "[prep] Uploading $(($(wc -l < "${REQUESTED_CSV_OUT}") - 1)) lead(s) after local LD assessment to SAS ODA; see ${LD_AUDIT_OUT} for unresolved variants."
 }
 
 compact_merged_target_windows() {
@@ -870,6 +934,12 @@ SAFE_PROJECT_TAG="$(printf '%s' "${PROJECT_TAG}" | tr -c 'A-Za-z0-9._-' '_')"
 compact_merged_target_windows
 augment_data_gz_with_target_snp_windows
 
+if [[ "${LOCAL_TOP_HITS_CSV_PREGENERATED:-0}" != "1" ]] && ! generate_requested_top_hits_csv_locally; then
+  echo "ERROR: Local top-hit selection failed; refusing unfiltered SAS fallback." >&2
+  exit 1
+fi
+clump_requested_top_hits_locally
+
 perl "${SCHEMA_INCLUDE_HELPER}" \
   --config "${SCHEMA_CONFIG_JSON}" \
   --input-file "${DATA_GZ}" \
@@ -887,6 +957,7 @@ perl "${RENDER_SAS_HELPER}" \
   --replace "TOP_HIT_SIGNAL_THRSHDS=${TOP_HIT_SIGNAL_THRSHDS:-${TOP_HIT_SIGNAL_THRSHD}}" \
   --replace "TOP_HIT_DIST_BP=${TOP_HIT_DIST_BP}" \
   --replace "TOP_HIT_SELECTION_METHOD=${TOP_HIT_SELECTION_METHOD}" \
+  --replace "TOP_HIT_LD_PRECLUMPED=${TOP_HIT_LD_PRECLUMPED}" \
   --replace "TOP_HIT_LD_R2_THRESHOLD=${TOP_HIT_LD_R2_THRESHOLD}" \
   --replace "TOP_HIT_LD_POPULATIONS=${TOP_HIT_LD_POPULATIONS}" \
   --replace "TOP_HIT_LD_POPULATION_RULE=${TOP_HIT_LD_POPULATION_RULE}" \
@@ -1026,11 +1097,6 @@ cat > "${GET_GTF_MACRO_UPLOAD}" <<'EOF'
 %mend;
 EOF
 perl -0pi -e 's/__GET_GTF_MACRO_NAME__/\Q'"${GET_GTF_MACRO_NAME}"'\E/g' "${GET_GTF_MACRO_UPLOAD}"
-
-if [[ "${LOCAL_TOP_HITS_CSV_PREGENERATED:-0}" != "1" ]] && ! generate_requested_top_hits_csv_locally; then
-  rm -f "${REQUESTED_CSV_OUT}" "${REQUESTED_CSV_OUT}.request.md5"
-  echo "WARNING: Local top-hit CSV generation did not succeed. The SAS script will use its internal top-hit selection; no requested CSV will be imported." >&2
-fi
 
 if [[ "${EMIT_LOCAL_SAS_DEBUG}" == "1" || "${LOCAL_SAS_DEBUG_ONLY}" == "1" ]]; then
   perl "${LOCAL_SAS_DEBUG_EMITTER}" \
@@ -1196,7 +1262,7 @@ support_download_args=(
   --download-local-path "${CSV_OUT}"
 )
 # Explicit target SNPs bypass LD clumping, so SAS does not create an LD audit.
-if [[ -z "${TARGET_SNP_LIST}" ]]; then
+if [[ -z "${TARGET_SNP_LIST}" && "${TOP_HIT_LD_PRECLUMPED}" != "1" ]]; then
   support_download_args+=(
     --download-file "~/${TOP_HIT_LD_AUDIT_BASENAME}"
     --download-local-path "${LD_AUDIT_OUT}"

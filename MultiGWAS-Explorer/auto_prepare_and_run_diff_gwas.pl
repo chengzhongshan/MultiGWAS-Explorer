@@ -3540,7 +3540,9 @@ sub detect_stdized_value_and_filter_fields {
 
 sub top_hit_selection_pvar {
     my ($track, $mode) = @_;
-    return ($track->{prefix} // '') . '_STD_P'
+    # Use the physical wide-table column. The SAS import also creates _STD_P,
+    # but the locally selected top-hit CSV only carries _STD_DIFF_P.
+    return ($track->{prefix} // '') . '_STD_DIFF_P'
         if $mode eq 'standardized' && ($track->{kind} // '') eq 'std';
     return $track->{pvar};
 }

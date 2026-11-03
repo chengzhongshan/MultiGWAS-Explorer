@@ -3066,6 +3066,14 @@ differential P is derived for visualization, so thresholds on it are exploratory
 and should not be interpreted as calibrated association significance. Explicit
 `--target-snps` bypasses automatic top-hit discovery.
 
+For automatic SAS combined local Manhattan plots using the default
+`PLINK2_1KG` LD source, the runner now clumps candidates locally with the
+build-matched 1KG panel and uploads only selected leads to SAS ODA. The full
+candidate CSV and local LD audit remain in the local cache, so a rerun can
+reuse the clumping result. An `UNRESOLVED_NO_LD` audit entry means the reference
+panel could not estimate LD for that variant. Set `top_hit_max_loci` in the spec
+when the unrestricted lead count is too large for one combined plot.
+
 The default remains `none`; no LD query or overlay is performed unless the
 user requests `markers`, `heatmap`, or `both`. Explicit proxy lists can supply
 values with `--local-ld-r2-values rs1:0.92,rs2:0.81`. The gnuplot equivalent is

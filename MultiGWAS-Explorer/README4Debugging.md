@@ -1,5 +1,27 @@
 # Debugging the AOA GWAS comparison pipeline
 
+## 2026-11-03: Anemia standardized-P local Manhattan top hits
+
+The automatic local Manhattan run selected 10,176 significant candidates and
+uploaded its entire candidate CSV to SAS for HaploReg LD clumping. The SAS
+submit then failed with `EAS_EUR_PLUS_EAS_STD_P` missing: that name is a SAS
+display alias, while the uploaded CSV contains the physical
+`EAS_EUR_PLUS_EAS_STD_DIFF_P` column. This was a code-path mismatch, not a
+SAS ODA space error.
+
+For `TOP_HIT_LD_SOURCE=PLINK2_1KG`, locally LD-clump the candidate CSV using
+the build-matched 1KG panel before the SAS upload. Keep the candidates and
+selected leads in separate cache files so reruns do not mistake leads for all
+candidates. SAS must use those preclumped leads directly. The local audit
+records variants that were not estimable in the reference panel; do not
+describe those as LD-independent. When an unrestricted hit set is still too
+large to display, set `top_hit_max_loci` explicitly in the spec.
+
+For standardized differential-P selection, use `PREFIX_STD_DIFF_P` in the
+runner's top-hit focus and filter expression. `PREFIX_STD_P` remains a display
+alias. Check the generated runner JSON and requested CSV header before a
+large SAS submit.
+
 This is a reproducible record of the 2026-10-09 AOA rerun and the checks to
 make before trusting its figures. Run the commands from `AOA_GWAS_Data` unless
 another directory is shown. Keep failed `run_*` and `upload_*` directories
