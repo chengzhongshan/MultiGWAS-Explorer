@@ -387,6 +387,8 @@ die "--input-merged cannot be combined with --spec or --gwas-dir\n"
 die "--top-hit-differential-p-mode must be raw or standardized\n"
     if length($top_hit_differential_p_mode_override)
        && lc($top_hit_differential_p_mode_override) !~ /^(?:raw|standardized)$/;
+die "--top-hit-max-loci must be zero or a positive integer\n"
+    if defined($top_hit_max_loci_override) && $top_hit_max_loci_override < 0;
 
 my $generated_spec_input = !length($spec_file) && (length($gwas_dir) || length($input_merged));
 if ($generated_spec_input) {
@@ -449,6 +451,8 @@ if ($generated_spec_input) {
         if defined $manhattan_top_logp_override;
     $draft_spec->{top_hit_differential_p_mode} = lc($top_hit_differential_p_mode_override)
         if length $top_hit_differential_p_mode_override;
+    $draft_spec->{top_hit_max_loci} = $top_hit_max_loci_override
+        if defined $top_hit_max_loci_override;
     if ($preview_spec) {
         print pretty_json($draft_spec), "\n";
         exit 0 if $generate_spec_only || !length $spec_out;
@@ -705,6 +709,9 @@ if (length($top_hit_ld_cache_tsv) && $top_hit_ld_r2_threshold < $top_hit_ld_cach
 my $top_hit_max_loci = defined($top_hit_max_loci_override)
     ? $top_hit_max_loci_override
     : cfg_or($spec, 'top_hit_max_loci', 0);
+die "top_hit_max_loci must be zero or a positive integer\n"
+    unless defined($top_hit_max_loci)
+       && $top_hit_max_loci =~ /^(?:0|[1-9]\d*)$/;
 my $local_window_bp = cfg_or($spec, 'local_window_bp', '1e7');
 my $local_gtf_window_bp = cfg_or($spec, 'local_gtf_window_bp', '2.5e5');
 die "--local-manhattan-window-bp must be a positive number of base pairs\n"
@@ -1841,6 +1848,7 @@ sub infer_spec_from_gwas_dir {
         keep_remote_plot_data  => 1,
         top_hit_focus_prefix   => $focus_prefix,
         top_hit_signal_thrshd  => '1e-6',
+        top_hit_max_loci       => 0,
         top_hit_dist_bp        => '1e6',
         top_hit_selection_method => 'ld',
         top_hit_ld_r2_threshold => '0.1',
@@ -2123,6 +2131,7 @@ sub infer_merged_spec_from_dir {
         keep_remote_plot_data => 1,
         top_hit_focus_prefix  => $pairs[0]{prefix},
         top_hit_signal_thrshd => '1e-6',
+        top_hit_max_loci      => 0,
         top_hit_dist_bp       => '1e6',
         top_hit_selection_method => 'ld',
         top_hit_ld_r2_threshold => '0.1',
@@ -2508,6 +2517,7 @@ sub infer_precomputed_spec_from_dir {
         keep_remote_plot_data => 1,
         top_hit_focus_prefix  => $prefixes[0],
         top_hit_signal_thrshd => '1e-6',
+        top_hit_max_loci      => 0,
         top_hit_dist_bp       => '1e6',
         top_hit_selection_method => 'ld',
         top_hit_ld_r2_threshold => '0.1',
@@ -5434,6 +5444,9 @@ Options:
   --top-hit-dist-bp N  Total physical span used only as the LD-query failure
                        fallback when LD selection is active.
   --top-hit-max-loci N Stop after N independent leads; 0 means no limit.
+                       Spec key: top_hit_max_loci. Applies to automatic local
+                       Manhattan/GTF and forest hit selection. It does not
+                       limit the candidate SNPs assessed for LD.
   --local-max-hits-per-fig N
                        Requested upper bound for local top-hit columns per panel.
                        Current pipeline maximum is 15.
@@ -5942,6 +5955,7 @@ sub sample_spec_json {
   "keep_remote_plot_data": 1,
   "top_hit_focus_prefix": "ASN_EUR",
   "top_hit_signal_thrshd": "1e-6",
+  "top_hit_max_loci": 0,
   "top_hit_differential_p_mode": "raw",
   "local_window_bp": "1e7",
   "local_gtf_window_bp": "2.5e5",

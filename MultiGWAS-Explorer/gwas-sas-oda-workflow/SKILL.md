@@ -46,6 +46,10 @@ Use this skill as the workflow brain. Keep MCP tools small and reliable.
   `--top-hit-differential-p-mode standardized` selects with the physical
   `PREFIX_STD_DIFF_P` column, which is present in both the wide table and the
   locally selected CSV. The `PREFIX_STD_P` name is only a SAS display alias.
+- If the LD-assessed lead count is too large for a combined plot, use
+  `--top-hit-max-loci N` with either pipeline or set `top_hit_max_loci` in the
+  spec. `0` means unlimited. This caps the number of selected leads after LD
+  assessment; `local_max_hits_per_fig` only controls panel layout.
 
 ## Required Context
 

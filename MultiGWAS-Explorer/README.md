@@ -2624,8 +2624,10 @@ Important selector details:
 - The common-association selector now defaults to `top_hit_dist_bp=1e6`
   unless your spec overrides it.
 - The local-top-hit wrappers no longer hard-cap the helper at `15` loci.
-  Use `top_hit_max_loci` in the spec or `TOP_HIT_MAX_LOCI` in the runner
-  environment when you want an explicit cap; `0` means "no hard limit".
+  Use `--top-hit-max-loci N` with either pipeline, `top_hit_max_loci` in the
+  spec, or `TOP_HIT_MAX_LOCI` in the runner environment when you want an
+  explicit cap; `0` means "no hard limit". Auto-generated specs now show
+  `"top_hit_max_loci": 0` so the setting is easy to find.
 - In the bundled PGC schizophrenia sex-stratified validation on
   2026-06-14, the shared-association verifier found `11,703` candidates at
   `COMMON_ASSOC_P < 5e-8` and retained `103` loci after MAF QC and
