@@ -3055,6 +3055,17 @@ tracks in genome-wide Manhattan, local Manhattan, and local GTF plots, pass
 tracks, not top-hit selection. The added track has ID `PREFIX_STD_P`, so the
 existing track order and exclusion options can place or remove it separately.
 
+Local top-hit selection can use standardized differential P instead of raw
+differential P by passing `--top-hit-differential-p-mode standardized` to either
+pipeline, or by setting `"top_hit_differential_p_mode": "standardized"` in the
+comparison spec. The cutoff still comes from `top_hit_signal_thrshd` (for
+example, `"1e-5"`). The default mode is `raw`. This selection setting applies
+to local Manhattan, local GTF, and forest top-hit discovery; it does not change
+the displayed tracks or genomewide Manhattan filtering. Standardized
+differential P is derived for visualization, so thresholds on it are exploratory
+and should not be interpreted as calibrated association significance. Explicit
+`--target-snps` bypasses automatic top-hit discovery.
+
 The default remains `none`; no LD query or overlay is performed unless the
 user requests `markers`, `heatmap`, or `both`. Explicit proxy lists can supply
 values with `--local-ld-r2-values rs1:0.92,rs2:0.81`. The gnuplot equivalent is

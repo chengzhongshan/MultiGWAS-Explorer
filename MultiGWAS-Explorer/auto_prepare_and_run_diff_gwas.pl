@@ -79,6 +79,7 @@ my $standardize_method_override = '';
 my $clip_lower_quantile_override = '';
 my $clip_upper_quantile_override = '';
 my $top_hit_dist_bp_override = '';
+my $top_hit_differential_p_mode_override = '';
 my $top_hit_selection_method_override = '';
 my $top_hit_ld_r2_threshold_override = '';
 my $top_hit_ld_populations_override = '';
@@ -219,6 +220,7 @@ GetOptions(
     'clip-lower-quantile=s' => \$clip_lower_quantile_override,
     'clip-upper-quantile=s' => \$clip_upper_quantile_override,
     'top-hit-dist-bp=s'   => \$top_hit_dist_bp_override,
+    'top-hit-differential-p-mode=s' => \$top_hit_differential_p_mode_override,
     'top-hit-selection-method=s' => \$top_hit_selection_method_override,
     'top-hit-ld-r2-threshold=s' => \$top_hit_ld_r2_threshold_override,
     'top-hit-ld-populations=s' => \$top_hit_ld_populations_override,
@@ -382,6 +384,9 @@ die "--max-eaf-abs-diff must be a number between 0 and 1, or none\n"
 
 die "--input-merged cannot be combined with --spec or --gwas-dir\n"
     if length($input_merged) && (length($spec_file) || length($gwas_dir));
+die "--top-hit-differential-p-mode must be raw or standardized\n"
+    if length($top_hit_differential_p_mode_override)
+       && lc($top_hit_differential_p_mode_override) !~ /^(?:raw|standardized)$/;
 
 my $generated_spec_input = !length($spec_file) && (length($gwas_dir) || length($input_merged));
 if ($generated_spec_input) {
@@ -442,6 +447,8 @@ if ($generated_spec_input) {
         if defined $standardized_p_tracks_override;
     $draft_spec->{manhattan_top_logp} = $manhattan_top_logp_override
         if defined $manhattan_top_logp_override;
+    $draft_spec->{top_hit_differential_p_mode} = lc($top_hit_differential_p_mode_override)
+        if length $top_hit_differential_p_mode_override;
     if ($preview_spec) {
         print pretty_json($draft_spec), "\n";
         exit 0 if $generate_spec_only || !length $spec_out;
@@ -527,6 +534,14 @@ my $manhattan_differential_p_mode = lc(
 die "--manhattan-differential-p-mode must be raw or standardized\n"
     unless $manhattan_differential_p_mode =~ /^(?:raw|standardized)$/;
 $spec->{manhattan_differential_p_mode} = $manhattan_differential_p_mode;
+$spec->{top_hit_differential_p_mode} = lc($top_hit_differential_p_mode_override)
+    if length $top_hit_differential_p_mode_override;
+my $top_hit_differential_p_mode = lc(cfg_or($spec, 'top_hit_differential_p_mode', 'raw'));
+die "--top-hit-differential-p-mode must be raw or standardized\n"
+    unless $top_hit_differential_p_mode =~ /^(?:raw|standardized)$/;
+$spec->{top_hit_differential_p_mode} = $top_hit_differential_p_mode;
+print STDERR "[science] Standardized differential P is a visualization-derived score; top-hit thresholds using it are exploratory, not calibrated association significance.\n"
+    if $top_hit_differential_p_mode eq 'standardized';
 $spec->{manhattan_top_logp} = $manhattan_top_logp_override
     if defined $manhattan_top_logp_override;
 my $manhattan_top_logp = cfg_or($spec, 'manhattan_top_logp', 8);
@@ -3523,6 +3538,13 @@ sub detect_stdized_value_and_filter_fields {
     return (\@default_value_fields, \@default_filter_fields);
 }
 
+sub top_hit_selection_pvar {
+    my ($track, $mode) = @_;
+    return ($track->{prefix} // '') . '_STD_P'
+        if $mode eq 'standardized' && ($track->{kind} // '') eq 'std';
+    return $track->{pvar};
+}
+
 sub build_runner_config {
     my (%args) = @_;
     my $spec = $args{spec};
@@ -3695,7 +3717,13 @@ sub build_runner_config {
         : ($source_mode eq 'merged_gwas_table' && @selected_std_tracks && @selected_group_tracks >= 2
             ? 'common_and_differential'
             : (@selected_std_tracks ? 'differential' : 'single_gwas'));
-    my $top_hit_focus_pvar = $get_common_associations ? 'COMMON_ASSOC_P' : $primary_focus_track->{pvar};
+    my $top_hit_p_mode = lc(cfg_or($spec, 'top_hit_differential_p_mode', 'raw'));
+    die "Standardized top-hit differential P requires a displayed differential comparison track\n"
+        if $top_hit_p_mode eq 'standardized' && !@selected_std_tracks;
+    die "Standardized top-hit differential P is not used by --get-common-associations; select differential top hits instead\n"
+        if $top_hit_p_mode eq 'standardized' && $get_common_associations;
+    my $top_hit_focus_pvar = $get_common_associations ? 'COMMON_ASSOC_P'
+        : top_hit_selection_pvar($primary_focus_track, $top_hit_p_mode);
     if (!length $top_hit_ld_populations) {
         my $ld_focus = uc($focus_prefix || '');
         $top_hit_ld_populations = $ld_focus eq 'EUR' ? 'EUR'
@@ -3739,7 +3767,7 @@ sub build_runner_config {
     } else {
         $top_hit_filter_expr = join(' or ', map {
             "(($_>0) and ($_<$top_hit_threshold))"
-        } map { $_->{pvar} } @focus_tracks);
+        } map { top_hit_selection_pvar($_, $top_hit_p_mode) } @focus_tracks);
         if ($top_hit_mode eq 'differential') {
             $top_hit_signal_thrshds = build_differential_threshold_ladder(
                 $top_hit_threshold,
@@ -3849,6 +3877,7 @@ sub build_runner_config {
         MANHATTAN_FIG_WIDTH => $manhattan_fig_width,
         MANHATTAN_GWAS_LABEL_NAMES => join('|', @mh_labels),
         TOP_HIT_MODE => $top_hit_mode,
+        TOP_HIT_DIFFERENTIAL_P_MODE => $top_hit_p_mode,
         TOP_HIT_FOCUS_PVAR => $top_hit_focus_pvar,
         TOP_HIT_FILTER_EXPR => $top_hit_filter_expr,
         TOP_HIT_SIGNAL_THRSHD => $top_hit_threshold,
@@ -5323,6 +5352,14 @@ Options:
   --exclude-manhattan-tracks LIST  Remove comma-separated genomewide scatter tracks.
   --manhattan-top-logp N  Cap -log10(P) in each genomewide Manhattan track.
                          N is an integer of at least 8; default: 8.
+  --top-hit-differential-p-mode MODE
+                       Choose raw or standardized differential P for the local
+                       top-hit cutoff top_hit_signal_thrshd (default: raw).
+                       Spec key: top_hit_differential_p_mode. This changes
+                       selection for local Manhattan/GTF and forest top hits;
+                       it does not change the plotted P tracks. Standardized
+                       P is visualization-derived; treat selected hits as
+                       exploratory, not calibrated association significance.
   --[no-]standardized-p-tracks
                        Add/remove standardized differential P tracks in genomewide
                        Manhattan, local Manhattan, and local GTF plots. Default: off.
@@ -5779,7 +5816,7 @@ sub full_help {
         $text .= "  DIFF_Z                    : raw differential Z-score\n";
         $text .= "  DIFF_P                    : raw differential P-value\n";
         $text .= "  STD_DIFF_Z                : standardized differential Z-score used for cross-comparison plotting\n";
-        $text .= "  STD_DIFF_P                : legacy visualization-standardized value; not used for inferential thresholds\n";
+        $text .= "  STD_DIFF_P                : visualization-standardized value; optional exploratory top-hit cutoff only, not calibrated association significance\n";
     }
 
     if ($show_example) {
@@ -5903,6 +5940,7 @@ sub sample_spec_json {
   "keep_remote_plot_data": 1,
   "top_hit_focus_prefix": "ASN_EUR",
   "top_hit_signal_thrshd": "1e-6",
+  "top_hit_differential_p_mode": "raw",
   "local_window_bp": "1e7",
   "local_gtf_window_bp": "2.5e5",
   "include_non_protein_coding_genes_in_local_gtf": 0,

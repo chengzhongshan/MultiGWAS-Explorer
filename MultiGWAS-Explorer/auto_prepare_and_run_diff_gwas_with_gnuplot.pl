@@ -85,6 +85,13 @@ Options:
                                 EUR female/male demo cutoff is study-specific.
                                 Missing-in-one-group SNPs cannot yield a paired
                                 differential result even with filters off.
+  --top-hit-differential-p-mode MODE
+                                raw or standardized P for the local top-hit
+                                cutoff top_hit_signal_thrshd (default: raw).
+                                Spec key: top_hit_differential_p_mode. Applies
+                                to local Manhattan/GTF and forest hit selection,
+                                without changing plotted P tracks. Standardized
+                                P is visualization-derived and exploratory.
   --step NAME                   Render only this plot stage; repeat for several:
                                 plot_manhattan, plot_local_manhattan,
                                 plot_local_gtf, or plot_forest.
@@ -236,6 +243,7 @@ my $local_manhattan_track_order_override = '';
 my $exclude_local_gtf_tracks_override;
 my $local_gtf_track_order_override = '';
 my $manhattan_differential_p_mode_override = '';
+my $top_hit_differential_p_mode_override = '';
 my $manhattan_top_logp_override;
 my $standardized_p_tracks_override;
 # Keep ancestry-overlap decisions in the shared spec; gnuplot forwards an
@@ -307,6 +315,7 @@ GetOptions(
     'exclude-local-gtf-tracks|exclude-gtf-tracks=s' => \$exclude_local_gtf_tracks_override,
     'local-gtf-track-order|gtf-track-order=s' => \$local_gtf_track_order_override,
     'manhattan-differential-p-mode=s' => \$manhattan_differential_p_mode_override,
+    'top-hit-differential-p-mode=s' => \$top_hit_differential_p_mode_override,
     'manhattan-top-logp|genomewide-logp-cap=i' => \$manhattan_top_logp_override,
     'standardized-p-tracks!' => \$standardized_p_tracks_override,
     'compute-meta!'             => \$compute_meta_override,
@@ -395,6 +404,8 @@ if (length($input_merged) || length($gwas_dir)) {
             ? ($standardized_p_tracks_override ? '--standardized-p-tracks' : '--no-standardized-p-tracks') : ()),
         (defined($manhattan_top_logp_override)
             ? ('--manhattan-top-logp', $manhattan_top_logp_override) : ()),
+        (length($top_hit_differential_p_mode_override)
+            ? ('--top-hit-differential-p-mode', $top_hit_differential_p_mode_override) : ()),
     ], 'auto-generate GWAS comparison spec');
     my $generated_spec = load_json($spec_file);
     $generated_spec->{configs_dir} = dirname(localize_path($spec_file));
@@ -448,6 +459,10 @@ my %requested = normalize_requested_plots($plots, \@step_args);
 die "No gnuplot plot steps were requested.\n" unless grep { $requested{$_} } qw(plot_manhattan plot_local_manhattan plot_local_gtf plot_forest);
 
 my $spec = load_json($spec_file);
+$spec->{top_hit_differential_p_mode} = lc(trim($top_hit_differential_p_mode_override))
+    if length($top_hit_differential_p_mode_override);
+die "--top-hit-differential-p-mode must be raw or standardized\n"
+    unless lc($spec->{top_hit_differential_p_mode} // 'raw') =~ /^(?:raw|standardized)$/;
 $spec->{compute_meta} = $compute_meta_override ? 1 : 0
     if defined $compute_meta_override;
 if (!length($input_merged) && !length($gwas_dir)) {
@@ -532,6 +547,7 @@ for my $override_value (
     $exclude_local_gtf_tracks_override,
     $local_gtf_track_order_override,
     $manhattan_differential_p_mode_override,
+    $top_hit_differential_p_mode_override,
     $target_snps_override,
     $target_snp_genes_override,
     $get_common_associations,
@@ -575,6 +591,11 @@ if (-f $runner_config_local) {
         ? $manhattan_top_logp_override : ($spec->{manhattan_top_logp} // 8);
     $has_runner_override = 1
         if "$requested_top_logp" ne ("" . ($cached_runner->{MANHATTAN_TOP_LOGP} // 8));
+    my $requested_hit_p_mode = lc($spec->{top_hit_differential_p_mode} // 'raw');
+    $has_runner_override = 1
+        if $requested_hit_p_mode ne lc($cached_runner->{TOP_HIT_DIFFERENTIAL_P_MODE} // 'raw');
+    $has_runner_override = 1
+        if ($spec->{top_hit_signal_thrshd} // '1e-6') ne ($cached_runner->{TOP_HIT_SIGNAL_THRSHD} // '1e-6');
     $has_runner_override = 1
         if !!($cached_runner->{MANHATTAN_INCLUDE_X_CHR} || 0) != !!(!$remove_x_chr);
     my $requested_exclusions = length($exclude_manhattan_tracks_override)
@@ -634,6 +655,7 @@ if (!$reused_existing_runner) {
         exclude_local_gtf_tracks_override => $exclude_local_gtf_tracks_override,
         local_gtf_track_order_override => $local_gtf_track_order_override,
         manhattan_differential_p_mode_override => $manhattan_differential_p_mode_override,
+        top_hit_differential_p_mode_override => $top_hit_differential_p_mode_override,
         standardized_p_tracks_override => $standardized_p_tracks_override,
         manhattan_top_logp_override => $manhattan_top_logp_override,
         compute_meta_override           => $compute_meta_override,
@@ -1018,6 +1040,10 @@ sub run_upstream_preprocessing {
     if ($args{manhattan_differential_p_mode_override}) {
         push @cmd, '--manhattan-differential-p-mode',
           $args{manhattan_differential_p_mode_override};
+    }
+    if ($args{top_hit_differential_p_mode_override}) {
+        push @cmd, '--top-hit-differential-p-mode',
+          $args{top_hit_differential_p_mode_override};
     }
     push @cmd, ($args{standardized_p_tracks_override}
         ? '--standardized-p-tracks' : '--no-standardized-p-tracks')
