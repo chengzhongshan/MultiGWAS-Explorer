@@ -58,6 +58,8 @@ fixed_group_span=, /*Optional common BP span for local hit panels. Requires a
   relative pos_var and fixed_group_index_var (1-based); preserves physical
   distances even when the first/last observed SNP differs across panels.*/
 fixed_group_index_var=,
+x_axis_length_pct=, /*Optional horizontal plotting length as percent of image
+  width. Batched local plots use this to keep pixels per locus constant.*/
 sep_chr_grp=0, /*Default is not to add lines to separate x-axis chromosomal groups;
 Provide value 1 to add lines to separate each chromosomal group*/ 
 xgrp_y_pos=-1, /*Asign the y-axis value for all x-axis group labels;
@@ -788,6 +790,9 @@ symbol1 v=dot r=46 h=&dotsize;
 
 * suppress drawing of any x-axis feature;
 axis1 value=none major=none minor=none label=none style=0
+%if %length(%superq(x_axis_length_pct))>0 %then %do;
+  length=&x_axis_length_pct.pct
+%end;
 %if %length(%superq(fixed_group_span))>0 and %length(%superq(fixed_group_index_var))>0 %then %do;
   order=(0 to &maxbp by &fixed_group_span)
 %end;

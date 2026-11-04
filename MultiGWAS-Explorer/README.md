@@ -3283,6 +3283,11 @@ The combined SAS panels now use the same physical x-axis span of
 inward, so its displayed width is preserved without extending past the
 chromosome. Panel labels and separator lines use fixed panel centers and
 boundaries. Gnuplot locus plots use the same bounded-window rule.
+When the final SAS batch contains fewer loci, its image width shrinks while
+preserving the horizontal pixel width per locus and the scatter-point size.
+The HTML wrapper scales all batches together, so a two-window final batch
+does not stretch to the width of a fifteen-window batch. A single batch still
+uses the requested figure width.
 
 Available CLI overrides:
 

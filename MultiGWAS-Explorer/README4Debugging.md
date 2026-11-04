@@ -14,6 +14,15 @@ The four-target chr2 SAS ODA rerun completed successfully after sorting the
 new fixed-coordinate data by group and position before `PROC TRANSPOSE`.
 Its exported target windows each span 2,000,000 bp for a 1 Mb half-window.
 
+The final short batch also needs a smaller image width: using the full image
+width for two loci stretches them relative to fifteen-locus batches. Reserve
+the same axis margin, allocate the same horizontal plotting length per locus,
+and compensate GPLOT symbol size when the image narrows. Both the SAS HTML
+writer and the shell wrapper's rebuilt HTML must retain the PNG width ratios;
+otherwise browser resizing stretches the last batch again. A SAS ODA test of
+17 synthetic loci produced 1800-pixel and 365-pixel images, with approximately
+110 horizontal plotting pixels per locus in both batches.
+
 The Anemia chr2 LD audit showed `rs58750654` (82,815,807), `rs974260`
 (82,814,529), `rs60119673` (82,815,686), and `rs151056964` (82,807,930)
 all selected in the same small locus. The lead and two other candidates had

@@ -906,14 +906,40 @@ run;
 %put NOTE: n_top_hits=&n_top_hits;
 %put NOTE: n_hit_batches=&n_hit_batches;
 
+/* Reserve the same margin for axes in every image, then allocate the same
+   horizontal pixel length to each locus, including the final short batch. */
+%let local_reference_batch_count=%sysfunc(min(&n_top_hits,&local_max_hits_per_fig));
+%let local_full_axis_width=%sysevalf(0.92*__MANHATTAN_FIG_WIDTH__);
+%let local_batch_margin_width=%sysevalf(0.08*__MANHATTAN_FIG_WIDTH__);
+
 %macro render_local_hit_batches;
   %local batch_idx start_idx end_idx batch_snp_gene_label batch_output_prefix batch_count batch_dsdin batch_chr_colors;
   %local local_xgrp_y_pos local_yoffset_setting local_gwas_label_y_frac;
   %local local_angle4xaxis_label local_fontsize local_y_axis_label_size local_y_axis_value_size;
+  %local batch_fig_width batch_axis_width batch_axis_pct batch_track_label_size batch_plot_title batch_track_labels;
+  %let batch_track_labels=%str(__MANHATTAN_GWAS_LABEL_NAMES__);
   %do batch_idx=1 %to &n_hit_batches;
     %let start_idx=%eval((&batch_idx-1)*&local_max_hits_per_fig + 1);
     %let end_idx=%sysfunc(min(&n_top_hits,%eval(&batch_idx*&local_max_hits_per_fig)));
     %let batch_count=%eval(&end_idx-&start_idx+1);
+    %let batch_axis_width=%sysevalf(&local_full_axis_width*&batch_count/&local_reference_batch_count);
+    %let batch_fig_width=%sysfunc(ceil(%sysevalf(&local_batch_margin_width+&batch_axis_width)));
+    %let batch_axis_pct=%sysevalf(100*&batch_axis_width/&batch_fig_width);
+    %let batch_plot_title=Combined local Manhattan: -log10(P) by chromosome color;
+    %if &batch_count<&local_reference_batch_count %then
+      %let batch_plot_title=Local Manhattan: -log10(P);
+    %let batch_track_label_size=1.8;
+    data _null_;
+      length labels $4096;
+      labels=symget('batch_track_labels');
+      max_chars=1;
+      do i=1 to countw(labels,'|');
+        max_chars=max(max_chars,length(scan(labels,i,'|')));
+      end;
+      label_size=min(1.8,100*0.85*&batch_fig_width/(0.6*max_chars*__MANHATTAN_FIG_HEIGHT__));
+      call symputx('batch_track_label_size',label_size,'L');
+    run;
+    %put NOTE: batch_count=&batch_count batch_fig_width=&batch_fig_width batch_axis_width=&batch_axis_width;
     proc sql noprint;
       select snp_gene into: batch_snp_gene_label separated by ' '
       from top_hit_groups
@@ -1021,11 +1047,11 @@ run;
       logP=1,
       gwas_thrsd=7.30103,
       thrsd_line_color=gray,
-      dotsize=1,
+      dotsize=1.2,
       uniq_colors=&batch_chr_colors,
       _logP_topval=8,
       y_axix_step=2,
-      fig_width=__MANHATTAN_FIG_WIDTH__,
+      fig_width=&batch_fig_width,
       fig_height=__MANHATTAN_FIG_HEIGHT__,
       fontsize=&local_fontsize,
       y_axis_label_size=&local_y_axis_label_size,
@@ -1033,16 +1059,17 @@ run;
       gwas_label_names=%str(__MANHATTAN_GWAS_LABEL_NAMES__),
       gwas_label_x_pct=50,
       gwas_label_y_frac=&local_gwas_label_y_frac,
-      gwas_label_size=1.8,
-      gwas_label_halo_size=1.8,
+      gwas_label_size=&batch_track_label_size,
+      gwas_label_halo_size=&batch_track_label_size,
       gwas_label_angle=0,
       flip1stGWAS_signal=0,
       rm_signals_with_logP_lt=0,
       outputfigname=&batch_output_prefix,
-      plot_title=Combined local Manhattan: -log10(P) by chromosome color,
+      plot_title=&batch_plot_title,
       Use_scaled_pos=1,
       fixed_group_span=%sysevalf(2*&local_window_bp),
       fixed_group_index_var=panel_order,
+      x_axis_length_pct=&batch_axis_pct,
       sep_chr_grp=1,
       gwas_sortedby_numchrpos=1,
       angle4xaxis_label=&local_angle4xaxis_label,
@@ -1067,22 +1094,27 @@ run;
 %render_local_hit_batches;
 
 %macro write_local_hit_html_wrapper;
+%local batch_idx batch_count batch_fig_width batch_width_pct;
 data _null_;
   file "~/__OUTPUT_PREFIX__.html" lrecl=32767;
   put '<!doctype html>';
   put '<html><head><meta charset="utf-8">';
   put '<title>__HTML_TITLE__</title>';
-  put '<style>body{margin:0;padding:16px;font-family:Arial,sans-serif;background:#fff;} img{max-width:100%;height:auto;display:block;}</style>';
+  put '<style>body{margin:0;padding:16px;font-family:Arial,sans-serif;background:#fff;} img{width:100%;height:auto;display:block;}</style>';
   put '</head><body>';
+  put '<div style="max-width:__MANHATTAN_FIG_WIDTH__px">';
   %do batch_idx=1 %to &n_hit_batches;
+    %let batch_count=%sysfunc(min(&local_max_hits_per_fig,%eval(&n_top_hits-(&batch_idx-1)*&local_max_hits_per_fig)));
+    %let batch_fig_width=%sysfunc(ceil(%sysevalf(&local_batch_margin_width+&local_full_axis_width*&batch_count/&local_reference_batch_count)));
+    %let batch_width_pct=%sysevalf(100*&batch_fig_width/__MANHATTAN_FIG_WIDTH__);
     %if &batch_idx=1 %then %do;
-      put "<section style=""margin-bottom:24px""><img src=""__OUTPUT_PREFIX__.png"" alt=""__HTML_TITLE__ part &batch_idx of &n_hit_batches""></section>";
+      put "<section style=""margin-bottom:24px;width:&batch_width_pct.%""><img src=""__OUTPUT_PREFIX__.png"" alt=""__HTML_TITLE__ part &batch_idx of &n_hit_batches""></section>";
     %end;
     %else %do;
-      put "<section style=""margin-bottom:24px""><img src=""__OUTPUT_PREFIX___part&batch_idx..png"" alt=""__HTML_TITLE__ part &batch_idx of &n_hit_batches""></section>";
+      put "<section style=""margin-bottom:24px;width:&batch_width_pct.%""><img src=""__OUTPUT_PREFIX___part&batch_idx..png"" alt=""__HTML_TITLE__ part &batch_idx of &n_hit_batches""></section>";
     %end;
   %end;
-  put '</body></html>';
+  put '</div></body></html>';
 run;
 %mend;
 

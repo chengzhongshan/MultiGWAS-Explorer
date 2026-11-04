@@ -1320,18 +1320,21 @@ if [[ "${#downloaded_pngs[@]}" -gt 0 ]]; then
     ordered_pngs+=("${local_png}")
   done < <(printf '%s\n' "${downloaded_pngs[@]}" | grep '_part[0-9]\+\.png$' | sort -V)
 
+  reference_png_width="$(perl -e 'open my $f,q{<:raw},$ARGV[0] or die $!; read($f,my $h,24)==24 or die q{Invalid PNG header}; print unpack(q{N},substr($h,16,4))' "${PNG_OUT}")"
   {
     echo '<!doctype html>'
     echo '<html><head><meta charset="utf-8">'
     echo "<title>${LOCAL_HTML_TITLE}</title>"
-    echo '<style>body{margin:0;padding:16px;font-family:Arial,sans-serif;background:#fff;} img{max-width:100%;height:auto;display:block;}</style>'
+    echo '<style>body{margin:0;padding:16px;font-family:Arial,sans-serif;background:#fff;} img{width:100%;height:auto;display:block;}</style>'
     echo '</head><body>'
+    echo "<div style=\"max-width:${reference_png_width}px\">"
     part_idx=1
     for local_png in "${ordered_pngs[@]}"; do
-      echo "<section style=\"margin-bottom:24px\"><img src=\"${local_png}\" alt=\"${LOCAL_HTML_TITLE} part ${part_idx} of ${#ordered_pngs[@]}\"></section>"
+      image_width_pct="$(perl -e 'open my $f,q{<:raw},$ARGV[0] or die $!; read($f,my $h,24)==24 or die q{Invalid PNG header}; printf q{%.10g},100*unpack(q{N},substr($h,16,4))/$ARGV[1]' "${WORKDIR}/${local_png}" "${reference_png_width}")"
+      echo "<section style=\"margin-bottom:24px;width:${image_width_pct}%\"><img src=\"${local_png}\" alt=\"${LOCAL_HTML_TITLE} part ${part_idx} of ${#ordered_pngs[@]}\"></section>"
       part_idx=$((part_idx+1))
     done
-    echo '</body></html>'
+    echo '</div></body></html>'
   } > "${HTML_OUT}"
 fi
 

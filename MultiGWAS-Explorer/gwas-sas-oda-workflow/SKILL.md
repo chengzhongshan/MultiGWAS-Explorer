@@ -49,6 +49,11 @@ Use this skill as the workflow brain. Keep MCP tools small and reliable.
   close leads. For combined local Manhattan panels, give every lead the same
   chromosome-bounded `2 * local_window_bp` physical x-axis span; never reset
   each panel to its first observed SNP. Check the first and later batches.
+  A final short batch must have a proportionally smaller image width while
+  retaining the same plotting pixels per locus and visible scatter-point
+  size. Preserve relative PNG widths in both SAS-generated and locally rebuilt
+  HTML; independent `max-width:100%` images do not preserve this relationship
+  on narrow screens. A single batch keeps the requested full figure width.
   `--top-hit-differential-p-mode standardized` selects with the physical
   `PREFIX_STD_DIFF_P` column, which is present in both the wide table and the
   locally selected CSV. The `PREFIX_STD_P` name is only a SAS display alias.
