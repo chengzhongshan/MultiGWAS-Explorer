@@ -54,6 +54,10 @@ Use_scaled_pos=1, /*Default is to draw manhattan plot with fake positions by gro
 Provide value 1 to draw the plot in scaled and uneven distance relative to its real position values!
 This will be helpful when draw top hits local manhattan plots!
 */
+fixed_group_span=, /*Optional common BP span for local hit panels. Requires a
+  relative pos_var and fixed_group_index_var (1-based); preserves physical
+  distances even when the first/last observed SNP differs across panels.*/
+fixed_group_index_var=,
 sep_chr_grp=0, /*Default is not to add lines to separate x-axis chromosomal groups;
 Provide value 1 to add lines to separate each chromosomal group*/ 
 xgrp_y_pos=-1, /*Asign the y-axis value for all x-axis group labels;
@@ -363,6 +367,13 @@ run;
 
 %else %do;
 *Here we will use fake positions with scaled and uneven gap  to draw manhattan plot;
+%if %length(%superq(fixed_group_span))>0 and %length(%superq(fixed_group_index_var))>0 %then %do;
+data manhattan;
+set &dsdin;
+Fake_position=&pos_var+(&fixed_group_index_var-1)*&fixed_group_span;
+run;
+%end;
+%else %do;
 %add_fake_pos_by_grp4nonnegvars(
 dsdin=&dsdin,
 axis_var=&pos_var,
@@ -373,6 +384,7 @@ axis_step=1,
 concise_output=1,
 reset_1st_value_as_one=1
 );
+%end;
 %end;
 
 
@@ -408,6 +420,12 @@ proc sql noprint;
 select 1.005*ceil(max(Fake_position)) into :maxbp 
 from manhattan;
 quit;
+%if %length(%superq(fixed_group_span))>0 and %length(%superq(fixed_group_index_var))>0 %then %do;
+proc sql noprint;
+select max(&fixed_group_index_var)*&fixed_group_span into :maxbp
+from &dsdin;
+quit;
+%end;
  
 * 
 find mean of BP within each chromosome (C)
@@ -442,6 +460,23 @@ var Fake_position;
 /*output out=mbp mean= min=min max=max;*/
 output out=mbp mean=;
 run;
+%if %length(%superq(fixed_group_span))>0 and %length(%superq(fixed_group_index_var))>0 %then %do;
+proc sql;
+create table _fixed_panel_centers as
+select &chr_var, min(&fixed_group_index_var) as _fixed_panel_index
+from &dsdin
+group by &chr_var;
+quit;
+proc sort data=mbp; by &chr_var; run;
+proc sort data=_fixed_panel_centers; by &chr_var; run;
+data mbp;
+merge mbp(in=_in_mbp) _fixed_panel_centers;
+by &chr_var;
+if _in_mbp;
+Fake_position=(_fixed_panel_index-0.5)*&fixed_group_span;
+drop _fixed_panel_index;
+run;
+%end;
 
 %if &Keep_order_of_target_SNPs=1 %then %do;
 proc sql;
@@ -752,7 +787,11 @@ symbol1 v=dot r=46 h=&dotsize;
 %if %length(&y_axis_value_size)=0 %then %let y_axis_value_size=&fontsize;
 
 * suppress drawing of any x-axis feature;
-axis1 value=none major=none minor=none label=none style=0;
+axis1 value=none major=none minor=none label=none style=0
+%if %length(%superq(fixed_group_span))>0 and %length(%superq(fixed_group_index_var))>0 %then %do;
+  order=(0 to &maxbp by &fixed_group_span)
+%end;
+;
 * rotate y-axis label and asign font as f='Albany AMT';
 axis2 label=(angle=90 "-Log10(p)" f=Arial h=&y_axis_label_size) 
      order=(0 to  &max_yaxis_val by &y_axix_step)	 &yoffset_setting
@@ -867,6 +906,11 @@ run;
 proc append base=anno data=_ld_r2_legend force; run;
 %end;
 
+%if %length(%superq(fixed_group_span))>0 and %length(%superq(fixed_group_index_var))>0 %then %do;
+proc sort data=manhattan;
+by &chr_var Fake_position;
+run;
+%end;
 proc transpose data=manhattan out=manhattan(rename=(col1=logP) drop=_name_);
 var logp:;
 by &chr_var Fake_position;
@@ -886,6 +930,16 @@ end=%ntokens(&min_fk_pos),
 sublist=new_min_fk_pos, 
 sep=%str( ) 
 ); 
+%if %length(%superq(fixed_group_span))>0 and %length(%superq(fixed_group_index_var))>0 %then %do;
+%let new_min_fk_pos=;
+proc sql noprint;
+select distinct (&fixed_group_index_var-1)*&fixed_group_span as boundary
+into :new_min_fk_pos separated by ' '
+from &dsdin
+where &fixed_group_index_var>1
+order by boundary;
+quit;
+%end;
 
 
 %if "&var_type"="2" or &Keep_order_of_target_SNPs=1 %then %do;

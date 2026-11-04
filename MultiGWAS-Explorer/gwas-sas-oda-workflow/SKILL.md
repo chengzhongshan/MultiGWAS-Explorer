@@ -43,6 +43,12 @@ Use this skill as the workflow brain. Keep MCP tools small and reliable.
   only the selected lead CSV. Reuse the local clump cache on reruns. Do not
   send thousands of candidates to SAS for HaploReg clumping or call an
   unresolved reference variant LD independent; inspect the local LD audit.
+  When LD cannot be estimated jointly for a nearby pair, use the configured
+  `top_hit_dist_bp` as a distance fallback and mark the audit
+  `PRUNED_DISTANCE_FALLBACK`. A low measured LD value still permits both
+  close leads. For combined local Manhattan panels, give every lead the same
+  chromosome-bounded `2 * local_window_bp` physical x-axis span; never reset
+  each panel to its first observed SNP. Check the first and later batches.
   `--top-hit-differential-p-mode standardized` selects with the physical
   `PREFIX_STD_DIFF_P` column, which is present in both the wide table and the
   locally selected CSV. The `PREFIX_STD_P` name is only a SAS display alias.
@@ -65,6 +71,12 @@ Before running a workflow, identify:
   filtering, and whether a suitable population-matched lookup is available.
   With the default zero MAF cutoff, unknown-MAF candidates are retained;
   a requested positive cutoff excludes candidates with unknown MAF.
+  If an explicit analysis requests the 1KG Phase 3 fallback, set
+  `top_hit_1kg_maf_filter=1` and optionally `top_hit_1kg_maf_threshold=0.01`.
+  For UNKNOWN MAF, exclude only if AFR, AMR, EAS, EUR, and SAS are all
+  measured and all below the cutoff after matching rsID, chromosome, and BP
+  in the build-matched panel. Retain missing or incomplete reference
+  variants. Do not make this filter an ancestry-comparison default.
 - Desired final products: long merged table, tabix-indexed coordinate table,
   differential effects, Manhattan subset, local GTF plot, forest plot, and
   SAS ODA or gnuplot PNG/HTML outputs.
@@ -196,6 +208,9 @@ and [GWAS Catalog allele/frequency harmonization](https://www.ebi.ac.uk/gwas/doc
      absent
    - if neither source is available, expect `maf_source=UNKNOWN`; keep the
      candidate with the default zero cutoff rather than losing every hit
+   - optionally use build-matched 1KG Phase 3 PLINK2 allele counts for UNKNOWN
+     MAF; mark filtered only when all five superpopulations are below the
+     configured cutoff, and record the population values in the audit reason
    - apply `MAF > 0.01` only when the user explicitly sets
      `top_hit_maf_threshold` to `0.01` (or another justified cutoff)
    If optional local top-hit selection produces no CSV, check file existence

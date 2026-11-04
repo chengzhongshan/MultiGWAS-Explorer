@@ -16,6 +16,7 @@ use TopHitMAF qw(
   load_gnomad_lookup
   lookup_gnomad_maf
 );
+use OneKGPhase3MAF qw(query_phase3_maf);
 
 sub usage {
     return <<"USAGE";
@@ -36,6 +37,9 @@ Options:
   --gnomad-freq-file FILE        Optional lightweight gnomAD lookup TSV/TSV.GZ.
   --gnomad-pop-map MAP           Optional token-to-gnomAD-pop map such as
                                  EUR=NFE,ASN=EAS,AFR=AFR,ALL=AF
+  --onekg-maf-filter             For UNKNOWN MAF, remove a SNP only if all five
+                                 AFR/AMR/EAS/EUR/SAS MAFs are below the cutoff.
+  --onekg-maf-threshold NUM      Default: 0.01.
 USAGE
 }
 
@@ -50,6 +54,8 @@ my %opt = (
     gnomad_freq_file => '',
     gnomad_pop_map   => '',
     focus_prefix     => '',
+    onekg_maf_filter => 0,
+    onekg_maf_threshold => 0.01,
 );
 
 GetOptions(
@@ -66,12 +72,20 @@ GetOptions(
     'maf-threshold=f'    => \$opt{maf_threshold},
     'gnomad-freq-file=s' => \$opt{gnomad_freq_file},
     'gnomad-pop-map=s'   => \$opt{gnomad_pop_map},
+    'onekg-maf-filter!'  => \$opt{onekg_maf_filter},
+    'onekg-maf-threshold=f' => \$opt{onekg_maf_threshold},
+    'onekg-build=s'      => \$opt{onekg_build},
+    'onekg-plink2=s'     => \$opt{onekg_plink2},
+    'onekg-panel-dir=s'  => \$opt{onekg_panel_dir},
+    'onekg-pfile=s'      => \$opt{onekg_pfile},
 ) or die usage();
 
 die usage() unless $opt{input} && $opt{output};
 die "Input file not found: $opt{input}\n" unless -s $opt{input};
 die "--focus-pvar is required for non-targeted selection\n"
     if !$opt{target_snps} && !$opt{focus_pvar};
+die "--onekg-maf-threshold must be within (0, 0.5)\n"
+    unless $opt{onekg_maf_threshold} > 0 && $opt{onekg_maf_threshold} < 0.5;
 
 my @target_snps = grep { length } map { trim($_) } split /,/, ($opt{target_snps} // '');
 my @thresholds = grep { defined && length } map { trim($_) } split /[,\s]+/, $opt{thresholds};
@@ -133,7 +147,8 @@ while (my $line = <$fh>) {
         gnomad_lookup => $gnomad_lookup,
         pop_map       => $pop_map,
     );
-    if (!@target_snps && $opt{maf_threshold} > 0) {
+    if (!@target_snps && $opt{maf_threshold} > 0
+        && !($opt{onekg_maf_filter} && $row->{maf_info}{maf_source} eq 'UNKNOWN')) {
         if (!$row->{maf_info}{pass}) {
             $maf_filtered++;
             $maf_unknown++ if ($row->{maf_info}{maf_source} || '') eq 'UNKNOWN';
@@ -152,6 +167,44 @@ while (my $line = <$fh>) {
     push @rows, $row;
 }
 close $fh;
+
+if ($opt{onekg_maf_filter} && !@target_snps) {
+    my @unknown = map { +{ SNP => $_->{SNP}, CHR => $_->{CHR}, BP => $_->{BP} } }
+        grep { ($_->{maf_info}{maf_source} || '') eq 'UNKNOWN' } @rows;
+    my $ref = query_phase3_maf(
+        rows => \@unknown, build => ($opt{onekg_build} || 'hg38'),
+        plink2 => $opt{onekg_plink2}, panel_dir => $opt{onekg_panel_dir},
+        pfile => $opt{onekg_pfile},
+    );
+    for my $row (@rows) {
+        next unless ($row->{maf_info}{maf_source} || '') eq 'UNKNOWN';
+        my $status = $ref->{uc $row->{SNP}} || {};
+        unless ($status->{complete}) {
+            $row->{maf_info}{reason} = '1KG Phase 3 MAF incomplete or reference-missing; cannot confirm rare across all five superpopulations; variant retained';
+            next;
+        }
+        my $maf = $status->{max_maf};
+        my $low = $maf < $opt{onekg_maf_threshold};
+        my @pops = map { $_ . '=' . sprintf('%.6g', $status->{per_pop}{$_}) }
+            sort keys %{ $status->{per_pop} || {} };
+        $row->{maf_info} = {
+            selected_maf => $maf, maf_source => '1KG_PHASE3',
+            decision => $low ? 'FILTERED' : 'PASS', pass => !$low,
+            reason => sprintf('1KG Phase 3 maximum population MAF %.6g %s %.6g; rare in all five populations: %s (%s)',
+                $maf, $low ? '<' : '>=', $opt{onekg_maf_threshold}, $low ? 'yes' : 'no', join(', ', @pops)),
+        };
+    }
+    my @kept;
+    for my $row (@rows) {
+        if (!$row->{maf_info}{pass}) { $maf_filtered++; next; }
+        if ($opt{maf_threshold} > 0
+            && ($row->{maf_info}{maf_source} || '') eq 'UNKNOWN') {
+            $maf_filtered++; $maf_unknown++; next;
+        }
+        push @kept, $row;
+    }
+    @rows = @kept;
+}
 
 my @selected;
 if (@target_snps) {

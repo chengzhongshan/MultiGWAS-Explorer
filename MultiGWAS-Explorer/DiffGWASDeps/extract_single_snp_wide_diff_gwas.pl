@@ -8,6 +8,7 @@ use IO::Uncompress::Gunzip qw($GunzipError);
 use lib $Bin;
 use HTSToolResolver qw(resolve_hts_tool external_tool_path);
 use FixedEffectMeta qw(fixed_effect_meta);
+use ChromosomeBounds qw(locus_window);
 use DiffGWASConfig qw(
   load_config_file
   normalize_pair_map
@@ -34,6 +35,7 @@ my $target_chr_hint;
 my $target_bp_hint;
 my $compute_meta = 0;
 my $meta_rho = 0;
+my $reference_build = '';
 
 GetOptions(
     'config=s'      => \$config_file,
@@ -54,6 +56,7 @@ GetOptions(
     'target-bp=f'  => \$target_bp_hint,
     'compute-meta!' => \$compute_meta,
     'meta-rho=f'    => \$meta_rho,
+    'reference-build=s' => \$reference_build,
 ) or die usage();
 
 my $cfg = load_config_file($config_file);
@@ -77,6 +80,7 @@ $target_chr_hint = pick_value($target_chr_hint, cfg_or($cfg, 'target_chr', undef
 $target_bp_hint = pick_value($target_bp_hint, cfg_or($cfg, 'target_bp', undef), undef);
 $compute_meta = cfg_or($cfg, 'compute_meta', $compute_meta);
 $meta_rho = cfg_or($cfg, 'meta_rho', $meta_rho);
+$reference_build = pick_value($reference_build, cfg_or($cfg, 'reference_build', undef), 'hg38');
 
 die "--target-snp is required\n" unless length $target_snp;
 die "Input file not found: $input\n" unless -s $input;
@@ -125,6 +129,8 @@ else {
 die "Target SNP not found in input: $target_snp\n" unless defined $raw_target_chr && defined $target_bp;
 
 my $target_chr = sas_chr($raw_target_chr);
+my ($window_start, $window_end) = locus_window(
+    $reference_build, $target_chr, $target_bp, $window_bp);
 my $safe_target = safe_name($target_snp);
 my $safe_chr = safe_name($target_chr);
 my $safe_bp = safe_name($target_bp);
@@ -158,6 +164,9 @@ my %stats = (
     target_bp             => $target_bp,
     target_snp            => $target_snp,
     window_bp             => sprintf('%.0f', $window_bp),
+    window_start          => $window_start,
+    window_end            => $window_end,
+    reference_build       => $reference_build,
     output                => $output,
     manifest              => $manifest,
     target_lookup_mode    => $target_lookup_mode,
@@ -169,7 +178,7 @@ my %stats = (
     target_row_has_all_prefixes => 0,
 );
 
-my $in = open_window_reader($input, $raw_target_chr, $target_bp, $window_bp, \%stats);
+my $in = open_window_reader($input, $raw_target_chr, $window_start, $window_end, \%stats);
 my $out = open_writer($output);
 print {$out} join("\t", @out_cols), "\n";
 
@@ -188,7 +197,7 @@ while (my $line = <$in>) {
 
     my $bp = numeric($v[ $idx{BP} ]);
     next unless defined $bp;
-    next if $bp < ($target_bp - $window_bp) || $bp > ($target_bp + $window_bp);
+    next if $bp < $window_start || $bp > $window_end;
 
     $stats{rows_in_window}++;
     my $key = join("\t", map { $v[ $idx{$_} ] // '' } @base_cols);
@@ -217,6 +226,9 @@ for my $metric (qw(
   target_chr
   target_bp
   window_bp
+  window_start
+  window_end
+  reference_build
   target_lookup_mode
   region_query_mode
   pair_col
@@ -408,10 +420,7 @@ sub open_reader {
 }
 
 sub open_window_reader {
-    my ($path, $raw_chr, $bp, $window_bp, $stats) = @_;
-    my $start = int($bp - $window_bp);
-    $start = 1 if $start < 1;
-    my $end = int($bp + $window_bp);
+    my ($path, $raw_chr, $start, $end, $stats) = @_;
 
     my $tabix = resolve_hts_tool('tabix', explicit => $htsbin, start_dir => $Bin);
     if (defined $tabix && has_tabix_index($path)) {

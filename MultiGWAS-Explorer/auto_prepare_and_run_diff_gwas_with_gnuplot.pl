@@ -95,6 +95,11 @@ Options:
   --top-hit-max-loci N          Stop after N automatic local top-hit leads.
                                 Spec key: top_hit_max_loci; 0 means no limit.
                                 Applies to local Manhattan/GTF and forest plots.
+  --top-hit-1kg-maf-filter      For UNKNOWN top-hit MAF, exclude SNPs with MAF
+                                below 0.01 in all 1KG Phase 3 superpopulations
+                                (AFR, AMR, EAS, EUR, SAS). Default: off.
+                                Missing reference SNPs remain UNKNOWN.
+  --top-hit-1kg-maf-threshold N Change the optional 1KG cutoff; default 0.01.
   --step NAME                   Render only this plot stage; repeat for several:
                                 plot_manhattan, plot_local_manhattan,
                                 plot_local_gtf, or plot_forest.
@@ -291,6 +296,8 @@ my $forest_fig_width_override = 0;
 my $forest_fig_height_override = 0;
 my $local_max_hits_per_fig_override = 0;
 my $top_hit_max_loci_override;
+my $top_hit_1kg_maf_filter_override;
+my $top_hit_1kg_maf_threshold_override;
 my $local_manhattan_columns_override = 0;
 my $local_manhattan_annotation_override = '';
 my $remove_x_chr;
@@ -321,6 +328,8 @@ GetOptions(
     'manhattan-differential-p-mode=s' => \$manhattan_differential_p_mode_override,
     'top-hit-differential-p-mode=s' => \$top_hit_differential_p_mode_override,
     'top-hit-max-loci=i' => \$top_hit_max_loci_override,
+    'top-hit-1kg-maf-filter!' => \$top_hit_1kg_maf_filter_override,
+    'top-hit-1kg-maf-threshold=f' => \$top_hit_1kg_maf_threshold_override,
     'manhattan-top-logp|genomewide-logp-cap=i' => \$manhattan_top_logp_override,
     'standardized-p-tracks!' => \$standardized_p_tracks_override,
     'compute-meta!'             => \$compute_meta_override,
@@ -413,6 +422,10 @@ if (length($input_merged) || length($gwas_dir)) {
             ? ('--top-hit-differential-p-mode', $top_hit_differential_p_mode_override) : ()),
         (defined($top_hit_max_loci_override)
             ? ('--top-hit-max-loci', $top_hit_max_loci_override) : ()),
+        (defined($top_hit_1kg_maf_filter_override)
+            ? ($top_hit_1kg_maf_filter_override ? '--top-hit-1kg-maf-filter' : '--no-top-hit-1kg-maf-filter') : ()),
+        (defined($top_hit_1kg_maf_threshold_override)
+            ? ('--top-hit-1kg-maf-threshold', $top_hit_1kg_maf_threshold_override) : ()),
     ], 'auto-generate GWAS comparison spec');
     my $generated_spec = load_json($spec_file);
     $generated_spec->{configs_dir} = dirname(localize_path($spec_file));
@@ -468,6 +481,13 @@ die "No gnuplot plot steps were requested.\n" unless grep { $requested{$_} } qw(
 my $spec = load_json($spec_file);
 $spec->{top_hit_max_loci} = $top_hit_max_loci_override
     if defined $top_hit_max_loci_override;
+$spec->{top_hit_1kg_maf_filter} = $top_hit_1kg_maf_filter_override ? 1 : 0
+    if defined $top_hit_1kg_maf_filter_override;
+$spec->{top_hit_1kg_maf_threshold} = $top_hit_1kg_maf_threshold_override
+    if defined $top_hit_1kg_maf_threshold_override;
+die "top_hit_1kg_maf_threshold must be greater than 0 and less than 0.5\n"
+    unless ($spec->{top_hit_1kg_maf_threshold} // 0.01) > 0
+        && ($spec->{top_hit_1kg_maf_threshold} // 0.01) < 0.5;
 die "--top-hit-max-loci must be zero or a positive integer\n"
     unless defined($spec->{top_hit_max_loci} // 0)
        && ($spec->{top_hit_max_loci} // 0) =~ /^(?:0|[1-9]\d*)$/;
@@ -579,6 +599,7 @@ for my $override_value (
 }
 $has_runner_override = 1 if $local_max_hits_per_fig_override;
 $has_runner_override = 1 if defined $top_hit_max_loci_override;
+$has_runner_override = 1 if defined $top_hit_1kg_maf_filter_override || defined $top_hit_1kg_maf_threshold_override;
 $has_runner_override = 1 if defined $compute_meta_override;
 $has_runner_override = 1 if defined $standardized_p_tracks_override;
 $has_runner_override = 1 if defined $manhattan_top_logp_override;
@@ -611,6 +632,9 @@ if (-f $runner_config_local) {
         if ($spec->{top_hit_signal_thrshd} // '1e-6') ne ($cached_runner->{TOP_HIT_SIGNAL_THRSHD} // '1e-6');
     $has_runner_override = 1
         if ($spec->{top_hit_max_loci} // 0) != ($cached_runner->{TOP_HIT_MAX_LOCI} // 0);
+    $has_runner_override = 1
+        if !!($spec->{top_hit_1kg_maf_filter} // 0) != !!($cached_runner->{TOP_HIT_1KG_MAF_FILTER} // 0)
+        || ($spec->{top_hit_1kg_maf_threshold} // 0.01) != ($cached_runner->{TOP_HIT_1KG_MAF_THRESHOLD} // 0.01);
     $has_runner_override = 1
         if !!($cached_runner->{MANHATTAN_INCLUDE_X_CHR} || 0) != !!(!$remove_x_chr);
     my $requested_exclusions = length($exclude_manhattan_tracks_override)
@@ -672,6 +696,8 @@ if (!$reused_existing_runner) {
         manhattan_differential_p_mode_override => $manhattan_differential_p_mode_override,
         top_hit_differential_p_mode_override => $top_hit_differential_p_mode_override,
         top_hit_max_loci_override       => $top_hit_max_loci_override,
+        top_hit_1kg_maf_filter_override => $top_hit_1kg_maf_filter_override,
+        top_hit_1kg_maf_threshold_override => $top_hit_1kg_maf_threshold_override,
         standardized_p_tracks_override => $standardized_p_tracks_override,
         manhattan_top_logp_override => $manhattan_top_logp_override,
         compute_meta_override           => $compute_meta_override,
@@ -1063,6 +1089,11 @@ sub run_upstream_preprocessing {
     }
     push @cmd, '--top-hit-max-loci', $args{top_hit_max_loci_override}
         if defined $args{top_hit_max_loci_override};
+    push @cmd, ($args{top_hit_1kg_maf_filter_override}
+        ? '--top-hit-1kg-maf-filter' : '--no-top-hit-1kg-maf-filter')
+        if defined $args{top_hit_1kg_maf_filter_override};
+    push @cmd, '--top-hit-1kg-maf-threshold', $args{top_hit_1kg_maf_threshold_override}
+        if defined $args{top_hit_1kg_maf_threshold_override};
     push @cmd, ($args{standardized_p_tracks_override}
         ? '--standardized-p-tracks' : '--no-standardized-p-tracks')
         if defined $args{standardized_p_tracks_override};
@@ -1282,6 +1313,7 @@ sub plot_forest {
             if defined $runner->{TOP_HIT_GNOMAD_FREQ_FILE} && length $runner->{TOP_HIT_GNOMAD_FREQ_FILE};
         push @cmd, ('--gnomad-pop-map', $runner->{TOP_HIT_GNOMAD_POP_MAP})
             if defined $runner->{TOP_HIT_GNOMAD_POP_MAP} && length $runner->{TOP_HIT_GNOMAD_POP_MAP};
+        push @cmd, gnuplot_onekg_maf_args($runner);
         push @cmd, '--remove-x-chr' if $args{remove_x_chr};
         run_cmd(\@cmd, 'gnuplot forest top-hit CSV generation');
     }
@@ -1529,6 +1561,7 @@ sub collect_top_hits_for_mode {
         if defined $runner->{TOP_HIT_GNOMAD_FREQ_FILE} && length $runner->{TOP_HIT_GNOMAD_FREQ_FILE};
     push @cmd, ('--gnomad-pop-map', $runner->{TOP_HIT_GNOMAD_POP_MAP})
         if defined $runner->{TOP_HIT_GNOMAD_POP_MAP} && length $runner->{TOP_HIT_GNOMAD_POP_MAP};
+    push @cmd, gnuplot_onekg_maf_args($runner);
     push @cmd, '--remove-x-chr' if $args{remove_x_chr};
     run_cmd(\@cmd, 'differential top-hit selection');
     my @hits = read_hits_tsv($out_tsv);
@@ -1548,6 +1581,8 @@ sub top_hit_selection_request_key {
     my @selector_stat = stat($args{selector});
     die "Top-hit selector is missing: $args{selector}\n"
         unless @selector_stat;
+    my $onekg_module = File::Spec->catfile($Bin, 'DiffGWASDeps', 'OneKGPhase3MAF.pm');
+    my @onekg_module_stat = stat($onekg_module);
     my $gnomad_path = localize_path($runner->{TOP_HIT_GNOMAD_FREQ_FILE} || '');
     my @gnomad_stat = length($gnomad_path) ? stat($gnomad_path) : ();
     my %request = (
@@ -1555,6 +1590,7 @@ sub top_hit_selection_request_key {
         mode         => $mode,
         wide         => [$wide, @wide_stat[7, 9]],
         selector     => [$args{selector}, @selector_stat[7, 9]],
+        onekg_module => [$onekg_module, (@onekg_module_stat ? @onekg_module_stat[7, 9] : ())],
         remove_x_chr => $args{remove_x_chr} ? 1 : 0,
         thresholds   => $mode eq 'differential'
             ? resolve_runner_differential_threshold_ladder($runner)
@@ -1563,6 +1599,8 @@ sub top_hit_selection_request_key {
         dist_bp      => $runner->{TOP_HIT_DIST_BP} || '1e8',
         max_hits     => 15,
         maf          => runner_maf_threshold($runner),
+        onekg_maf_filter => $runner->{TOP_HIT_1KG_MAF_FILTER} ? 1 : 0,
+        onekg_maf_threshold => $runner->{TOP_HIT_1KG_MAF_THRESHOLD} // 0.01,
         gnomad       => [($runner->{TOP_HIT_GNOMAD_FREQ_FILE} || ''),
             (@gnomad_stat ? @gnomad_stat[7, 9] : ())],
         gnomad_map   => $runner->{TOP_HIT_GNOMAD_POP_MAP} || '',
@@ -1572,6 +1610,19 @@ sub top_hit_selection_request_key {
         $request{runner} = $runner;
     }
     return sha1_hex(JSON::PP->new->canonical(1)->encode(\%request));
+}
+
+sub gnuplot_onekg_maf_args {
+    my ($runner) = @_;
+    return () unless $runner->{TOP_HIT_1KG_MAF_FILTER};
+    my @cmd = ('--onekg-maf-filter', '--onekg-maf-threshold',
+        $runner->{TOP_HIT_1KG_MAF_THRESHOLD} // 0.01,
+        '--onekg-build', $runner->{REFERENCE_BUILD} || 'hg38');
+    push @cmd, ('--onekg-plink2', $runner->{TOP_HIT_LD_PLINK2})
+        if $runner->{TOP_HIT_LD_PLINK2};
+    push @cmd, ('--onekg-pfile', $runner->{TOP_HIT_LD_PFILE})
+        if $runner->{TOP_HIT_LD_PFILE};
+    return @cmd;
 }
 
 sub write_top_hit_request_key {
@@ -3242,6 +3293,7 @@ sub prepare_locus_wide_sources {
             my ($valid) = locus_wide_cache_matches(
                 data => $data, manifest => $manifest,
                 snp => $hit->{SNP}, window_bp => $args{window_bp}, exact_window => 1,
+                chr => $hit->{CHR}, bp => $hit->{BP}, reference_build => $args{reference_build},
                 source => $args{wide_data},
                 required_cols => $args{required_cols},
             );
@@ -3310,6 +3362,7 @@ sub prepare_locus_wide_sources {
             snp        => $snp,
             window_bp  => $args{window_bp},
             exact_window => 1,
+            chr => $hit->{CHR}, bp => $hit->{BP}, reference_build => $args{reference_build},
             required_cols => $args{required_cols},
         );
 
@@ -3323,6 +3376,7 @@ sub prepare_locus_wide_sources {
                 '--input', $args{source_long},
                 '--target-snp', $snp,
                 '--window-bp', $args{window_bp},
+                '--reference-build', ($args{reference_build} || 'hg38'),
                 '--output', $data,
                 '--manifest', $manifest,
                 '--output-dir', $args{output_dir},
@@ -3336,6 +3390,7 @@ sub prepare_locus_wide_sources {
                 snp        => $snp,
                 window_bp  => $args{window_bp},
                 exact_window => 1,
+                chr => $hit->{CHR}, bp => $hit->{BP}, reference_build => $args{reference_build},
                 required_cols => $args{required_cols},
             );
             die "Target-locus extraction did not produce a valid cache for $snp\n" unless $valid;
@@ -3412,6 +3467,14 @@ sub locus_wide_cache_matches {
     my $window_ok = $args{exact_window}
         ? ((0 + $manifest_window) == (0 + $args{window_bp}))
         : ((0 + $manifest_window) >= (0 + $args{window_bp}));
+    if ($window_ok && defined($args{chr}) && defined($args{bp})
+        && length($args{reference_build} || '')) {
+        my ($expected_start, $expected_end) = locus_window(
+            $args{reference_build}, $args{chr}, $args{bp}, 0 + $args{window_bp});
+        $window_ok = defined($metrics->{window_start}) && defined($metrics->{window_end})
+            && $metrics->{window_start} == $expected_start
+            && $metrics->{window_end} == $expected_end;
+    }
     return ($window_ok ? 1 : 0, $metrics);
 }
 

@@ -16,6 +16,7 @@ my ($candidates, $pfile, $bfile, $plink2, $populations, $output_leads,
 my $signal_threshold = 1;
 my $r2_threshold = 0.1;
 my $window_kb = 1000;
+my $fallback_dist_bp = 1e6;
 my $threads = 4;
 my $population_rule = 'ANY';
 my $max_leads = 0;
@@ -43,6 +44,7 @@ GetOptions(
     'signal-threshold=f' => \$signal_threshold,
     'r2-threshold=f'     => \$r2_threshold,
     'window-kb=f'        => \$window_kb,
+    'fallback-dist-bp=f' => \$fallback_dist_bp,
     'threads=i'          => \$threads,
     'max-leads=i'        => \$max_leads,
     'output-leads=s'     => \$output_leads,
@@ -56,6 +58,7 @@ die usage() unless defined($candidates) && (defined($pfile) xor defined($bfile))
     && (length($signal_column) xor length($signal_columns));
 die "--r2-threshold must be between 0 and 1\n"
     unless $r2_threshold >= 0 && $r2_threshold <= 1;
+die "--fallback-dist-bp must be zero or positive\n" unless $fallback_dist_bp >= 0;
 $population_rule = uc($population_rule);
 die "--population-rule must be ANY or ALL\n"
     unless $population_rule =~ /\A(?:ANY|ALL)\z/;
@@ -73,17 +76,28 @@ my $tmp = tempdir('plink2_1kg_greedy_clump.XXXXXX',
     DIR => dirname($output_leads), CLEANUP => 1);
 my $ids = File::Spec->catfile($tmp, 'candidates.ids.txt');
 open my $id_fh, '>:raw', $ids or die "Cannot write $ids: $!\n";
-print {$id_fh} "$_->{snp}\n" for @$rows;
+print {$id_fh} reference_id($_->{snp}), "\n" for @$rows;
 close $id_fh;
 my $subset = File::Spec->catfile($tmp, 'candidate_reference');
 my @extract = plink_input();
 push @extract, '--extract', native_path($ids), '--snps-only', 'just-acgt',
     '--max-alleles', 2, '--make-pgen', '--threads', $threads,
     '--out', native_path($subset);
-run(@extract);
+my $extract_status = system(@extract);
+my $has_reference_subset = $extract_status == 0;
+unless ($has_reference_subset) {
+    open my $log_fh, '<', "$subset.log"
+        or die "Cannot inspect failed PLINK2 extraction $subset.log: $!\n";
+    local $/;
+    my $log_text = <$log_fh> // '';
+    close $log_fh;
+    die "Command failed (exit $extract_status): @extract\n"
+        unless $log_text =~ /No variants remaining after main filters/;
+    print STDERR "[local LD] No candidates in the reference; using distance fallback for nearby pairs.\n";
+}
 
 my %frequency;
-for my $pop (@pops) {
+for my $pop ($has_reference_subset ? @pops : ()) {
     my $prefix = File::Spec->catfile($tmp, lc($pop) . '.freq');
     run(plink_exe(), '--pfile', native_path($subset), '--keep-if', 'SuperPop',
         '==', $pop, '--nonfounders', '--freq', 'counts', '--threads', $threads,
@@ -105,13 +119,13 @@ for my $lead (@$rows) {
     my $lead_rank = scalar @selected;
     my (%proxy, @estimable_pops);
     for my $pop (@pops) {
-        next unless polymorphic($frequency{$pop}{$lead->{snp}});
+        next unless polymorphic($frequency{$pop}{$lead->{key}});
         push @estimable_pops, $pop;
         print {$cache_fh} join("\t", $lead->{key}, $lead->{key}, $pop, 1,
             'PLINK2_1KG_DIRECT'), "\n" if $cache_fh;
         my $prefix = File::Spec->catfile($tmp, sprintf('lead_%05d_%s', $lead_rank, lc($pop)));
         run(plink_exe(), '--pfile', native_path($subset), '--keep-if', 'SuperPop',
-            '==', $pop, '--nonfounders', '--mac', 1, '--ld-snp', $lead->{snp},
+            '==', $pop, '--nonfounders', '--mac', 1, '--ld-snp', reference_id($lead->{snp}),
             '--r2-phased', 'allow-ambiguous-allele', 'cols=chrom,pos,id',
             '--ld-window-kb', $window_kb, '--ld-window-r2', $r2_threshold,
             '--threads', $threads, '--out', native_path($prefix), '--silent');
@@ -149,6 +163,31 @@ for my $lead (@$rows) {
             population => @edge_pops > 1 ? join('+', @edge_pops) : $edge_pops[0],
         };
     }
+    # A low LD value is evidence of independence only when both variants
+    # are polymorphic in at least one requested population. Without such a
+    # comparison, keep just the strongest hit in a local physical interval.
+    my $distance_pruned = 0;
+    if ($fallback_dist_bp > 0) {
+        for my $other (@$rows) {
+            next if $other->{rank} <= $lead->{rank} || $pruned{$other->{key}};
+            next unless $other->{chr} eq $lead->{chr}
+                && abs($other->{bp} - $lead->{bp}) <= 0.5 * $fallback_dist_bp;
+            my @joint = grep {
+                polymorphic($frequency{$_}{$lead->{key}})
+                    && polymorphic($frequency{$_}{$other->{key}})
+            } @pops;
+            next if @joint;
+            $pruned{$other->{key}} = 1;
+            $distance_pruned++;
+            $audit{$other->{key}} = {
+                action => 'PRUNED_DISTANCE_FALLBACK', lead => $lead->{key},
+                lead_rank => $lead_rank, method => 'DISTANCE_FALLBACK_NO_LD',
+                query_status => 'NO_JOINT_ESTIMABLE_LD', population => '', r2 => '',
+            };
+        }
+    }
+    $audit{$lead->{key}}{method} = 'DISTANCE_FALLBACK_NO_LD'
+        if $distance_pruned && !@estimable_pops;
 }
 close $cache_fh if $cache_fh;
 for my $row (@$rows) {
@@ -160,6 +199,7 @@ write_audit($rows, \%audit);
 print "TOP_HIT_LD_SOURCE\tPLINK2_1KG_DIRECT\n";
 print "CANDIDATES\t", scalar(@$rows), "\nSELECTED_LEADS\t", scalar(@selected), "\n";
 print "PRUNED_LD\t", scalar(grep { $_->{action} eq 'PRUNED_LD' } values %audit), "\n";
+print "PRUNED_DISTANCE_FALLBACK\t", scalar(grep { $_->{action} eq 'PRUNED_DISTANCE_FALLBACK' } values %audit), "\n";
 print "NOT_ESTIMABLE_LEADS\t", scalar(grep { $_->{action} eq 'SELECTED_LEAD' && $_->{query_status} eq 'NOT_ESTIMABLE' } values %audit), "\n";
 
 sub load_candidates {
@@ -212,7 +252,7 @@ sub read_acount {
     while (my $line = <$fh>) {
         $line =~ s/[\r\n]+\z//;
         my @f = split /\t/, $line, -1;
-        $result{$f[$i{ID}]} = [0 + $f[$i{ALT_CTS}], 0 + $f[$i{OBS_CT}]];
+        $result{uc($f[$i{ID}])} = [0 + $f[$i{ALT_CTS}], 0 + $f[$i{OBS_CT}]];
     }
     close $fh;
     return \%result;
@@ -250,7 +290,7 @@ sub write_reference_status {
     open my $fh, '>:raw', $output_status or die "Cannot write $output_status: $!\n";
     print {$fh} join("\t", qw(variant ld_population reference_status alt_count obs_count maf source)), "\n";
     for my $row (@$rows) { for my $pop (@pops) {
-        my $c = $frequency->{$pop}{$row->{snp}};
+        my $c = $frequency->{$pop}{$row->{key}};
         my ($status, $alt, $obs, $maf) = ('ABSENT_REFERENCE', '', '', '');
         if ($c) { ($alt, $obs) = @$c; $status = polymorphic($c) ? 'POLYMORPHIC' : $obs ? 'MONOMORPHIC' : 'NO_GENOTYPE_OBSERVATIONS';
             if ($obs) { $maf = $alt / $obs; $maf = 1 - $maf if $maf > .5; } }
@@ -290,6 +330,7 @@ sub plink_input {
     return @cmd;
 }
 sub plink_exe { return $plink2; }
+sub reference_id { my $id = shift; return $id =~ /^rs\d+$/i ? lc($id) : $id; }
 sub run { my @cmd = @_; system(@cmd); die "Command failed (exit $?): @cmd\n" if $? != 0; }
 sub numeric { my $v = trim($_[0]); return undef unless $v =~ /\A[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[Ee][+-]?\d+)?\z/; return 0 + $v; }
 sub trim { my $v = defined($_[0]) ? $_[0] : ''; $v =~ s/^\s+|\s+$//g; return $v; }
@@ -304,6 +345,8 @@ Usage: clump_top_hits_with_plink2_1kg.pl --candidates FILE
   (--pfile PREFIX | --bfile PREFIX) --output-leads FILE --output-audit FILE
   (--signal-column P | --signal-columns "P1 P2") [--output-cache FILE]
   [--output-status FILE] [--populations "EUR EAS"] [--population-rule ANY]
+  [--fallback-dist-bp 1000000]  Total span for nearby pairs with no jointly
+  estimable LD; retain the strongest P-value lead and audit the fallback.
   [--r2-threshold 0.1] [--window-kb 1000] [--plink2 EXE]
 USAGE
 }

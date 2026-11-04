@@ -92,6 +92,8 @@ my $top_hit_ld_pfile_override = '';
 my $top_hit_ld_bfile_override = '';
 my $top_hit_ld_plink2_override = '';
 my $top_hit_max_loci_override;
+my $top_hit_1kg_maf_filter_override;
+my $top_hit_1kg_maf_threshold_override;
 my $local_max_hits_per_fig_override = 0;
 my $local_window_bp_override = '';
 my $local_gtf_window_bp_override = '';
@@ -233,6 +235,8 @@ GetOptions(
     'top-hit-ld-bfile=s' => \$top_hit_ld_bfile_override,
     'top-hit-ld-plink2=s' => \$top_hit_ld_plink2_override,
     'top-hit-max-loci=i'  => \$top_hit_max_loci_override,
+    'top-hit-1kg-maf-filter!' => \$top_hit_1kg_maf_filter_override,
+    'top-hit-1kg-maf-threshold=f' => \$top_hit_1kg_maf_threshold_override,
     'local-max-hits-per-fig=i' => \$local_max_hits_per_fig_override,
     'local-manhattan-window-bp|local-window-bp=s' => \$local_window_bp_override,
     'local-gtf-window-bp=s' => \$local_gtf_window_bp_override,
@@ -453,6 +457,10 @@ if ($generated_spec_input) {
         if length $top_hit_differential_p_mode_override;
     $draft_spec->{top_hit_max_loci} = $top_hit_max_loci_override
         if defined $top_hit_max_loci_override;
+    $draft_spec->{top_hit_1kg_maf_filter} = $top_hit_1kg_maf_filter_override ? 1 : 0
+        if defined $top_hit_1kg_maf_filter_override;
+    $draft_spec->{top_hit_1kg_maf_threshold} = $top_hit_1kg_maf_threshold_override
+        if defined $top_hit_1kg_maf_threshold_override;
     if ($preview_spec) {
         print pretty_json($draft_spec), "\n";
         exit 0 if $generate_spec_only || !length $spec_out;
@@ -471,6 +479,10 @@ if ($generated_spec_input) {
 
 die "--spec is required (or provide --gwas-dir or --input-merged to generate one)\n" unless length $spec_file;
 my $spec = load_json($spec_file);
+$spec->{top_hit_1kg_maf_filter} = $top_hit_1kg_maf_filter_override ? 1 : 0
+    if defined $top_hit_1kg_maf_filter_override;
+$spec->{top_hit_1kg_maf_threshold} = $top_hit_1kg_maf_threshold_override
+    if defined $top_hit_1kg_maf_threshold_override;
 $spec->{compute_meta} = $compute_meta_override ? 1 : 0
     if defined $compute_meta_override;
 $spec->{exclude_strand_ambiguous} = $exclude_strand_ambiguous_override ? 1 : 0
@@ -712,6 +724,12 @@ my $top_hit_max_loci = defined($top_hit_max_loci_override)
 die "top_hit_max_loci must be zero or a positive integer\n"
     unless defined($top_hit_max_loci)
        && $top_hit_max_loci =~ /^(?:0|[1-9]\d*)$/;
+my $top_hit_1kg_maf_filter = defined($top_hit_1kg_maf_filter_override)
+    ? $top_hit_1kg_maf_filter_override : cfg_or($spec, 'top_hit_1kg_maf_filter', 0);
+my $top_hit_1kg_maf_threshold = defined($top_hit_1kg_maf_threshold_override)
+    ? $top_hit_1kg_maf_threshold_override : cfg_or($spec, 'top_hit_1kg_maf_threshold', 0.01);
+die "top_hit_1kg_maf_threshold must be greater than 0 and less than 0.5\n"
+    unless $top_hit_1kg_maf_threshold > 0 && $top_hit_1kg_maf_threshold < 0.5;
 my $local_window_bp = cfg_or($spec, 'local_window_bp', '1e7');
 my $local_gtf_window_bp = cfg_or($spec, 'local_gtf_window_bp', '2.5e5');
 die "--local-manhattan-window-bp must be a positive number of base pairs\n"
@@ -1380,13 +1398,25 @@ for my $step (@step_defs) {
                     ? ($runner_cfg->{FOREST_OUTPUT_PREFIX} || "${project_tag}_SAS_top_hits_forest")
                     : ($runner_cfg->{OUTPUT_HTML_BASENAME} || "${project_tag}_SAS_local_top_hits_with_gtf.html")));
         my @input_identity = @input_stat ? ($input_stat[7], $input_stat[9]) : (0, 0);
+        my @local_manhattan_code_identity;
+        if ($step->{name} eq 'plot_local_manhattan') {
+            for my $name (qw(Manhattan4DiffGWASs_png.sas
+                             run_sas_oda_local_top_hits_manhattan.sas
+                             run_sas_oda_local_top_hits_manhattan_download_png.sh
+                             clump_top_hits_by_build.pl
+                             clump_top_hits_with_plink2_1kg.pl)) {
+                my @code_stat = stat("$Bin/DiffGWASDeps/$name");
+                push @local_manhattan_code_identity, $name,
+                    (@code_stat ? @code_stat[7, 9] : (0, 0));
+            }
+        }
         $step->{legacy_cache_key} = md5_hex(join("\0",
             $step->{name}, JSON::PP->new->canonical(1)->encode($runner_cfg),
             @input_identity));
         $step->{cache_key} = md5_hex(join("\0",
             'plot_cache_v2', $step->{name},
             JSON::PP->new->canonical(1)->encode(plot_cache_config($step->{name}, $runner_cfg)),
-            @input_identity));
+            @input_identity, @local_manhattan_code_identity));
         $step->{cache_file} = $step->{name} eq 'plot_local_gtf'
             ? $local_gtf_request_cache_file
             : "$Bin/$plot_prefix.request.md5";
@@ -1849,6 +1879,8 @@ sub infer_spec_from_gwas_dir {
         top_hit_focus_prefix   => $focus_prefix,
         top_hit_signal_thrshd  => '1e-6',
         top_hit_max_loci       => 0,
+        top_hit_1kg_maf_filter => 0,
+        top_hit_1kg_maf_threshold => 0.01,
         top_hit_dist_bp        => '1e6',
         top_hit_selection_method => 'ld',
         top_hit_ld_r2_threshold => '0.1',
@@ -2132,6 +2164,8 @@ sub infer_merged_spec_from_dir {
         top_hit_focus_prefix  => $pairs[0]{prefix},
         top_hit_signal_thrshd => '1e-6',
         top_hit_max_loci      => 0,
+        top_hit_1kg_maf_filter => 0,
+        top_hit_1kg_maf_threshold => 0.01,
         top_hit_dist_bp       => '1e6',
         top_hit_selection_method => 'ld',
         top_hit_ld_r2_threshold => '0.1',
@@ -2518,6 +2552,8 @@ sub infer_precomputed_spec_from_dir {
         top_hit_focus_prefix  => $prefixes[0],
         top_hit_signal_thrshd => '1e-6',
         top_hit_max_loci      => 0,
+        top_hit_1kg_maf_filter => 0,
+        top_hit_1kg_maf_threshold => 0.01,
         top_hit_dist_bp       => '1e6',
         top_hit_selection_method => 'ld',
         top_hit_ld_r2_threshold => '0.1',
@@ -3926,6 +3962,8 @@ sub build_runner_config {
               ? $top_hit_max_loci
               : 0
         ),
+        TOP_HIT_1KG_MAF_FILTER => cfg_or($spec, 'top_hit_1kg_maf_filter', 0) ? 1 : 0,
+        TOP_HIT_1KG_MAF_THRESHOLD => cfg_or($spec, 'top_hit_1kg_maf_threshold', 0.01),
         # Many harmonised studies provide no usable MAF in the plotting table.
         # An implicit positive cutoff would silently discard every top hit.
         TOP_HIT_MAF_THRESHOLD => cfg_or($spec, 'top_hit_maf_threshold', 0),
@@ -5447,6 +5485,13 @@ Options:
                        Spec key: top_hit_max_loci. Applies to automatic local
                        Manhattan/GTF and forest hit selection. It does not
                        limit the candidate SNPs assessed for LD.
+  --top-hit-1kg-maf-filter
+                       For top hits with UNKNOWN MAF, query 1000 Genomes Phase 3
+                       AFR, AMR, EAS, EUR, SAS and exclude only when all five
+                       have MAF below 0.01. Default: off. Missing reference SNPs
+                       remain UNKNOWN. Spec key: top_hit_1kg_maf_filter.
+  --top-hit-1kg-maf-threshold N
+                       Change the optional 1KG cutoff (default: 0.01).
   --local-max-hits-per-fig N
                        Requested upper bound for local top-hit columns per panel.
                        Current pipeline maximum is 15.
@@ -5956,6 +6001,8 @@ sub sample_spec_json {
   "top_hit_focus_prefix": "ASN_EUR",
   "top_hit_signal_thrshd": "1e-6",
   "top_hit_max_loci": 0,
+  "top_hit_1kg_maf_filter": 0,
+  "top_hit_1kg_maf_threshold": 0.01,
   "top_hit_differential_p_mode": "raw",
   "local_window_bp": "1e7",
   "local_gtf_window_bp": "2.5e5",

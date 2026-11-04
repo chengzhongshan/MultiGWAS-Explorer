@@ -1610,7 +1610,7 @@ if [[ -z "${TARGET_SNP_LIST}" \
     ld_clump_key="$(stable_hash_text \
       "$(stable_hash_file "${CSV_OUT}")" "${REFERENCE_BUILD}" \
       "${TOP_HIT_LD_POPULATIONS}" "${TOP_HIT_LD_POPULATION_RULE}" \
-      "${TOP_HIT_LD_R2_THRESHOLD}" "${TOP_HIT_LD_WINDOW_KB:-1000}" \
+      "${TOP_HIT_LD_R2_THRESHOLD}" "${TOP_HIT_LD_WINDOW_KB:-1000}" "${TOP_HIT_DIST_BP}" \
       "${TOP_HIT_MAX_LOCI}" "${TOP_HIT_LD_PLINK2:-}" \
       "${TOP_HIT_LD_PFILE:-}")"
     ld_clump_dir="${WORKDIR}/cache/top_hit_ld"
@@ -1628,6 +1628,7 @@ if [[ -z "${TARGET_SNP_LIST}" \
         --population-rule "${TOP_HIT_LD_POPULATION_RULE}"
         --r2-threshold "${TOP_HIT_LD_R2_THRESHOLD}"
         --window-kb "${TOP_HIT_LD_WINDOW_KB:-1000}"
+        --fallback-dist-bp "${TOP_HIT_DIST_BP}"
         --max-leads "${TOP_HIT_MAX_LOCI}"
         --output-leads "${TOP_HIT_LD_LEADS_TSV}"
         --output-audit "${ld_clump_base}.audit.tsv"

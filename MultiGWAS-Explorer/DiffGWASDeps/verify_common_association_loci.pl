@@ -17,6 +17,7 @@ use TopHitMAF qw(
   load_gnomad_lookup
   lookup_gnomad_maf
 );
+use OneKGPhase3MAF qw(query_phase3_maf);
 
 my $spec_file = '';
 my $runner_config_file = '';
@@ -33,6 +34,9 @@ my $remove_x_chr = 0;
 my $maf_threshold = 0.01;
 my $gnomad_freq_file = '';
 my $gnomad_pop_map = '';
+my $onekg_maf_filter = 0;
+my $onekg_maf_threshold = 0.01;
+my ($onekg_build, $onekg_plink2, $onekg_panel_dir, $onekg_pfile);
 my $help = 0;
 
 GetOptions(
@@ -51,6 +55,12 @@ GetOptions(
     'maf-threshold=f'       => \$maf_threshold,
     'gnomad-freq-file=s'    => \$gnomad_freq_file,
     'gnomad-pop-map=s'      => \$gnomad_pop_map,
+    'onekg-maf-filter!'     => \$onekg_maf_filter,
+    'onekg-maf-threshold=f' => \$onekg_maf_threshold,
+    'onekg-build=s'         => \$onekg_build,
+    'onekg-plink2=s'        => \$onekg_plink2,
+    'onekg-panel-dir=s'     => \$onekg_panel_dir,
+    'onekg-pfile=s'         => \$onekg_pfile,
     'help!'                 => \$help,
 ) or die usage();
 
@@ -58,6 +68,8 @@ if ($help) {
     print usage();
     exit 0;
 }
+die "--onekg-maf-threshold must be within (0, 0.5)\n"
+    unless $onekg_maf_threshold > 0 && $onekg_maf_threshold < 0.5;
 
 if (!$spec_file && !$runner_config_file && !$input_file) {
     die usage();
@@ -190,7 +202,8 @@ while (my $line = <$fh>) {
         gnomad_lookup  => $gnomad_lookup,
         pop_map        => $pop_map,
     );
-    if ($maf_threshold > 0 && !$maf_info->{pass}) {
+    if ($maf_threshold > 0 && !$maf_info->{pass}
+        && !($onekg_maf_filter && ($maf_info->{maf_source} || '') eq 'UNKNOWN')) {
         $maf_filtered_candidates++;
         next;
     }
@@ -209,6 +222,49 @@ while (my $line = <$fh>) {
     };
 }
 $close_fh->();
+
+if ($onekg_maf_filter) {
+    my $loosest = $thresholds[-1];
+    my @unknown = map { $_->{record} }
+        grep { ($_->{maf_info}{maf_source} || '') eq 'UNKNOWN'
+            && $_->{common_assoc_p} < $loosest } @candidates;
+    my $ref = query_phase3_maf(
+        rows => \@unknown, build => ($onekg_build || $runner_cfg->{REFERENCE_BUILD} || 'hg38'),
+        plink2 => $onekg_plink2, panel_dir => $onekg_panel_dir,
+        pfile => $onekg_pfile,
+    );
+    my @kept;
+    %candidate_count_by_threshold = ();
+    for my $hit (@candidates) {
+        my $info = $hit->{maf_info};
+        if (($info->{maf_source} || '') eq 'UNKNOWN'
+            && $hit->{common_assoc_p} < $loosest) {
+            my $status = $ref->{uc($hit->{record}{SNP} || '')} || {};
+            if ($status->{complete}) {
+                my $low = $status->{max_maf} < $onekg_maf_threshold;
+                my @pops = map { $_ . '=' . sprintf('%.6g', $status->{per_pop}{$_}) }
+                    sort keys %{ $status->{per_pop} || {} };
+                $hit->{maf_info} = {
+                    selected_maf => $status->{max_maf}, maf_source => '1KG_PHASE3',
+                    decision => $low ? 'FILTERED' : 'PASS', pass => !$low,
+                    reason => sprintf('1KG Phase 3 maximum population MAF %.6g %s %.6g; rare in all five populations: %s (%s)',
+                        $status->{max_maf}, $low ? '<' : '>=', $onekg_maf_threshold, $low ? 'yes' : 'no', join(', ', @pops)),
+                };
+            }
+            else {
+                $info->{reason} = '1KG Phase 3 MAF incomplete or reference-missing; cannot confirm rare across all five superpopulations; variant retained';
+            }
+        }
+        if ($hit->{common_assoc_p} < $loosest && !$hit->{maf_info}{pass}) {
+            $maf_filtered_candidates++;
+            next;
+        }
+        $candidate_count_by_threshold{$_}++
+            for grep { $hit->{common_assoc_p} < $_ } @thresholds;
+        push @kept, $hit;
+    }
+    @candidates = @kept;
+}
 
 my $chosen_threshold;
 for my $thr (@thresholds) {
@@ -731,6 +787,10 @@ Options:
   --max-loci N               Stop after N selected loci.
   --direction-metric STR     beta or z. Default: beta
   --remove-x-chr             Exclude chromosome X / 23 from selected loci.
+  --onekg-maf-filter         For UNKNOWN MAF only, exclude when AFR, AMR, EAS,
+                             EUR, and SAS are all below the 1KG Phase 3 cutoff.
+                             Missing/incomplete reference SNPs are retained.
+  --onekg-maf-threshold NUM  Optional 1KG cutoff; default 0.01.
   --help                     Show this help.
 USAGE
 }

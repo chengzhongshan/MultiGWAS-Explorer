@@ -20,6 +20,8 @@ my %opt = (
     maf_threshold      => '',
     gnomad_freq_file   => '',
     gnomad_pop_map     => '',
+    onekg_maf_filter   => undef,
+    onekg_maf_threshold => '',
     gene_annotation_gtf => '',
     target_snps        => '',
     target_snp_genes   => '',
@@ -42,6 +44,8 @@ GetOptions(
     'maf-threshold=f'       => \$opt{maf_threshold},
     'gnomad-freq-file=s'    => \$opt{gnomad_freq_file},
     'gnomad-pop-map=s'      => \$opt{gnomad_pop_map},
+    'onekg-maf-filter!'     => \$opt{onekg_maf_filter},
+    'onekg-maf-threshold=f' => \$opt{onekg_maf_threshold},
     'gene-annotation-gtf=s' => \$opt{gene_annotation_gtf},
     'target-snps=s'         => \$opt{target_snps},
     'target-snp-genes=s'    => \$opt{target_snp_genes},
@@ -97,6 +101,10 @@ my $gnomad_pop_map = first_nonempty(
     $runner->{TOP_HIT_GNOMAD_POP_MAP},
     '',
 );
+my $onekg_maf_filter = defined($opt{onekg_maf_filter})
+    ? $opt{onekg_maf_filter} : ($runner->{TOP_HIT_1KG_MAF_FILTER} || 0);
+my $onekg_maf_threshold = length($opt{onekg_maf_threshold} // '')
+    ? $opt{onekg_maf_threshold} : ($runner->{TOP_HIT_1KG_MAF_THRESHOLD} // 0.01);
 my $gene_annotation_gtf = first_nonempty(
     $opt{gene_annotation_gtf},
     default_gene_annotation_gtf($runner->{REFERENCE_BUILD}),
@@ -123,13 +131,15 @@ my $cache_key = md5_hex(JSON::PP->new->canonical(1)->encode({
         target_snp_genes => ($opt{target_snp_genes} || $runner->{TARGET_SNP_GENES} || ''),
         gnomad_freq_file => file_signature($gnomad_freq_file),
         gnomad_pop_map => file_signature($gnomad_pop_map),
+        onekg_maf_filter => $onekg_maf_filter,
+        onekg_maf_threshold => $onekg_maf_threshold,
         gene_annotation_gtf => file_signature($gene_annotation_gtf),
     },
     runner => \%selection_config,
     spec => small_file_digest($opt{spec}),
     code => [map { file_signature(File::Spec->catfile($Bin, $_)) }
         qw(generate_requested_top_hits_csv.pl verify_common_association_loci.pl
-           gnuplot/select_top_hits_from_wide.pl)],
+           gnuplot/select_top_hits_from_wide.pl OneKGPhase3MAF.pm)],
 }));
 if ($opt{reuse_cache} && -s $opt{output} && -s $cache_file) {
     open my $cache_fh, '<', $cache_file or die "Cannot read $cache_file: $!\n";
@@ -169,6 +179,11 @@ if (length $target_snps) {
         maf_threshold    => $maf_threshold,
         gnomad_freq_file => $gnomad_freq_file,
         gnomad_pop_map   => $gnomad_pop_map,
+        onekg_maf_filter => $onekg_maf_filter,
+        onekg_maf_threshold => $onekg_maf_threshold,
+        onekg_build => $runner->{REFERENCE_BUILD},
+        onekg_plink2 => $runner->{TOP_HIT_LD_PLINK2},
+        onekg_pfile => $runner->{TOP_HIT_LD_PFILE},
         remove_x_chr     => $opt{remove_x_chr},
     );
 } elsif ($top_hit_mode =~ /^(?:common_and_differential|union_common_and_differential)$/i) {
@@ -184,6 +199,11 @@ if (length $target_snps) {
         maf_threshold    => $maf_threshold,
         gnomad_freq_file => $gnomad_freq_file,
         gnomad_pop_map   => $gnomad_pop_map,
+        onekg_maf_filter => $onekg_maf_filter,
+        onekg_maf_threshold => $onekg_maf_threshold,
+        onekg_build => $runner->{REFERENCE_BUILD},
+        onekg_plink2 => $runner->{TOP_HIT_LD_PLINK2},
+        onekg_pfile => $runner->{TOP_HIT_LD_PFILE},
         remove_x_chr     => $opt{remove_x_chr},
     );
 } else {
@@ -197,6 +217,11 @@ if (length $target_snps) {
         maf_threshold    => $maf_threshold,
         gnomad_freq_file => $gnomad_freq_file,
         gnomad_pop_map   => $gnomad_pop_map,
+        onekg_maf_filter => $onekg_maf_filter,
+        onekg_maf_threshold => $onekg_maf_threshold,
+        onekg_build => $runner->{REFERENCE_BUILD},
+        onekg_plink2 => $runner->{TOP_HIT_LD_PLINK2},
+        onekg_pfile => $runner->{TOP_HIT_LD_PFILE},
     );
 }
 
@@ -266,6 +291,7 @@ sub run_common_selector {
         if defined $args{gnomad_freq_file} && length $args{gnomad_freq_file};
     push @cmd, ('--gnomad-pop-map', $args{gnomad_pop_map})
         if defined $args{gnomad_pop_map} && length $args{gnomad_pop_map};
+    push @cmd, _onekg_args(\%args);
     push @cmd, '--remove-x-chr' if $args{remove_x_chr};
     run_cmd(\@cmd, 'common-association selector');
     return read_hits_tsv($tmp);
@@ -294,6 +320,7 @@ sub run_differential_selector {
         if defined $args{gnomad_freq_file} && length $args{gnomad_freq_file};
     push @cmd, ('--gnomad-pop-map', $args{gnomad_pop_map})
         if defined $args{gnomad_pop_map} && length $args{gnomad_pop_map};
+    push @cmd, _onekg_args(\%args);
     run_cmd(\@cmd, 'differential top-hit selector');
     return read_hits_tsv($tmp);
 }
@@ -308,6 +335,16 @@ sub run_union_selector {
         max_hits => $args{max_hits},
         lists    => [ \@diff, \@common ],
     );
+}
+
+sub _onekg_args {
+    my ($args) = @_;
+    return () unless $args->{onekg_maf_filter};
+    my @cmd = ('--onekg-maf-filter', '--onekg-maf-threshold', $args->{onekg_maf_threshold});
+    push @cmd, ('--onekg-build', $args->{onekg_build}) if $args->{onekg_build};
+    push @cmd, ('--onekg-plink2', $args->{onekg_plink2}) if $args->{onekg_plink2};
+    push @cmd, ('--onekg-pfile', $args->{onekg_pfile}) if $args->{onekg_pfile};
+    return @cmd;
 }
 
 sub merge_hit_lists {

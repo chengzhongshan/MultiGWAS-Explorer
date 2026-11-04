@@ -1,5 +1,37 @@
 # Debugging the AOA GWAS comparison pipeline
 
+## 2026-11-04: equal local Manhattan spans and unresolved LD pairs
+
+The combined SAS local Manhattan plot used each panel's first observed SNP
+as its x-axis origin. With sparse or uneven SNP coverage, equal requested
+windows consequently occupied different visual widths. The combined plot now
+uses a chromosome-bounded, fixed `2 * LOCAL_WINDOW_BP` scale per lead, with
+the same physical base-pair length in every panel. The gnuplot locus-window
+helper shifts end-clipped windows inward to retain that span when possible.
+Check both first and later SAS batches: a later batch must start at its own
+first panel rather than reserving blank space for previous batches.
+The four-target chr2 SAS ODA rerun completed successfully after sorting the
+new fixed-coordinate data by group and position before `PROC TRANSPOSE`.
+Its exported target windows each span 2,000,000 bp for a 1 Mb half-window.
+
+The Anemia chr2 LD audit showed `rs58750654` (82,815,807), `rs974260`
+(82,814,529), `rs60119673` (82,815,686), and `rs151056964` (82,807,930)
+all selected in the same small locus. The lead and two other candidates had
+`NOT_ESTIMABLE` 1KG LD, so the old clumper treated absence of an LD estimate
+as independence. The local PLINK2 clumper now applies `TOP_HIT_DIST_BP`
+(default 1 Mb total span, or ±0.5 Mb around the stronger lead) only when a
+pair lacks jointly estimable LD in the requested populations. The audit marks
+such exclusions `PRUNED_DISTANCE_FALLBACK`; it does not claim an LD r2 for
+them. An isolated missing-reference hit remains eligible. A four-SNP rerun
+of this chr2 locus retained one lead and distance-pruned the other three.
+
+For unknown top-hit MAF, `--top-hit-1kg-maf-filter` optionally checks 1KG
+Phase 3 AFR/AMR/EAS/EUR/SAS frequencies. It excludes only when all five are
+measured and all fall below the cutoff. Missing or incomplete panel values
+remain UNKNOWN, as does an rsID whose panel BP differs from the GWAS BP;
+audit the per-population values and build before interpreting
+the result. The filter is off by default.
+
 ## 2026-11-03: Anemia standardized-P local Manhattan top hits
 
 The automatic local Manhattan run selected 10,176 significant candidates and

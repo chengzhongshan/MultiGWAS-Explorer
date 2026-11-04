@@ -263,6 +263,17 @@ safeguard before the local Manhattan and local GTF plotting stages:
 - if both GWAS frequencies and a configured gnomAD lookup are unavailable,
   the selector marks `maf_source=UNKNOWN` and retains the candidate at the
   default zero cutoff
+- optional 1KG fallback: set `top_hit_1kg_maf_filter` to `1` in the spec,
+  or pass `--top-hit-1kg-maf-filter` to either pipeline. For candidates with
+  `maf_source=UNKNOWN`, PLINK2 estimates MAF separately in AFR, AMR, EAS,
+  EUR, and SAS from the build-matched 1000 Genomes Phase 3 panel. The rsID
+  must occur at the GWAS position in that build. A candidate
+  is excluded only when **all five** MAFs are below `top_hit_1kg_maf_threshold`
+  (default `0.01`). A missing SNP or incomplete population data remains
+  UNKNOWN and is retained at the default zero MAF cutoff. The maximum of the
+  five MAFs is recorded as `selected_maf`, with each population's value in
+  `maf_filter_reason`. This reference check is off by default, especially for
+  cross-ancestry analyses where population-enriched signals may be real
 - optional safeguard: set `top_hit_maf_threshold` to `0.01` (or another
   justified cutoff) in the spec; with a positive cutoff, unknown-MAF
   candidates are filtered
@@ -3073,7 +3084,11 @@ For automatic SAS combined local Manhattan plots using the default
 build-matched 1KG panel and uploads only selected leads to SAS ODA. The full
 candidate CSV and local LD audit remain in the local cache, so a rerun can
 reuse the clumping result. An `UNRESOLVED_NO_LD` audit entry means the reference
-panel could not estimate LD for that variant. Set `top_hit_max_loci` in the spec
+panel could not estimate LD for that variant. For a nearby pair lacking jointly
+estimable LD, the stronger P-value hit is kept and the other is marked
+`PRUNED_DISTANCE_FALLBACK` in the audit. The fallback uses `top_hit_dist_bp`
+(default 1 Mb total span); a measured low LD r2 still permits close leads.
+Set `top_hit_max_loci` in the spec
 when the unrestricted lead count is too large for one combined plot.
 
 The default remains `none`; no LD query or overlay is performed unless the
@@ -3263,6 +3278,11 @@ for a tested smaller-window example and failure checks.
 
 Local top-hit Manhattan panels now support manual label-placement overrides for
 cases where SNP-gene labels are hard to optimize automatically.
+The combined SAS panels now use the same physical x-axis span of
+`2 * local_window_bp` around each hit. Near chromosome ends the window shifts
+inward, so its displayed width is preserved without extending past the
+chromosome. Panel labels and separator lines use fixed panel centers and
+boundaries. Gnuplot locus plots use the same bounded-window rule.
 
 Available CLI overrides:
 

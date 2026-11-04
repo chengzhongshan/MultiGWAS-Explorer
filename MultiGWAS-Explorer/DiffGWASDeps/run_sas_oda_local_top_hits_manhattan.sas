@@ -776,14 +776,22 @@ data top_hit4diffp;
   else if CHR=24 then chr_label='chrY';
   else chr_label=cats('chr',strip(put(CHR,best32.)));
   snp_gene=catx(':',SNP,coalescec(gene,'NA'),chr_label);
+  _chr_length=input(scan("&reference_chromosome_lengths",CHR,','),best32.);
+  window_start=max(1,BP-&local_window_bp);
+  if _chr_length > 2*&local_window_bp then
+    window_start=min(window_start,_chr_length-2*&local_window_bp);
+  window_end=window_start+2*&local_window_bp;
+  if not missing(_chr_length) then window_end=min(window_end,_chr_length);
+  drop _chr_length;
 run;
 
 proc sql;
   create table top_local_signals as
-  select a.*, b.snp_gene as snp_gene length=128
+  select a.*, b.snp_gene as snp_gene length=128,
+         (a.BP-b.window_start) as plot_bp
   from scz_mh as a, top_hit4diffp as b
   where a.CHR=b.CHR
-    and a.BP between (b.BP-&local_window_bp) and (b.BP+&local_window_bp)
+    and a.BP between b.window_start and b.window_end
   ;
 
   select snp_gene into: snp_gene_label separated by ' '
@@ -991,7 +999,7 @@ run;
 
     proc sql;
       create table &batch_dsdin as
-      select a.*, b.hit_order
+      select a.*, b.hit_order, (b.hit_order-&start_idx+1) as panel_order
       from top_local_signals as a
       inner join top_hit_groups as b
         on a.snp_gene=b.snp_gene
@@ -1006,7 +1014,7 @@ run;
 
     %Manhattan4DiffGWASs(
       dsdin=&batch_dsdin,
-      pos_var=BP,
+      pos_var=plot_bp,
       chr_var=snp_gene,
       P_var=__MANHATTAN_P_VAR__,
       Other_P_vars=__MANHATTAN_OTHER_P_VARS__,
@@ -1033,6 +1041,8 @@ run;
       outputfigname=&batch_output_prefix,
       plot_title=Combined local Manhattan: -log10(P) by chromosome color,
       Use_scaled_pos=1,
+      fixed_group_span=%sysevalf(2*&local_window_bp),
+      fixed_group_index_var=panel_order,
       sep_chr_grp=1,
       gwas_sortedby_numchrpos=1,
       angle4xaxis_label=&local_angle4xaxis_label,

@@ -40,13 +40,19 @@ sub chromosome_length {
 
 sub locus_window {
     my ($build, $chr, $bp, $half_window) = @_;
-    my $start = $bp - $half_window;
-    $start = 1 if $start < 1;
-    my $end = $bp + $half_window;
     my $length = chromosome_length($build, $chr);
-    $end = $length if defined($length) && $end > $length;
     die "Target coordinate $chr:$bp exceeds $build chromosome length $length\n"
         if defined($length) && $bp > $length;
+    my $span = 2 * $half_window;
+    my $start = $bp - $half_window;
+    $start = 1 if $start < 1;
+    $start = 1 if defined($length) && $length <= $span;
+    # Shift an end-clipped window inward so equal-width locus plots retain
+    # the same physical BP scale. Very short chromosomes use their full span.
+    $start = $length - $span if defined($length) && $length > $span
+        && $start + $span > $length;
+    my $end = $start + $span;
+    $end = $length if defined($length) && $end > $length;
     return ($start, $end);
 }
 

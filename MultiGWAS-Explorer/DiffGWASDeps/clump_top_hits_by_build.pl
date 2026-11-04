@@ -9,13 +9,15 @@ use File::Spec;
 use File::Temp qw(tempdir);
 
 my %opt = (build => 'hg38', populations => 'EUR EAS', population_rule => 'ANY',
-    r2_threshold => 0.1, window_kb => 1000, max_leads => 0);
+    r2_threshold => 0.1, window_kb => 1000, fallback_dist_bp => 1e6,
+    max_leads => 0);
 GetOptions(
     'candidates=s' => \$opt{candidates}, 'build=s' => \$opt{build},
     'panel-dir=s' => \$opt{panel_dir}, 'pfile=s' => \$opt{pfile},
     'plink2=s' => \$opt{plink2}, 'populations=s' => \$opt{populations},
     'population-rule=s' => \$opt{population_rule},
     'r2-threshold=f' => \$opt{r2_threshold}, 'window-kb=f' => \$opt{window_kb},
+    'fallback-dist-bp=f' => \$opt{fallback_dist_bp},
     'max-leads=i' => \$opt{max_leads},
     'output-leads=s' => \$opt{output_leads},
     'output-audit=s' => \$opt{output_audit},
@@ -40,6 +42,7 @@ my @common = ('--plink2', $opt{plink2}, '--populations', $opt{populations},
     '--population-rule', $opt{population_rule}, '--signal-column', 'focus_signal',
     '--signal-threshold', 1, '--r2-threshold', $opt{r2_threshold},
     '--window-kb', $opt{window_kb});
+push @common, ('--fallback-dist-bp', $opt{fallback_dist_bp});
 
 if ($opt{build} eq 'hg19') {
     run($^X, $clumper, '--candidates', $opt{candidates},
