@@ -30,6 +30,8 @@ jobs:
         run: bash install/test_cpan_downloader.sh
       - name: Check local SAS home and Linux STDIO configuration
         run: perl tests/test_local_sas_home.pl
+      - name: Check Windows COM submit thread ownership
+        run: perl tests/test_sas_com_threading.pl
 
   unix:
     needs: preflight
