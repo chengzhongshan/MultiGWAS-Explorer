@@ -3735,3 +3735,11 @@ profiles while keeping ODA as its default.
 See [Windows IOM/SSPI troubleshooting](docs/WINDOWS_LOCAL_IOM_SSPI.md),
 [GTEx cached/real-data plotting examples](docs/GTEX_LARGE_DOWNLOAD_RECOVERY.md),
 and the [SAS ODA adaptation record](docs/SAS_ODA_ADAPTATION_20261103.md).
+### Local SAS home and Linux STDIO
+
+`--dir4local_sas_home DIR` supplies `~` for local Windows/Linux SAS; recognized
+local profiles default to the HTML output directory. See
+[local SAS home examples](docs/LOCAL_SAS_HOME.md) for file operations, persistent
+sessions and the Linux `install/sascfg_linux_local.py` STDIO profile.
+Windows saving/transfers were tested live; Linux selection and failure handling
+were tested offline because no local Linux SAS was available.

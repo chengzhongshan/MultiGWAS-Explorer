@@ -683,7 +683,7 @@ _DEFAULT_CLASSPATH = r'${classpath_value}'
 cpW = _DEFAULT_CLASSPATH
 cpL = _DEFAULT_CLASSPATH
 
-SAS_config_names = ['oda', 'default', 'winlocal', 'winlocal_com']
+SAS_config_names = ['oda', 'default', 'winlocal', 'winlocal_com', 'linuxlocal']
 SAS_config_options = {'lock_down': False, 'verbose': True, 'prompt': True}
 
 _ODA_BASE = {
@@ -709,6 +709,11 @@ winlocal = {
     'javaparms': ['-Djava.library.path=' + _sas_native] if os.path.isdir(_sas_native) else [],
 }
 winlocal_com = {'provider': 'sas.iomprovider', 'encoding': 'windows-1252'}
+linuxlocal = {
+    'saspath': os.environ.get('SASPY_LOCAL_SAS_PATH', '/usr/local/SASHome/SASFoundation/9.4/sas'),
+    'options': [],
+    'encoding': os.environ.get('SASPY_LOCAL_SAS_ENCODING', 'utf-8'),
+}
 PY
   ensure_authinfo_from_reference_source
   log "Configured repo-local SASPy ODA profile at ${cfg_file}"

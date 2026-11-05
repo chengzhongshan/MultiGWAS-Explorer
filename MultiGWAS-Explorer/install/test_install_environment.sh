@@ -78,7 +78,8 @@ configure_saspy_oda_profile
 python3 - "$test_root/site/saspy/sascfg_personal.py" <<'PY'
 import runpy, sys
 cfg = runpy.run_path(sys.argv[1])
-assert {'oda', 'default', 'winlocal', 'winlocal_com'} <= set(cfg['SAS_config_names'])
+assert {'oda', 'default', 'winlocal', 'winlocal_com', 'linuxlocal'} <= set(cfg['SAS_config_names'])
+assert cfg['linuxlocal']['saspath'] and 'iomhost' not in cfg['linuxlocal']
 assert cfg['oda'] == cfg['default'] and cfg['oda'] is not cfg['default']
 assert cfg['oda']['iomhost']
 assert 'java' in cfg['winlocal'] and 'iomhost' not in cfg['winlocal']

@@ -28,6 +28,8 @@ jobs:
         run: perl DiffGWASDeps/test_ld_heatmap_contract.pl
       - name: Check CPAN downloader arguments
         run: bash install/test_cpan_downloader.sh
+      - name: Check local SAS home and Linux STDIO configuration
+        run: perl tests/test_local_sas_home.pl
 
   unix:
     needs: preflight
