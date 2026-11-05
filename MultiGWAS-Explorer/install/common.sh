@@ -683,7 +683,7 @@ _DEFAULT_CLASSPATH = r'${classpath_value}'
 cpW = _DEFAULT_CLASSPATH
 cpL = _DEFAULT_CLASSPATH
 
-SAS_config_names = ['oda', 'default']
+SAS_config_names = ['oda', 'default', 'winlocal', 'winlocal_com']
 SAS_config_options = {'lock_down': False, 'verbose': True, 'prompt': True}
 
 _ODA_BASE = {
@@ -697,6 +697,18 @@ _ODA_BASE = {
 
 oda = dict(_ODA_BASE)
 default = dict(_ODA_BASE)
+
+# Explicit local Windows profiles; the ODA default remains unchanged.
+_sas_java = r'C:\Program Files\SASHome\SASPrivateJavaRuntimeEnvironment\9.4\jre\bin\java.exe'
+_sas_native = os.environ.get('SASPY_SSPI_PATH', r'C:\Program Files\SASHome\SASFoundation\9.4\core\sasext')
+if os.name == 'nt' and os.path.isdir(_sas_native):
+    os.environ['PATH'] = _sas_native + os.pathsep + os.environ.get('PATH', '')
+winlocal = {
+    'java': os.environ.get('SASPY_LOCAL_JAVA', _sas_java if os.path.isfile(_sas_java) else r'${java_bin}'),
+    'encoding': os.environ.get('SASPY_LOCAL_SAS_ENCODING', 'windows-1252'),
+    'javaparms': ['-Djava.library.path=' + _sas_native] if os.path.isdir(_sas_native) else [],
+}
+winlocal_com = {'provider': 'sas.iomprovider', 'encoding': 'windows-1252'}
 PY
   ensure_authinfo_from_reference_source
   log "Configured repo-local SASPy ODA profile at ${cfg_file}"
@@ -892,6 +904,16 @@ ensure_cpanm() {
   fi
 }
 
+pipeline_cpanm() {
+  # Always nonempty: macOS Bash 3 with nounset cannot expand an empty array.
+  local -a options=(--from "${PIPELINE_CPAN_MIRROR}")
+  if [ "${PIPELINE_PLATFORM_TAG}" = "cygwin" ]; then
+    # Use the same curl backend that successfully bootstraps cpanminus.
+    options+=(--no-lwp --no-wget --curl --verbose)
+  fi
+  perl "${PIPELINE_CPANM_BIN}" "${options[@]}" "$@"
+}
+
 install_perl_deps() {
   local cpanfile_to_use=""
   local module_name=""
@@ -916,8 +938,7 @@ install_perl_deps() {
     esac
   done
   if [ "${#regular_modules[@]}" -gt 0 ]; then
-    perl "${PIPELINE_CPANM_BIN}" \
-      --mirror "${PIPELINE_CPAN_MIRROR}" --mirror-only \
+    pipeline_cpanm \
       --local-lib "${PIPELINE_PERL_LOCAL_DIR}" \
       --notest \
       "${regular_modules[@]}"
@@ -978,8 +999,7 @@ install_cygwin_legacy_perl_deps() {
   fi
   [ "${#modules[@]}" -gt 0 ] || return 0
   log "Repairing Cygwin Perl compatibility modules: ${modules[*]}"
-  perl "${PIPELINE_CPANM_BIN}" \
-    --mirror "${PIPELINE_CPAN_MIRROR}" --mirror-only \
+  pipeline_cpanm \
     --local-lib "${PIPELINE_PERL_LOCAL_DIR}" \
     --notest \
     --reinstall \
@@ -1009,8 +1029,7 @@ install_pdl_perl_deps() {
     \) -exec rm -rf {} +
   fi
   log "Refreshing Devel::CheckLib before configuring PDL"
-  perl "${PIPELINE_CPANM_BIN}" \
-    --mirror "${PIPELINE_CPAN_MIRROR}" --mirror-only \
+  pipeline_cpanm \
     --local-lib "${PIPELINE_PERL_LOCAL_DIR}" \
     --notest \
     --reinstall \
@@ -1019,8 +1038,7 @@ install_pdl_perl_deps() {
     'die "Devel::CheckLib did not define check_lib\n" unless defined &Devel::CheckLib::check_lib' \
     || die "Devel::CheckLib cannot initialize with the active Cygwin compiler"
   log "Installing PDL with extended Cygwin-friendly build timeouts"
-  MAKEFLAGS="${MAKEFLAGS:--j$(num_cpus)}" perl "${PIPELINE_CPANM_BIN}" \
-    --mirror "${PIPELINE_CPAN_MIRROR}" --mirror-only \
+  MAKEFLAGS="${MAKEFLAGS:--j$(num_cpus)}" pipeline_cpanm \
     --local-lib "${PIPELINE_PERL_LOCAL_DIR}" \
     --notest \
     --reinstall \

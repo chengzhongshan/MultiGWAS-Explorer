@@ -57,6 +57,9 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+      - name: Check CPAN downloader selection
+        shell: bash
+        run: bash MultiGWAS-Explorer/install/test_cpan_downloader.sh
       - name: Install portable Cygwin and pipeline
         shell: powershell
         run: |

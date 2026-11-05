@@ -6,6 +6,14 @@ _authinfo
 .vagrant/
 install/cache/
 tools/
+# Track evaluation sources while keeping downloaded tool binaries local.
+!/tools/
+/tools/*
+!/tools/build_library500_round10.pl
+!/tools/subset_gtex_expression.pl
+!/tools/lib/
+/tools/lib/*
+!/tools/lib/Library_Evaluation_Corpus.pm
 example-output*/
 public-gwas-test*/
 *.sif
@@ -16,6 +24,11 @@ run_local_hits_manhattan_*/
 tmp*/
 debug_single_local_gtf_*/
 SAS_Output_RandID*/
+/SAS_Output_library500_live_*/
+/SAS_Output_gtex_cache_*/
+/SAS_Output_adaptation_*/
+/SAS_Output_macro_preflight_*/
+/SAS_Output_github_sync_*/
 codex_*/
 
 cache/local_gtf_reuse/

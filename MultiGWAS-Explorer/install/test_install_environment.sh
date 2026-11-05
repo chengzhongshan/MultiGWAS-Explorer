@@ -2,8 +2,15 @@
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "${SCRIPT_DIR}/common.sh"
-test_root="$(mktemp -d)"
-trap 'rm -rf "$test_root"' EXIT
+bash "${SCRIPT_DIR}/test_cpan_downloader.sh"
+temporary_root="$(cd "${TMPDIR:-/tmp}" && pwd -P)"
+test_root="$(mktemp -d "$temporary_root/pipeline-install-test.XXXXXX")"
+cleanup() {
+  [[ -d "$test_root" && "${test_root##*/}" == pipeline-install-test.* ]] || return 0
+  [[ "$(cd "$test_root/.." && pwd -P)" == "$temporary_root" ]] || return 1
+  rm -rf -- "$test_root"
+}
+trap cleanup EXIT
 
 # Reproduce first-install state: no library directory exists yet. A module
 # written after activation must be loadable by a child Perl build process.
@@ -56,3 +63,27 @@ resolved_java="$(resolve_unix_java_for_saspy)"
 [ "$resolved_java" = "$JAVA_HOME/bin/java" ] || die "JAVA_HOME was not respected"
 "$resolved_java" -version
 log "First-install Perl environment and Java path checks passed"
+
+# Generate a profile in the isolated fixture; do not inspect/copy credentials.
+mkdir -p "$test_root/site/saspy"
+activate_python_env() { :; }
+resolve_saspy_site_packages() { printf '%s\n' "$test_root/site"; }
+sync_saspy_reference_java_assets() { :; }
+ensure_authinfo_from_reference_source() { :; }
+resolve_windows_java_for_saspy() { printf '%s\n' 'C:/fixture/java.exe'; }
+resolve_unix_java_for_saspy() { printf '%s\n' '/fixture/java'; }
+build_saspy_windows_classpath() { printf '%s\n' 'C:/fixture/test.jar'; }
+build_saspy_unix_classpath() { printf '%s\n' '/fixture/test.jar'; }
+configure_saspy_oda_profile
+python3 - "$test_root/site/saspy/sascfg_personal.py" <<'PY'
+import runpy, sys
+cfg = runpy.run_path(sys.argv[1])
+assert {'oda', 'default', 'winlocal', 'winlocal_com'} <= set(cfg['SAS_config_names'])
+assert cfg['oda'] == cfg['default'] and cfg['oda'] is not cfg['default']
+assert cfg['oda']['iomhost']
+assert 'java' in cfg['winlocal'] and 'iomhost' not in cfg['winlocal']
+assert cfg['winlocal_com']['provider'] == 'sas.iomprovider'
+assert 'iomhost' not in cfg['winlocal_com']
+assert not ({'omruser', 'omrpw'} & set(cfg['winlocal']))
+print('Generated ODA and local Windows SASPy profile checks passed')
+PY

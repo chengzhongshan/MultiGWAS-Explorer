@@ -3708,3 +3708,30 @@ See [SAS ODA reliability and cleanup](docs/sas_oda_reliability_and_cleanup.md) f
 ## Expression and mutation displays
 
 The optional [visualization module](visualization/README.md) adds the author's clustergram and branch-review macros, aligned gene/protein mutation tracks, and MGXOncoPrint with callability-aware frequencies. Run its standalone examples in a separate SAS session; the GWAS pipeline does not automatically load its pinned dependency snapshots.
+
+## Local Windows SAS from Cygwin
+
+When local SAS 9.4 and native Windows SASPy are available, select the local
+profile explicitly. Run from this project directory:
+
+```bash
+export PIPELINE_PYTHON_BIN="$(cygpath -m "$USERPROFILE/anaconda3/python.exe")"
+export SASPY_CFGFILE="$(cygpath -m "$USERPROFILE/sascfg_winlocal_sasjava.py")"
+export SASPY_CFGNAME=winlocal
+export SAS_ODA_AUTOLOAD_MACROS=0
+perl run_sas_codes_or_script_in_ODA.pl --check-saspy-connection-only
+perl run_sas_codes_or_script_in_ODA.pl \
+  --code 'proc print data=sashelp.class(obs=3);run;' \
+  --output-prefix "SAS_Output_RandID_winlocal_$(date +%Y%m%d_%H%M%S)"
+```
+
+Adjust the Python and config paths to your installation. The winlocal profile
+omits iomhost and remote credentials. Explicit target selection does not silently
+fall back to ODA. Local selections skip ODA credential bootstrapping. Helper
+paths are converted for the selected Python interpreter; Cygwin Python retains
+POSIX paths. The installer also generates explicit `winlocal` and `winlocal_com`
+profiles while keeping ODA as its default.
+
+See [Windows IOM/SSPI troubleshooting](docs/WINDOWS_LOCAL_IOM_SSPI.md),
+[GTEx cached/real-data plotting examples](docs/GTEX_LARGE_DOWNLOAD_RECOVERY.md),
+and the [SAS ODA adaptation record](docs/SAS_ODA_ADAPTATION_20261103.md).
