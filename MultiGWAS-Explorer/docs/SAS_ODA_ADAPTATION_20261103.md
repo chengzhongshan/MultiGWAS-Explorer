@@ -100,3 +100,25 @@ A native Windows Python session created through the corrected launcher was
 reused by this runner with the same SAS PID 37624 and the same five-row WORK
 dataset. HTML: `SAS_Output_RandID_persistent_path_shared_20261104/sas_res_FIVdu.html`.
 The canonical runner's help now includes the persistent `mc1` create/read example.
+
+## Installation workflow repair: Bash 3.2 compatibility (2026-11-04)
+
+The previous GitHub Installation run 41922257401 failed in all six installation
+jobs. Every job reached the existing LD heatmap contract check and stopped with
+`run_sas_oda_local_top_hits_manhattan_download_png.sh uses Bash 4 case conversion
+and will fail in macOS Bash 3.2`. Dependency installation and SASPy imports had
+already passed; this failure was separate from local Windows SAS authentication.
+
+The new automatic PLINK2 lead-selection branches used Bash 4 uppercase expansion.
+Both branches now use the existing portable `printf | tr` pattern, preserving
+case-insensitive LD/PLINK2_1KG matching. The existing contract check reproduced
+the failure before the change and passed afterwards. Shell syntax, installer
+environment checks (including all 29 CPAN downloader assertions), and the 12
+requested-hit gene checks passed locally.
+
+The workflow now runs the existing plotting contract and CPAN argument checks
+in a short preflight job before any of the six installation jobs starts. Full
+installation and synthetic plotting checks remain required on all platforms.
+The workflow tests installed dependencies and synthetic plots without SAS ODA
+credentials or a licensed local SAS instance. The previously published Windows
+persistent-session runtime fix remains in commit adb2b7e.

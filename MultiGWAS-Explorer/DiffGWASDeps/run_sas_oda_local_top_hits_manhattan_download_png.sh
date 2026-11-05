@@ -658,8 +658,8 @@ upload_data_with_integrity_check() {
 generate_requested_top_hits_csv_locally() {
   [[ -x "${LOCAL_TOP_HITS_CSV_HELPER}" || -f "${LOCAL_TOP_HITS_CSV_HELPER}" ]] || return 1
   local output_csv="${REQUESTED_CSV_OUT}"
-  if [[ -z "${TARGET_SNP_LIST}" && "${TOP_HIT_SELECTION_METHOD^^}" == "LD" \
-      && "${TOP_HIT_LD_SOURCE^^}" == "PLINK2_1KG" \
+  if [[ -z "${TARGET_SNP_LIST}" && "$(printf '%s' "${TOP_HIT_SELECTION_METHOD}" | tr '[:lower:]' '[:upper:]')" == "LD" \
+      && "$(printf '%s' "${TOP_HIT_LD_SOURCE}" | tr '[:lower:]' '[:upper:]')" == "PLINK2_1KG" \
       && "${LOCAL_SAS_DEBUG_ONLY}" != "1" && "${ODA_TRANSFER_MANIFEST_ONLY:-0}" != "1" ]]; then
     output_csv="${CANDIDATE_CSV_OUT}"
   fi
@@ -713,7 +713,7 @@ stable_hash_file() {
 
 clump_requested_top_hits_locally() {
   [[ -z "${TARGET_SNP_LIST}" ]] || return 0
-  [[ "${TOP_HIT_SELECTION_METHOD^^}" == "LD" && "${TOP_HIT_LD_SOURCE^^}" == "PLINK2_1KG" ]] || return 0
+  [[ "$(printf '%s' "${TOP_HIT_SELECTION_METHOD}" | tr '[:lower:]' '[:upper:]')" == "LD" && "$(printf '%s' "${TOP_HIT_LD_SOURCE}" | tr '[:lower:]' '[:upper:]')" == "PLINK2_1KG" ]] || return 0
   [[ "${LOCAL_SAS_DEBUG_ONLY}" != "1" && "${ODA_TRANSFER_MANIFEST_ONLY:-0}" != "1" ]] || return 0
   [[ -s "${CANDIDATE_CSV_OUT}" ]] || { echo "ERROR: Missing local LD candidate CSV: ${CANDIDATE_CSV_OUT}" >&2; return 1; }
 
