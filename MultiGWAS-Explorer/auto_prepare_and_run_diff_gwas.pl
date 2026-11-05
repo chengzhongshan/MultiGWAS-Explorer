@@ -130,6 +130,7 @@ my $exclude_local_gtf_tracks_override;
 my $local_gtf_track_order_override = '';
 my $manhattan_differential_p_mode_override = '';
 my $manhattan_top_logp_override;
+my %manhattan_label_overrides;
 my $standardized_p_tracks_override;
 my $compute_meta_override;
 my $exclude_strand_ambiguous_override;
@@ -273,6 +274,8 @@ GetOptions(
     'local-gtf-track-order|gtf-track-order=s' => \$local_gtf_track_order_override,
     'manhattan-differential-p-mode=s' => \$manhattan_differential_p_mode_override,
     'manhattan-top-logp|genomewide-logp-cap=i' => \$manhattan_top_logp_override,
+    'manhattan-gwas-label-size=f' => \$manhattan_label_overrides{manhattan_gwas_label_size},
+    'manhattan-gwas-label-halo-size=f' => \$manhattan_label_overrides{manhattan_gwas_label_halo_size},
     'standardized-p-tracks!' => \$standardized_p_tracks_override,
     'compute-meta!' => \$compute_meta_override,
     'exclude-strand-ambiguous!' => \$exclude_strand_ambiguous_override,
@@ -462,9 +465,11 @@ if ($generated_spec_input) {
     $draft_spec->{top_hit_1kg_maf_threshold} = $top_hit_1kg_maf_threshold_override
         if defined $top_hit_1kg_maf_threshold_override;
     if ($preview_spec) {
+        apply_manhattan_label_options($draft_spec);
         print pretty_json($draft_spec), "\n";
         exit 0 if $generate_spec_only || !length $spec_out;
     }
+    apply_manhattan_label_options($draft_spec);
     write_json_if_defined($draft_path, $draft_spec);
     if (defined $draft_path){
         print "Generated comparison spec: $draft_path\n";
@@ -479,6 +484,7 @@ if ($generated_spec_input) {
 
 die "--spec is required (or provide --gwas-dir or --input-merged to generate one)\n" unless length $spec_file;
 my $spec = load_json($spec_file);
+apply_manhattan_label_options($spec);
 $spec->{top_hit_1kg_maf_filter} = $top_hit_1kg_maf_filter_override ? 1 : 0
     if defined $top_hit_1kg_maf_filter_override;
 $spec->{top_hit_1kg_maf_threshold} = $top_hit_1kg_maf_threshold_override
@@ -3916,6 +3922,8 @@ sub build_runner_config {
             $spec, 'manhattan_differential_p_mode', 'raw'
         )),
         MANHATTAN_TOP_LOGP => cfg_or($spec, 'manhattan_top_logp', 8),
+        MANHATTAN_GWAS_LABEL_SIZE => $spec->{manhattan_gwas_label_size},
+        MANHATTAN_GWAS_LABEL_HALO_SIZE => $spec->{manhattan_gwas_label_halo_size},
         STANDARDIZED_P_TRACKS => (cfg_or($spec, 'standardized_p_tracks', 0) ? 1 : 0),
         MANHATTAN_P_VAR => ($manhattan_tracks[0]{manhattan_pvar} || $manhattan_tracks[0]{pvar}),
         MANHATTAN_OTHER_P_VARS => [
@@ -4540,6 +4548,17 @@ sub run_command_with_heartbeat {
         $pause = 0.25 if $pause > 0.25;
         $pause = 0.05 if $pause < 0.05;
         select undef, undef, undef, $pause;
+    }
+}
+
+sub apply_manhattan_label_options {
+    my ($config) = @_;
+    for my $key (qw(manhattan_gwas_label_size manhattan_gwas_label_halo_size)) {
+        my $value = $manhattan_label_overrides{$key} // $ENV{uc $key} // $config->{$key} // 4;
+        die "$key must be a positive number (halo size may be zero)\n"
+            unless "$value" =~ /^(?:\d+(?:\.\d*)?|\.\d+)$/
+                && ($key =~ /halo/ ? $value >= 0 : $value > 0);
+        $config->{$key} = 0 + $value;
     }
 }
 
@@ -5402,6 +5421,13 @@ Options:
   --exclude-manhattan-tracks LIST  Remove comma-separated genomewide scatter tracks.
   --manhattan-top-logp N  Cap -log10(P) in each genomewide Manhattan track.
                          N is an integer of at least 8; default: 8.
+  --manhattan-gwas-label-size N
+                       Genomewide track-label font size. Default: 4.
+  --manhattan-gwas-label-halo-size N
+                       White label-underlay size. Default: 4; 0 disables it.
+                       Spec keys: manhattan_gwas_label_size and
+                       manhattan_gwas_label_halo_size. Uppercase environment
+                       variables of the same names are also accepted.
   --top-hit-differential-p-mode MODE
                        Choose raw or standardized differential P for the local
                        top-hit cutoff top_hit_signal_thrshd (default: raw).
@@ -6006,6 +6032,8 @@ sub sample_spec_json {
   "top_hit_focus_prefix": "ASN_EUR",
   "top_hit_signal_thrshd": "1e-6",
   "top_hit_max_loci": 0,
+  "manhattan_gwas_label_size": 4,
+  "manhattan_gwas_label_halo_size": 4,
   "top_hit_1kg_maf_filter": 0,
   "top_hit_1kg_maf_threshold": 0.01,
   "top_hit_differential_p_mode": "raw",

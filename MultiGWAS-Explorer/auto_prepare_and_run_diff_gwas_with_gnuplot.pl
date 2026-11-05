@@ -69,6 +69,12 @@ Options:
                                 N is an integer of at least 8; default: 8.
   --include-x-chr               Include chromosome X / 23 in genomewide Manhattan.
                                 Default: autosomes only.
+  --manhattan-gwas-label-size N Genomewide track-label size; default 4.
+  --manhattan-gwas-label-halo-size N
+                                White label-underlay size; default 4, 0 disables.
+                                Both use percent-of-image-height units, converted
+                                to gnuplot points. Lowercase spec keys and matching
+                                uppercase environment variables work too.
   --[no-]compute-meta           Calculated meta-analysis is OFF by default;
                                 enable only for independent or covariance-modeled cohorts.
                                 EAS versus EUR+EAS overlaps; justify rho first.
@@ -253,6 +259,7 @@ my $local_gtf_track_order_override = '';
 my $manhattan_differential_p_mode_override = '';
 my $top_hit_differential_p_mode_override = '';
 my $manhattan_top_logp_override;
+my %manhattan_label_overrides;
 my $standardized_p_tracks_override;
 # Keep ancestry-overlap decisions in the shared spec; gnuplot forwards an
 # explicit request but otherwise inherits the no-computed-meta default.
@@ -331,6 +338,8 @@ GetOptions(
     'top-hit-1kg-maf-filter!' => \$top_hit_1kg_maf_filter_override,
     'top-hit-1kg-maf-threshold=f' => \$top_hit_1kg_maf_threshold_override,
     'manhattan-top-logp|genomewide-logp-cap=i' => \$manhattan_top_logp_override,
+    'manhattan-gwas-label-size=f' => \$manhattan_label_overrides{manhattan_gwas_label_size},
+    'manhattan-gwas-label-halo-size=f' => \$manhattan_label_overrides{manhattan_gwas_label_halo_size},
     'standardized-p-tracks!' => \$standardized_p_tracks_override,
     'compute-meta!'             => \$compute_meta_override,
     'exclude-strand-ambiguous!' => \$exclude_strand_ambiguous_override,
@@ -418,6 +427,9 @@ if (length($input_merged) || length($gwas_dir)) {
             ? ($standardized_p_tracks_override ? '--standardized-p-tracks' : '--no-standardized-p-tracks') : ()),
         (defined($manhattan_top_logp_override)
             ? ('--manhattan-top-logp', $manhattan_top_logp_override) : ()),
+        (map { defined($manhattan_label_overrides{$_})
+            ? ('--' . ($_ =~ s/_/-/gr), $manhattan_label_overrides{$_}) : () }
+            qw(manhattan_gwas_label_size manhattan_gwas_label_halo_size)),
         (length($top_hit_differential_p_mode_override)
             ? ('--top-hit-differential-p-mode', $top_hit_differential_p_mode_override) : ()),
         (defined($top_hit_max_loci_override)
@@ -479,6 +491,13 @@ my %requested = normalize_requested_plots($plots, \@step_args);
 die "No gnuplot plot steps were requested.\n" unless grep { $requested{$_} } qw(plot_manhattan plot_local_manhattan plot_local_gtf plot_forest);
 
 my $spec = load_json($spec_file);
+for my $key (qw(manhattan_gwas_label_size manhattan_gwas_label_halo_size)) {
+    my $value = $manhattan_label_overrides{$key} // $ENV{uc $key} // $spec->{$key} // 4;
+    die "$key must be a positive number (halo size may be zero)\n"
+        unless "$value" =~ /^(?:\d+(?:\.\d*)?|\.\d+)$/
+            && ($key =~ /halo/ ? $value >= 0 : $value > 0);
+    $spec->{$key} = 0 + $value;
+}
 $spec->{top_hit_max_loci} = $top_hit_max_loci_override
     if defined $top_hit_max_loci_override;
 $spec->{top_hit_1kg_maf_filter} = $top_hit_1kg_maf_filter_override ? 1 : 0
@@ -625,6 +644,10 @@ if (-f $runner_config_local) {
         ? $manhattan_top_logp_override : ($spec->{manhattan_top_logp} // 8);
     $has_runner_override = 1
         if "$requested_top_logp" ne ("" . ($cached_runner->{MANHATTAN_TOP_LOGP} // 8));
+    for my $key (qw(manhattan_gwas_label_size manhattan_gwas_label_halo_size)) {
+        $has_runner_override = 1
+            if !defined($cached_runner->{uc $key}) || $cached_runner->{uc $key} != $spec->{$key};
+    }
     my $requested_hit_p_mode = lc($spec->{top_hit_differential_p_mode} // 'raw');
     $has_runner_override = 1
         if $requested_hit_p_mode ne lc($cached_runner->{TOP_HIT_DIFFERENTIAL_P_MODE} // 'raw');
@@ -700,6 +723,8 @@ if (!$reused_existing_runner) {
         top_hit_1kg_maf_threshold_override => $top_hit_1kg_maf_threshold_override,
         standardized_p_tracks_override => $standardized_p_tracks_override,
         manhattan_top_logp_override => $manhattan_top_logp_override,
+        manhattan_gwas_label_size => $spec->{manhattan_gwas_label_size},
+        manhattan_gwas_label_halo_size => $spec->{manhattan_gwas_label_halo_size},
         compute_meta_override           => $compute_meta_override,
         exclude_strand_ambiguous_override => $exclude_strand_ambiguous_override,
         max_eaf_abs_diff_override => $max_eaf_abs_diff_override,
@@ -1099,6 +1124,9 @@ sub run_upstream_preprocessing {
         if defined $args{standardized_p_tracks_override};
     push @cmd, '--manhattan-top-logp', $args{manhattan_top_logp_override}
         if defined $args{manhattan_top_logp_override};
+    for my $key (qw(manhattan_gwas_label_size manhattan_gwas_label_halo_size)) {
+        push @cmd, '--' . ($key =~ s/_/-/gr), $args{$key} if defined $args{$key};
+    }
     push @cmd, ($args{compute_meta_override} ? '--compute-meta' : '--no-compute-meta')
         if defined $args{compute_meta_override};
     push @cmd, ($args{exclude_strand_ambiguous_override} ? '--exclude-strand-ambiguous' : '--no-exclude-strand-ambiguous')
@@ -1224,6 +1252,8 @@ sub plot_manhattan {
     my $plot_manifest = $out_prefix_path . '.manifest.tsv';
     my $prior = -s $plot_manifest ? read_manifest_tsv($plot_manifest) : {};
     my $reference_p = $args{runner}{MANHATTAN_REFERENCE_P} || '5e-8';
+    my $label_size = $args{runner}{MANHATTAN_GWAS_LABEL_SIZE} // 4;
+    my $halo_size = $args{runner}{MANHATTAN_GWAS_LABEL_HALO_SIZE} // 4;
     my $top_logp = defined($args{top_logp})
         ? $args{top_logp}
         : ($args{runner}{MANHATTAN_TOP_LOGP} // 8);
@@ -1235,6 +1265,8 @@ sub plot_manhattan {
         && ($prior->{labels} || '') eq join('|', @{ $args{labels} || [] })
         && ($prior->{reference_p} || '') eq $reference_p
         && ($prior->{top_logp} || '') eq "$top_logp"
+        && ($prior->{gwas_label_size} // '') eq "$label_size"
+        && ($prior->{gwas_label_halo_size} // '') eq "$halo_size"
         && target_is_newer_than_inputs($png_path, $compact_data,
             File::Spec->catfile($Bin, 'DiffGWASDeps', 'gnuplot', 'pdl_gnuplot_manhattan.pl'));
     if (!$plot_reusable) {
@@ -1249,6 +1281,8 @@ sub plot_manhattan {
             '--height', ($args{runner}{MANHATTAN_FIG_HEIGHT} || 1250),
             '--sig', $reference_p,
             '--top-logp', $top_logp,
+            '--gwas-label-size', $label_size,
+            '--gwas-label-halo-size', $halo_size,
             '--min-logp', $min_logp,
             '--keep-all-logp', $keep_all_logp,
             '--thin-mod', $thin_mod,

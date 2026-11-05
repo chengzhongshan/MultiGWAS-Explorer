@@ -1,5 +1,15 @@
 # Debugging the AOA GWAS comparison pipeline
 
+## 2026-11-05: genome-wide track-label sizing
+
+Both drivers now export `MANHATTAN_GWAS_LABEL_SIZE` and
+`MANHATTAN_GWAS_LABEL_HALO_SIZE`, defaulting to 4, into the runner config.
+Use `--manhattan-gwas-label-size` and `--manhattan-gwas-label-halo-size` or
+the corresponding lowercase spec keys. Keep these values in plot cache keys
+and the gnuplot manifest, otherwise a changed font can reuse an old PNG.
+The gnuplot renderer converts percent-of-image-height sizes to font points;
+both the label and its white background must be drawn after scatter points.
+
 ## 2026-11-04: equal local Manhattan spans and unresolved LD pairs
 
 The combined SAS local Manhattan plot used each panel's first observed SNP

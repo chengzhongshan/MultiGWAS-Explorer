@@ -3274,6 +3274,17 @@ test, so a `1e8` or `1e9` stress test is not a good first rerun. See
 [SAS ODA local-GTF rendering and session loss](#sas-oda-local-gtf-rendering-and-session-loss)
 for a tested smaller-window example and failure checks.
 
+Genome-wide track labels have separate controls in both entry points:
+`--manhattan-gwas-label-size 4 --manhattan-gwas-label-halo-size 4`.
+Both default to `4`. Persist them as `manhattan_gwas_label_size` and
+`manhattan_gwas_label_halo_size` in the comparison spec, or use the environment
+variables `MANHATTAN_GWAS_LABEL_SIZE` and `MANHATTAN_GWAS_LABEL_HALO_SIZE`.
+Command-line values override environment values, which override the spec.
+SAS uses graph-percent label sizes; gnuplot converts the same percentage of
+image height to font points and draws a white background under the label.
+Changing either parameter automatically refreshes the genome-wide plot cache.
+These controls do not change local-plot labels.
+
 ## Local Manhattan Layout Controls
 
 Local top-hit Manhattan panels now support manual label-placement overrides for

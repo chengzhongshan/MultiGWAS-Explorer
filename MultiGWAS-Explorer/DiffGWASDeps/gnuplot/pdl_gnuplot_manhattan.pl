@@ -17,6 +17,8 @@ Options:
   --out-prefix PREFIX       Output prefix for .png/.gp/.plot.tsv/.manifest.tsv.
   --pcols A,B,C             Comma-separated P columns.
   --labels A|B|C            Pipe-separated track labels.
+  --gwas-label-size N       Track-label size as percent of image height; default 4.
+  --gwas-label-halo-size N  White label-underlay size in the same units; default 4.
   --title TEXT              Optional plot title. Default: none.
   --width N                 PNG width. Default: 1800
   --height N                PNG height. Default: 1250
@@ -42,6 +44,8 @@ my %opt = (
     remove_x_chr  => 1,
     gnuplot       => 'gnuplot',
     title         => '',
+    gwas_label_size => 4,
+    gwas_label_halo_size => 4,
 );
 
 GetOptions(
@@ -49,6 +53,8 @@ GetOptions(
     'out-prefix=s'   => \$opt{out_prefix},
     'pcols=s'        => \$opt{pcols},
     'labels=s'       => \$opt{labels},
+    'gwas-label-size=f' => \$opt{gwas_label_size},
+    'gwas-label-halo-size=f' => \$opt{gwas_label_halo_size},
     'title=s'        => \$opt{title},
     'width=i'        => \$opt{width},
     'height=i'       => \$opt{height},
@@ -63,6 +69,8 @@ GetOptions(
 
 die usage() unless $opt{data} && $opt{out_prefix};
 die "Input file not found: $opt{data}\n" unless -s $opt{data};
+die "Track-label size must be positive and halo size nonnegative\n"
+    unless $opt{gwas_label_size} > 0 && $opt{gwas_label_halo_size} >= 0;
 die "--sig must be a P value greater than zero and at most one\n"
     unless defined(numeric($opt{sig})) && $opt{sig} > 0 && $opt{sig} <= 1;
 die "--top-logp must exceed -log10(--sig) so the reference line stays inside each track\n"
@@ -128,6 +136,8 @@ write_gnuplot(
     chrs      => \@chrs,
     chr_mid   => $chr_mid,
     max_x     => $max_x,
+    gwas_label_size => $opt{gwas_label_size},
+    gwas_label_halo_size => $opt{gwas_label_halo_size},
 );
 
 system($opt{gnuplot}, $gp_file) == 0
@@ -145,6 +155,8 @@ print {$mf} join("\t", 'resolved_pcols', join(',', @resolved_pcols)), "\n";
 print {$mf} join("\t", 'labels', join('|', @labels)), "\n";
 print {$mf} join("\t", 'reference_p', $opt{sig}), "\n";
 print {$mf} join("\t", 'top_logp', $opt{top_logp}), "\n";
+print {$mf} join("\t", 'gwas_label_size', $opt{gwas_label_size}), "\n";
+print {$mf} join("\t", 'gwas_label_halo_size', $opt{gwas_label_halo_size}), "\n";
 print {$mf} join("\t", 'remove_x_chr', ($opt{remove_x_chr} ? 1 : 0)), "\n";
 print {$mf} join("\t", 'rows_scanned', $rows_scanned), "\n";
 print {$mf} join("\t", 'rows_kept', $rows_kept), "\n";
@@ -325,11 +337,17 @@ sub write_gnuplot {
         print {$gp} "set arrow $arrow_id from 0,$base to $args{max_x},$base nohead lc rgb '#bbbbbb' lw 1\n";
         $arrow_id++;
     }
+    print {$gp} "set style textbox opaque noborder fillcolor rgb 'white' margins 0.2,0.2\n";
+    my $label_points = $args{gwas_label_size} * $args{height} * 0.0075;
+    my $halo_points = $args{gwas_label_halo_size} * $args{height} * 0.0075;
     for my $i (0 .. $#{ $args{labels} }) {
         my $label_gap = $args{top_logp} <= 8.5 ? 1.5 : 0.95;
         my $panel_y = $i * $args{top_logp} + $args{top_logp} - $label_gap;
         my $xmid = $args{max_x} / 2;
-        print {$gp} "set label " . (100 + $i) . " \"" . escape_gp($args{labels}[$i]) . "\" at $xmid,$panel_y center font ',18'\n";
+        my $label = escape_gp($args{labels}[$i]);
+        print {$gp} "set label " . (100 + 2*$i) . " \"$label\" at $xmid,$panel_y center font ',$halo_points' textcolor rgb 'white' boxed front\n"
+            if $halo_points > 0;
+        print {$gp} "set label " . (101 + 2*$i) . " \"$label\" at $xmid,$panel_y center font ',$label_points' textcolor rgb 'black' front\n";
     }
 
     print {$gp} "plot '" . escape_gp($args{plot_tsv}) . "' using 1:2:7 every ::1 with points pt 7 ps 0.33 lc palette\n";
