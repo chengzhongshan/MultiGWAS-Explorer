@@ -5522,12 +5522,17 @@ Options:
   --local-manhattan-xgrp-y-pos N
                        Override the vertical position of SNP/gene labels in
                        local top-hit Manhattan panels.
+                       Please change its negative value by enlarging it,
+                       such as -4 to -2 to move the labels up, avoiding overlap
+                       with the bottom x-axis reference line.
   --local-manhattan-yoffset-top N
                        Override the top y-axis offset used to make room for
                        local Manhattan SNP/gene labels.
   --local-manhattan-yoffset-bottom N
                        Override the bottom y-axis offset paired with the top
-                       offset for local Manhattan label layout.
+                       offset for local Manhattan label layout. It does not change
+                       the bottom xgrp label offset, instead which is controlled
+                       by --local-manhattan-xgrp-y-pos.
   --local-manhattan-fontsize N
                        Override the base SAS font size used by the local
                        Manhattan macro, including SNP/gene label sizing.

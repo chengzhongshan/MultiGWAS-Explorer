@@ -575,7 +575,8 @@ run;
 
 %if %sysevalf(&requested_top_hits_loaded,boolean) %then %do;
   %if &top_hit_ld_preclumped=1 %then %do;
-    %put NOTE: Using locally PLINK2/1KG LD-clumped top hits; no SAS LD query is needed.;
+    %put NOTE: Using locally PLINK2/1KG LD-clumped top hits;
+    %put no SAS LD query is needed.;
     data top_hit4diffp_raw;
       set requested_top_hits_csv;
       requested_hit_order=coalesce(LD_LEAD_RANK,hit_order,_n_);
