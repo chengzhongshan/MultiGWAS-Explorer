@@ -131,6 +131,7 @@ use JSON::PP qw(encode_json decode_json);
 use IO::Socket::INET;
 use IO::Select;
 use SAS_Source_Analysis;
+use SAS_Local_Home;
 
 sub _runner_temp_dir {
     my $worker_temp_dir = $ENV{SAS_ODA_WORKER_TEMP_DIR} // '';
@@ -343,27 +344,28 @@ def _write_status(update):
     os.replace(tmp_path, STATUS_FILE)
 
 def _iter_saspy_cfg_names():
-    preferred = os.environ.get('SASPY_CFGNAME') or os.environ.get('SASPY_CONFIG_NAME') or 'oda'
-    seen = set()
-    for name in (preferred, 'oda', 'default'):
-        if not name or name in seen:
-            continue
-        seen.add(name)
+    preferred = os.environ.get('SASPY_CFGNAME') or os.environ.get('SASPY_CONFIG_NAME')
+    if preferred:
+        yield preferred
+        return
+    for name in ('oda', 'default'):
         yield name
 
 def _open_sas_session():
     last_exc = None
     for cfgname in _iter_saspy_cfg_names():
         try:
-            return saspy.SASsession(cfgname=cfgname, results='html')
+            return saspy.SASsession(cfgname=cfgname, results='html', cfgfile=os.environ.get('SASPY_CFGFILE') or None)
         except Exception as exc:
             last_exc = exc
     if last_exc is not None:
+        if os.environ.get('SASPY_CFGNAME') or os.environ.get('SASPY_CONFIG_NAME'):
+            raise last_exc
         try:
-            return saspy.SASsession(results='html')
+            return saspy.SASsession(results='html', cfgfile=os.environ.get('SASPY_CFGFILE') or None)
         except Exception:
             raise last_exc
-    return saspy.SASsession(results='html')
+    return saspy.SASsession(results='html', cfgfile=os.environ.get('SASPY_CFGFILE') or None)
 
 def _format_elapsed(seconds):
     seconds = max(0, int(seconds or 0))
@@ -387,7 +389,10 @@ def _print_submit_heartbeat(label, elapsed_seconds):
     })
 
 def _submit_with_heartbeat(sess, sas_code, label="SAS ODA job"):
-    if SUBMIT_HEARTBEAT_SECONDS <= 0:
+    # SASPy COM objects belong to the thread that created the workspace.
+    # Keep COM submits there; the outer CLI process timeout still applies.
+    uses_com = type(getattr(sess, '_io', None)).__module__.endswith('.sasiocom')
+    if SUBMIT_HEARTBEAT_SECONDS <= 0 or uses_com:
         return sess.submit(sas_code)
 
     holder = {}
@@ -429,6 +434,7 @@ def get_session(session_obj):
     if session_obj is None or not hasattr(session_obj, '_session'):
         session_obj = type('SessionWrapper', (), {})()
         session_obj._session = _open_sas_session()
+        configure_local_home(session_obj._session, os.environ.get('SAS_LOCAL_HOME_DIR', ''))
         session_obj._macros_loaded = False
         _LAST_SASPY_SUBPROCESS_ID = _saspy_subprocess_id(session_obj)
 
@@ -550,6 +556,8 @@ def ensure_macros_loaded(session_obj):
     return session, session_obj
 
 def _session_home_value(sess):
+    if getattr(sess, '_pipeline_local_home', ''):
+        return sess._pipeline_local_home
     cfg = getattr(getattr(sess, '_io', None), 'sascfg', None)
     userid = str(getattr(cfg, 'omruser', '') or '').strip()
     authkey = str(getattr(cfg, 'authkey', '') or '').strip()
@@ -732,8 +740,8 @@ def _probe_session_after_empty_submit(session):
         detail = traceback.format_exc()
         return False, f"{type(exc).__name__}: {exc}\n{detail}"
 
-def run_sas_logic(sas_code, session_obj):   
-    try:    
+def run_sas_logic(sas_code, session_obj):
+    try:
         macro_log = ''
         macro_warning = False
         _write_status({
@@ -851,6 +859,8 @@ def delete_files_bulk(items, session_obj):
     return results, session_obj
 
 def resolve_remote_path(remote_filepath, session_obj):
+    if remote_filepath == '~':
+        return get_sas_home(session_obj)[0]
     if remote_filepath.startswith('~/'):
         home = get_sas_home(session_obj)[0]
         remote_filepath = f"{home}/{remote_filepath[2:]}"
@@ -886,12 +896,12 @@ def download_file(remote_filepath, local_path, session_obj):
         session, session_obj = get_session(session_obj)
         requested_remote_path = str(remote_filepath or '')
         filename = os.path.basename(requested_remote_path)
-        
+
         # Logic to handle empty local_path
         if not local_path or local_path.strip() == '':
             local_path = filename # Removed the leading '.' unless you specifically wanted a hidden file
         local_path = os.path.abspath(local_path)
-            
+
         dir_name = os.path.dirname(local_path)
 
         if dir_name and not os.path.exists(dir_name):
@@ -1373,12 +1383,12 @@ def dirlist(remote_path, session_obj):
     try:
         # Get the active session
         session, session_obj = get_session(session_obj)
-        
+
         # listdir returns a list of filenames in the remote_path
-        files = session.dirlist(remote_path)
-        
+        files = session.dirlist(resolve_remote_path(remote_path, session_obj))
+
         return files, session_obj
-    
+
     except Exception as e:
         return f"PYTHON ERROR: {str(e)}", session_obj
 
@@ -1389,6 +1399,7 @@ def get_sas_home(session_obj):
 
 END_PYTHON
 ;
+$INLINE_PYTHON_SOURCE .= SAS_Local_Home::python_setup();
 
 our @EXPORT_OK = qw(new run_code run_file upload_file download_file);
 
@@ -1405,8 +1416,8 @@ sub _autoload_macros_enabled {
 }
 
 my $SERVER_HOST = '127.0.0.1';
-my $SERVER_PORT = 8765;
-my $SERVER_API_VERSION = '2026-09-01-sas32-debug-macro-guard';
+my $SERVER_PORT = int($ENV{SAS_ODA_SESSION_PORT} // 8765);
+my $SERVER_API_VERSION = '2026-11-04-local-home';
 my $SERVER_CONNECT_TIMEOUT_SECONDS = int($ENV{SAS_ODA_SESSION_CONNECT_TIMEOUT_SECONDS} // 5);
 my $SERVER_CREATE_TIMEOUT_SECONDS  = int($ENV{SAS_ODA_SESSION_CREATE_TIMEOUT_SECONDS} // 60);
 my $SERVER_FILEOP_TIMEOUT_SECONDS  = int($ENV{SAS_ODA_SESSION_FILEOP_TIMEOUT_SECONDS} // 20);
@@ -1612,8 +1623,8 @@ import shutil
 import tempfile
 from datetime import datetime
 HOST = '127.0.0.1'
-PORT = 8765
-SERVER_API_VERSION = '2026-09-01-sas32-debug-macro-guard'
+PORT = int(os.environ.get('SAS_ODA_SESSION_PORT', '8765'))
+SERVER_API_VERSION = '2026-11-04-local-home'
 sessions = {}
 session_macros_loaded = {}
 session_macro_bootstrap_warning = {}
@@ -1661,26 +1672,27 @@ options &_pipeline_opt_mprint &_pipeline_opt_mlogic &_pipeline_opt_symbolgen &_p
 SUBMIT_HEARTBEAT_SECONDS = max(0, int(os.environ.get('SAS_ODA_SUBMIT_HEARTBEAT_SECONDS', '20') or '20'))
 MACRO_BOOTSTRAP_TIMEOUT_SECONDS = max(0, int(os.environ.get('SAS_ODA_MACRO_BOOTSTRAP_TIMEOUT_SECONDS', '420') or '420'))
 def iter_saspy_cfg_names():
-    preferred = os.environ.get('SASPY_CFGNAME') or os.environ.get('SASPY_CONFIG_NAME') or 'oda'
-    seen = set()
-    for name in (preferred, 'oda', 'default'):
-        if not name or name in seen:
-            continue
-        seen.add(name)
+    preferred = os.environ.get('SASPY_CFGNAME') or os.environ.get('SASPY_CONFIG_NAME')
+    if preferred:
+        yield preferred
+        return
+    for name in ('oda', 'default'):
         yield name
 def open_sas_session():
     last_exc = None
     for cfgname in iter_saspy_cfg_names():
         try:
-            return SASsession(cfgname=cfgname, results='html')
+            return SASsession(cfgname=cfgname, results='html', cfgfile=os.environ.get('SASPY_CFGFILE') or None)
         except Exception as exc:
             last_exc = exc
     if last_exc is not None:
+        if os.environ.get('SASPY_CFGNAME') or os.environ.get('SASPY_CONFIG_NAME'):
+            raise last_exc
         try:
-            return SASsession(results='html')
+            return SASsession(results='html', cfgfile=os.environ.get('SASPY_CFGFILE') or None)
         except Exception:
             raise last_exc
-    return SASsession(results='html')
+    return SASsession(results='html', cfgfile=os.environ.get('SASPY_CFGFILE') or None)
 def log_event(message):
     stamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     line = f"[{stamp}] {message}\n"
@@ -2013,6 +2025,8 @@ def ensure_session(session_id):
     return sessions[session_id]
 
 def session_home(sess):
+    if getattr(sess, '_pipeline_local_home', ''):
+        return sess._pipeline_local_home
     cfg = getattr(getattr(sess, '_io', None), 'sascfg', None)
     userid = str(getattr(cfg, 'omruser', '') or '').strip()
     authkey = str(getattr(cfg, 'authkey', '') or '').strip()
@@ -2044,6 +2058,8 @@ def session_home(sess):
     return str(sess.symget('_mg_homepath') or '').strip()
 
 def resolve_remote_path(remote_path, sess):
+    if remote_path == '~':
+        return session_home(sess)
     if remote_path.startswith('~/'):
         remote_path = f"{session_home(sess)}/{remote_path[2:]}"
     return remote_path
@@ -2255,6 +2271,13 @@ def handle_client(conn, addr):
         req = json.loads(data.decode('utf-8'))
         cmd = req.get('cmd')
         session_id = req.get('session_id')
+        if session_id and req.get('local_home'):
+            # The root belongs to this request/session, not the server process
+            # environment inherited from whichever CLI launched it first.
+            with lock:
+                if session_id not in sessions:
+                    sessions[session_id] = create_session(session_id)
+                configure_local_home(sessions[session_id], req['local_home'])
         log_event(f"request cmd={cmd} session_id={session_id} from={addr[0]}:{addr[1]}")
         if cmd == 'ping':
             resp = {'status':'ok', 'server_api_version': SERVER_API_VERSION, 'pid': os.getpid()}
@@ -2492,7 +2515,7 @@ def handle_client(conn, addr):
             remote_path = req.get('remote_path', '')
             try:
                 log_event(f"dirlist start session_id={session_id} remote_path={remote_path}")
-                files = with_retry(session_id, lambda sess: sess.dirlist(remote_path))
+                files = with_retry(session_id, lambda sess: sess.dirlist(resolve_remote_path(remote_path, sess)))
                 resp = {'status':'ok','files':files}
             except Exception as e:
                 resp = {'status':'error','error':str(e)}
@@ -2543,6 +2566,9 @@ def server_loop():
 if __name__ == '__main__':
     server_loop()
 END_SERVER_PY
+$SERVER_PY =~ s/^def handle_client/SAS_Local_Home::python_setup() . 'def handle_client'/me;
+
+sub _session_server_source { return $SERVER_PY; }
 
 sub _server_reachable {
     my ($host, $port) = @_;
@@ -2743,6 +2769,7 @@ sub _start_server_if_needed {
     }
     # start server in background
     my ($python_bin, $site_packages) = _repo_python_env_for_session_server();
+    my $server_path_for_python = _normalize_local_path_for_python($server_path, $python_bin);
     my $server_stdio_mode = $ENV{SAS_ODA_SERVER_STDIO} // '';
     my $inherit_server_stdio =
       $server_stdio_mode =~ /^(?:1|true|yes|on|inherit|show)$/i ? 1 :
@@ -2756,7 +2783,7 @@ sub _start_server_if_needed {
     if ($pid == 0) {
         # A persistent service outlives the CLI's owned scratch directory.
         if (length($ENV{SAS_ODA_SESSION_TEMP_DIR} // '')) {
-            $ENV{TMPDIR} = $ENV{SAS_ODA_SESSION_TEMP_DIR};
+            $ENV{TMPDIR} = _normalize_local_path_for_python($ENV{SAS_ODA_SESSION_TEMP_DIR}, $python_bin);
         } else {
             delete $ENV{TMPDIR} if length($ENV{SAS_ODA_WORKER_TEMP_DIR} // '');
         }
@@ -2772,7 +2799,7 @@ sub _start_server_if_needed {
             open STDOUT, '>', File::Spec->devnull();
             open STDERR, '>', File::Spec->devnull();
         }
-        exec { $python_bin } $python_bin, $server_path;
+        exec { $python_bin } $python_bin, $server_path_for_python;
         exit 127;
     }
     # wait a short time for server to start
@@ -2875,6 +2902,13 @@ sub _read_session_server_frame {
 
 sub _call_session_server {
     my ($payload, $timeout_seconds) = @_;
+    $payload = { %{$payload}, local_home => $ENV{SAS_LOCAL_HOME_DIR} // '' }
+      if $payload->{session_id};
+    # File transfers cross the same Perl/Python path boundary as startup.
+    if (exists $payload->{local_path}) {
+        my ($python_bin) = _repo_python_env_for_session_server();
+        $payload = _normalize_python_action_args($payload, $python_bin);
+    }
     my $json = encode_json($payload);
     my $sock = IO::Socket::INET->new(
         PeerAddr => $SERVER_HOST,
@@ -2923,9 +2957,41 @@ sub _call_session_server {
     return $resp;
 }
 
+my %_python_windows_path_cache;
+sub _python_uses_windows_paths {
+    my ($python_bin) = @_;
+    $python_bin ||= $ENV{PIPELINE_PYTHON_BIN} || '';
+    return $^O eq 'MSWin32' unless length $python_bin;
+    return $_python_windows_path_cache{$python_bin}
+      if exists $_python_windows_path_cache{$python_bin};
+    open my $probe, '-|', $python_bin, '-c', 'import os; print(os.name)'
+      or die "Cannot inspect Python path convention for $python_bin: $!\n";
+    my $name = <$probe> // '';
+    close $probe or die "Python path-convention probe failed for $python_bin\n";
+    $name =~ s/\s+\z//;
+    die "Unknown Python path convention '$name' for $python_bin\n" unless $name eq 'nt' || $name eq 'posix';
+    return $_python_windows_path_cache{$python_bin} = ($name eq 'nt' ? 1 : 0);
+}
+
 sub _normalize_local_path_for_python {
-    my ($path) = @_;
+    my ($path, $python_bin) = @_;
     return $path unless defined $path && length $path;
+    if (_python_uses_windows_paths($python_bin)) {
+        return $path if $path =~ m{^[A-Za-z]:[\\/]} || $path =~ m{^\\\\};
+        if ($^O eq 'cygwin' && $path =~ m{^/}) {
+            open my $convert, '-|', 'cygpath', '-am', $path
+              or die "Cannot convert path for Windows Python: $!\n";
+            my $converted = <$convert> // '';
+            close $convert or die "cygpath failed for $path\n";
+            $converted =~ s/[\r\n]+\z//;
+            die "Empty Windows path for $path\n" unless length $converted;
+            return $converted;
+        }
+        if ($path =~ m{^/(?:mnt|cygdrive)/([A-Za-z])(?:/(.*))?$}) {
+            return uc($1) . ':/' . ($2 // '');
+        }
+        return $path;
+    }
     # Cygwin getcwd() may yield E:/... even though the helper Python is the
     # POSIX /usr/bin/python. Linux Python treats E:/... as relative and
     # prepends cwd, so convert it to the project's /mnt/<drive>/ convention.
@@ -2948,18 +3014,18 @@ sub _normalize_local_path_for_python {
 }
 
 sub _normalize_python_action_args {
-    my ($args_ref) = @_;
+    my ($args_ref, $python_bin) = @_;
     $args_ref = {} unless ref($args_ref) eq 'HASH';
     my %normalized = %{$args_ref};
     for my $key (qw(local_path download_local_path code_path result_path args_path json_path py_path)) {
         next unless exists $normalized{$key};
-        $normalized{$key} = _normalize_local_path_for_python($normalized{$key});
+        $normalized{$key} = _normalize_local_path_for_python($normalized{$key}, $python_bin);
     }
     for my $list_key (qw(uploads downloads)) {
         next unless ref($normalized{$list_key}) eq 'ARRAY';
         $normalized{$list_key} = [ map {
             my %item = ref($_) eq 'HASH' ? %{$_} : ();
-            $item{local_path} = _normalize_local_path_for_python($item{local_path})
+            $item{local_path} = _normalize_local_path_for_python($item{local_path}, $python_bin)
               if exists $item{local_path};
             \%item;
         } @{ $normalized{$list_key} } ];
@@ -3092,9 +3158,9 @@ END_NONPERSISTENT_PY
     close $pyfh;
 
     my ($python_bin, $site_packages) = _repo_python_env_for_session_server();
-    my $py_path_for_python   = _normalize_local_path_for_python($py_path);
-    my $code_path_for_python = _normalize_local_path_for_python($code_path);
-    my $json_path_for_python = _normalize_local_path_for_python($json_path);
+    my $py_path_for_python   = _normalize_local_path_for_python($py_path, $python_bin);
+    my $code_path_for_python = _normalize_local_path_for_python($code_path, $python_bin);
+    my $json_path_for_python = _normalize_local_path_for_python($json_path, $python_bin);
     local $ENV{PIPELINE_PYTHON_BIN} = $python_bin if defined($python_bin) && length($python_bin);
     if (defined($site_packages) && length($site_packages) && -d $site_packages) {
         local $ENV{PYTHONPATH} = length($ENV{PYTHONPATH} // '')
@@ -3148,7 +3214,8 @@ END_NONPERSISTENT_PY
 
 sub _run_nonpersistent_python_action {
     my ($action, $args_ref) = @_;
-    $args_ref = _normalize_python_action_args($args_ref);
+    my ($python_bin, $site_packages) = _repo_python_env_for_session_server();
+    $args_ref = _normalize_python_action_args($args_ref, $python_bin);
 
     my ($argsfh, $args_path) = tempfile('sas_action_args_XXXX', SUFFIX => '.json', UNLINK => 0, DIR => _runner_temp_dir());
     print {$argsfh} encode_json($args_ref);
@@ -3295,10 +3362,9 @@ if __name__ == '__main__':
 END_NONPERSISTENT_ACTION_PY
     close $pyfh;
 
-    my ($python_bin, $site_packages) = _repo_python_env_for_session_server();
-    my $py_path_for_python   = _normalize_local_path_for_python($py_path);
-    my $args_path_for_python = _normalize_local_path_for_python($args_path);
-    my $json_path_for_python = _normalize_local_path_for_python($json_path);
+    my $py_path_for_python   = _normalize_local_path_for_python($py_path, $python_bin);
+    my $args_path_for_python = _normalize_local_path_for_python($args_path, $python_bin);
+    my $json_path_for_python = _normalize_local_path_for_python($json_path, $python_bin);
     local $ENV{PIPELINE_PYTHON_BIN} = $python_bin if defined($python_bin) && length($python_bin);
     if (defined($site_packages) && length($site_packages) && -d $site_packages) {
         local $ENV{PYTHONPATH} = length($ENV{PYTHONPATH} // '')
@@ -3503,8 +3569,10 @@ sub _local_macro_should_overlay_remote {
 }
 
 sub _build_targeted_remote_macro_loader {
-    my ($self, $macro_names_ref) = @_;
+    my ($self, $macro_names_ref, $opts) = @_;
     return '' unless ref($macro_names_ref) eq 'ARRAY' && @$macro_names_ref;
+    $opts = {} unless ref($opts) eq 'HASH';
+    my $only_if_missing = $opts->{only_if_missing} ? 1 : 0;
 
     my @names = _expanded_targeted_remote_macro_names($macro_names_ref);
     return '' unless @names;
@@ -3522,6 +3590,9 @@ SAS
         my $required_check = lc($name) eq 'del_dir_recursive'
           ? "%if not %sysmacexist(Del_Dir_Recursive) %then %put ERROR: Remote Del_Dir_Recursive macro could not be loaded;\n"
           : '';
+        my $include_statement = $only_if_missing
+          ? qq{%if not %sysmacexist($name) %then %include "%superq(_pipeline_targeted_macro_path)";}
+          : qq{%include "%superq(_pipeline_targeted_macro_path)";};
         print STDERR "\nSASPy automatically preparing targeted remote macro loader\n",
                      "checking $primary (primary choice), then $fallback for: $name\n\n";
         $code .= qq{
@@ -3586,7 +3657,7 @@ data _null_;
 run;
 %if &_pipeline_targeted_macro_error %then %return;
 %if %length(%superq(_pipeline_targeted_macro_path)) > 0 %then %do;
-    %if not %sysmacexist($name) %then %include "%superq(_pipeline_targeted_macro_path)";
+    $include_statement
 %end;
 %mend;
 %_pipeline_load_macro_tmp;
@@ -3791,7 +3862,10 @@ sub _process_dependencies {
     } elsif (@unresolved_macro_names) {
         my @explicit_remote = grep {lc($_) eq 'del_dir_recursive'} @unresolved_macro_names;
         if (@explicit_remote) {
-            $header_includes = $self->_build_targeted_remote_macro_loader(\@explicit_remote) . "\n" . $header_includes;
+            $header_includes = $self->_build_targeted_remote_macro_loader(
+                \@explicit_remote,
+                {only_if_missing => 1},
+            ) . "\n" . $header_includes;
             push @logs, 'Injected targeted remote macro loader for: Del_Dir_Recursive';
         }
         my %seen;
@@ -3862,6 +3936,7 @@ SAS_STATUS
 sub run_code {
     my ($self, $sas_code) = @_;
     my ($processed_code, $dep_logs) = $self->_process_dependencies($sas_code);
+    $processed_code = SAS_Local_Home::expand_code_paths($processed_code, $ENV{SAS_LOCAL_HOME_DIR});
     $processed_code = _guard_redirected_sas_log($processed_code);
     my $has_local_macro_upload = ($dep_logs // '') =~ /Uploaded overlay to/ ? 1 : 0;
     my $has_targeted_remote_loader = ($dep_logs // '') =~ /Injected targeted remote macro loader/ ? 1 : 0;
@@ -4293,7 +4368,7 @@ sub get_sas_home_path {
 
 =head1 DESCRIPTION
 
-SAS_ODA_Runner provides a Perl interface to run SAS code on remote ODA systems using saspy. 
+SAS_ODA_Runner provides a Perl interface to run SAS code on remote ODA systems using saspy.
 It handles automatic dependency resolution, file uploads/downloads, and macro management.
 
 =head1 METHODS
@@ -4312,7 +4387,7 @@ Creates a new SAS_ODA_Runner instance.
 Executes SAS code and returns results.
 
     my $result = $runner->run_code('proc print data=sashelp.class; run;');
-    
+
     # Returns hashref with keys:
     # - log: SAS log output
     # - lst: SAS listing/HTML output
@@ -4355,15 +4430,15 @@ Gets the SAS home directory path on the remote system.
 =head1 EXAMPLE
 
     use SAS_ODA_Runner;
-    
+
     my $runner = SAS_ODA_Runner->new(local_macro_dir => './my_macros');
-    
+
     my $result = $runner->run_code(q{
         %my_macro(param1=value1);
         proc means data=sashelp.class;
         run;
     });
-    
+
     die $result->{error} if $result->{error};
     print "Log:\n", $result->{log};
 

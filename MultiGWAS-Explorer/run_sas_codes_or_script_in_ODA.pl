@@ -142,6 +142,7 @@ my (@upload_files, @download_files, @download_local_paths, @delete_files, @delet
 my (@delete_directory_rgxs, $delete_directory_dry_run);
 my ($sas_oda_account, $sas_oda_password, $force_sas_oda_auth_prompt,
     $skip_sas_oda_auth_bootstrap, $check_sas_oda_login_only);
+my ($saspy_cfgname, $saspy_cfgfile, $dir4local_sas_home);
 my $classify_sas_log;
 my ($cli_sas_run_timeout_seconds, $cli_sas_run_timeout_grace_seconds, $disable_run_timeout);
 our $python_bin;
@@ -465,7 +466,10 @@ GetOptions(
     'sas-oda-password=s' => \$sas_oda_password,
     'prompt-sas-oda-auth!' => \$force_sas_oda_auth_prompt,
     'skip-sas-oda-auth-bootstrap!' => \$skip_sas_oda_auth_bootstrap,
-    'check-sas-oda-login-only!' => \$check_sas_oda_login_only,
+    'check-sas-oda-login-only|check-saspy-connection-only!' => \$check_sas_oda_login_only,
+    'saspy-cfgname=s' => \$saspy_cfgname,
+    'saspy-cfgfile=s' => \$saspy_cfgfile,
+    'dir4local_sas_home=s' => \$dir4local_sas_home,
     'classify-sas-log=s' => \$classify_sas_log,
     'monitor-status-file=s' => \$monitor_status_file,
     'monitor-interval-seconds=i' => \$monitor_interval_seconds,
@@ -483,6 +487,9 @@ GetOptions(
     '_internal-persistent!' => \$internal_persistent,
     '_internal-session-id=s' => \$internal_session_id,
 ) or die "Error in command line arguments\n";
+
+$ENV{SASPY_CFGNAME} = $saspy_cfgname if defined($saspy_cfgname) && length($saspy_cfgname);
+$ENV{SASPY_CFGFILE} = $saspy_cfgfile if defined($saspy_cfgfile) && length($saspy_cfgfile);
 
 sub collect_sas_oda_session_pids {
     my %seen;
@@ -737,9 +744,12 @@ import sys
 import saspy
 
 def iter_cfg_names():
-    preferred = os.environ.get('SASPY_CFGNAME') or os.environ.get('SASPY_CONFIG_NAME') or 'oda'
+    preferred = os.environ.get('SASPY_CFGNAME') or os.environ.get('SASPY_CONFIG_NAME')
+    if preferred:
+        yield preferred
+        return
     seen = set()
-    for name in (preferred, 'oda', 'default'):
+    for name in ('oda', 'default'):
         if not name or name in seen:
             continue
         seen.add(name)
@@ -747,10 +757,14 @@ def iter_cfg_names():
 
 def main():
     last_error = None
+    session_options = {'results': 'html'}
+    cfgfile = os.environ.get('SASPY_CFGFILE')
+    if cfgfile:
+        session_options['cfgfile'] = cfgfile
     for cfgname in iter_cfg_names():
         sess = None
         try:
-            sess = saspy.SASsession(cfgname=cfgname, results='html')
+            sess = saspy.SASsession(cfgname=cfgname, **session_options)
             res = sess.submit("proc setinit;run;")
             log = res.get('LOG', '') or ''
             ok = ('ERROR:' not in log and 'FATAL' not in log)
@@ -780,7 +794,8 @@ PY
     close $fh;
 
     local $ENV{PYTHONPATH} = resolve_pythonpath() unless defined $ENV{PYTHONPATH} && length $ENV{PYTHONPATH};
-    my $cmd = join(' ', sh_quote($python_bin), sh_quote($script_path), '2>&1');
+    my $script_path_for_python = SAS_ODA_Runner::_normalize_local_path_for_python($script_path, $python_bin);
+    my $cmd = join(' ', sh_quote($python_bin), sh_quote($script_path_for_python), '2>&1');
     my $raw = qx{$cmd};
     my $status = $? >> 8;
     my $parsed;
@@ -800,6 +815,8 @@ PY
 }
 
 sub bootstrap_sas_oda_credentials_if_needed {
+    my $target = $ENV{SASPY_CFGNAME} || $ENV{SASPY_CONFIG_NAME} || 'oda';
+    return if lc($target) ne 'oda';
     return if $sas_oda_auth_bootstrap_done;
     return if env_truthy($skip_sas_oda_auth_bootstrap) || env_truthy($ENV{PIPELINE_SKIP_SAS_ODA_AUTH_BOOTSTRAP});
 
@@ -1018,7 +1035,13 @@ Options:
   --sas-oda-account <user>   Optional SAS ODA account/email for first-run credential bootstrap.
   --sas-oda-password <pass>  Optional SAS ODA password for first-run credential bootstrap.
   --prompt-sas-oda-auth      Force an interactive SAS ODA credential refresh before connecting.
-  --check-sas-oda-login-only Validate SAS ODA login with PROC SETINIT and exit.
+  --check-sas-oda-login-only Validate the selected SASPy target with PROC SETINIT.
+  --check-saspy-connection-only Alias for the selected-target connection probe.
+  --saspy-cfgname <name>     Select a SASPy target, such as oda or winlocal.
+  --saspy-cfgfile <file>     Use an explicit SASPy configuration file.
+  --dir4local_sas_home <dir> Set ~ for local SAS file actions and quoted SAS paths.
+                             Local profiles default to the HTML output directory.
+                             Use the same explicit directory across persistent runs.
   --classify-sas-log <file>  Inspect an existing SAS log without connecting to ODA.
                              Space exhaustion returns JSON with retryable=false
                              and exits 73; other logs exit 0.
@@ -1080,6 +1103,62 @@ Examples:
     'run;' |
   $0 --code - --persistent --session-id mysession
 USAGE
+    print <<'LOCAL_WINDOWS_EXAMPLE';
+
+Local Windows SAS 9.4 from Cygwin (when SAS and native Windows SASPy are installed):
+  # Run from the project directory. Use your existing local-only winlocal config.
+  # Native Windows Python is required here; /usr/bin/python selects Cygwin Python.
+  export PIPELINE_PYTHON_BIN="$(cygpath -m "$USERPROFILE/anaconda3/python.exe")"
+  export SASPY_CFGFILE="$(cygpath -m "$USERPROFILE/sascfg_winlocal_sasjava.py")"
+  export SASPY_CFGNAME=winlocal
+  export SAS_ODA_AUTOLOAD_MACROS=0
+
+  # Check local IOM authentication:
+  perl run_sas_codes_or_script_in_ODA.pl --check-saspy-connection-only
+
+  # Execute SAS code and save HTML plus the SAS log:
+  perl run_sas_codes_or_script_in_ODA.pl \
+    --code 'proc print data=sashelp.class(obs=5); run; %put EXPLORER_WINDOWS_PASS;' \
+    --output-prefix "SAS_Output_RandID_winlocal_$(date +%Y%m%d_%H%M%S)" \
+    --run-timeout-seconds 120
+
+  # Reuse WORK data in a persistent local session (keep the same environment):
+  perl run_sas_codes_or_script_in_ODA.pl \
+    --code 'data a; set sashelp.class(obs=5); run; proc print data=a; run;' \
+    --output-prefix "SAS_Output_RandID_winlocal_create_$(date +%Y%m%d_%H%M%S)" \
+    --run-timeout-seconds 120 --persistent --session-id mc1
+  perl run_sas_codes_or_script_in_ODA.pl --code 'proc print data=work.a; run;' \
+    --output-prefix "SAS_Output_RandID_winlocal_reuse_$(date +%Y%m%d_%H%M%S)" \
+    --run-timeout-seconds 120 --persistent --session-id mc1
+
+  # Or execute a local SAS program:
+  perl run_sas_codes_or_script_in_ODA.pl --file example.sas \
+    --output-prefix "SAS_Output_RandID_winlocal_file_$(date +%Y%m%d_%H%M%S)"
+
+  # Adjust Python/config paths for other installations. The winlocal profile
+  # must omit iomhost and remote credentials. Macro autoload is disabled for
+  # this SASHELP smoke test; load your local macros explicitly when needed.
+  # Loopback/SSPI troubleshooting: docs/WINDOWS_LOCAL_IOM_SSPI.md
+Local SAS home on Windows or Linux:
+  # Omit the option to default ~ to this run's HTML output directory.
+  # Set it explicitly to keep saved files available across output prefixes.
+  perl run_sas_codes_or_script_in_ODA.pl --dir4local_sas_home ./local_sas_home \
+    --dir4listing '~'
+
+Local Linux SAS using STDIO (requires installed Linux SAS and Linux SASPy):
+  export PIPELINE_PYTHON_BIN="$(command -v python3)"
+  export SASPY_CFGFILE="$PWD/install/sascfg_linux_local.py"
+  export SASPY_CFGNAME=linuxlocal
+  export SASPY_LOCAL_SAS_PATH='/path/to/your/SASFoundation/9.4/sas'
+  export SAS_ODA_AUTOLOAD_MACROS=0
+  perl run_sas_codes_or_script_in_ODA.pl --check-saspy-connection-only
+  perl run_sas_codes_or_script_in_ODA.pl --dir4local_sas_home "$PWD/local_sas_home" \
+    --code 'libname saved "~"; data saved.class; set sashelp.class(obs=5); run; proc print data=saved.class; run;' \
+    --output-prefix SAS_Output_RandID_linuxlocal --persistent --session-id linux_demo \
+    --run-timeout-seconds 120
+  # Linux profile selection is tested offline; no live Linux SAS was available.
+  # File operations, persistent home behavior and examples: docs/LOCAL_SAS_HOME.md
+LOCAL_WINDOWS_EXAMPLE
     exit 0;
 }
 
@@ -1122,13 +1201,14 @@ SAS_ODA_Temp::initialize(keep => $keep_intermediate_files) unless $dry_run;
 bootstrap_sas_oda_credentials_if_needed();
 
 if ($check_sas_oda_login_only) {
+    my $target = $ENV{SASPY_CFGNAME} || $ENV{SASPY_CONFIG_NAME} || 'oda';
     my $probe = validate_sas_oda_login_once('proc setinit');
     if ($probe->{ok}) {
-        print "SAS ODA login validation succeeded with proc setinit;run;\n";
+        print "SASPy target '$target' connection validation succeeded with proc setinit;run;\n";
         exit 0;
     }
     my $detail = $probe->{error} || $probe->{raw_output} || 'unknown SAS ODA validation failure';
-    die "SAS ODA login validation failed: $detail\n";
+    die "SASPy target '$target' connection validation failed: $detail\n";
 }
 
 die "Error: Cannot provide both --code and --file\n" if $code && $file;
@@ -1477,6 +1557,19 @@ sub run_array_action_with_timeout {
 # Create output directory name with random ID
 my $rand_id = int(rand(999999)) + 1000;
 my $output_dir = ($output_prefix || "SAS_Output" . "_RandID" . $rand_id);
+my $local_profile = $ENV{SASPY_CFGNAME} || $ENV{SASPY_CONFIG_NAME} || 'oda';
+if (defined($dir4local_sas_home) || length($ENV{SAS_LOCAL_HOME_DIR} // '') ||
+    $local_profile =~ /^(?:winlocal(?:_com)?|linuxlocal|local|stdio)$/i) {
+    die "--dir4local_sas_home is for local SAS, not the oda profile\n" if lc($local_profile) eq 'oda';
+    my $home = defined($dir4local_sas_home) ? $dir4local_sas_home : ($ENV{SAS_LOCAL_HOME_DIR} || $output_dir);
+    die "Local SAS home must be nonempty and contain no control characters\n" if !length($home) || $home =~ /[\x00-\x1f]/;
+    $home = File::Spec->rel2abs($home);
+    make_path($home) unless -d $home;
+    die "Cannot create local SAS home: $home\n" unless -d $home;
+    my ($home_python) = SAS_ODA_Runner::_repo_python_env_for_session_server();
+    $ENV{SAS_LOCAL_HOME_DIR} = SAS_ODA_Runner::_normalize_local_path_for_python($home, $home_python);
+    print "Local SAS home (~): $ENV{SAS_LOCAL_HOME_DIR}\n";
+}
 my $output_prefix_path = "$output_dir/output";
 my $status_file = "$output_prefix_path.run.status.json";
 

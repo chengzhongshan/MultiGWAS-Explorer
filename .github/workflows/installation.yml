@@ -14,7 +14,27 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  preflight:
+    name: Check portable shell and plotting contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    defaults:
+      run:
+        shell: bash
+        working-directory: MultiGWAS-Explorer
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check plotting contracts before installing dependencies
+        run: perl DiffGWASDeps/test_ld_heatmap_contract.pl
+      - name: Check CPAN downloader arguments
+        run: bash install/test_cpan_downloader.sh
+      - name: Check local SAS home and Linux STDIO configuration
+        run: perl tests/test_local_sas_home.pl
+      - name: Check Windows COM submit thread ownership
+        run: perl tests/test_sas_com_threading.pl
+
   unix:
+    needs: preflight
     name: Install on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 90
@@ -49,6 +69,7 @@ jobs:
             MultiGWAS-Explorer/example-output/
 
   windows:
+    needs: preflight
     runs-on: windows-2022
     timeout-minutes: 90
     steps:
@@ -57,6 +78,9 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+      - name: Check CPAN downloader selection
+        shell: bash
+        run: bash MultiGWAS-Explorer/install/test_cpan_downloader.sh
       - name: Install portable Cygwin and pipeline
         shell: powershell
         run: |
@@ -79,6 +103,7 @@ jobs:
             MultiGWAS-Explorer/example-output/
 
   docker:
+    needs: preflight
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     steps:
@@ -96,6 +121,7 @@ jobs:
           path: docker-build.log
 
   apptainer:
+    needs: preflight
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     steps:

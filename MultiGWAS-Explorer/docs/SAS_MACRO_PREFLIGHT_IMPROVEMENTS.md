@@ -78,3 +78,7 @@ it cannot promote stale evidence to a passing result.
 Runtime logs, credentials, automatic GWAS configurations and generated benchmark
 outputs are excluded from this source update. No Python evaluation scripts are
 required.
+
+The later [2026-11-03 adaptation record](SAS_ODA_ADAPTATION_20261103.md) covers
+the Windows CPAN downloader fix, cache-only GTEx alternative and Explorer's own
+500-case round10 validation.
