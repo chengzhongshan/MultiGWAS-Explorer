@@ -11,6 +11,7 @@ tools/
 /tools/*
 !/tools/build_library500_round10.pl
 !/tools/subset_gtex_expression.pl
+!/tools/profile_sas_source.pl
 !/tools/lib/
 /tools/lib/*
 !/tools/lib/Library_Evaluation_Corpus.pm

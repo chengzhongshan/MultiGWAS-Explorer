@@ -105,6 +105,7 @@ perl DiffGWASDeps/test_sas_oda_connection_lifecycle.pl >/dev/null
 perl DiffGWASDeps/test_sas_oda_upload_timeout.pl >/dev/null
 perl DiffGWASDeps/test_sas_include_preflight_lookup.pl >/dev/null
 perl DiffGWASDeps/test_sas_oda_cygwin_lock.pl >/dev/null
+"${BASH:-bash}" install/check_sas_runtime.sh
 perl -I DiffGWASDeps -c auto_prepare_and_run_diff_gwas.pl >/dev/null
 perl -c auto_prepare_and_run_diff_gwas_with_gnuplot.pl >/dev/null
 perl -I DiffGWASDeps -c server.pl >/dev/null

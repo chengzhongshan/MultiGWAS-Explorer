@@ -32,6 +32,8 @@ jobs:
         run: perl tests/test_local_sas_home.pl
       - name: Check Windows COM submit thread ownership
         run: perl tests/test_sas_com_threading.pl
+      - name: Check SAS runtime performance and transfer regressions
+        run: bash install/check_sas_runtime.sh
 
   unix:
     needs: preflight

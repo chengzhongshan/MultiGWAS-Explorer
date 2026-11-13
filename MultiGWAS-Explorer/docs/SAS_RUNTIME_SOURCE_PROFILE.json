@@ -1,0 +1,240 @@
+{
+   "all_nine_result_hashes_unchanged" : true,
+   "live_runtime_smoke" : {
+      "bulk_rpc_count" : 2,
+      "harness_note" : "Initial console-marker assertion was corrected to inspect the actual retained SAS log; completed job was verified without rerunning it.",
+      "remote_cleanup" : true,
+      "roundtrip_files" : 2,
+      "sas_completion_marker" : true,
+      "sas_errors" : 0,
+      "scope" : "Actual MultiGWAS canonical CLI; fresh persistent ODA session; syntax preflight enabled; two-file archive upload/download; no full GWAS pipeline or runtime benchmark",
+      "sha256_roundtrips_identical" : true,
+      "success" : true,
+      "test_helper_shutdown" : true
+   },
+   "profiles" : [
+      {
+         "files" : [
+            {
+               "file" : "clustergram.sas",
+               "measurements" : [
+                  {
+                     "median_seconds" : 0.144433975219727,
+                     "operation" : "analyze_source",
+                     "result_sha256" : "da333141f5221627214065f1aded770744582243df4f7cda6d5d19fb380319cc",
+                     "seconds" : [
+                        0.144433975219727
+                     ]
+                  },
+                  {
+                     "median_seconds" : 0.455219984054565,
+                     "operation" : "macro_dependency_view",
+                     "result_sha256" : "fa8f226326afa769f8ee706d14d07147795294c88c1edf3793b9640e49760da2",
+                     "seconds" : [
+                        0.455219984054565
+                     ]
+                  },
+                  {
+                     "median_seconds" : 0.785013198852539,
+                     "operation" : "include_targets",
+                     "result_sha256" : "a850094015bea1c7702a678c3bf262730231c8cd7c32eac049568be526db4633",
+                     "seconds" : [
+                        0.785013198852539
+                     ]
+                  }
+               ],
+               "source_bytes" : 57624,
+               "source_sha256" : "9adcb7c5c88902d2e3c1d101edb3f7d2ee6d431c5e0bd9656adbc3b8e003be18"
+            },
+            {
+               "file" : "gene_gtf.sas",
+               "measurements" : [
+                  {
+                     "median_seconds" : 1.13208699226379,
+                     "operation" : "analyze_source",
+                     "result_sha256" : "ddbea16ffbaf518d9c0a9059bb7ce2b678bf83c23385522fa8c0d94ea7ba6383",
+                     "seconds" : [
+                        1.13208699226379
+                     ]
+                  },
+                  {
+                     "median_seconds" : 8.82070207595825,
+                     "operation" : "macro_dependency_view",
+                     "result_sha256" : "e6871e7470ef67b4861750b3706de1084db27360e543217eef22ffab5f6a4d56",
+                     "seconds" : [
+                        8.82070207595825
+                     ]
+                  },
+                  {
+                     "median_seconds" : 15.6898748874664,
+                     "operation" : "include_targets",
+                     "result_sha256" : "56fd96829e3815f7d98ede51307b77871926d190b81cd2c999da1a2e1b95dfd2",
+                     "seconds" : [
+                        15.6898748874664
+                     ]
+                  }
+               ],
+               "source_bytes" : 380785,
+               "source_sha256" : "021235ad50dc42b7c5ec8e53cf9e7e76d8a551604e8bc067bc3ae7877ad33783"
+            },
+            {
+               "file" : "forest.sas",
+               "measurements" : [
+                  {
+                     "median_seconds" : 1.14500188827515,
+                     "operation" : "analyze_source",
+                     "result_sha256" : "d151e552a429e4f6eba769a2b0471a96bdf725e2cc71aadd479ac351c5a92eec",
+                     "seconds" : [
+                        1.14500188827515
+                     ]
+                  },
+                  {
+                     "median_seconds" : 7.75048899650574,
+                     "operation" : "macro_dependency_view",
+                     "result_sha256" : "a89546951998c271666957e65e36c8454aacb05314f98e3ee16db5110898e63e",
+                     "seconds" : [
+                        7.75048899650574
+                     ]
+                  },
+                  {
+                     "median_seconds" : 14.2055881023407,
+                     "operation" : "include_targets",
+                     "result_sha256" : "4680d3b0f8934af12ae3010d25993730245a78ccff8318319b9ca4c6e7cf67a2",
+                     "seconds" : [
+                        14.2055881023407
+                     ]
+                  }
+               ],
+               "source_bytes" : 375348,
+               "source_sha256" : "3661e1785b9513dd1448011fbd89136911a1b60d719865470b57df36b0c45df2"
+            }
+         ],
+         "perl_version" : "v5.40.3",
+         "platform" : "cygwin",
+         "repeat" : 1,
+         "scope" : "Local Perl source inspection. Timings exclude result hashing, SAS execution, network transfers and model requests.",
+         "stage" : "before"
+      },
+      {
+         "files" : [
+            {
+               "file" : "clustergram.sas",
+               "measurements" : [
+                  {
+                     "median_seconds" : 0.133856058120728,
+                     "operation" : "analyze_source",
+                     "result_sha256" : "da333141f5221627214065f1aded770744582243df4f7cda6d5d19fb380319cc",
+                     "seconds" : [
+                        0.134044170379639,
+                        0.133856058120728,
+                        0.132821798324585
+                     ]
+                  },
+                  {
+                     "median_seconds" : 0.142935991287231,
+                     "operation" : "macro_dependency_view",
+                     "result_sha256" : "fa8f226326afa769f8ee706d14d07147795294c88c1edf3793b9640e49760da2",
+                     "seconds" : [
+                        0.142935991287231,
+                        0.14104700088501,
+                        0.151103973388672
+                     ]
+                  },
+                  {
+                     "median_seconds" : 0.145326137542725,
+                     "operation" : "include_targets",
+                     "result_sha256" : "a850094015bea1c7702a678c3bf262730231c8cd7c32eac049568be526db4633",
+                     "seconds" : [
+                        0.142888069152832,
+                        0.145326137542725,
+                        0.149068117141724
+                     ]
+                  }
+               ],
+               "source_bytes" : 57624,
+               "source_sha256" : "9adcb7c5c88902d2e3c1d101edb3f7d2ee6d431c5e0bd9656adbc3b8e003be18"
+            },
+            {
+               "file" : "gene_gtf.sas",
+               "measurements" : [
+                  {
+                     "median_seconds" : 1.1081690788269,
+                     "operation" : "analyze_source",
+                     "result_sha256" : "ddbea16ffbaf518d9c0a9059bb7ce2b678bf83c23385522fa8c0d94ea7ba6383",
+                     "seconds" : [
+                        1.11804604530334,
+                        1.1081690788269,
+                        1.08369493484497
+                     ]
+                  },
+                  {
+                     "median_seconds" : 1.17045092582703,
+                     "operation" : "macro_dependency_view",
+                     "result_sha256" : "e6871e7470ef67b4861750b3706de1084db27360e543217eef22ffab5f6a4d56",
+                     "seconds" : [
+                        1.17045092582703,
+                        1.17265295982361,
+                        1.14786696434021
+                     ]
+                  },
+                  {
+                     "median_seconds" : 1.14426898956299,
+                     "operation" : "include_targets",
+                     "result_sha256" : "56fd96829e3815f7d98ede51307b77871926d190b81cd2c999da1a2e1b95dfd2",
+                     "seconds" : [
+                        1.14426898956299,
+                        1.14985918998718,
+                        1.1346480846405
+                     ]
+                  }
+               ],
+               "source_bytes" : 380785,
+               "source_sha256" : "021235ad50dc42b7c5ec8e53cf9e7e76d8a551604e8bc067bc3ae7877ad33783"
+            },
+            {
+               "file" : "forest.sas",
+               "measurements" : [
+                  {
+                     "median_seconds" : 1.09017014503479,
+                     "operation" : "analyze_source",
+                     "result_sha256" : "d151e552a429e4f6eba769a2b0471a96bdf725e2cc71aadd479ac351c5a92eec",
+                     "seconds" : [
+                        1.08459687232971,
+                        1.11448407173157,
+                        1.09017014503479
+                     ]
+                  },
+                  {
+                     "median_seconds" : 1.13891410827637,
+                     "operation" : "macro_dependency_view",
+                     "result_sha256" : "a89546951998c271666957e65e36c8454aacb05314f98e3ee16db5110898e63e",
+                     "seconds" : [
+                        1.12242484092712,
+                        1.13891410827637,
+                        1.14624404907227
+                     ]
+                  },
+                  {
+                     "median_seconds" : 1.12325620651245,
+                     "operation" : "include_targets",
+                     "result_sha256" : "4680d3b0f8934af12ae3010d25993730245a78ccff8318319b9ca4c6e7cf67a2",
+                     "seconds" : [
+                        1.12325620651245,
+                        1.12003111839294,
+                        1.13421607017517
+                     ]
+                  }
+               ],
+               "source_bytes" : 375348,
+               "source_sha256" : "3661e1785b9513dd1448011fbd89136911a1b60d719865470b57df36b0c45df2"
+            }
+         ],
+         "perl_version" : "v5.40.3",
+         "platform" : "cygwin",
+         "repeat" : 3,
+         "scope" : "Local Perl source inspection. Timings exclude result hashing, SAS execution, network transfers and model requests.",
+         "stage" : "after"
+      }
+   ],
+   "scope" : "Local MultiGWAS source inspection; before=one sample, after=median of three. No SAS execution, network, agent-token or complete pipeline timing."
+}

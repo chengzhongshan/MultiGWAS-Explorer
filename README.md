@@ -32,6 +32,10 @@ For reproducible example for running diagnostics and scientific checks, particul
 genome-wide/local Manhattan plots, local GTF plot, and forest plot, see the
 [debugging guide](MultiGWAS-Explorer/README4Debugging.md).
 
+For slow SAS requests or file transfers, the
+[SAS runtime performance guide](MultiGWAS-Explorer/docs/SAS_RUNTIME_PERFORMANCE.md)
+records the MCP4SAS fixes ported to this project and the offline regression commands.
+
 ## Try a local example
 
 After installing:

@@ -1,0 +1,94 @@
+{
+   "date" : "2026-11-12",
+   "files" : [
+      {
+         "adaptation" : "byte-identical",
+         "path" : "DiffGWASDeps/SAS_Source_Analysis.pm",
+         "sha256" : "6ff294fd0387df75839c1d21bb38f9beb0ddb57023971dde56b3397d3cfe551f",
+         "upstream_path" : "MCPDeps/SAS_Source_Analysis.pm",
+         "upstream_sha256" : "6ff294fd0387df75839c1d21bb38f9beb0ddb57023971dde56b3397d3cfe551f"
+      },
+      {
+         "adaptation" : "byte-identical",
+         "path" : "DiffGWASDeps/sas_archive_transfer.py",
+         "sha256" : "59429641581f084f54b0230507d72e662cfa6318bce3e8c489d6c132e53c6e20",
+         "upstream_path" : "MCPDeps/sas_archive_transfer.py",
+         "upstream_sha256" : "59429641581f084f54b0230507d72e662cfa6318bce3e8c489d6c132e53c6e20"
+      },
+      {
+         "adaptation" : "targeted port; existing GWAS temporary-directory and local SAS integration preserved",
+         "path" : "DiffGWASDeps/SAS_ODA_Runner.pm",
+         "sha256" : "4a855725c4d224444c289e7a4a5b9204afb0b8ab0b839f33ca219948a4e666a9",
+         "upstream_path" : "MCPDeps/SAS_ODA_Runner.pm",
+         "upstream_sha256" : "5cbb9a470d69b2ce18e5e4dc1d6909158bcb9e9158c792306b5bb9d021c555db"
+      },
+      {
+         "adaptation" : "dynamic include guard only; canonical CLI preserved",
+         "path" : "run_sas_codes_or_script_in_ODA.pl",
+         "sha256" : "83a0f698790361b4bd74784bca2d46bb765ced51abf1ac26b800eb3fb6f4e643",
+         "upstream_path" : "run_sas_codes_or_script_in_ODA.pl",
+         "upstream_sha256" : "580bcad2eab4798362bee92a6aa49eeeb813900bb849ec7c73c4d14595324d6c"
+      },
+      {
+         "adaptation" : "filename probe guard applied at this project actual MCP dispatch boundary",
+         "path" : "DiffGWASDeps/SAS_ODA_MCP.pm",
+         "sha256" : "689e9eced3931d9504096b0adb2434974203a614c4e06968043a2fe5d3e1164a",
+         "upstream_path" : "server.pl",
+         "upstream_sha256" : "7f64363513048a22fdcdfde48e589134207c5fc18a0352d62e7642eae277134f"
+      },
+      {
+         "adaptation" : "module directory adapted to DiffGWASDeps",
+         "path" : "tools/profile_sas_source.pl",
+         "sha256" : "5b3ee615236b1115bf30dac361116596ce286cca054f1d8775ae87cc1270a533",
+         "upstream_path" : "tools/profile_sas_source.pl",
+         "upstream_sha256" : "704bc3ad17d088f0e037d782928bee4a612b644186e9cf119819ad0ed82c8c19"
+      },
+      {
+         "adaptation" : "module directory adapted to DiffGWASDeps",
+         "path" : "tests/test_poc_input_boundaries.pl",
+         "sha256" : "ad18bad9f9a39e65391d212653535c3449be344a6ba7608846446b7ba1f008e9",
+         "upstream_path" : "tests/test_poc_input_boundaries.pl",
+         "upstream_sha256" : "5061a8df0ec588523f7b523cededfbd36539530218b6820adb4437fbb6a5c5c6"
+      },
+      {
+         "adaptation" : "module directory adapted to DiffGWASDeps",
+         "path" : "tests/test_sas_supplied_autocall.pl",
+         "sha256" : "166d0133b469e8098fddcc50ccf9f053325d4cee4fa447627a8fd921f852ca81",
+         "upstream_path" : "tests/test_sas_supplied_autocall.pl",
+         "upstream_sha256" : "12b710acd31117712ce8dc252da8261978746eebc5601eb864110702ed90dd03"
+      },
+      {
+         "adaptation" : "module directory adapted to DiffGWASDeps",
+         "path" : "tests/test_literal_execution_contexts.pl",
+         "sha256" : "027d49923140f2b8e32313df4e34e38fb3c07c239a1dafe1a66d489097d705f0",
+         "upstream_path" : "tests/test_literal_execution_contexts.pl",
+         "upstream_sha256" : "4b78b8fd4c71596fc5ee28419f575ad2fad3686692fbd649492c89431f80fb15"
+      },
+      {
+         "adaptation" : "module directory adapted to DiffGWASDeps",
+         "path" : "tests/test_python_path_boundary.pl",
+         "sha256" : "efc2832f90e1fc224e6b7c3b8974e4f759bbd0399f3c64399ae18615d4500202",
+         "upstream_path" : "tests/test_python_path_boundary.pl",
+         "upstream_sha256" : "b0d8fd756c1f12bb3b5efa976e7195568e58fc0485ab811dfe747172ab3ee475"
+      },
+      {
+         "adaptation" : "module directory adapted to DiffGWASDeps",
+         "path" : "tests/test_persistent_archive.py",
+         "sha256" : "524e3f8cf3aef617a2f0abeff2ff8ed08eb0f1ae8f0d195ec3eff8e43168c6b4",
+         "upstream_path" : "tests/test_persistent_archive.py",
+         "upstream_sha256" : "33dfd8afaa867547def89818c15205b788c97c09e8bb7931a4679a5fdca12085"
+      }
+   ],
+   "persistent_protocol" : "2026-11-12-persistent-archive",
+   "preservation" : "No original scientific macros, GWAS calculations, LD selection, plot parameters or generated user configurations were modified.",
+   "project_specific_regressions" : [
+      "tests/test_runner_preflight_parity.pl",
+      "tests/test_persistent_bulk_dispatch.pl",
+      "tests/test_one_shot_status_path.pl",
+      "install/check_sas_runtime.sh"
+   ],
+   "target_base" : "d10985a74b5ae3e6bc4840a7578f8f07c6c79a36",
+   "target_repository" : "https://github.com/chengzhongshan/MultiGWAS-Explorer",
+   "upstream_commit" : "351e7905908dc026f65ddc2da712467d6ccc7812",
+   "upstream_repository" : "https://github.com/chengzhongshan/MCP4SAS"
+}

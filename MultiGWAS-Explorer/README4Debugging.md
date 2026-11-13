@@ -1,5 +1,15 @@
 # Debugging the AOA GWAS comparison pipeline
 
+## 2026-11-12: SAS submission and transfer performance
+
+The MCP4SAS runtime fixes are now ported to this pipeline: persistent ZIP
+batching, batched metadata, faster source inspection, deferred runtime include
+paths, supplied autocall classification and Windows status-path conversion.
+See [the SAS runtime guide](docs/SAS_RUNTIME_PERFORMANCE.md) for the exact source
+versions, diagnostic sequence, measurements and scope of validation. Run
+`bash install/check_sas_runtime.sh` for the offline regressions. Preserve the
+canonical runner and its thin compatibility aliases when changing this path.
+
 ## 2026-11-05: genome-wide track-label sizing
 
 Both drivers now export `MANHATTAN_GWAS_LABEL_SIZE` and

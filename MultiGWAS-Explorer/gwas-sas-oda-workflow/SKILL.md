@@ -760,4 +760,15 @@ For a new project, copy/adapt the script templates in this skill's `scripts/` fo
 
 ## References
 
+For slow SAS submission or collection, read `docs/SAS_RUNTIME_PERFORMANCE.md`
+from the pipeline root. Distinguish local source inspection, transfer metadata,
+actual SAS submit and result collection using timestamps. Confirm that the
+actual persistent RPC is `bulk_transfer`, not only that the archive flag is
+enabled. Profile frozen SAS source with `tools/profile_sas_source.pl`; preserve
+dependency-result hashes as well as timings. This project uses
+`run_sas_codes_or_script_in_ODA.pl` as the canonical runner, with thin aliases;
+the MCP argument dispatcher is `DiffGWASDeps/SAS_ODA_MCP.pm`. Run
+`bash install/check_sas_runtime.sh` after edits. Keep original warnings visible
+and do not disable validation or change scientific calculations for speed.
+
 Read `references/tooling-strategy.md` when deciding whether a workflow step belongs in a Codex skill, a project script, or a new Perl MCP server tool.
