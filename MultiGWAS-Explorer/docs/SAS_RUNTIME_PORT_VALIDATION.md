@@ -8,7 +8,7 @@ Credentials, account paths and raw protocol captures remain local.
 ## Passing checks
 
 - `bash install/check_sas_runtime.sh`: all 20 Perl files passed, with 278
-  top-level assertions, plus all 10 Python archive tests. The check includes
+  top-level assertions in the initial run, plus all 10 Python archive tests. The check includes
   one-shot failure reporting, actual Cygwin/native file I/O, supplied/custom
   macro classification, literal contexts, include ordering, alias delegation,
   persistent bulk RPC, local homes and Windows COM thread ownership.
@@ -76,6 +76,13 @@ modules into an isolated temporary runner directory without an installed
 environment. This preserves the actual launcher code while preventing a real
 SAS connection attempt. The correction changes the test, not production
 connection behavior or a scientific example.
+
+The next CI run passed Ubuntu installation and the archive tests inside Docker,
+then exposed a Docker-context omission: `tools/` was excluded wholesale, hiding
+the new profiler. The context now excludes `tools/*` with a narrow profiler
+exception, retaining the exclusion of downloaded build tools. Two packaging
+assertions were added to the runner-boundary suite (280 focused assertions in
+the resulting suite). This is a packaging fix; SAS execution code is unchanged.
 
 ## Scope
 

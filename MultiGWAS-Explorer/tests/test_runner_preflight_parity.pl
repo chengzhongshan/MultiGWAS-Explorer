@@ -19,4 +19,8 @@ for my $alias (qw(run_sas_codes_or_file_in_ODA.pl run_sas_codes_or_files_in_ODA.
 like(source('DiffGWASDeps/SAS_ODA_MCP.pm'),
     qr/is_local_file_candidate\(\$sas_input\).*?-f \$sas_input/s,
     'MCP dispatch guards its actual source-versus-file probe');
+like(source('.dockerignore'), qr/^!tools\/profile_sas_source\.pl\s*$/m,
+    'Docker context includes the runtime profiler');
+unlike(source('.dockerignore'), qr/^tools\/\s*$/m,
+    'Docker does not exclude the parent directory needed for the profiler exception');
 done_testing();

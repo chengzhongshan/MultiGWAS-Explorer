@@ -5,7 +5,8 @@ $log
 NUL
 
 install/vagrant/ubuntu/.vagrant/
-tools/
+tools/*
+!tools/profile_sas_source.pl
 
 run_local_hits_*/
 run_manhattan_*/
