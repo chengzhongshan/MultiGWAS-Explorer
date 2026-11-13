@@ -8,6 +8,7 @@ use File::Spec;
 use File::Temp qw(tempdir);
 use File::Path qw(make_path);
 use File::Copy qw(copy);
+use Cwd qw(getcwd);
 use IPC::Open3;
 use Symbol qw(gensym);
 use Test::More;
@@ -44,9 +45,12 @@ for my $case (
 ) {
     my ($name, @args) = @$case;
     my $error = gensym;
+    my $original_dir = getcwd();
+    chdir $fixture or die $!; # The installed source may be a read-only SIF.
     my $pid = open3(my $in, my $out, $error, $^X,
         $cli, @args,
         '--output-prefix', File::Spec->catdir($root, $name), '--run-timeout-seconds', 20);
+    chdir $original_dir or die $!;
     close $in;
     my $captured = (do {local $/; <$out>} // '') . (do {local $/; <$error>} // '');
     waitpid($pid, 0);

@@ -19,6 +19,12 @@ for test in \
   perl "tests/${test}.pl"
 done
 "${runtime_python}" tests/test_persistent_archive.py
-"${runtime_python}" -m py_compile DiffGWASDeps/sas_oda_session_server.py DiffGWASDeps/sas_archive_transfer.py
+"${runtime_python}" - <<'PY'
+from pathlib import Path
+# Apptainer runs this check against a read-only SIF; do not write __pycache__.
+for name in ('DiffGWASDeps/sas_oda_session_server.py', 'DiffGWASDeps/sas_archive_transfer.py'):
+    compile(Path(name).read_bytes(), name, 'exec')
+print('Python runtime syntax: PASS (no cache writes)')
+PY
 perl -c tools/profile_sas_source.pl
 printf 'SAS runtime offline regressions: PASS\n'

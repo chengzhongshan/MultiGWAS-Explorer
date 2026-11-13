@@ -84,6 +84,12 @@ exception, retaining the exclusion of downloaded build tools. Two packaging
 assertions were added to the runner-boundary suite (280 focused assertions in
 the resulting suite). This is a packaging fix; SAS execution code is unchanged.
 
+Apptainer's read-only SIF test also exposed a fixture working-directory
+assumption: the copied CLI still inherited `/opt/MultiGWAS-Explorer` as its
+scratch root. The child now runs from its owned temporary fixture directory.
+The runtime syntax check uses Python's compile function without writing a
+bytecode cache, so verification also works against read-only installed source.
+
 ## Scope
 
 The original working checkout's edited generated configurations and retained
