@@ -68,6 +68,15 @@ and dependency smoke checks. Platform/container outcomes must be read from
 the actual GitHub Actions run for the published commit; this report does not
 infer those results from the workflow definition.
 
+The first fresh-install CI run exposed a fixture isolation problem in the new
+one-shot diagnostic test. Installed site-packages take precedence over its
+PYTHONPATH stub, so the test accidentally loaded real SASPy instead of the
+intended failure stub. The fixture now copies the unchanged CLI and dependency
+modules into an isolated temporary runner directory without an installed
+environment. This preserves the actual launcher code while preventing a real
+SAS connection attempt. The correction changes the test, not production
+connection behavior or a scientific example.
+
 ## Scope
 
 The original working checkout's edited generated configurations and retained

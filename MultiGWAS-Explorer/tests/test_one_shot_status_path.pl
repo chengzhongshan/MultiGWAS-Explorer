@@ -6,6 +6,8 @@ use lib "$Bin/../DiffGWASDeps";
 use SAS_ODA_Runner;
 use File::Spec;
 use File::Temp qw(tempdir);
+use File::Path qw(make_path);
+use File::Copy qw(copy);
 use IPC::Open3;
 use Symbol qw(gensym);
 use Test::More;
@@ -13,6 +15,19 @@ use Test::More;
 # Execute the actual one-shot CLI with an intentionally failing SASPy stub.
 # No SAS account, Java process or network connection is used.
 my $root = tempdir('one shot status XXXX', TMPDIR => 1, CLEANUP => 1);
+# A configured checkout prepends its installed site-packages to PYTHONPATH.
+# Copy the real CLI/modules into a fixture without that environment so the
+# intended stub cannot be shadowed by real SASPy during an installer check.
+my $fixture = File::Spec->catdir($root, 'runner');
+my $deps = File::Spec->catdir($fixture, 'DiffGWASDeps');
+make_path($deps);
+my $cli = File::Spec->catfile($fixture, 'run_sas_codes_or_script_in_ODA.pl');
+copy("$Bin/../run_sas_codes_or_script_in_ODA.pl", $cli) or die $!;
+opendir my $modules, "$Bin/../DiffGWASDeps" or die $!;
+for my $name (grep { /\.pm\z/ } readdir $modules) {
+    copy("$Bin/../DiffGWASDeps/$name", File::Spec->catfile($deps, $name)) or die $!;
+}
+closedir $modules;
 open my $stub, '>', File::Spec->catfile($root, 'saspy.py') or die $!;
 print {$stub} "class SASsession:\n    def __init__(self, **kwargs):\n        raise RuntimeError('POC_STUB_CONNECTION_FAILURE')\n";
 close $stub;
@@ -30,7 +45,7 @@ for my $case (
     my ($name, @args) = @$case;
     my $error = gensym;
     my $pid = open3(my $in, my $out, $error, $^X,
-        "$Bin/../run_sas_codes_or_script_in_ODA.pl", @args,
+        $cli, @args,
         '--output-prefix', File::Spec->catdir($root, $name), '--run-timeout-seconds', 20);
     close $in;
     my $captured = (do {local $/; <$out>} // '') . (do {local $/; <$error>} // '');
