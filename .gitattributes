@@ -13,3 +13,6 @@ cpanfile text eol=lf
 # Preserve pinned visualization evidence bytes and hashes.
 MultiGWAS-Explorer/visualization/companion/** -text -whitespace
 MultiGWAS-Explorer/visualization/validation/** -text -whitespace
+
+# Preserve the upstream copyright notice's original spacing.
+MultiGWAS-Explorer/DiffGWASDeps/MCP4SAS-MIT-License.txt -whitespace

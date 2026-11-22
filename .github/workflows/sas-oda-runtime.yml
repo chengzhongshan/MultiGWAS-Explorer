@@ -2,9 +2,9 @@ name: SAS ODA runtime
 on:
   push:
     branches: [main, port/mcp4sas-runtime-20261121]
-    paths: ['MultiGWAS-Explorer/run_sas_codes_or*.pl', 'MultiGWAS-Explorer/DiffGWASDeps/*.pm', 'MultiGWAS-Explorer/DiffGWASDeps/*.py', 'MultiGWAS-Explorer/DiffGWASDeps/test_sas_*.pl', 'MultiGWAS-Explorer/tests/**', 'MultiGWAS-Explorer/install/check_sas_runtime.sh', '.github/workflows/sas-oda-runtime.yml']
+    paths: ['MultiGWAS-Explorer/run_sas_codes_or*.pl', 'MultiGWAS-Explorer/DiffGWASDeps/*.pm', 'MultiGWAS-Explorer/DiffGWASDeps/*.py', 'MultiGWAS-Explorer/DiffGWASDeps/test_sas_*.pl', 'MultiGWAS-Explorer/tests/**', 'MultiGWAS-Explorer/install/check_sas_runtime.sh', '.github/workflows/sas-oda-runtime.yml', '.gitattributes']
   pull_request:
-    paths: ['MultiGWAS-Explorer/run_sas_codes_or*.pl', 'MultiGWAS-Explorer/DiffGWASDeps/*.pm', 'MultiGWAS-Explorer/DiffGWASDeps/*.py', 'MultiGWAS-Explorer/DiffGWASDeps/test_sas_*.pl', 'MultiGWAS-Explorer/tests/**', 'MultiGWAS-Explorer/install/check_sas_runtime.sh', '.github/workflows/sas-oda-runtime.yml']
+    paths: ['MultiGWAS-Explorer/run_sas_codes_or*.pl', 'MultiGWAS-Explorer/DiffGWASDeps/*.pm', 'MultiGWAS-Explorer/DiffGWASDeps/*.py', 'MultiGWAS-Explorer/DiffGWASDeps/test_sas_*.pl', 'MultiGWAS-Explorer/tests/**', 'MultiGWAS-Explorer/install/check_sas_runtime.sh', '.github/workflows/sas-oda-runtime.yml', '.gitattributes']
   workflow_dispatch:
 permissions:
   contents: read
