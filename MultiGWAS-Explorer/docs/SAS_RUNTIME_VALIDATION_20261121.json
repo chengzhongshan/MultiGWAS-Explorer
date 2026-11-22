@@ -162,5 +162,16 @@
     ],
     "log_sha256": "a55d8527db6e1e342b8b922eb409befc995687d8aba92451141fcc30067e42e4",
     "scope": "Syntax and existing SDK fixture, not a live full Explorer HTTP/GWAS-server trial."
+  },
+  "validated_ci": {
+    "url": "https://github.com/chengzhongshan/MultiGWAS-Explorer/actions/runs/44989163496",
+    "commit": "e4a99ed0b2cb8b921ee860ac8bf69c32758e7865",
+    "result": "success",
+    "platforms": [
+      "Windows/Cygwin with native Python",
+      "macOS",
+      "Ubuntu"
+    ],
+    "scope": "Runtime/provenance revision; subsequent live-test skip guard was also checked locally."
   }
 }
