@@ -25,6 +25,7 @@ BEGIN {
     lib->import("$self_dir/DiffGWASDeps");
 }
 use Getopt::Long qw(GetOptions);
+use SAS_Runtime_Selection;
 use JSON::PP qw(decode_json encode_json);
 use IO::Uncompress::Gunzip qw($GunzipError);
 use Digest::MD5 qw(md5_hex);
@@ -140,6 +141,7 @@ my $include_x_chr;
 my $sas_oda_account_override = '';
 my $sas_oda_password_override = '';
 my $prompt_sas_oda_auth_override = 0;
+my ($saspy_cfgname_override, $saspy_cfgfile_override, $local_sas_home_override);
 my $emit_local_sas_scripts = 0;
 my $local_sas_only = 0;
 my $local_gtf_label_snps_override = '';
@@ -283,6 +285,9 @@ GetOptions(
     'sas-oda-account=s' => \$sas_oda_account_override,
     'sas-oda-password=s' => \$sas_oda_password_override,
     'prompt-sas-oda-auth!' => \$prompt_sas_oda_auth_override,
+    'saspy-cfgname=s' => \$saspy_cfgname_override,
+    'saspy-cfgfile=s' => \$saspy_cfgfile_override,
+    'dir4local_sas_home|local-sas-home=s' => \$local_sas_home_override,
     'emit-local-sas-scripts!' => \$emit_local_sas_scripts,
     'local-sas-only!' => \$local_sas_only,
     'local-gtf-label-snps=s' => \$local_gtf_label_snps_override,
@@ -648,6 +653,15 @@ my $artifact_stem = cfg_or($spec, 'artifact_stem', cfg_or($spec, 'project_tag', 
 my $project_tag = cfg_or($spec, 'project_tag', $artifact_stem);
 my $input_dir = normalize_unix_path(cfg_or($spec, 'input_dir', ''));
 my $output_dir = normalize_unix_path(cfg_or($spec, 'output_dir', $input_dir || $workdir));
+my $sas_runtime = SAS_Runtime_Selection::resolve(
+    cli => { cfgname => $saspy_cfgname_override, cfgfile => $saspy_cfgfile_override,
+             home => $local_sas_home_override },
+    spec => $spec, env => \%ENV, output_dir => $output_dir, artifact_stem => $artifact_stem,
+);
+@ENV{keys %$sas_runtime} = values %$sas_runtime;
+print "[sas] Requested SASPy profile: $sas_runtime->{SASPY_CFGNAME} (no cross-profile fallback)\n";
+print "[sas] Shared local staging home: $sas_runtime->{SAS_LOCAL_HOME_DIR}\n"
+    if length $sas_runtime->{SAS_LOCAL_HOME_DIR};
 my $source_mode = cfg_or($spec, 'source_mode', 'raw_pgc_vcf_sumstats');
 # EAS versus EAS+EUR illustrates why calculated meta-analysis must be opt-in:
 # one input can already contain participants from the other input.
@@ -1026,6 +1040,7 @@ my $runner_cfg = build_runner_config(
 
 $runner_cfg->{GTF_LD_R2_CACHE_BY_SNP} = { %local_ld_cache_by_snp }
     if %local_ld_cache_by_snp;
+@{$runner_cfg}{keys %$sas_runtime} = values %$sas_runtime;
 if (%common_ld_artifacts) {
     $runner_cfg->{TOP_HIT_LD_LEADS_TSV} = $common_ld_artifacts{leads};
     $runner_cfg->{TOP_HIT_LD_AUDIT_LOCAL_TSV} = $common_ld_artifacts{audit};
@@ -5601,6 +5616,19 @@ Options:
                        annotations. Accepted values: hg19, hg38, t2t. When
                        omitted, the pipeline first looks for build tokens in
                        input filenames and headers, then falls back to hg38.
+  --saspy-cfgname NAME Select a SASPy profile explicitly: oda (default),
+                       winlocal, winlocal_com, or linuxlocal. No retry to ODA
+                       occurs if the requested local connection fails.
+  --saspy-cfgfile FILE
+                       SASPy configuration for the selected profile. Requires
+                       SASPy and a licensed SAS installation for local profiles.
+  --local-sas-home DIR
+  --dir4local_sas_home DIR
+                       Dedicated local staging folder shared by upload, plot,
+                       download and cleanup steps. Defaults to a project
+                       subdirectory under output_dir for known local profiles.
+                       This executes local SAS; --local-sas-only remains the
+                       separate option to emit scripts without executing them.
   --sas-oda-account EMAIL
   --sas-oda-password PASS
                        Optional noninteractive SAS ODA credential bootstrap for

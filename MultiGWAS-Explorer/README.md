@@ -98,6 +98,13 @@ opening controls. All existing runner spellings delegate to the same canonical
 CLI. The [source manifest](docs/SAS_RUNTIME_PORT_MANIFEST.json) records the exact
 upstream version and project adaptations.
 
+The workflow also accepts **explicit local Windows or Linux SAS selection**:
+`--saspy-cfgname winlocal` or `--saspy-cfgname linuxlocal`, together with the
+matching `--saspy-cfgfile`. ODA remains the default. See
+[selecting the SAS runtime](docs/SELECT_SAS_RUNTIME.md) for commands, shared
+staging folders and persistent-session isolation. `--local-sas-only` retains
+its separate meaning of emitting debug scripts without executing them.
+
 ### Import an existing AOA combined / meta-analysis table
 
 Use `--input-merged` to select one existing table directly, without supplying

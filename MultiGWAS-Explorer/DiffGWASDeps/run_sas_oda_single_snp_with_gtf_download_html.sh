@@ -214,7 +214,13 @@ case "${REFERENCE_BUILD}" in
 esac
 
 GTF_DSD="${GTF_DSD:-${DEFAULT_GTF_DSD}}"
-FM_LIBPATH="${FM_LIBPATH:-/home/cheng.zhong.shan/my_shared_file_links/cheng.zhong.shan/F_vs_M_Covid19_Hosp}"
+# Local SAS has no ODA shared-library directory. Resolve its configured HOME
+# inside SAS, after the runner has created the dedicated staging directory.
+if [[ -n "${SAS_LOCAL_HOME_DIR:-}" ]]; then
+  FM_LIBPATH="${FM_LIBPATH:-%sysfunc(pathname(HOME))}"
+else
+  FM_LIBPATH="${FM_LIBPATH:-/home/cheng.zhong.shan/my_shared_file_links/cheng.zhong.shan/F_vs_M_Covid19_Hosp}"
+fi
 GTF_LOCAL_DSD="${GTF_LOCAL_DSD:-${DEFAULT_GTF_LOCAL_DSD}}"
 GTF_GZ_URL="${GTF_GZ_URL:-${DEFAULT_GTF_GZ_URL}}"
 SNP_LOCAL_MACRO_SAS="${SNP_LOCAL_MACRO_SAS:-${DEPS_DIR}/SNP_Local_Manhattan_With_GTF.sas}"
@@ -1491,7 +1497,7 @@ done
 echo "[6/6] Downloading HTML result..."
 rm -f "${HTML_OUT}" "${RAW_HTML_OUT}" "${PNG_OUT}"
 remote_png_path="$(
-  perl -ne 'if(/The final figure is put here:/){$want=1; next} if($want && m{(/home/\S+\.(?:png|jpg|jpeg|svg))}){print $1; exit}' "${RUN_LOG_FILE}" 2>/dev/null || true
+  perl "${DEPS_DIR}/extract_sas_figure_path.pl" "${RUN_LOG_FILE}" 2>/dev/null || true
 )"
 download_manifest=(
   --download-file "~/${OUTPUT_HTML_BASENAME}"

@@ -1473,7 +1473,7 @@ sub _autoload_macros_enabled {
 
 my $SERVER_HOST = '127.0.0.1';
 my $SERVER_PORT = int($ENV{SAS_ODA_SESSION_PORT} // 8765);
-my $SERVER_API_VERSION = '2026-11-12-persistent-archive';
+my $SERVER_API_VERSION = '2026-11-21-explicit-sas-target';
 my $SERVER_CONNECT_TIMEOUT_SECONDS = int($ENV{SAS_ODA_SESSION_CONNECT_TIMEOUT_SECONDS} // 5);
 my $SERVER_CREATE_TIMEOUT_SECONDS  = int($ENV{SAS_ODA_SESSION_CREATE_TIMEOUT_SECONDS} // 60);
 my $SERVER_FILEOP_TIMEOUT_SECONDS  = int($ENV{SAS_ODA_SESSION_FILEOP_TIMEOUT_SECONDS} // 20);
@@ -1672,7 +1672,7 @@ sub _remember_uploaded_file_match {
 # is missing. Keep it in sync with the standalone sas_oda_session_server.py file.
 my $SERVER_PY = <<'END_SERVER_PY';
 #!/usr/bin/env python3
-import socket, threading, json, struct, time, sys, traceback
+import socket, threading, json, struct, time, sys, traceback, hashlib
 from saspy import SASsession
 import os
 import shutil
@@ -1680,8 +1680,10 @@ import tempfile
 from datetime import datetime
 HOST = '127.0.0.1'
 PORT = int(os.environ.get('SAS_ODA_SESSION_PORT', '8765'))
-SERVER_API_VERSION = '2026-11-12-persistent-archive'
+SERVER_API_VERSION = '2026-11-21-explicit-sas-target'
 sessions = {}
+session_configs = {}
+session_homes = {}
 session_macros_loaded = {}
 session_macro_bootstrap_warning = {}
 session_macro_bootstrap_meta = {}
@@ -1734,7 +1736,11 @@ def iter_saspy_cfg_names():
         return
     for name in ('oda', 'default'):
         yield name
-def open_sas_session():
+def open_sas_session(config=None):
+    if config is not None:
+        # A request's explicit target is independent of the first client's
+        # environment. Never retry a failed local profile using ODA.
+        return SASsession(cfgname=config['cfgname'], results='html', cfgfile=config['cfgfile'] or None)
     last_exc = None
     for cfgname in iter_saspy_cfg_names():
         try:
@@ -1876,7 +1882,8 @@ def write_text_artifact(path, text):
         fh.write(text or '')
 def create_session(session_id):
     log_event(f"create_session start session_id={session_id}")
-    sess = open_session_with_diagnostics(open_sas_session)
+    sess = open_session_with_diagnostics(lambda: open_sas_session(session_configs.get(session_id)))
+    configure_local_home(sess, session_homes.get(session_id, ''))
     session_macros_loaded[session_id] = False
     session_macro_bootstrap_warning[session_id] = False
     session_macro_bootstrap_meta[session_id] = {}
@@ -2375,6 +2382,16 @@ def handle_client(conn, addr):
         req = json.loads(data.decode('utf-8'))
         cmd = req.get('cmd')
         session_id = req.get('session_id')
+        if session_id and isinstance(req.get('sas_config'), dict):
+            config = {key: str(req['sas_config'].get(key) or '') for key in ('cfgname', 'cfgfile')}
+            config['cfgname'] = config['cfgname'] or 'oda'
+            # The same caller-facing session ID may be used for ODA and local
+            # SAS without reusing WORK or an authenticated connection across them.
+            digest = hashlib.sha256(json.dumps(config, sort_keys=True).encode('utf-8')).hexdigest()[:20]
+            session_id = str(session_id) + '__target_' + digest
+            with lock:
+                session_configs[session_id] = config
+                session_homes[session_id] = str(req.get('local_home') or '')
         if session_id and req.get('local_home'):
             # The root belongs to this request/session, not the server process
             # environment inherited from whichever CLI launched it first.
@@ -3014,8 +3031,14 @@ sub _read_session_server_frame {
 
 sub _call_session_server {
     my ($payload, $timeout_seconds) = @_;
-    $payload = { %{$payload}, local_home => $ENV{SAS_LOCAL_HOME_DIR} // '' }
-      if $payload->{session_id};
+    if ($payload->{session_id}) {
+        my ($python_bin) = _repo_python_env_for_session_server();
+        my $cfgfile = $ENV{SASPY_CFGFILE} // '';
+        $cfgfile = _normalize_local_path_for_python($cfgfile, $python_bin) if length $cfgfile;
+        $payload = { %{$payload}, local_home => $ENV{SAS_LOCAL_HOME_DIR} // '',
+            sas_config => { cfgname => $ENV{SASPY_CFGNAME} || $ENV{SASPY_CONFIG_NAME} || 'oda',
+                            cfgfile => $cfgfile } };
+    }
     # File transfers cross the same Perl/Python path boundary as startup.
     if (exists($payload->{local_path}) || ref($payload->{payload}) eq 'HASH' || ref($payload->{uploads}) eq 'ARRAY' || ref($payload->{downloads}) eq 'ARRAY') {
         my ($python_bin) = _repo_python_env_for_session_server();

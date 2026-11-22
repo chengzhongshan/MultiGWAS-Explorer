@@ -88,7 +88,13 @@ case "${REFERENCE_BUILD}" in
 esac
 
 GTF_DSD="${GTF_DSD:-${DEFAULT_GTF_DSD}}"
-FM_LIBPATH="${FM_LIBPATH:-/home/cheng.zhong.shan/my_shared_file_links/cheng.zhong.shan/F_vs_M_Covid19_Hosp}"
+# Local SAS has no ODA shared-library directory. Resolve its configured HOME
+# inside SAS, after the runner has created the dedicated staging directory.
+if [[ -n "${SAS_LOCAL_HOME_DIR:-}" ]]; then
+  FM_LIBPATH="${FM_LIBPATH:-%sysfunc(pathname(HOME))}"
+else
+  FM_LIBPATH="${FM_LIBPATH:-/home/cheng.zhong.shan/my_shared_file_links/cheng.zhong.shan/F_vs_M_Covid19_Hosp}"
+fi
 GTF_LOCAL_DSD="${GTF_LOCAL_DSD:-${DEFAULT_GTF_LOCAL_DSD}}"
 GTF_GZ_URL="${GTF_GZ_URL:-${DEFAULT_GTF_GZ_URL}}"
 GET_GTF_MACRO_SAS="${GET_GTF_MACRO_SAS:-${DEPS_DIR}/get_genecode_gtf_data.sas}"

@@ -39,6 +39,10 @@ The [November 21 runtime update](MultiGWAS-Explorer/docs/SAS_RUNTIME_UPDATE_2026
 adds the newer Perl runner, dependency/transfer fixes, browser controls and
 bounded MCP completion reporting, with source hashes and execution evidence.
 
+You can explicitly run SAS plots on **licensed local Windows or Linux SAS**
+using `--saspy-cfgname` and `--saspy-cfgfile`. ODA remains the default; see
+[selecting the SAS runtime](MultiGWAS-Explorer/docs/SELECT_SAS_RUNTIME.md).
+
 ## Try a local example
 
 After installing:

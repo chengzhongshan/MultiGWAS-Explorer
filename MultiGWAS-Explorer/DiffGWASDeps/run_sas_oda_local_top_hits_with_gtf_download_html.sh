@@ -100,7 +100,13 @@ case "${REFERENCE_BUILD}" in
 esac
 
 GTF_DSD="${GTF_DSD:-${DEFAULT_GTF_DSD}}"
-FM_LIBPATH="${FM_LIBPATH:-/home/cheng.zhong.shan/my_shared_file_links/cheng.zhong.shan/F_vs_M_Covid19_Hosp}"
+# Local SAS has no ODA shared-library directory. Resolve its configured HOME
+# inside SAS, after the runner has created the dedicated staging directory.
+if [[ -n "${SAS_LOCAL_HOME_DIR:-}" ]]; then
+  FM_LIBPATH="${FM_LIBPATH:-%sysfunc(pathname(HOME))}"
+else
+  FM_LIBPATH="${FM_LIBPATH:-/home/cheng.zhong.shan/my_shared_file_links/cheng.zhong.shan/F_vs_M_Covid19_Hosp}"
+fi
 GTF_LOCAL_DSD="${GTF_LOCAL_DSD:-${DEFAULT_GTF_LOCAL_DSD}}"
 GTF_GZ_URL="${GTF_GZ_URL:-${DEFAULT_GTF_GZ_URL}}"
 GET_GTF_MACRO_SAS="${GET_GTF_MACRO_SAS:-${DEPS_DIR}/get_genecode_gtf_data.sas}"
@@ -834,22 +840,7 @@ recover_csv_from_existing_local_copy() {
 extract_remote_png_path_from_log_file() {
   local logfile="$1"
   [[ -s "${logfile}" ]] || return 1
-  awk '
-    /The final figure is put here:/ {
-      for (i = 0; i < 40 && getline > 0; i++) {
-        line = $0;
-        gsub(/^[[:space:]]+|[[:space:]]+$/, "", line);
-        if (line ~ /^\/[^[:space:]]+\.png$/) {
-          print line;
-          exit;
-        }
-        if (match(line, /\/[^[:space:]]+\.png/)) {
-          print substr(line, RSTART, RLENGTH);
-          exit;
-        }
-      }
-    }
-  ' "${logfile}"
+  perl "${DEPS_DIR}/extract_sas_figure_path.pl" "${logfile}"
 }
 
 extract_remote_png_path_from_run_log() {

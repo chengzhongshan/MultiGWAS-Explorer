@@ -39,7 +39,7 @@ open my $fh, '<:raw', "$Bin/../DiffGWASDeps/sas_oda_session_server.py" or die $!
 my $standalone = do {local $/; <$fh>};
 is($standalone, SAS_ODA_Runner::_session_server_source(),
     'checked-in Python helper exactly matches the generated session implementation');
-like($standalone, qr/SERVER_API_VERSION = '2026-11-12-persistent-archive'/,
+like($standalone, qr/SERVER_API_VERSION = '2026-11-21-explicit-sas-target'/,
     'new protocol rejects stale helpers that lack bulk dispatch');
 like($standalone, qr/elif cmd == 'bulk_transfer':.*?transfer_many\(sess,/s,
     'Python bulk handler operates on the existing SASPy session');

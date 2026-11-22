@@ -14,9 +14,11 @@ use IO::Socket::INET;
 use JSON::PP qw(encode_json);
 use Test::More;
 
-my ($live,$cfgfile,$outdir);
-GetOptions('live'=>\$live,'saspy-cfgfile=s'=>\$cfgfile,'outdir=s'=>\$outdir) or die 'Invalid test option';
-plan skip_all=>'Use --live with configured SAS ODA credentials' unless $live;
+my ($live,$cfgfile,$outdir,$home,$with_graph);
+my $cfgname='oda';
+GetOptions('live'=>\$live,'saspy-cfgfile=s'=>\$cfgfile,'saspy-cfgname=s'=>\$cfgname,
+           'local-sas-home=s'=>\$home,'with-graph'=>\$with_graph,'outdir=s'=>\$outdir) or die 'Invalid test option';
+plan skip_all=>'Use --live with a configured SASPy profile' unless $live;
 my $root=abs_path("$Bin/..");
 die "Choose a new --outdir; existing results must not be reused\n" if defined($outdir) && -e $outdir;
 $outdir //= tempdir('SAS_Output_RandID_runtime_live_XXXXXX',DIR=>$root,CLEANUP=>0);
@@ -31,13 +33,19 @@ my $session=$tag.'_runtime';
 my $used=0;
 my $owner=$$;
 local $ENV{SAS_ODA_SESSION_PORT}=$port;
-local $ENV{SASPY_CFGNAME}='oda';
+local $ENV{SASPY_CFGNAME}=$cfgname;
 local $ENV{SASPY_CFGFILE}=$cfgfile if defined $cfgfile;
+local $ENV{SAS_LOCAL_HOME_DIR}='';
+if (lc($cfgname) ne 'oda') {
+    $home //= "$outdir/staging_home";
+    make_path($home) unless -d $home;
+    $ENV{SAS_LOCAL_HOME_DIR}=SAS_ODA_Runner::_normalize_local_path_for_python(abs_path($home),$ENV{PIPELINE_PYTHON_BIN} || 'python3');
+}
 local $ENV{OPEN_RESULT}=0;
 local $ENV{SAS_ODA_AUTOLOAD_MACROS}=0;
 local $ENV{PERLMCP_SASPY_LOAD_MACROS}=0;
 local $ENV{SAS_ODA_SESSION_DEBUG_LOG}=SAS_ODA_Runner::_normalize_local_path_for_python("$outdir/session.log",$ENV{PIPELINE_PYTHON_BIN} || 'python3');
-my @common=('--persistent','--session-id',$session,'--saspy-cfgname','oda','--no-open-html','--run-timeout-seconds',180);
+my @common=('--persistent','--session-id',$session,'--saspy-cfgname',$cfgname,'--no-open-html','--run-timeout-seconds',180);
 push @common,('--saspy-cfgfile',$cfgfile) if defined $cfgfile;
 my @records;
 sub action {
@@ -84,6 +92,7 @@ proc print data=work.port_values; run;
 %put MGX_PORT_PASS=transfer;
 %put MGX_PORT_PID=&sysjobid;
 SAS
+$program .= "proc sgplot data=work.port_values; scatter x=x y=x / markerattrs=(size=9); run;\n" if $with_graph;
 write_bytes("$outdir/transfer.sas",$program);
 my ($exit,$log)=action('transfer','run_sas_codes_or_files_in_ODA.pl','--file',"$outdir/transfer.sas",
     '--upload-file',"$outdir/$remote[0]",'--upload-file',"$outdir/$remote[1]",
@@ -100,6 +109,7 @@ for my $i(0,1){
 }
 my @html=glob("$outdir/transfer/sas_res_*.html");
 ok(@html && -s $html[0],'actual PRINT HTML is retained');
+like(@html ? read_bytes($html[0]) : '', qr/<(?:img|svg)\b/i,'actual SAS graphic is retained in HTML') if $with_graph;
 ($exit,$log)=action('reuse','run_sas_codes_or_file_in_ODA.pl','--code',q{proc sql noprint; select sum(x) into :again trimmed from work.port_values; quit; %macro check_reuse; %if &again ne 33 %then %do; %put ERROR: WORK was not retained; %abort cancel; %end; %mend; %check_reuse; %put MGX_PORT_PASS=reuse; %put MGX_PORT_PID=&sysjobid;});
 is($exit,0,'another alias reuses the same persistent WORK');
 like($log,qr/^MGX_PORT_PASS=reuse\s*$/m,'reused WORK has the expected values');
@@ -123,6 +133,6 @@ if(-f "$outdir/session.log"){
     cmp_ok(scalar(()=$debug=~/request cmd=bulk_transfer session_id=\Q$session\E/mg),'>=',2,'actual persistent bulk RPCs are recorded');
 }else{fail('dedicated session debug log is retained');}
 close_owned();
-write_bytes("$outdir/execution.json",JSON::PP->new->canonical->pretty->encode({session=>$session,records=>\@records,scope=>'Synthetic runner integration; not a scientific pipeline or performance benchmark.'}));
+write_bytes("$outdir/execution.json",JSON::PP->new->canonical->pretty->encode({session=>$session,saspy_cfgname=>$cfgname,records=>\@records,scope=>'Synthetic runner integration; not a scientific pipeline or performance benchmark.'}));
 diag("Retained execution evidence: $outdir");
 done_testing;

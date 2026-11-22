@@ -20,7 +20,7 @@ for test in \
   test_include_abbreviation test_include_file_lists test_include_source_order \
   test_resolve_macro_dependencies test_unquote_macro_dependencies \
   test_macro_quoting_preflight test_inline_macro_preflight \
-  test_open_code_macro_diagnostics test_local_sas_home test_sas_com_threading \
+  test_open_code_macro_diagnostics test_explicit_sas_target test_local_sas_home test_sas_com_threading \
   test_macro_span_scaling test_nested_include_graph test_copilot_runner_review \
   test_quoted_filename_upload test_sas_log_diagnostics \
   test_expected_failure_evaluation test_java_setup_help test_mcp_bounded_completion \
