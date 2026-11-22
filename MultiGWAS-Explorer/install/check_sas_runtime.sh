@@ -24,7 +24,7 @@ for test in \
   test_macro_span_scaling test_nested_include_graph test_copilot_runner_review \
   test_quoted_filename_upload test_sas_log_diagnostics \
   test_expected_failure_evaluation test_java_setup_help test_mcp_bounded_completion \
-  test_runner_alias_options; do
+  test_runner_alias_options test_runtime_port_manifest; do
   perl "tests/${test}.pl"
 done
 "${runtime_python}" tests/test_persistent_archive.py

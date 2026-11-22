@@ -91,6 +91,13 @@ as errors. See the cleanup guide for search precedence and live checks.
 
 ## Main Entry Points
 
+The SAS ODA runner includes the [current MCP4SAS runtime improvements](docs/SAS_RUNTIME_UPDATE_20261121.md):
+verified dependency uploads, recursive local macro staging, archive batching,
+faster large-program preflight, detailed failure diagnostics and explicit HTML
+opening controls. All existing runner spellings delegate to the same canonical
+CLI. The [source manifest](docs/SAS_RUNTIME_PORT_MANIFEST.json) records the exact
+upstream version and project adaptations.
+
 ### Import an existing AOA combined / meta-analysis table
 
 Use `--input-merged` to select one existing table directly, without supplying

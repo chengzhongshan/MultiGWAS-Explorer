@@ -10,6 +10,9 @@ use File::Temp qw(tempdir);
 use File::Spec;
 use IPC::Open3;
 use Symbol qw(gensym);
+use File::Copy qw(copy);
+use File::Path qw(make_path);
+use Cwd qw(getcwd);
 
 my $failure='RuntimeError: An exception was thrown during the encryption key exchange';
 my $help=SAS_Java_Help::instructions($failure);
@@ -48,6 +51,23 @@ is(SAS_Java_Help::decorate_result($decorated)->{error},$decorated->{error},'repe
 
 # Exercise the actual CLI probe without SAS, Java, credentials or network access.
 my $fixture=tempdir('java-help-XXXX',TMPDIR=>1,CLEANUP=>1);
+my $original=getcwd();
+END {chdir $original if defined $original;}
+my $runner_dir=File::Spec->catdir($fixture,'runner');
+my $deps=File::Spec->catdir($runner_dir,'DiffGWASDeps');
+make_path($deps);
+for my $name(qw(run_sas_codes_or_files_in_ODA.pl run_sas_codes_or_script_in_ODA.pl)) {
+    copy("$Bin/../$name",File::Spec->catfile($runner_dir,$name)) or die $!;
+}
+opendir my $modules,"$Bin/../DiffGWASDeps" or die $!;
+for my $name(grep {/\.(?:pm|py)$/} readdir $modules) {
+    copy("$Bin/../DiffGWASDeps/$name",File::Spec->catfile($deps,$name)) or die $!;
+}
+closedir $modules;
+my $cli=File::Spec->catfile($runner_dir,'run_sas_codes_or_files_in_ODA.pl');
+# The installed project can be a read-only SIF and can contain a real SASPy
+# environment. Own both the scratch directory and the failing import fixture.
+chdir $runner_dir or die $!;
 open my $stub,'>',File::Spec->catfile($fixture,'saspy.py') or die $!;
 print {$stub} <<'PY';
 class SASsession:
@@ -63,7 +83,7 @@ local $ENV{SASPY_CFGNAME}='linuxlocal';
 local $ENV{SASPY_CFGFILE}='';
 my ($input,$output);
 my $error=gensym;
-my $pid=open3($input,$output,$error,$^X,"$Bin/../run_sas_codes_or_files_in_ODA.pl",'--check-saspy-connection-only');
+my $pid=open3($input,$output,$error,$^X,$cli,'--check-saspy-connection-only');
 close $input;
 my $stdout=do {local $/; <$output>} // '';
 my $stderr=do {local $/; <$error>} // '';
@@ -79,7 +99,7 @@ for my $case (
     my ($label,@args)=@{$case};
     my $child_error=gensym;
     my $child=open3(my $child_in,my $child_out,$child_error,$^X,
-        "$Bin/../run_sas_codes_or_files_in_ODA.pl",@args,
+        $cli,@args,
         '--output-prefix',File::Spec->catdir($fixture,$label =~ s/ /_/gr),
         '--run-timeout-seconds','20');
     close $child_in;
@@ -91,4 +111,5 @@ for my $case (
         "actual $label status path does not mask the underlying Java failure");
     unlike($captured,qr/WORK\/quota or memory exhaustion is possible/,"known Java failure is not overwritten by a quota/session-loss guess");
 }
+chdir $original or die $!;
 done_testing();

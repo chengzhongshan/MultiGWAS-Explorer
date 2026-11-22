@@ -35,6 +35,9 @@ genome-wide/local Manhattan plots, local GTF plot, and forest plot, see the
 For slow SAS requests or file transfers, the
 [SAS runtime performance guide](MultiGWAS-Explorer/docs/SAS_RUNTIME_PERFORMANCE.md)
 records the MCP4SAS fixes ported to this project and the offline regression commands.
+The [November 21 runtime update](MultiGWAS-Explorer/docs/SAS_RUNTIME_UPDATE_20261121.md)
+adds the newer Perl runner, dependency/transfer fixes, browser controls and
+bounded MCP completion reporting, with source hashes and execution evidence.
 
 ## Try a local example
 

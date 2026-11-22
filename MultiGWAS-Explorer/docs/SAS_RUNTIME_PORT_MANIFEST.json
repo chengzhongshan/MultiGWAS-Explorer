@@ -1,94 +1,254 @@
 {
-   "date" : "2026-11-12",
-   "files" : [
-      {
-         "adaptation" : "byte-identical",
-         "path" : "DiffGWASDeps/SAS_Source_Analysis.pm",
-         "sha256" : "6ff294fd0387df75839c1d21bb38f9beb0ddb57023971dde56b3397d3cfe551f",
-         "upstream_path" : "MCPDeps/SAS_Source_Analysis.pm",
-         "upstream_sha256" : "6ff294fd0387df75839c1d21bb38f9beb0ddb57023971dde56b3397d3cfe551f"
-      },
-      {
-         "adaptation" : "byte-identical",
-         "path" : "DiffGWASDeps/sas_archive_transfer.py",
-         "sha256" : "59429641581f084f54b0230507d72e662cfa6318bce3e8c489d6c132e53c6e20",
-         "upstream_path" : "MCPDeps/sas_archive_transfer.py",
-         "upstream_sha256" : "59429641581f084f54b0230507d72e662cfa6318bce3e8c489d6c132e53c6e20"
-      },
-      {
-         "adaptation" : "targeted port; existing GWAS temporary-directory and local SAS integration preserved",
-         "path" : "DiffGWASDeps/SAS_ODA_Runner.pm",
-         "sha256" : "4a855725c4d224444c289e7a4a5b9204afb0b8ab0b839f33ca219948a4e666a9",
-         "upstream_path" : "MCPDeps/SAS_ODA_Runner.pm",
-         "upstream_sha256" : "5cbb9a470d69b2ce18e5e4dc1d6909158bcb9e9158c792306b5bb9d021c555db"
-      },
-      {
-         "adaptation" : "dynamic include guard only; canonical CLI preserved",
-         "path" : "run_sas_codes_or_script_in_ODA.pl",
-         "sha256" : "83a0f698790361b4bd74784bca2d46bb765ced51abf1ac26b800eb3fb6f4e643",
-         "upstream_path" : "run_sas_codes_or_script_in_ODA.pl",
-         "upstream_sha256" : "580bcad2eab4798362bee92a6aa49eeeb813900bb849ec7c73c4d14595324d6c"
-      },
-      {
-         "adaptation" : "filename probe guard applied at this project actual MCP dispatch boundary",
-         "path" : "DiffGWASDeps/SAS_ODA_MCP.pm",
-         "sha256" : "689e9eced3931d9504096b0adb2434974203a614c4e06968043a2fe5d3e1164a",
-         "upstream_path" : "server.pl",
-         "upstream_sha256" : "7f64363513048a22fdcdfde48e589134207c5fc18a0352d62e7642eae277134f"
-      },
-      {
-         "adaptation" : "module directory adapted to DiffGWASDeps",
-         "path" : "tools/profile_sas_source.pl",
-         "sha256" : "5b3ee615236b1115bf30dac361116596ce286cca054f1d8775ae87cc1270a533",
-         "upstream_path" : "tools/profile_sas_source.pl",
-         "upstream_sha256" : "704bc3ad17d088f0e037d782928bee4a612b644186e9cf119819ad0ed82c8c19"
-      },
-      {
-         "adaptation" : "module directory adapted to DiffGWASDeps",
-         "path" : "tests/test_poc_input_boundaries.pl",
-         "sha256" : "ad18bad9f9a39e65391d212653535c3449be344a6ba7608846446b7ba1f008e9",
-         "upstream_path" : "tests/test_poc_input_boundaries.pl",
-         "upstream_sha256" : "5061a8df0ec588523f7b523cededfbd36539530218b6820adb4437fbb6a5c5c6"
-      },
-      {
-         "adaptation" : "module directory adapted to DiffGWASDeps",
-         "path" : "tests/test_sas_supplied_autocall.pl",
-         "sha256" : "166d0133b469e8098fddcc50ccf9f053325d4cee4fa447627a8fd921f852ca81",
-         "upstream_path" : "tests/test_sas_supplied_autocall.pl",
-         "upstream_sha256" : "12b710acd31117712ce8dc252da8261978746eebc5601eb864110702ed90dd03"
-      },
-      {
-         "adaptation" : "module directory adapted to DiffGWASDeps",
-         "path" : "tests/test_literal_execution_contexts.pl",
-         "sha256" : "027d49923140f2b8e32313df4e34e38fb3c07c239a1dafe1a66d489097d705f0",
-         "upstream_path" : "tests/test_literal_execution_contexts.pl",
-         "upstream_sha256" : "4b78b8fd4c71596fc5ee28419f575ad2fad3686692fbd649492c89431f80fb15"
-      },
-      {
-         "adaptation" : "module directory adapted to DiffGWASDeps",
-         "path" : "tests/test_python_path_boundary.pl",
-         "sha256" : "efc2832f90e1fc224e6b7c3b8974e4f759bbd0399f3c64399ae18615d4500202",
-         "upstream_path" : "tests/test_python_path_boundary.pl",
-         "upstream_sha256" : "b0d8fd756c1f12bb3b5efa976e7195568e58fc0485ab811dfe747172ab3ee475"
-      },
-      {
-         "adaptation" : "module directory adapted to DiffGWASDeps",
-         "path" : "tests/test_persistent_archive.py",
-         "sha256" : "524e3f8cf3aef617a2f0abeff2ff8ed08eb0f1ae8f0d195ec3eff8e43168c6b4",
-         "upstream_path" : "tests/test_persistent_archive.py",
-         "upstream_sha256" : "33dfd8afaa867547def89818c15205b788c97c09e8bb7931a4679a5fdca12085"
-      }
-   ],
-   "persistent_protocol" : "2026-11-12-persistent-archive",
-   "preservation" : "No original scientific macros, GWAS calculations, LD selection, plot parameters or generated user configurations were modified.",
-   "project_specific_regressions" : [
-      "tests/test_runner_preflight_parity.pl",
-      "tests/test_persistent_bulk_dispatch.pl",
-      "tests/test_one_shot_status_path.pl",
-      "install/check_sas_runtime.sh"
-   ],
-   "target_base" : "d10985a74b5ae3e6bc4840a7578f8f07c6c79a36",
-   "target_repository" : "https://github.com/chengzhongshan/MultiGWAS-Explorer",
-   "upstream_commit" : "351e7905908dc026f65ddc2da712467d6ccc7812",
-   "upstream_repository" : "https://github.com/chengzhongshan/MCP4SAS"
+  "date": "2026-11-21",
+  "upstream_repository": "https://github.com/chengzhongshan/MCP4SAS",
+  "upstream_commit": "cd0caa928bd37da3a7720a136d6949c261cbb545",
+  "target_repository": "https://github.com/chengzhongshan/MultiGWAS-Explorer",
+  "target_base": "3a7a5fa1235dfbf80b11e2fbc01550e85291dc3d",
+  "hash_policy": "SHA-256 after CRLF-to-LF normalization",
+  "files": [
+    {
+      "path": "DiffGWASDeps/MCP4SAS-MIT-License.txt",
+      "sha256": "04254c824d4c8be5a815b4bb6287e8aa1bafac6022d4fb3e1f68cef84ba82ac5",
+      "upstream_path": "MIT_License.txt",
+      "upstream_sha256": "04254c824d4c8be5a815b4bb6287e8aa1bafac6022d4fb3e1f68cef84ba82ac5",
+      "normalized_byte_identical": true,
+      "adaptation": "Upstream copyright/permission notice retained."
+    },
+    {
+      "path": "DiffGWASDeps/MCP_Job_Options.pm",
+      "sha256": "d3257524628e91e7cf6d3a9c04a43216257e325818baec3b568ce64ba342e1bc",
+      "upstream_path": "MCPDeps/MCP_Job_Options.pm",
+      "upstream_sha256": "d3257524628e91e7cf6d3a9c04a43216257e325818baec3b568ce64ba342e1bc",
+      "normalized_byte_identical": true,
+      "adaptation": "Current upstream shared dependency; existing compatible files retained when unchanged."
+    },
+    {
+      "path": "DiffGWASDeps/SAS_Evaluation_Log.pm",
+      "sha256": "89a813c7812755b8f446ce7ce906d9464bddb9c74ea773199590b3fe74eb7816",
+      "upstream_path": "MCPDeps/SAS_Evaluation_Log.pm",
+      "upstream_sha256": "89a813c7812755b8f446ce7ce906d9464bddb9c74ea773199590b3fe74eb7816",
+      "normalized_byte_identical": true,
+      "adaptation": "Current upstream shared dependency; existing compatible files retained when unchanged."
+    },
+    {
+      "path": "DiffGWASDeps/SAS_Java_Help.pm",
+      "sha256": "07f0909bf87378c237d9819e6cb4c2815b7da2d84f9ef202aacf825db37bdeff",
+      "upstream_path": "MCPDeps/SAS_Java_Help.pm",
+      "upstream_sha256": "b7fb5d5b092d76eaf255b2aad09141dddcf3a8ff851c26d2fb7fd999180802d9",
+      "normalized_byte_identical": false,
+      "adaptation": "Current diagnostics; setup instructions use actual Explorer profile configuration and docs instead of unavailable MCP4SAS installer commands."
+    },
+    {
+      "path": "DiffGWASDeps/SAS_Local_Home.pm",
+      "sha256": "f14de20464e1e714de13c69938185e10a2020cbe39a97e9f8e45f28b8051bab3",
+      "upstream_path": "MCPDeps/SAS_Local_Home.pm",
+      "upstream_sha256": "f14de20464e1e714de13c69938185e10a2020cbe39a97e9f8e45f28b8051bab3",
+      "normalized_byte_identical": true,
+      "adaptation": "Current upstream shared dependency; existing compatible files retained when unchanged."
+    },
+    {
+      "path": "DiffGWASDeps/SAS_Log_Diagnostics.pm",
+      "sha256": "717fdc711b24d64a6ab11dbeaa7eb36059d03ff64674ddba4b752f374deb6743",
+      "upstream_path": "MCPDeps/SAS_Log_Diagnostics.pm",
+      "upstream_sha256": "717fdc711b24d64a6ab11dbeaa7eb36059d03ff64674ddba4b752f374deb6743",
+      "normalized_byte_identical": true,
+      "adaptation": "Current upstream shared dependency; existing compatible files retained when unchanged."
+    },
+    {
+      "path": "DiffGWASDeps/SAS_ODA_Directory_Cleanup.pm",
+      "sha256": "692bedaa1df1f5ce144ca252e030f8e5883ae366b1c2d14bab59152df76a9c70",
+      "upstream_path": "MCPDeps/SAS_ODA_Directory_Cleanup.pm",
+      "upstream_sha256": "692bedaa1df1f5ce144ca252e030f8e5883ae366b1c2d14bab59152df76a9c70",
+      "normalized_byte_identical": true,
+      "adaptation": "Current upstream shared dependency; existing compatible files retained when unchanged."
+    },
+    {
+      "path": "DiffGWASDeps/SAS_ODA_MCP.pm",
+      "sha256": "043b4a1df9813a1a518904a49443c500dfa8d017370e60dfb761d6d0020cbacc",
+      "upstream_path": "server.pl",
+      "upstream_sha256": "601d7cff5b32c6a70f23f0da008e2dfed1b43c7b240316e612f77494e35b5458",
+      "normalized_byte_identical": false,
+      "adaptation": "Bounded wait/log-excerpt and structured job-reporting behavior ported into the existing Explorer dispatch module; unrelated GWAS tools preserved."
+    },
+    {
+      "path": "DiffGWASDeps/SAS_ODA_Runner.pm",
+      "sha256": "8a813bd1e4777b18859418688f9f477b575aa57d8bb483166e6bb1741d5bc999",
+      "upstream_path": "MCPDeps/SAS_ODA_Runner.pm",
+      "upstream_sha256": "07357271a3f3c15a4d5fd5329eff5b7f8c0f5bd0ba5154fd4fb1bb97ef0e8dc8",
+      "normalized_byte_identical": false,
+      "adaptation": "Current upstream implementation; worker/session temporary environment names adapted to Explorer."
+    },
+    {
+      "path": "DiffGWASDeps/SAS_ODA_Temp.pm",
+      "sha256": "032d987db5e57a466170f1bd584eb18799dfe9c723c4abce31566e911946fd4e",
+      "upstream_path": "MCPDeps/MCP4SAS_Temp.pm",
+      "upstream_sha256": "a89f73ae8682784ecc88f15d90e345c34cdff3faf221768c3d8afaf241dffd11",
+      "normalized_byte_identical": false,
+      "adaptation": "Package, owned directory/marker names, environment variables and displayed project name adapted."
+    },
+    {
+      "path": "DiffGWASDeps/SAS_Source_Analysis.pm",
+      "sha256": "00b85b38890dc9a83f384b9978ad3285499edb53fa313e15f39e2c39868901f1",
+      "upstream_path": "MCPDeps/SAS_Source_Analysis.pm",
+      "upstream_sha256": "00b85b38890dc9a83f384b9978ad3285499edb53fa313e15f39e2c39868901f1",
+      "normalized_byte_identical": true,
+      "adaptation": "Current upstream shared dependency; existing compatible files retained when unchanged."
+    },
+    {
+      "path": "DiffGWASDeps/result_browser.py",
+      "sha256": "a4e11f8ab9d6ab8d1f3cef2a801a49f565197025839d87a0ef7bfd757e711ae8",
+      "upstream_path": "MCPDeps/result_browser.py",
+      "upstream_sha256": "a4e11f8ab9d6ab8d1f3cef2a801a49f565197025839d87a0ef7bfd757e711ae8",
+      "normalized_byte_identical": true,
+      "adaptation": "Current upstream shared dependency; existing compatible files retained when unchanged."
+    },
+    {
+      "path": "DiffGWASDeps/sas_archive_transfer.py",
+      "sha256": "bbb1d94313a49be256fca40be68f42c5009e26396b2b0143ee7dd68d1e13d3c2",
+      "upstream_path": "MCPDeps/sas_archive_transfer.py",
+      "upstream_sha256": "bbb1d94313a49be256fca40be68f42c5009e26396b2b0143ee7dd68d1e13d3c2",
+      "normalized_byte_identical": true,
+      "adaptation": "Current upstream shared dependency; existing compatible files retained when unchanged."
+    },
+    {
+      "path": "DiffGWASDeps/sas_oda_session_server.py",
+      "sha256": "c0f81518733a2e3b2b6d13eb1cd9d01582cbf26258a297035909278a80b3655a",
+      "upstream_path": "MCPDeps/sas_oda_session_server.py",
+      "upstream_sha256": "c38d85b1ad83f591108e40c812b0a145a7f9cdae1ad9239ea5c2a7564effe48d",
+      "normalized_byte_identical": false,
+      "adaptation": "Regenerated byte-for-byte from target SAS_ODA_Runner::_session_server_source, including startup diagnostics; upstream checked-in whitespace drift is not carried over."
+    },
+    {
+      "path": "DiffGWASDeps/test_sas_oda_include_lookup.pl",
+      "sha256": "b3d689ef10c979a4b9ad6cd99c21a283b05b07fbb8a27b024da8d83725238fcf",
+      "upstream_path": "MCPDeps/test_sas_oda_include_lookup.pl",
+      "upstream_sha256": "aedaf9fc32126680c730357cec4f08f95ffaa30788696afe14c4ba52c7da5cf6",
+      "normalized_byte_identical": false,
+      "adaptation": "Dependency directory; source-extraction tests use canonical CLI while aliases remain covered by delegation tests. Java hints use Explorer configuration."
+    },
+    {
+      "path": "DiffGWASDeps/test_sas_oda_macro_dir_fallback.pl",
+      "sha256": "3d652039226d53208a55cc21b2e8f49686a6c1d37e2bc1281f997e38a8d5628a",
+      "upstream_path": "MCPDeps/test_sas_oda_macro_dir_fallback.pl",
+      "upstream_sha256": "3d652039226d53208a55cc21b2e8f49686a6c1d37e2bc1281f997e38a8d5628a",
+      "normalized_byte_identical": true,
+      "adaptation": "Dependency directory; source-extraction tests use canonical CLI while aliases remain covered by delegation tests. Java hints use Explorer configuration."
+    },
+    {
+      "path": "run_sas_codes_or_script_in_ODA.pl",
+      "sha256": "698a3fb9e199b0154dc187eed80a6e4612292ae9da213da8e1639b2eafaad2e9",
+      "upstream_path": "run_sas_codes_or_files_in_ODA.pl",
+      "upstream_sha256": "12ab549f6124943859d4fb8912bb9b2b2a64f9b3229972dc2b0bc436bf6e20c6",
+      "normalized_byte_identical": false,
+      "adaptation": "Canonical CLI port; Explorer aliases, local-SAS examples, temporary namespace and retained-HTML status path preserved."
+    },
+    {
+      "path": "server.pl",
+      "sha256": "4a69867212bf963c6069d2a05e409f95a0109778af55ce5aa4358a6169436e33",
+      "upstream_path": "server.pl",
+      "upstream_sha256": "601d7cff5b32c6a70f23f0da008e2dfed1b43c7b240316e612f77494e35b5458",
+      "normalized_byte_identical": false,
+      "adaptation": "Only the SAS ODA tool schema is extended; full MCP4SAS server is not substituted."
+    },
+    {
+      "path": "tests/test_copilot_runner_review.pl",
+      "sha256": "669bb7adfdc2762f2f9a4863141a81141a5db8d182f322193efe8efcd8ab6fb0",
+      "upstream_path": "tests/test_copilot_runner_review.pl",
+      "upstream_sha256": "4992e797bc1e81f5de233b968aa5f7bfe049906ce4253621fa84aff25e835e3e",
+      "normalized_byte_identical": false,
+      "adaptation": "Dependency directory; source-extraction tests use canonical CLI while aliases remain covered by delegation tests. Java hints use Explorer configuration."
+    },
+    {
+      "path": "tests/test_expected_failure_evaluation.pl",
+      "sha256": "5fb80db6f3c26ac2b5dd745753333dfb04137344fede023cafce3e97848e3173",
+      "upstream_path": "tests/test_expected_failure_evaluation.pl",
+      "upstream_sha256": "724137798eb93c70c4ec0830d3a642686643daacadc4024533364a8dd0024c58",
+      "normalized_byte_identical": false,
+      "adaptation": "Dependency directory; source-extraction tests use canonical CLI while aliases remain covered by delegation tests. Java hints use Explorer configuration."
+    },
+    {
+      "path": "tests/test_java_setup_help.pl",
+      "sha256": "e510259a54caf3ddca94ff8949453ee61d355e0edaaa08a368c05ae9107844db",
+      "upstream_path": "tests/test_java_setup_help.pl",
+      "upstream_sha256": "e9429f968f8a5b344423d47a25d3174aeb08d024c6bac892d27fc1119a53d22a",
+      "normalized_byte_identical": false,
+      "adaptation": "Dependency directory; source-extraction tests use canonical CLI while aliases remain covered by delegation tests. Java hints use Explorer configuration."
+    },
+    {
+      "path": "tests/test_macro_span_scaling.pl",
+      "sha256": "0f7db610c11cf398b5d4072f25525f6176d028a8a1f5c2c5402abd77aae8be30",
+      "upstream_path": "tests/test_macro_span_scaling.pl",
+      "upstream_sha256": "54e4cb5bcd781b660c57b57ac10358c2d46f68446413e663a1f6eaeee36c927d",
+      "normalized_byte_identical": false,
+      "adaptation": "Dependency directory; source-extraction tests use canonical CLI while aliases remain covered by delegation tests. Java hints use Explorer configuration."
+    },
+    {
+      "path": "tests/test_nested_include_graph.pl",
+      "sha256": "8d41c141b70cd6278af26050a7949144c4618da483dd7a541e6c7ff57d1bbbda",
+      "upstream_path": "tests/test_nested_include_graph.pl",
+      "upstream_sha256": "d443eaab867e722de9d7f653a7353e9c47708da5503022ea81d152fa1951903b",
+      "normalized_byte_identical": false,
+      "adaptation": "Dependency directory; source-extraction tests use canonical CLI while aliases remain covered by delegation tests. Java hints use Explorer configuration."
+    },
+    {
+      "path": "tests/test_persistent_archive.py",
+      "sha256": "df83b98916c1571ad7f4561c554a7749c2960ff803fdc91c8cabf6ad1a4b40be",
+      "upstream_path": "tests/test_persistent_archive.py",
+      "upstream_sha256": "1ff6956390881700e9771e3b2ef5474ab9f2a3a1201a854bb712dbcb396496dc",
+      "normalized_byte_identical": false,
+      "adaptation": "Dependency directory; source-extraction tests use canonical CLI while aliases remain covered by delegation tests. Java hints use Explorer configuration."
+    },
+    {
+      "path": "tests/test_quoted_filename_upload.pl",
+      "sha256": "23a547201ca338842a3f2595423ba99be9fbcec1824ef83c25edc4440326a0ac",
+      "upstream_path": "tests/test_quoted_filename_upload.pl",
+      "upstream_sha256": "013ca8c71935a95d04a9ba83fb531d5d46fe2e40c914b828c2293b7f53e1ffcc",
+      "normalized_byte_identical": false,
+      "adaptation": "Dependency directory; source-extraction tests use canonical CLI while aliases remain covered by delegation tests. Java hints use Explorer configuration."
+    },
+    {
+      "path": "tests/test_result_browser.py",
+      "sha256": "17af73bf1e9a808889cef009b50c3669f8a35aa20590fcd1e91e4c8fa00eb0bf",
+      "upstream_path": "MCP4SAS_Use_Python/tests/test_runner_cli_browser.py",
+      "upstream_sha256": "1b9b2a164b22f65f7d9a64fe3d0dfa4894ef770296772e3e238c934ac46405fa",
+      "normalized_byte_identical": false,
+      "adaptation": "BrowserTests only, loading Explorer shared helper; unrelated native Python CLI parity class omitted."
+    },
+    {
+      "path": "tests/test_sas_log_diagnostics.pl",
+      "sha256": "868d4cca78314157ab0eae933f06162f9972ca247467f2f7474535169b5ef3d3",
+      "upstream_path": "tests/test_sas_log_diagnostics.pl",
+      "upstream_sha256": "09edb4f1e54df2041c11405c3e77ea9afc87c53e55a1050ffd8e8f260bc9dee5",
+      "normalized_byte_identical": false,
+      "adaptation": "Dependency directory; source-extraction tests use canonical CLI while aliases remain covered by delegation tests. Java hints use Explorer configuration."
+    },
+    {
+      "path": "tools/profile_sas_source.pl",
+      "sha256": "5b3ee615236b1115bf30dac361116596ce286cca054f1d8775ae87cc1270a533",
+      "upstream_path": "tools/profile_sas_source.pl",
+      "upstream_sha256": "704bc3ad17d088f0e037d782928bee4a612b644186e9cf119819ad0ed82c8c19",
+      "normalized_byte_identical": false,
+      "adaptation": "Existing source profiler, dependency directory adapted."
+    }
+  ],
+  "compatibility_entrypoints": [
+    "run_sas_codes_or_files_in_ODA.pl",
+    "run_sas_codes_or_file_in_ODA.pl",
+    "run_sas_codes_or_files_in_SAS_ODA.pl"
+  ],
+  "project_specific_regressions": [
+    "tests/test_runner_alias_options.pl",
+    "tests/test_runtime_port_manifest.pl",
+    "tests/test_mcp_bounded_completion.pl",
+    "tests/test_live_runtime_updates.pl",
+    "tests/test_runner_preflight_parity.pl",
+    "tests/test_persistent_bulk_dispatch.pl",
+    "tests/test_one_shot_status_path.pl",
+    "DiffGWASDeps/test_sas_oda_mcp.pl",
+    "install/check_sas_runtime.sh",
+    ".github/workflows/sas-oda-runtime.yml (repository root)"
+  ],
+  "persistent_protocol": "2026-11-12-persistent-archive",
+  "preservation": "Existing scientific SAS macros, GWAS inputs, plotting parameters, allele/LD policies and user configuration edits are not changed.",
+  "previous_port_manifest": "https://github.com/chengzhongshan/MultiGWAS-Explorer/blob/3a7a5fa1235dfbf80b11e2fbc01550e85291dc3d/MultiGWAS-Explorer/docs/SAS_RUNTIME_PORT_MANIFEST.json"
 }

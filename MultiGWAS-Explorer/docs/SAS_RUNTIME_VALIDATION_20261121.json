@@ -1,0 +1,166 @@
+{
+  "date": "2026-11-21",
+  "runtime_commit_executed": "e8f3b35",
+  "mcp4sas_source_commit": "cd0caa928bd37da3a7720a136d6949c261cbb545",
+  "synthetic_live": {
+    "passed": true,
+    "checks": 17,
+    "seconds": 130.084,
+    "log_sha256": "c74ee2cecdabbec3ad526304f36e32839c1f84042cd6e332ae841e0e63dbd4ac",
+    "assertions": [
+      "two-file persistent upload/submit/download",
+      "two rows and sum 33",
+      "download SHA-256 equality",
+      "PRINT HTML retained",
+      "WORK/SAS PID reused across aliases",
+      "recursive include and macro staging",
+      "exact four-file remote deletion verified",
+      "actual persistent bulk RPCs"
+    ],
+    "submitted_programs": {
+      "transfer.sas": {
+        "sha256": "6d9c3f716f0c9d56d20c46cc3bf5d2605f503fc0ebcaa2a013d6543e595d1a0f",
+        "sas_log_sha256": "10fe527b7e7f0f6a02c291e830afdf6155f53542a1b297770a0e3295ed2ae51c"
+      },
+      "nested.sas": {
+        "sha256": "5e97d1678d520504696ed4017c392c57534b81e0cab2bd33667de8bad20efa51",
+        "sas_log_sha256": "a778e39cd3bf48fb8a25f8e4b97fd64be50d89578e6ecd9c894f75b2048ebbe7"
+      }
+    },
+    "closes_only_owned_session": true,
+    "global_kill_used": false,
+    "expected_endsas_exit": 74,
+    "cleanup_note": "The intentional END-SAS command returns 74; the upstream recovery path prewarms an owned replacement helper/session before explicit helper shutdown. No global kill or unrelated session cleanup was used."
+  },
+  "multi_gwas": {
+    "passed": true,
+    "checks": 11295,
+    "seconds": 147.76,
+    "source_program": "programs/multi_gwas_gtf.sas",
+    "source_program_sha256": "595c1c91dab966ec03e3d2eb8a744c5223cbaf99906cbca605ce846e7e51485f",
+    "inputs": [],
+    "returned_files": {
+      "multi_gwas_gtf.png": "0ddb568b0325f9a0b3fed3cc02a8caa0cef3b446611b07a94a1043d71c82d1fc",
+      "multi_gwas_gtf.svg": "a1beb1162f601702569b0b1b99821c92dfb07001465016720351e078054f2770",
+      "multi_gwas_template.sas": "87360592140c9c472ceceec6c9b9baf617a000c4a84d9b6bb74d8147c990dc8f",
+      "panel_values.csv": "f9e02c63a503240b17f6d2dfa99c2192f03fb63682cc13e65ae46acfddbcc858",
+      "regional_input.csv": "f3b3b0e6bec337819940b12250a2f37d0268f1fa061cfc5ed212bb72a8ddf2b6",
+      "regional_annotation.csv": "1da26d4fcb285a605bc8103b60938b8a268c5b0233ffb512912f42930ae84779",
+      "regional_render.csv": "267660c3e960086fcca81c4ddd261d0bdfb267660e686c286362fed964c24e96"
+    },
+    "sas_log_sha256": "9cfc18c463205b341c586b80404d5ace594ef596486b695e8e760eb4cdc08c7f",
+    "warnings": [
+      "WARNING: This CREATE TABLE statement recursively references the target table. A consequence of this is a possible data integrity ",
+      "WARNING: This CREATE TABLE statement recursively references the target table. A consequence of this is a possible data integrity ",
+      "WARNING: This CREATE TABLE statement recursively references the target table. A consequence of this is a possible data integrity ",
+      "WARNING: This CREATE TABLE statement recursively references the target table. A consequence of this is a possible data integrity ",
+      "WARNING: This CREATE TABLE statement recursively references the target table. A consequence of this is a possible data integrity "
+    ],
+    "comparison": [
+      {
+        "file": "multi_gwas_gtf.png",
+        "bytes_equal": true,
+        "sha256": "0ddb568b0325f9a0b3fed3cc02a8caa0cef3b446611b07a94a1043d71c82d1fc",
+        "dimensions": [
+          2280,
+          2070
+        ],
+        "pixel_identical": true,
+        "pixel_sha256": "2238b6fa50c1d116664a5c9af0c9b44cecab0292b85e5aa629bb1a62dc49655e"
+      },
+      {
+        "file": "multi_gwas_gtf.svg",
+        "bytes_equal": true,
+        "sha256": "a1beb1162f601702569b0b1b99821c92dfb07001465016720351e078054f2770"
+      },
+      {
+        "file": "multi_gwas_template.sas",
+        "bytes_equal": true,
+        "sha256": "87360592140c9c472ceceec6c9b9baf617a000c4a84d9b6bb74d8147c990dc8f"
+      },
+      {
+        "file": "panel_values.csv",
+        "bytes_equal": true,
+        "sha256": "f9e02c63a503240b17f6d2dfa99c2192f03fb63682cc13e65ae46acfddbcc858",
+        "rows": 5640,
+        "numerical_equal": true
+      },
+      {
+        "file": "regional_annotation.csv",
+        "bytes_equal": true,
+        "sha256": "1da26d4fcb285a605bc8103b60938b8a268c5b0233ffb512912f42930ae84779",
+        "rows": 996,
+        "numerical_equal": true
+      },
+      {
+        "file": "regional_input.csv",
+        "bytes_equal": true,
+        "sha256": "f3b3b0e6bec337819940b12250a2f37d0268f1fa061cfc5ed212bb72a8ddf2b6",
+        "rows": 1880,
+        "numerical_equal": true
+      },
+      {
+        "file": "regional_render.csv",
+        "bytes_equal": true,
+        "sha256": "267660c3e960086fcca81c4ddd261d0bdfb267660e686c286362fed964c24e96",
+        "rows": 11282,
+        "numerical_equal": true
+      }
+    ],
+    "comparison_reference": "MCP4SAS SAS_Output_poc_both_20261121/python/multi_gwas_gtf/files; actual independent direct Python runner outputs",
+    "scope": "Frozen plotting payload with embedded macro definitions; not a rerun of the complete GWAS pipeline, or a replacement of Explorer production scientific macros.",
+    "cleanup_note": "Owned END-SAS followed by helper shutdown. Existing shared PoC fixture basenames were retained rather than deleting potentially pre-existing inputs."
+  },
+  "initial_ci": {
+    "url": "https://github.com/chengzhongshan/MultiGWAS-Explorer/actions/runs/44987080093",
+    "commit": "e8f3b35",
+    "result": "success",
+    "platforms": [
+      "Windows/Cygwin with native Python",
+      "macOS",
+      "Ubuntu"
+    ]
+  },
+  "local_evidence": "SAS_Output_RandID_runtime_port_20261121/",
+  "privacy": "Private configuration and raw protocol/log artifacts are excluded from Git. VS Code selected target/configuration hash was verified unchanged.",
+  "scope": "Runner execution, transfer and output equivalence checks only; no full scientific/publication validation, AI authoring trial, token/cost measurement, or controlled speed comparison.",
+  "offline": {
+    "perl_files": 32,
+    "perl_assertions": 561,
+    "python_archive_tests": 15,
+    "python_browser_tests": 11,
+    "passed": true,
+    "log_sha256": "176419f66619ea3045587b0149a936596d0f6b5a48ecd1c75751745cdaf4d5ad"
+  },
+  "mcp_sdk_fixture": {
+    "passed": true,
+    "assertions": 31,
+    "log_sha256": "761908f21f14d92f2dd696f849089aec1aad9c469532d0cfb6af9b98e9a97193",
+    "isolated_dependency": {
+      "url": "https://cpan.metacpan.org/authors/id/T/TI/TINITA/YAML-PP-v0.43.0.tar.gz",
+      "version": "v0.43.0",
+      "sha256": "f4a2a6d22b32a31e418debcbd04b843ba0997f9dea0fcc1f96b08b2f2ebcb2e7",
+      "scope": "Isolated optional SDK test dependency; no global installation."
+    }
+  },
+  "server_syntax": {
+    "passed": true,
+    "command": "perl -c server.pl",
+    "existing_prerequisites": [
+      {
+        "distribution": "File-Which",
+        "version": "1.27",
+        "url": "https://cpan.metacpan.org/authors/id/P/PL/PLICEASE/File-Which-1.27.tar.gz",
+        "sha256": "3201f1a60e3f16484082e6045c896842261fc345de9fb2e620fd2a2c7af3a93a"
+      },
+      {
+        "distribution": "JSON-MaybeXS",
+        "version": "1.004008",
+        "url": "https://cpan.metacpan.org/authors/id/E/ET/ETHER/JSON-MaybeXS-1.004008.tar.gz",
+        "sha256": "cd3937afa78831f80a2ad5abab6c51b9e82fca4c31e5856ea208d598db5dc867"
+      }
+    ],
+    "log_sha256": "a55d8527db6e1e342b8b922eb409befc995687d8aba92451141fcc30067e42e4",
+    "scope": "Syntax and existing SDK fixture, not a live full Explorer HTTP/GWAS-server trial."
+  }
+}
