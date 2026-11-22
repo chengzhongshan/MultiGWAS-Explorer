@@ -72,11 +72,13 @@
     },
     {
       "path": "DiffGWASDeps/SAS_ODA_Runner.pm",
-      "sha256": "0272af5bb1ec3f09344d8f0e60e83ba56c4f53298bf2c68b520f74d8cbd5c65d",
+      "sha256": "15ccb66cb68f47c6c5181a2cd3d878381a08c4e9b318430e8272ebf731c07875",
       "upstream_path": "MCPDeps/SAS_ODA_Runner.pm",
-      "upstream_sha256": "07357271a3f3c15a4d5fd5329eff5b7f8c0f5bd0ba5154fd4fb1bb97ef0e8dc8",
+      "upstream_sha256": "fad024ecc27dcf77aed9b2a1f1b479292f190594624c3166720afaec75da2670",
       "normalized_byte_identical": false,
-      "adaptation": "Current upstream implementation; worker/session temporary environment names adapted to Explorer. 2026-11-21: Explorer explicit target routing isolates persistent profiles/configurations; synchronized helper/protocol regression. Added addressed-session shutdown for owned live-test cleanup without restarting SAS."
+      "adaptation": "Current upstream implementation; worker/session temporary environment names adapted to Explorer. 2026-11-21: Explorer explicit target routing isolates persistent profiles/configurations; synchronized helper/protocol regression. Added addressed-session shutdown for owned live-test cleanup without restarting SAS. Follow-up Windows CRLF discovery fix ported without changing Explorer target routing or temporary-file ownership.",
+      "original_port_upstream_sha256": "07357271a3f3c15a4d5fd5329eff5b7f8c0f5bd0ba5154fd4fb1bb97ef0e8dc8",
+      "upstream_commit": "79ada136979f0e91694d3191e02191a421235abe"
     },
     {
       "path": "DiffGWASDeps/SAS_ODA_Temp.pm",
@@ -136,11 +138,13 @@
     },
     {
       "path": "run_sas_codes_or_script_in_ODA.pl",
-      "sha256": "698a3fb9e199b0154dc187eed80a6e4612292ae9da213da8e1639b2eafaad2e9",
+      "sha256": "44a5852709932bcfc8c7f5e0c87867140b76f43ff9cecadaae88d6c56ae154ce",
       "upstream_path": "run_sas_codes_or_files_in_ODA.pl",
-      "upstream_sha256": "12ab549f6124943859d4fb8912bb9b2b2a64f9b3229972dc2b0bc436bf6e20c6",
+      "upstream_sha256": "0ee256c0e9aa4a7fc00038c955377f76f860daf366d757361f41f0a18fbee954",
       "normalized_byte_identical": false,
-      "adaptation": "Canonical CLI port; Explorer aliases, local-SAS examples, temporary namespace and retained-HTML status path preserved."
+      "adaptation": "Canonical CLI port; Explorer aliases, local-SAS examples, temporary namespace and retained-HTML status path preserved. Follow-up Windows CRLF discovery fix ported without changing Explorer target routing or temporary-file ownership.",
+      "original_port_upstream_sha256": "12ab549f6124943859d4fb8912bb9b2b2a64f9b3229972dc2b0bc436bf6e20c6",
+      "upstream_commit": "79ada136979f0e91694d3191e02191a421235abe"
     },
     {
       "path": "server.pl",
@@ -229,6 +233,16 @@
       "upstream_sha256": "704bc3ad17d088f0e037d782928bee4a612b644186e9cf119819ad0ed82c8c19",
       "normalized_byte_identical": false,
       "adaptation": "Existing source profiler, dependency directory adapted."
+    },
+    {
+      "path": "tests/test_saspy_python_discovery.pl",
+      "upstream_path": "tests/test_saspy_python_discovery.pl",
+      "adaptation": "MCPDeps path changed to DiffGWASDeps; tests the actual Explorer compatibility entry points. Follow-up Windows CRLF discovery fix ported without changing Explorer target routing or temporary-file ownership.",
+      "original_port_upstream_sha256": null,
+      "upstream_commit": "79ada136979f0e91694d3191e02191a421235abe",
+      "upstream_sha256": "dec554d691d88de65df354c491eb2d90387f9089fe3a427c49f8dc2fcf1e8834",
+      "sha256": "ccdb6f8f2b661d56709146df8964c70e418444bda84a5f93740538fbb3c5d313",
+      "normalized_byte_identical": false
     }
   ],
   "compatibility_entrypoints": [
@@ -250,5 +264,12 @@
   ],
   "persistent_protocol": "2026-11-12-persistent-archive",
   "preservation": "Existing scientific SAS macros, GWAS inputs, plotting parameters, allele/LD policies and user configuration edits are not changed.",
-  "previous_port_manifest": "https://github.com/chengzhongshan/MultiGWAS-Explorer/blob/3a7a5fa1235dfbf80b11e2fbc01550e85291dc3d/MultiGWAS-Explorer/docs/SAS_RUNTIME_PORT_MANIFEST.json"
+  "previous_port_manifest": "https://github.com/chengzhongshan/MultiGWAS-Explorer/blob/3a7a5fa1235dfbf80b11e2fbc01550e85291dc3d/MultiGWAS-Explorer/docs/SAS_RUNTIME_PORT_MANIFEST.json",
+  "follow_up_sources": [
+    {
+      "repository": "https://github.com/chengzhongshan/MCP4SAS",
+      "commit": "79ada136979f0e91694d3191e02191a421235abe",
+      "scope": "Windows CRLF interpreter/package-path discovery; both submission and listing regression."
+    }
+  ]
 }

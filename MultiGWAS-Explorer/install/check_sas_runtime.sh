@@ -12,7 +12,7 @@ fi
 
 # Offline regressions: no ODA credentials, Java session or scientific downloads.
 for test in \
-  test_poc_input_boundaries test_runner_preflight_parity \
+  test_saspy_python_discovery test_poc_input_boundaries test_runner_preflight_parity \
   test_persistent_bulk_dispatch test_one_shot_status_path \
   test_python_path_boundary test_sas_supplied_autocall \
   test_literal_execution_contexts test_deferred_include_paths \
