@@ -69,7 +69,7 @@ sub close_owned {
     };
     $used=0;
 }
-END {close_owned() if $$==$owner;}
+END {close_owned() if defined($owner) && $$==$owner;}
 
 my @remote=map {"${tag}_$_.".(/^[ab]$/?'tsv':'sas')} qw(a b parent child);
 write_bytes("$outdir/$remote[0]","x\n11\n");
