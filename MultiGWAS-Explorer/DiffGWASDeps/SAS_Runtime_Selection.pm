@@ -3,6 +3,17 @@ use strict;
 use warnings;
 use File::Spec;
 
+sub cli_arguments {
+    my ($args) = @_;
+    my @result;
+    for my $item ([saspy_cfgname => '--saspy-cfgname'],
+                  [saspy_cfgfile => '--saspy-cfgfile'],
+                  [dir4local_sas_home => '--dir4local_sas_home']) {
+        push @result, $item->[1], $args->{$item->[0]} if defined $args->{$item->[0]};
+    }
+    return @result;
+}
+
 # Return only public routing settings. Credentials remain in SASPy configuration.
 sub resolve {
     my (%args) = @_;

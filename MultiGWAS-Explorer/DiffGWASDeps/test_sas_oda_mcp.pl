@@ -90,6 +90,7 @@ chdir $root or die $!;
     my $started=SAS_ODA_MCP::run_sas_oda_tool({
         delete_directory_rgx=>['^tmp_','^old_'], delete_directory_dry_run=>JSON::PP::true,
         delete_dir=>'~', persistent=>0, wait_seconds=>0,
+        saspy_cfgname=>'winlocal',saspy_cfgfile=>'C:/SAS config/local.py',dir4local_sas_home=>'E:/SAS staging',
     });
     my ($pid)=$started->{content}[0]{text}=~/PID: (\d+)/;
     my ($dir)=$started->{content}[0]{text}=~/Results directory: ([^\r\n]+)/;
@@ -102,6 +103,10 @@ chdir $root or die $!;
     is_deeply(\@patterns,['^tmp_','^old_'],'MCP forwards all directory regexes');
     ok(grep($_ eq '--delete-directory-dry-run',@$received),'MCP forwards boolean preview');
     ok(grep($_ eq '~',@$received),'remote home is preserved without shell expansion');
+    for my $pair (['--saspy-cfgname','winlocal'],['--saspy-cfgfile','C:/SAS config/local.py'],['--dir4local_sas_home','E:/SAS staging']) {
+        my @values=map {$received->[$_+1]} grep {$received->[$_] eq $pair->[0]} 0..$#$received-1;
+        is_deeply(\@values,[$pair->[1]],"MCP forwards $pair->[0] without losing spaces");
+    }
     my $done=SAS_ODA_MCP::run_sas_oda_tool({pid=>$pid});
     is($done->{structuredContent}{status},'COMPLETE','directory-only worker uses standard completion reporting');
 }

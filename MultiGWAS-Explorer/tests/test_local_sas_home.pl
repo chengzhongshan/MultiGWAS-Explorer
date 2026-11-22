@@ -41,6 +41,7 @@ s=Session()
 configure_local_home(s,sys.argv[1])
 assert s._pipeline_local_home==sys.argv[1].replace('\\','/')
 assert 'filename HOME ' in s.calls[0] and 'PIPELINE_SAS_HOME' in s.calls[0]
+assert 'ods path (prepend) work.templat(update);' in s.calls[0]
 configure_local_home(s,sys.argv[1])
 assert len(s.calls)==1
 for bad in ['relative/missing', os.path.join(sys.argv[1],'does not exist')]:

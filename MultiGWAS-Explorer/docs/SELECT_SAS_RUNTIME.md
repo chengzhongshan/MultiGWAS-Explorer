@@ -81,6 +81,19 @@ Add these keys to your complete analysis specification. This fragment alone
 does not describe GWAS inputs or study groups. Keep credentials out of shared
 specifications and generated configuration files.
 
+## Select the runtime through an AI agent
+
+Both MCP tools, `run_sas_codes_or_files_in_ODA` and
+`auto_prepare_and_run_diff_gwas`, accept `saspy_cfgname`, `saspy_cfgfile` and
+`dir4local_sas_home`. For example, ask the agent to use the configured
+`winlocal` profile and provide its configuration-file path when requesting a
+plot. Tool discovery exposes these fields; an agent does not need to change
+server-wide settings to select a different SAS backend.
+
+For Windows COM use one-shot requests (`persistent=false`); use Windows IOM
+`winlocal` for persistent workflows. Persistent COM thread ownership is not
+validated by this change.
+
 ## How files and sessions are kept consistent
 
 For known local profiles, the workflow defaults to a dedicated child directory
@@ -96,7 +109,9 @@ explicit home. Remote IOM/SSH sessions reject local staging homes.
 Generated runner JSON pins the profile, configuration path and home. It can be
 reused through `RUNNER_CONFIG_JSON` by the existing shell plotting helpers.
 Local templates use the configured SAS HOME rather than an ODA user's shared
-library. Figure-path recovery accepts Windows drive paths, Linux paths and
+library. Local session setup prepends a writable `WORK.TEMPLAT` ODS store so a
+locked/read-only SASUSER store cannot leave an old same-named GTL template in
+use. This store lasts for the session; original macro definitions are preserved. Figure-path recovery accepts Windows drive paths, Linux paths and
 paths containing spaces.
 
 Persistent connections are isolated by both profile and configuration-file

@@ -25,6 +25,9 @@ is(SAS_Runtime_Selection::resolve(cli=>{cfgname=>'oda'},env=>{SAS_LOCAL_HOME_DIR
 eval { SAS_Runtime_Selection::resolve(cli=>{cfgname=>'oda',home=>$dir}); };
 like($@,qr/cannot be used/,'contradictory explicit ODA and local home rejected');
 is(SAS_Runtime_Selection::resolve(cli=>{cfgname=>'my_custom_local',home=>$dir})->{SAS_LOCAL_HOME_DIR},$dir,'custom local profiles supported with explicit home');
+is_deeply([SAS_Runtime_Selection::cli_arguments({saspy_cfgname=>'winlocal',saspy_cfgfile=>'C:/SAS config/local.py',dir4local_sas_home=>'E:/SAS staging'})],
+    ['--saspy-cfgname','winlocal','--saspy-cfgfile','C:/SAS config/local.py','--dir4local_sas_home','E:/SAS staging'],
+    'MCP workflow routing arguments retain their values without shell interpolation');
 
 # Exercise the real workflow config emitter, not just the resolver.
 my $root=File::Spec->rel2abs("$Bin/..");
@@ -67,14 +70,15 @@ class Session:
         self.kw=kw
         self._io=types.SimpleNamespace(sascfg=types.SimpleNamespace(iomhost=None,ssh=None))
     def submit(self, code, **kw): return {'LOG':'NOTE: '+self.kw['cfgname']+' '+str(self.kw['cfgfile']), 'LST':'<html>fixture</html>'}
+    def endsas(self): self.closed=True
 sys.modules['saspy']=types.SimpleNamespace(SASsession=Session)
 os.environ['SASPY_CFGNAME']='oda'
 os.environ['SASPY_CFGFILE']='server_first_client.py'
 os.environ['SAS_ODA_SESSION_DEBUG_LOG']=str(Path(sys.argv[2])/'handler.log')
 ns=runpy.run_path(sys.argv[1])
-def request(name, cfgfile='test profile.py', home=''):
+def request(name, cfgfile='test profile.py', home='', cmd='submit'):
     a,b=socket.socketpair();a.settimeout(10)
-    body=json.dumps({'cmd':'submit','session_id':'same_id','sas_config':{'cfgname':name,'cfgfile':cfgfile},'local_home':home,'load_macros':False,'code':'data _null_; run;'}).encode()
+    body=json.dumps({'cmd':cmd,'session_id':'same_id','sas_config':{'cfgname':name,'cfgfile':cfgfile},'local_home':home,'load_macros':False,'code':'data _null_; run;'}).encode()
     t=threading.Thread(target=ns['handle_client'],args=(b,('127.0.0.1',1)))
     t.start();a.sendall(len(body).to_bytes(8,'big')+body)
     def receive(n):
@@ -97,6 +101,10 @@ assert all(c['cfgfile']!='server_first_client.py' for c in calls)
 assert len(ns['sessions'])==4
 local=[s for s in ns['sessions'].values() if s.kw['cfgname']=='winlocal' and s.kw['cfgfile']=='test profile.py'][0]
 assert local._pipeline_local_home==sys.argv[2].replace('\\','/')
+assert request('winlocal',cmd='close_session')['msg']=='closed' and local.closed
+assert len(ns['sessions'])==3
+assert request('winlocal',cmd='close_session')['msg']=='not_open' and len(calls)==5
+assert request('oda')['status']=='ok' and len(calls)==5  # another target unaffected
 print('Framed handler: ODA/Windows/Linux routing, config isolation, reuse and no fallback PASS')
 PY
 close $out;

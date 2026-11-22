@@ -17,7 +17,10 @@ def configure_local_home(sess, home):
     if not os.path.isabs(home) or not os.path.isdir(home):
         raise ValueError('Local SAS home must be an existing absolute directory: ' + home)
     literal = "'" + home.replace("'", "''") + "'"
-    setup = ('filename HOME ' + literal + '; options set=HOME ' + literal + ';\n'
+    # SASUSER may be read-only/locked by another local SAS instance. A fresh
+    # WORK template store prevents stale same-named GTL templates being reused.
+    setup = ('ods path (prepend) work.templat(update);\n'
+             'filename HOME ' + literal + '; options set=HOME ' + literal + ';\n'
              'data _null_; call symputx("_USERHOME",' + literal + ',"G"); '
              'call symputx("PIPELINE_SAS_HOME",' + literal + ',"G"); run;')
     result = sess.submit(setup)

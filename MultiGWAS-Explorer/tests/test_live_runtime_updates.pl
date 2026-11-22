@@ -68,12 +68,20 @@ sub close_owned {
     local $ENV{SAS_ODA_SESSION_PORT}=$port;
     local $ENV{OPEN_RESULT}=0;
     local $ENV{SAS_ODA_AUTOLOAD_MACROS}=0;
-    eval {action('close','run_sas_codes_or_files_in_ODA.pl','--code','endsas;');};
     eval {
         my $connection=IO::Socket::INET->new(PeerAddr=>'127.0.0.1',PeerPort=>$port,Proto=>'tcp',Timeout=>5) or die $!;
-        my $body=encode_json({cmd=>'shutdown'});
+        my $body=encode_json({cmd=>'close_session',session_id=>$session,sas_config=>{
+            cfgname=>$cfgname,cfgfile=>defined($cfgfile)?SAS_ODA_Runner::_normalize_local_path_for_python($cfgfile,$ENV{PIPELINE_PYTHON_BIN} || 'python3'):($ENV{SASPY_CFGFILE} // '')}});
         print {$connection} pack('N2',0,length($body)),$body;
-        my $response;read($connection,$response,4096);close $connection;
+        my $header;read($connection,$header,8)==8 or die 'Incomplete close response';
+        my (undef,$length)=unpack('N2',$header);my $response='';
+        while(length($response)<$length){my $part;my $n=read($connection,$part,$length-length($response));die 'Incomplete close body' unless $n;$response.=$part;}
+        close $connection;
+        push @records,{phase=>'close',response=>JSON::PP::decode_json($response)};
+        $connection=IO::Socket::INET->new(PeerAddr=>'127.0.0.1',PeerPort=>$port,Proto=>'tcp',Timeout=>5) or die $!;
+        $body=encode_json({cmd=>'shutdown'});
+        print {$connection} pack('N2',0,length($body)),$body;
+        read($connection,$response,4096);close $connection;
     };
     $used=0;
 }
@@ -92,13 +100,22 @@ proc print data=work.port_values; run;
 %put MGX_PORT_PASS=transfer;
 %put MGX_PORT_PID=&sysjobid;
 SAS
-$program .= "proc sgplot data=work.port_values; scatter x=x y=x / markerattrs=(size=9); run;\n" if $with_graph;
+$program .= <<'SAS' if $with_graph;
+proc template;
+ define statgraph mgx_local_test;
+  begingraph; layout overlay; scatterplot x=x y=x; endlayout; endgraph;
+ end;
+run;
+proc sgrender data=work.port_values template=mgx_local_test;run;
+proc sgplot data=work.port_values; scatter x=x y=x / markerattrs=(size=9); run;
+SAS
 write_bytes("$outdir/transfer.sas",$program);
 my ($exit,$log)=action('transfer','run_sas_codes_or_files_in_ODA.pl','--file',"$outdir/transfer.sas",
     '--upload-file',"$outdir/$remote[0]",'--upload-file',"$outdir/$remote[1]",
     '--download-file',"~/$remote[0]",'--download-local-path',"$outdir/returned-a.tsv",
     '--download-file',"~/$remote[1]",'--download-local-path',"$outdir/returned-b.tsv");
 is($exit,0,'actual batched upload, SAS submit and download succeeds');
+BAIL_OUT('Transfer/submission failed; inspect retained logs before further dependent checks') if $exit;
 like($log,qr/^MGX_PORT_PASS=transfer\s*$/m,'runtime calculation verifies two rows and sum 33');
 unlike($log,qr/^\s*ERROR(?:\s+\d+-\d+)?:/m,'no SAS error in retained full log');
 my ($pid)=$log=~/^MGX_PORT_PID=(\S+)/m;
@@ -133,6 +150,8 @@ if(-f "$outdir/session.log"){
     cmp_ok(scalar(()=$debug=~/request cmd=bulk_transfer session_id=\Q$session\E/mg),'>=',2,'actual persistent bulk RPCs are recorded');
 }else{fail('dedicated session debug log is retained');}
 close_owned();
+ok(scalar(grep {$_->{phase} eq 'close' && ($_->{response}{status} // '') eq 'ok' && ($_->{response}{msg} // '') eq 'closed'} @records),
+   'owned SAS session closes explicitly without replay or termination classification');
 write_bytes("$outdir/execution.json",JSON::PP->new->canonical->pretty->encode({session=>$session,saspy_cfgname=>$cfgname,records=>\@records,scope=>'Synthetic runner integration; not a scientific pipeline or performance benchmark.'}));
 diag("Retained execution evidence: $outdir");
 done_testing;

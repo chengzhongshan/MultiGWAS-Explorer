@@ -65,6 +65,7 @@ BEGIN {
 }
 use strict;
 use SAS_ODA_MCP;
+use SAS_Runtime_Selection;
 use warnings;
 use FindBin qw($Bin);
 use lib "$Bin/DiffGWASDeps";
@@ -767,6 +768,8 @@ $server->tool(
                                description => 'Returned log excerpt limit, default 16000. Use 0 for the full response log; the complete saved log is always retained.' },
             open_html => { type => 'boolean', description => 'Explicitly request opening saved HTML in the system default browser. Background jobs remain non-opening unless requested.' },
             macro_dir => { type => 'string', description => 'Local SAS macro discovery directory. An inaccessible path falls back to the current working directory with a warning.' },
+            saspy_cfgname => { type => 'string', description => 'Explicit SASPy profile: oda (default), winlocal, winlocal_com, linuxlocal, or a configured custom profile. No cross-profile fallback.' },
+            saspy_cfgfile => { type => 'string', description => 'SASPy configuration file containing the requested profile, readable by the selected Python interpreter.' },
             dir4local_sas_home => { type => 'string', description => 'Optional persistent home directory for local SAS targets; not required for ODA.' },
             session_id    => { type => 'string',
                                description => 'Optional persistent SAS ODA session id. Default: mysession.' },
@@ -796,6 +799,7 @@ $server->tool(
     'For custom genome-wide Manhattan subsets, the plotting path expects chromosome labels to be normalized into sortable numeric coordinates before SAS reads them; leaving literal X/Y values in a numeric CHR import can create a false pre-chr1 block in the final figure. ' .
     'The local GTF path now also understands reference genome build selection through an explicit reference_build override or automatic header/path-token detection, and then maps hg19, hg38, or T2T/hs1 inputs onto the matching built-in GTF profile. ' .
     'It supports both differential top-hit mode and common-association top-hit mode, where loci can be selected from strong single-GWAS associations that also have nominal association in another GWAS. ' .
+    'It can execute plots using explicitly selected licensed local Windows/Linux SAS via saspy_cfgname and saspy_cfgfile, with a shared dir4local_sas_home staging folder. ODA remains default and a failed local connection is not retried using ODA. The separate local_sas_only option only emits scripts without execution. ' .
     'It can also forward optional SNP:GENE label overrides and emit runnable local desktop SAS scripts instead of submitting everything to SAS ODA when users prefer workstation SAS. ' .
     'It can also forward local-Manhattan layout controls so users can manually tune crowded SNP-gene labels without editing SAS templates by hand. ' .
     'For local GTF plots, it can forward a dedicated local GTF window override that now controls both the extracted GTF subset and the displayed local gene-track window. ' .
@@ -1009,6 +1013,9 @@ $server->tool(
                 type => 'string',
                 description => 'Optional local LD audit TSV. During gnuplot fallback, PRUNED_LD candidate_snp rows whose lead_snp matches a query SNP are automatically overlaid with asterisks.'
             },
+            saspy_cfgname => { type => 'string', description => 'Explicit SASPy execution profile; oda default, winlocal/winlocal_com for Windows, linuxlocal for Linux. Requires a working configured SAS installation.' },
+            saspy_cfgfile => { type => 'string', description => 'SASPy configuration containing the selected profile.' },
+            dir4local_sas_home => { type => 'string', description => 'Dedicated writable local staging directory shared across plotting steps. Use a short path on Windows.' },
             sas_oda_account => {
                 type => 'string',
                 description => 'Optional SAS ODA account/email for noninteractive first-run login bootstrap.'
@@ -1269,6 +1276,7 @@ $server->tool(
                 $automation_script,
             );
             push @cmd, ('--spec', $spec_file) if defined $spec_file && length $spec_file;
+            push @cmd, SAS_Runtime_Selection::cli_arguments($args);
             push @cmd, ('--gwas-dir', $gwas_dir) if defined $gwas_dir && length $gwas_dir;
             push @cmd, ('--spec-out', $spec_out) if defined $spec_out && length $spec_out;
             push @cmd, ('--raw-column-alias-config', $raw_column_alias_config)

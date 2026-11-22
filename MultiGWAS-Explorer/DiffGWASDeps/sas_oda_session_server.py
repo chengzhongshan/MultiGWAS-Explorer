@@ -706,7 +706,10 @@ def configure_local_home(sess, home):
     if not os.path.isabs(home) or not os.path.isdir(home):
         raise ValueError('Local SAS home must be an existing absolute directory: ' + home)
     literal = "'" + home.replace("'", "''") + "'"
-    setup = ('filename HOME ' + literal + '; options set=HOME ' + literal + ';\n'
+    # SASUSER may be read-only/locked by another local SAS instance. A fresh
+    # WORK template store prevents stale same-named GTL templates being reused.
+    setup = ('ods path (prepend) work.templat(update);\n'
+             'filename HOME ' + literal + '; options set=HOME ' + literal + ';\n'
              'data _null_; call symputx("_USERHOME",' + literal + ',"G"); '
              'call symputx("PIPELINE_SAS_HOME",' + literal + ',"G"); run;')
     result = sess.submit(setup)
@@ -760,7 +763,7 @@ def handle_client(conn, addr):
             with lock:
                 session_configs[session_id] = config
                 session_homes[session_id] = str(req.get('local_home') or '')
-        if session_id and req.get('local_home'):
+        if session_id and req.get('local_home') and cmd != 'close_session':
             # The root belongs to this request/session, not the server process
             # environment inherited from whichever CLI launched it first.
             with lock:
@@ -780,6 +783,19 @@ def handle_client(conn, addr):
                 os._exit(0)
             threading.Thread(target=_exit_soon, daemon=True).start()
             return
+        elif cmd == 'close_session':
+            # Close only the addressed profile/config/session. Do not create a
+            # missing session or interpret intentional ENDSAS as a failed job.
+            with lock:
+                sess = sessions.pop(session_id, None)
+                try:
+                    if sess is not None:
+                        sess.endsas()
+                finally:
+                    for mapping in (session_configs, session_homes, session_macros_loaded,
+                                    session_macro_bootstrap_warning, session_macro_bootstrap_meta):
+                        mapping.pop(session_id, None)
+            resp = {'status':'ok', 'msg':'closed' if sess is not None else 'not_open'}
         elif cmd == 'create':
             with lock:
                 if session_id in sessions:
