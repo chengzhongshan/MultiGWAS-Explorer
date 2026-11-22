@@ -54,7 +54,7 @@ previous successful ODA validation of the same frozen example remains a
 separate result; a full GWAS pipeline was not rerun here.
 
 **HOST-PATH:** unavailable mapped-drive/tool entries in the inherited Windows
-PATH could stall even a trivial Cygwin Perl command. Tests used a scoped local
+PATH could stall even a trivial Cygwin Perl command. The Explorer server also appended author-specific network library directories; those defaults were removed while retaining explicit caller settings and vendored dependencies. Tests used a scoped local
 tool PATH; the user's system PATH was not changed. This is distinct from the
 CRLF discovery defect. Failed startup attempts and partial/interrupted tests
 are retained and excluded from the passing totals.

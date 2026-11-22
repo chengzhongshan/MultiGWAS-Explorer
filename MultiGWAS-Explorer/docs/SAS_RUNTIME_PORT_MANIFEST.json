@@ -148,11 +148,11 @@
     },
     {
       "path": "server.pl",
-      "sha256": "5778c7a2ad8e54a376787493e809c0661fd0b976d454e5315bfa63755f9bc92c",
+      "sha256": "65f8b96afbbd26322f007a64db75e6c7e23d19b8a783dafa4bcb5635eceee766",
       "upstream_path": "server.pl",
       "upstream_sha256": "601d7cff5b32c6a70f23f0da008e2dfed1b43c7b240316e612f77494e35b5458",
       "normalized_byte_identical": false,
-      "adaptation": "Only the SAS ODA tool schema is extended; full MCP4SAS server is not substituted. Explicit SASPy profile/configuration fields exposed by both Explorer MCP tools."
+      "adaptation": "Only the SAS ODA tool schema is extended; full MCP4SAS server is not substituted. Explicit SASPy profile/configuration fields exposed by both Explorer MCP tools. Removed author-specific network directory defaults from PATH/PERL5LIB; explicit user environment and vendored dependencies retained."
     },
     {
       "path": "tests/test_copilot_runner_review.pl",

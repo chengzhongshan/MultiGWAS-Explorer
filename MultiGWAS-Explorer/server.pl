@@ -45,8 +45,8 @@ BEGIN {
     lib->import($vendor_perl5) if -d $vendor_perl5;
     lib->import($local_deps) if -d $local_deps;
     lib->import(@local_perl5_arch) if @local_perl5_arch;
-    $ENV{PATH} = join(':', grep { defined && length } $local_venv_bin, $local_venv_scripts, $self_dir, $local_bin, $local_deps, ($ENV{PATH} // ''), '/mnt/g/NGS_lib/Linux_codes_SAM', '//rs1.stjude.org/clusterhome/zcheng/NGS_lib/Linux_codes_SAM');
-    $ENV{PERL5LIB} = join(':', grep { defined && length } $vendor_perl5, @local_perl5_bases, @local_perl5_arch, $local_deps, ($ENV{PERL5LIB} // ''), '/mnt/g/NGS_lib/Linux_codes_SAM', '//rs1.stjude.org/clusterhome/zcheng/NGS_lib/Linux_codes_SAM');
+    $ENV{PATH} = join(':', grep { defined && length } $local_venv_bin, $local_venv_scripts, $self_dir, $local_bin, $local_deps, ($ENV{PATH} // ''));
+    $ENV{PERL5LIB} = join(':', grep { defined && length } $vendor_perl5, @local_perl5_bases, @local_perl5_arch, $local_deps, ($ENV{PERL5LIB} // ''));
     if (!$ENV{PIPELINE_PYTHON_BIN} && -f $local_python_record) {
         if (open(my $pfh, '<', $local_python_record)) {
             my $line = <$pfh>;
