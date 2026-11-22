@@ -8,7 +8,7 @@ class ArchiveSession:
         self.sas=sas; self.home=home; self.fallback_fileinfo=fileinfo; self.cache={}
     def fileinfo(self,path):
         return self.cache[path] if path in self.cache else self.fallback_fileinfo(path)
-    def prime_fileinfo(self,paths):
+    def prime_fileinfo(self,paths,details_for_existing=False):
         token='MCPMETA_'+uuid.uuid4().hex
         code=[]
         for i,path in enumerate(paths):
@@ -25,6 +25,13 @@ class ArchiveSession:
                 _,idx,exists,size=line.split('|');found[int(idx)]={'exists':exists.strip()=='1','size':int(size.strip()) if size.strip()!='.' else None,'path':paths[int(idx)]}
         if len(found)!=len(paths):raise IOError('Incomplete batch file metadata')
         self.cache.update({paths[i]:info for i,info in found.items()})
+        if details_for_existing:
+            # Only existing files need the slower timestamp query used by the
+            # unchanged-file policy. New dependencies need one shared probe,
+            # rather than a SAS round trip for every small input file.
+            for path in paths:
+                if self.cache[path].get('exists'):
+                    self.cache[path]=self.fallback_fileinfo(path)
     def submit(self, code): return self.sas.submit(code)
     def symget(self, name): return self.sas.symget(name)
 
@@ -34,10 +41,28 @@ def run_fileinfo(s,p): return s.fileinfo(p)
 def remote_file_info(p,s): return run_fileinfo(s,p),s
 def upload_file(p,s,label=None,skip_if_same=False):
     remote=s.home.rstrip('/')+'/'+os.path.basename(p)
-    result=s.sas.upload(p,remote,overwrite=True)
-    if not result.get('Success'): raise IOError('SASPy upload failed')
-    if not _remote_upload_size_ok(run_fileinfo(s,remote),os.path.getsize(p)):
-        raise IOError('Uploaded archive size mismatch')
+    expected=os.path.getsize(p)
+    def upload_and_verify(source):
+        result=s.sas.upload(source,remote,overwrite=True)
+        if not result.get('Success'): raise IOError('SASPy upload failed')
+        # Pre-transfer metadata must not validate an overwritten file.
+        cache=getattr(s,'cache',None)
+        if isinstance(cache,dict):cache.pop(remote,None)
+        info=run_fileinfo(s,remote)
+        return info,_remote_upload_size_ok(info,expected)
+    info,verified=upload_and_verify(p)
+    if not verified:
+        # Match the established single-file runner's bounded staged-copy retry.
+        # Only this file transfer is repeated; user SAS is never resubmitted.
+        got=info.get('size') if isinstance(info,dict) else None
+        print(f'Upload verification retry: {remote}: expected {expected} bytes, got {got}; retrying once from a private staged copy.',flush=True)
+        with tempfile.TemporaryDirectory(prefix='mcp4sas-upload-retry-') as directory:
+            staged=os.path.join(directory,os.path.basename(p))
+            shutil.copy2(p,staged)
+            info,verified=upload_and_verify(staged)
+    if not verified:
+        got=info.get('size') if isinstance(info,dict) else None
+        raise IOError(f'Uploaded archive size mismatch for {remote}: expected {expected} bytes, got {got}')
     return remote,s
 def download_file(remote,local,s):
     result=s.sas.download(local,remote,overwrite=True)
@@ -163,6 +188,18 @@ def upload_files_archive(items, session_obj):
     reused_results = []
     remote_names = set()
     try:
+        # Validate the entire list before sending anything. In particular,
+        # duplicate basenames must not overwrite an earlier dependency.
+        candidates=[];checked_names=set()
+        for item in items:
+            local=os.path.abspath(str(item.get('local_path','') or ''))
+            if not os.path.isfile(local):raise FileNotFoundError(f'Upload source does not exist: {local}')
+            name=os.path.basename(local.replace('\\','/'))
+            if name in checked_names:raise ValueError(f'Archive upload has duplicate remote basename: {name}')
+            checked_names.add(name)
+            if bool(item.get('skip_if_same',True)):candidates.append(home+'/'+name)
+        if candidates and hasattr(session,'prime_fileinfo'):
+            session.prime_fileinfo(candidates,details_for_existing=True)
         with zipfile.ZipFile(local_archive, 'w', compression=zipfile.ZIP_DEFLATED, allowZip64=True) as bundle:
             for index, item in enumerate(items):
                 local_path = os.path.abspath(str(item.get('local_path', '') or ''))
@@ -439,7 +476,11 @@ def download_files_archive(items, session_obj):
 def transfer_many(sas,payload,home,fileinfo):
     adapter=ArchiveSession(sas,home,fileinfo)
     uploads=payload.get('uploads',[]); downloads=payload.get('downloads',[])
-    if _archive_transfer_enabled(payload) and len(uploads)>=2:
+    # SASPy's single-file upload cannot safely quote apostrophes in its remote
+    # FILENAME statement. A one-member archive uses the verified SAS ZIP copy
+    # path, even when optional multi-file batching is disabled.
+    quoted_name=any("'" in os.path.basename(str(item.get('local_path','')).replace('\\','/')) for item in uploads)
+    if (_archive_transfer_enabled(payload) and len(uploads)>=2) or quoted_name:
         up,_=upload_files_archive(uploads,adapter)
     else:
         up=[]

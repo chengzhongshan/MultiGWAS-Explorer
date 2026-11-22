@@ -12,6 +12,7 @@ use File::Copy qw(copy);
 use POSIX qw(WNOHANG);
 use SAS_Log_Diagnostics;
 use SAS_Source_Analysis;
+use MCP_Job_Options;
 sub text_result {
     my ($text) = @_;
     return { content => [{ type => 'text', text => ($text // '') }] };
@@ -136,19 +137,37 @@ sub reap_child_if_finished {
 sub run_sas_oda_tool {
     my ($args) = @_;
     $args ||= {};
+    my ($wait_seconds, $log_limit);
+    my $valid = eval {
+        $wait_seconds = MCP_Job_Options::wait_seconds($args->{wait_seconds});
+        $log_limit = MCP_Job_Options::log_limit($args->{max_log_chars});
+        1;
+    };
+    if (!$valid) {
+        my $response = text_result("ERROR: $@");
+        $response->{isError} = JSON::PP::true;
+        $response->{structuredContent} = {status => 'FAILED', submitted => JSON::PP::false};
+        return $response;
+    }
 
     if (defined $args->{pid}) {
         my ($pid_file, $out_file) = find_status_for_pid($args->{pid});
         return text_result("ERROR: PID $args->{pid} not found or already completed.")
           unless $pid_file;
 
-        reap_child_if_finished($args->{pid});
+        MCP_Job_Options::await_completion(sub {
+            reap_child_if_finished($args->{pid});
+            return !pid_is_running($args->{pid});
+        }, $wait_seconds);
         if (pid_is_running($args->{pid})) {
-            return text_result(
+            my $response = text_result(
                 "STATUS: RUNNING (PID $args->{pid})\n"
               . "Output file: $out_file\n"
-              . "Ask the AI agent to check status again in a moment."
+              . "Poll again after about 5 seconds; use 30 seconds for known long analyses."
             );
+            $response->{structuredContent} = {status => 'RUNNING', pid => 0+$args->{pid},
+                log_path => $out_file, results_directory => dirname($pid_file), poll_after_seconds => 5};
+            return $response;
         }
 
         my $completion_file = File::Spec->catfile(dirname($pid_file), 'worker.result.json');
@@ -174,15 +193,17 @@ sub run_sas_oda_tool {
         unlink $pid_file if -f $pid_file;
         my $diagnostics = SAS_Log_Diagnostics::summarize($content);
         my $response = text_result(
-            "STATUS: $label (PID $args->{pid})\n$exit_detail\n"
+            "STATUS: $label (PID $args->{pid})\n$exit_detail\nResults directory: " . dirname($pid_file) . "\n"
           . SAS_Log_Diagnostics::format_summary($diagnostics)
           . "SAS log for debugging saved to: $log_path\n\n"
-          . ($content // '')
+          . MCP_Job_Options::log_excerpt($content, $log_limit, $log_path)
           . (length($cleanup_error) ? "\nWARNING: $cleanup_error\n" : '')
           . (length($worker_error) ? "\nERROR: $worker_error\n" : '')
         );
         $response->{isError} = $failed ? JSON::PP::true : JSON::PP::false;
-        $response->{structuredContent} = {status => $label, exit_code => $completion->{exit_code}, log_path => $log_path, diagnostics => $diagnostics};
+        $response->{structuredContent} = {status => $label, pid => 0+$args->{pid},
+            exit_code => $completion->{exit_code}, log_path => $log_path,
+            results_directory => dirname($pid_file), diagnostics => $diagnostics};
         return $response;
     }
 
@@ -245,6 +266,10 @@ sub run_sas_oda_tool {
     push @runner_args, ('--dir4listing', $args->{dir4listing}) if defined($args->{dir4listing}) && length($args->{dir4listing});
     push @runner_args, ('--saspy-cfgname', $args->{saspy_cfgname}) if defined($args->{saspy_cfgname}) && length($args->{saspy_cfgname});
     push @runner_args, ('--saspy-cfgfile', $args->{saspy_cfgfile}) if defined($args->{saspy_cfgfile}) && length($args->{saspy_cfgfile});
+    push @runner_args, ('--macro-dir', $args->{macro_dir}) if defined($args->{macro_dir});
+    push @runner_args, ('--dir4local_sas_home', $args->{dir4local_sas_home}) if defined($args->{dir4local_sas_home});
+    push @runner_args, is_falsey($args->{open_html}) ? '--no-open-html' : '--open-html'
+      if exists($args->{open_html});
     push @runner_args, '--check-saspy-connection-only' if is_truthy($args->{check_saspy_connection_only});
 
     my $pid = fork();
@@ -310,7 +335,10 @@ sub run_sas_oda_tool {
     }
 
     write_pid_file($pid_file, $pid);
-    return text_result(
+    if ($wait_seconds > 0) {
+        return run_sas_oda_tool({pid => $pid, wait_seconds => $wait_seconds, max_log_chars => $log_limit});
+    }
+    my $response = text_result(
         "QUERYING: SAS ODA worker started\n"
       . "PID: $pid\n"
       . "Output file: $out_file\n"
@@ -319,6 +347,9 @@ sub run_sas_oda_tool {
       . "Ask the AI agent to check status with: {\"pid\": $pid}\n"
       . "For long SAS jobs, check no more than every 30 seconds."
     );
+    $response->{structuredContent} = {status => 'RUNNING', pid => 0+$pid,
+        log_path => $out_file, results_directory => $result_dir, poll_after_seconds => 5};
+    return $response;
 }
 
 1;

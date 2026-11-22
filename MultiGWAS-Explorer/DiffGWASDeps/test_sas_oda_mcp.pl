@@ -59,7 +59,7 @@ chdir $root or die $!;
     for my $failure (0, 1) {
         local $ENV{ODA_TEST_FAIL} = $failure;
         my $started = SAS_ODA_MCP::run_sas_oda_tool({
-            sas_codes_or_file => 'proc print; run;', persistent => 0,
+            sas_codes_or_file => 'proc print; run;', persistent => 0, wait_seconds => 0,
             output_file => "custom_$failure.txt",
         });
         my $text = $started->{content}[0]{text};
@@ -89,7 +89,7 @@ chdir $root or die $!;
     local $ENV{ODA_TEST_FAIL}=0;
     my $started=SAS_ODA_MCP::run_sas_oda_tool({
         delete_directory_rgx=>['^tmp_','^old_'], delete_directory_dry_run=>JSON::PP::true,
-        delete_dir=>'~', persistent=>0,
+        delete_dir=>'~', persistent=>0, wait_seconds=>0,
     });
     my ($pid)=$started->{content}[0]{text}=~/PID: (\d+)/;
     my ($dir)=$started->{content}[0]{text}=~/Results directory: ([^\r\n]+)/;

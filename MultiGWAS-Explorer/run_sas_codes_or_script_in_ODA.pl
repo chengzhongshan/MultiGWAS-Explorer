@@ -119,6 +119,7 @@ use Getopt::Long;
 use SAS_ODA_Runner;
 use SAS_ODA_Directory_Cleanup;
 use SAS_Source_Analysis;
+use SAS_Java_Help;
 use SAS_ODA_Temp;
 use JSON::PP qw(encode_json decode_json);
 use Cwd qw(abs_path getcwd);
@@ -135,7 +136,8 @@ use Scalar::Util qw(blessed);
 
 my ($code, $file, $macro_dir, $no_html, $output_prefix, $help, $persistent, $session_id,
     $dry_run, $dir4listing, $monitor_status_file, $monitor_interval_seconds,
-    $kill_saspy_sessions);
+    $kill_saspy_sessions, $open_html);
+my $macro_dir_warning = '';
 my ($internal_runner_result_json, $internal_execution_file, $internal_execution_code_file,
     $internal_macro_dir, $internal_open_html, $internal_persistent, $internal_session_id);
 my (@upload_files, @download_files, @download_local_paths, @delete_files, @delete_file_rgxs, @file_infos);
@@ -323,83 +325,20 @@ sub detect_desktop_open_env {
     return \%open_env;
 }
 
-sub launch_command_detached {
-    my ($cmd, $open_env) = @_;
-    return 0 unless ref($cmd) eq 'ARRAY' && @{$cmd};
-    my $pid = fork();
-    return 0 unless defined $pid;
-    return 1 if $pid;
-
-    eval { POSIX::setsid(); };
-    if (ref($open_env) eq 'HASH') {
-        for my $key (qw(DISPLAY XAUTHORITY)) {
-            next unless defined($open_env->{$key}) && length($open_env->{$key});
-            $ENV{$key} = $open_env->{$key};
-        }
-    }
-    open STDIN,  '<', File::Spec->devnull();
-    open STDOUT, '>', File::Spec->devnull();
-    open STDERR, '>', File::Spec->devnull();
-    exec { $cmd->[0] } @{$cmd};
-    exit 127;
-}
-
 sub auto_open_local_file {
     my ($path) = @_;
     return 0 unless defined $path && length $path && -f $path;
-
-    my @commands;
+    my $helper = SAS_ODA_Runner::_normalize_local_path_for_python("$Bin/DiffGWASDeps/result_browser.py", $python_bin);
+    my $local_path = SAS_ODA_Runner::_normalize_local_path_for_python(abs_path($path), $python_bin);
     my $open_env = detect_desktop_open_env();
-    if ($^O eq 'cygwin' || $^O eq 'MSWin32') {
-        push @commands, ['cygstart', $path] if find_executable_in_path('cygstart');
-    } elsif ($^O eq 'darwin') {
-        push @commands, ['open', $path] if find_executable_in_path('open');
-    } else {
-        my $uri = local_file_uri($path);
-        my @browser_candidates;
-        push @browser_candidates, $ENV{OPEN_RESULT_BROWSER}
-          if defined($ENV{OPEN_RESULT_BROWSER}) && length($ENV{OPEN_RESULT_BROWSER});
-        push @browser_candidates, qw(
-          google-chrome-stable
-          google-chrome
-          chromium
-          chromium-browser
-          firefox
-          brave-browser
-          opera
-        );
-        my %seen_browser;
-        for my $browser (@browser_candidates) {
-            next if $seen_browser{$browser}++;
-            my $browser_path = find_executable_in_path($browser);
-            next unless $browser_path;
-            push @commands, [$browser_path, $uri];
-        }
-        push @commands, ['xdg-open', $path] if find_executable_in_path('xdg-open');
-        push @commands, ['open', $path] if find_executable_in_path('open');
+    local %ENV = %ENV;
+    if (ref($open_env) eq 'HASH') {
+        $ENV{$_} = $open_env->{$_} for keys %{$open_env};
     }
-
-    if ($python_bin) {
-        push @commands, [
-            $python_bin,
-            '-c',
-            'import pathlib, sys, webbrowser; webbrowser.open(pathlib.Path(sys.argv[1]).resolve().as_uri())',
-            $path,
-        ];
-    }
-
-    for my $cmd (@commands) {
-        if (launch_command_detached($cmd, $open_env)) {
-            my $display_note = (ref($open_env) eq 'HASH' && $open_env->{DISPLAY})
-              ? " on DISPLAY=$open_env->{DISPLAY}"
-              : '';
-            print "Requested browser open$display_note: $path\n";
-            return 1;
-        }
-    }
-
-    warn "WARNING: Could not auto-open $path with the system default browser. Set OPEN_RESULT=0 to suppress this attempt.\n";
-    return 0;
+    # The shared helper checks launcher exits and converts Cygwin paths before
+    # a Windows fallback. A successful fork alone did not prove launch success.
+    my $status = system {$python_bin} $python_bin, $helper, $local_path;
+    return $status == 0 ? 1 : 0;
 }
 
 sub status_timestamp {
@@ -445,6 +384,7 @@ GetOptions(
     'file|f=s' => \$file,
     'macro-dir|m=s' => \$macro_dir,
     'no-html-info|no-html_info' => \$no_html,
+    'open-html!' => \$open_html,
     'output-prefix|p=s' => \$output_prefix,
     'persistent!' => \$persistent,
     'session-id|s=s' => \$session_id,
@@ -487,6 +427,13 @@ GetOptions(
     '_internal-persistent!' => \$internal_persistent,
     '_internal-session-id=s' => \$internal_session_id,
 ) or die "Error in command line arguments\n";
+
+$ENV{OPEN_RESULT} = $open_html ? '1' : '0' if defined $open_html;
+
+if (defined $macro_dir) {
+    ($macro_dir, $macro_dir_warning) =
+      SAS_ODA_Runner::normalize_local_macro_dir($macro_dir);
+}
 
 $ENV{SASPY_CFGNAME} = $saspy_cfgname if defined($saspy_cfgname) && length($saspy_cfgname);
 $ENV{SASPY_CFGFILE} = $saspy_cfgfile if defined($saspy_cfgfile) && length($saspy_cfgfile);
@@ -795,7 +742,21 @@ PY
 
     local $ENV{PYTHONPATH} = resolve_pythonpath() unless defined $ENV{PYTHONPATH} && length $ENV{PYTHONPATH};
     my $script_path_for_python = SAS_ODA_Runner::_normalize_local_path_for_python($script_path, $python_bin);
-    my $cmd = join(' ', sh_quote($python_bin), sh_quote($script_path_for_python), '2>&1');
+    # Perl's list-form exec accepts Windows paths under Cygwin, but sh does
+    # not. Convert only the executable; native Python still needs its script
+    # argument in Windows form. Use this Perl's Cygwin mount table.
+    my $shell_python = $python_bin;
+    if ($^O eq 'cygwin' && $shell_python =~ m{^(?:[A-Za-z]:[\\/]|\\\\)}) {
+        my $cygpath = File::Spec->catfile(dirname($^X), 'cygpath.exe');
+        $cygpath = 'cygpath' unless -x $cygpath;
+        open my $convert, '-|', $cygpath, '-au', $shell_python
+          or die "Cannot convert Python executable for Cygwin shell: $!\n";
+        $shell_python = <$convert> // '';
+        close $convert or die "cygpath failed for Python executable $python_bin\n";
+        $shell_python =~ s/[\r\n]+\z//;
+        die "Empty Cygwin path for Python executable $python_bin\n" unless length $shell_python;
+    }
+    my $cmd = join(' ', sh_quote($shell_python), sh_quote($script_path_for_python), '2>&1');
     my $raw = qx{$cmd};
     my $status = $? >> 8;
     my $parsed;
@@ -810,6 +771,13 @@ PY
     $parsed->{status} = $status;
     $parsed->{raw_output} = $raw;
     $parsed->{ok} = $parsed->{ok} ? 1 : 0;
+    if (!$parsed->{ok}) {
+        my $help = SAS_Java_Help::instructions(join("\n", $parsed->{error} // '', $parsed->{log} // '', $raw));
+        if (length $help) {
+            $parsed->{java_setup_help} = $help;
+            $parsed->{error} = ($parsed->{error} || 'SASPy connection setup failed') . $help;
+        }
+    }
     $parsed->{label} = $label if defined $label && length $label;
     return $parsed;
 }
@@ -857,13 +825,23 @@ sub bootstrap_sas_oda_credentials_if_needed {
         my $password = $provided_password;
 
         if (!length($account)) {
-            die "SAS ODA credentials are not configured yet. Re-run interactively, or supply them with --sas-oda-account/--sas-oda-password (or PIPELINE_SAS_ODA_ACCOUNT / PIPELINE_SAS_ODA_PASSWORD).\n"
+            die "SAS ODA credentials are not configured for authkey '$authkey'.\n"
+              . "Credential file checked: $authinfo_path\n"
+              . "In VS Code run: MCP4SAS: Configure SAS ODA Login.\n"
+              . "Or open a private local terminal in the MCP4SAS runtime folder and run:\n"
+              . "  perl run_sas_codes_or_files_in_ODA.pl --prompt-sas-oda-auth --check-sas-oda-login-only\n"
+              . "Use the same Python, HOME, SASPY_CFGFILE and SASPY_CFGNAME=oda as the failing tool.\n"
+              . "A new Cygwin home may not contain credentials from your Windows home.\n"
+              . "Do not put passwords in AI chat, command arguments, screenshots or Git.\n"
+              . "Setup: https://github.com/chengzhongshan/MCP4SAS/blob/main/integrations/vscode/README.md\n"
                 unless $interactive;
             print STDERR "SAS ODA credentials were not found for authkey '$authkey'.\n";
             $account = prompt_line_stderr('Enter your SAS ODA account/email', $existing_user);
         }
         if (!length($password)) {
-            die "The SAS ODA password was not provided. Re-run interactively, or supply it with --sas-oda-password (or PIPELINE_SAS_ODA_PASSWORD).\n"
+            die "The SAS ODA password was not provided. In VS Code run MCP4SAS: Configure SAS ODA Login,\n"
+              . "or use a private local terminal: perl run_sas_codes_or_files_in_ODA.pl --prompt-sas-oda-auth --check-sas-oda-login-only\n"
+              . "Do not send the password to the AI assistant.\n"
                 unless $interactive;
             $password = prompt_password_stderr('Enter your SAS ODA password');
         }
@@ -894,6 +872,8 @@ sub bootstrap_sas_oda_credentials_if_needed {
 
         my $detail = $probe->{error} || $probe->{raw_output} || 'unknown SAS ODA validation failure';
         chomp $detail;
+        die "SASPy Java/IOM setup failed. Credentials were not saved.\n$detail\n"
+          if length($probe->{java_setup_help} // '');
         warn "WARNING: SAS ODA login validation failed. The supplied account or password may be wrong.\n";
         warn "Validation detail: $detail\n" if length $detail;
 
@@ -915,6 +895,7 @@ if ($internal_runner_result_json) {
         open_html       => defined($internal_open_html) ? $internal_open_html : 1,
         session_id      => $internal_session_id,
         persistent      => $internal_persistent,
+        batch_dependencies => $archive_transfers,
     );
     my $worker_result;
     my $worker_error = '';
@@ -959,15 +940,19 @@ if (!$help && defined($classify_sas_log) && length($classify_sas_log)) {
     close $classify_fh;
     my $has_space_failure = sas_log_contains_space_exhaustion($classify_text) ? 1 : 0;
     my $has_remote_termination = !$has_space_failure && sas_log_contains_remote_termination($classify_text) ? 1 : 0;
+    my $has_windows_network_failure = !$has_space_failure && !$has_remote_termination
+      && sas_log_contains_windows_network_path_failure($classify_text) ? 1 : 0;
     print encode_json({
         sas_log       => $classify_sas_log,
         failure_class => ($has_space_failure ? 'sas_oda_space_exhaustion'
-          : ($has_remote_termination ? 'sas_oda_remote_session_termination' : '')),
+          : ($has_remote_termination ? 'sas_oda_remote_session_termination'
+            : ($has_windows_network_failure ? 'sas_windows_network_path_unavailable' : ''))),
         error_code    => ($has_space_failure ? 'SAS_ODA_WORKSPACE_EXHAUSTION'
-          : ($has_remote_termination ? 'SAS_ODA_REMOTE_SESSION_TERMINATED' : '')),
-        retryable     => (($has_space_failure || $has_remote_termination) ? JSON::PP::false : JSON::PP::true),
+          : ($has_remote_termination ? 'SAS_ODA_REMOTE_SESSION_TERMINATED'
+            : ($has_windows_network_failure ? 'SAS_WINDOWS_NETWORK_PATH_UNAVAILABLE' : ''))),
+        retryable     => (($has_space_failure || $has_remote_termination || $has_windows_network_failure) ? JSON::PP::false : JSON::PP::true),
     }), "\n";
-    exit($has_space_failure ? 73 : ($has_remote_termination ? 74 : 0));
+    exit($has_space_failure ? 73 : ($has_remote_termination ? 74 : ($has_windows_network_failure ? 1 : 0)));
 }
 
 if ($help || (!$check_sas_oda_login_only && !$classify_sas_log && !$monitor_status_file && !$code && !$file && !@upload_files && !@download_files && !@delete_files && !@delete_file_rgxs && !@delete_directory_rgxs && !$delete_directory_dry_run && !$dir4listing && !@file_infos)
@@ -983,9 +968,11 @@ Options:
                              Literal '\n', '\r\n', and '\t' sequences in a
                              direct --code string are expanded before submit.
   -f, --file <file>          SAS script file to execute
-  -m, --macro-dir <dir>      Directory containing macro files (default: ./)
-  --no-html-info             output a plain text file containing the random html filename
+  -m, --macro-dir <dir>      Directory containing macro files; unreachable paths fall back to the current working directory (default: ./)
+  --no-html-info             Do not save or open the returned HTML output.
   --no-html_info             Legacy alias for --no-html-info
+  --open-html                Request opening saved HTML (default); overrides OPEN_RESULT.
+  --no-open-html             Save HTML without opening it. Firefox is not required.
   -p, --output-prefix <prefix> Prefix for output files (default: output)
     --persistent             Keep SAS session alive for multiple runs, only working with --session-id. If not specified, a new session is created and destroyed for each run.
                              As the intial starting of saspy server and sas oda session takes time, using persistent session can save time for multiple runs. So please try to
@@ -1061,6 +1048,9 @@ Options:
   -h, --help                 Show this help message
 
 Environment:
+  OPEN_RESULT                       Set 0, false, no or off to save HTML without opening it.
+                                     --open-html / --no-open-html override this setting.
+                                     Browser diagnostic: $python_bin DiffGWASDeps/result_browser.py --check
   SAS_ODA_RUN_TIMEOUT_SECONDS        Overall timeout for submit and file-transfer helper actions
                                      in this wrapper (default: ${default_sas_run_timeout_seconds}s; set to 0 to disable)
   SAS_ODA_RUN_TIMEOUT_GRACE_SECONDS  Extra wait after TERM before forcible kill (default: ${sas_run_timeout_grace_seconds}s)
@@ -1171,6 +1161,7 @@ if ($dry_run) {
     # Default session id when persistent mode is requested but none provided
     $session_id ||= "default_session" if $persistent;
     print "DRY-RUN: persistent=" . ($persistent ? 1 : 0) . " session_id=" . ($session_id // '(undef)') . "\n";
+    print "$macro_dir_warning\n" if length $macro_dir_warning;
     exit 0;
 }
 
@@ -1580,6 +1571,7 @@ my $runner = SAS_ODA_Runner->new(
     open_html => !$no_html,
     session_id => $session_id,
     persistent => $persistent,
+    batch_dependencies => $archive_transfers,
 );
 
 sub make_runner {
@@ -1589,6 +1581,7 @@ sub make_runner {
         open_html       => $overrides{open_html} // (!$no_html),
         session_id      => exists $overrides{session_id} ? $overrides{session_id} : $session_id,
         persistent      => exists $overrides{persistent} ? $overrides{persistent} : $persistent,
+        batch_dependencies => $archive_transfers,
     );
 }
 
@@ -1777,6 +1770,7 @@ sub run_runner_submit_with_timeout {
             open_html       => $runner_open_html,
             session_id      => $runner_session_id,
             persistent      => $runner_persistent,
+            batch_dependencies => $archive_transfers,
         );
         my $worker_result;
         my $worker_error = '';
@@ -2042,8 +2036,9 @@ sub scan_sas_text_for_macro_invocation_spans {
     my $len = length($masked // '');
 
     while ($i < $len) {
-        my $rest = substr($masked, $i);
-        if ($rest =~ /^%([A-Za-z_]\w*)([ \t\r\n]*)\(/) {
+        my $ch = substr($masked, $i, 1);
+        pos($masked) = $i;
+        if ($ch eq '%' && $masked =~ /\G%([A-Za-z_]\w*)([ \t\r\n]*)\(/gc) {
             my $name = $1;
             my $ws = $2 // '';
             $stack[-1]{paren_depth}++ if @stack;
@@ -2054,11 +2049,10 @@ sub scan_sas_text_for_macro_invocation_spans {
                 paren_depth  => 1,
             };
             $line_no += _count_newlines($ws);
-            $i += length($&);
+            $i = pos($masked);
             next;
         }
 
-        my $ch = substr($masked, $i, 1);
         if ($ch eq "\n") {
             $line_no++;
             $i++;
@@ -2827,6 +2821,13 @@ sub sas_log_contains_space_exhaustion {
     return 0;
 }
 
+sub sas_log_contains_windows_network_path_failure {
+    my ($text) = @_;
+    return 0 unless defined($text) && length($text);
+    $text=$1 if $text =~ /^=== SAS Log ===\r?\n(.*?)(?:\r?\n=== Output ===|\z)/ms;
+    return $text =~ /^\s*ERROR:\s+Windows error code:\s*67 in hx_disk_access\b/mi ? 1 : 0;
+}
+
 sub compose_remote_path_for_match {
     my ($remote_dir, $entry) = @_;
     return $entry if !defined $remote_dir || $remote_dir eq '' || $remote_dir eq '.';
@@ -3153,6 +3154,7 @@ if (($execution_file || ($execution_code && $execution_code !~ /^\s*$/))
 if (($execution_file || ($execution_code && $execution_code !~ /^\s*$/))
     && ref($result) eq 'HASH'
     && !$sas_execution_failure_class
+    && index($result->{error} // '', '[MCP4SAS Java setup help]') < 0
     && sas_log_contains_remote_termination(join("\n", $result->{error} // '', $result->{log} // '', $result->{dep_logs} // ''))) {
     $sas_execution_failed = 1;
     $sas_execution_failure_class = 'sas_oda_remote_session_termination';
@@ -3180,6 +3182,19 @@ if (($execution_file || ($execution_code && $execution_code !~ /^\s*$/))
     $sas_execution_error = 'NON-RETRYABLE: SAS ODA exhausted its WORK/storage space';
     $sas_execution_error .= ": $first_line" if length $first_line;
     $sas_execution_error .= '. Free ODA storage or reduce WORK data before rerunning; the same SAS script must not be submitted again automatically.';
+    warn "ERROR: $sas_execution_error\n";
+}
+
+if (($execution_file || ($execution_code && $execution_code !~ /^\s*$/))
+    && ref($result) eq 'HASH'
+    && !$sas_execution_failure_class
+    && sas_log_contains_windows_network_path_failure(join("\n", $result->{error} // '', $result->{log} // ''))) {
+    $sas_execution_failed = 1;
+    $sas_execution_failure_class = 'sas_windows_network_path_unavailable';
+    my $first_line = first_fatal_sas_log_line(join("\n", $result->{error} // '', $result->{log} // ''));
+    $sas_execution_error = 'SAS could not access a Windows network path (error 67)';
+    $sas_execution_error .= ": $first_line" if length $first_line;
+    $sas_execution_error .= '. Verify that the UNC share is reachable from the SAS host; check FILENAME, LIBNAME and SASAUTOS settings. --macro-dir controls local discovery and cannot repair server-side paths.';
     warn "ERROR: $sas_execution_error\n";
 }
 
@@ -3243,6 +3258,11 @@ if (ref($result) eq 'HASH' && length($combined_preflight_report // '')) {
           ? ($result->{dep_logs} . "\n\n" . $combined_preflight_report)
           : $combined_preflight_report;
     }
+}
+if (ref($result) eq 'HASH' && length($macro_dir_warning)) {
+    $result->{dep_logs} = length($result->{dep_logs} // '')
+      ? ($macro_dir_warning . "\n" . $result->{dep_logs})
+      : $macro_dir_warning;
 }
 
 if ($include_debug_ctx && ref($result) eq 'HASH') {
@@ -3511,7 +3531,7 @@ if (!$no_html and (($execution_code && $execution_code!~/^\s*$/) || $execution_f
         move($htmlfilename, $final_html_path)
           or warn "WARNING: Could not move HTML artifact from $htmlfilename to $final_html_path: $!\n";
     }
-    my $allow_auto_open = (!defined($ENV{OPEN_RESULT}) || $ENV{OPEN_RESULT} ne '0') ? 1 : 0;
+    my $allow_auto_open = (!defined($ENV{OPEN_RESULT}) || $ENV{OPEN_RESULT} !~ /^\s*(?:0|false|no|off)\s*$/i) ? 1 : 0;
     # Status metadata must point to the retained file, not deleted worker scratch.
     $result->{htmlfilename} = abs_path($final_html_path)
       if $final_html_path && -f $final_html_path;

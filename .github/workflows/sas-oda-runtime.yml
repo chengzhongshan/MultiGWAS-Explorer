@@ -1,0 +1,55 @@
+name: SAS ODA runtime
+on:
+  push:
+    branches: [main, port/mcp4sas-runtime-20261121]
+    paths: ['MultiGWAS-Explorer/run_sas_codes_or*.pl', 'MultiGWAS-Explorer/DiffGWASDeps/*.pm', 'MultiGWAS-Explorer/DiffGWASDeps/*.py', 'MultiGWAS-Explorer/DiffGWASDeps/test_sas_*.pl', 'MultiGWAS-Explorer/tests/**', 'MultiGWAS-Explorer/install/check_sas_runtime.sh', '.github/workflows/sas-oda-runtime.yml']
+  pull_request:
+    paths: ['MultiGWAS-Explorer/run_sas_codes_or*.pl', 'MultiGWAS-Explorer/DiffGWASDeps/*.pm', 'MultiGWAS-Explorer/DiffGWASDeps/*.py', 'MultiGWAS-Explorer/DiffGWASDeps/test_sas_*.pl', 'MultiGWAS-Explorer/tests/**', 'MultiGWAS-Explorer/install/check_sas_runtime.sh', '.github/workflows/sas-oda-runtime.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  offline:
+    name: Runtime on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15, windows-2022]
+    defaults:
+      run:
+        shell: bash
+        working-directory: MultiGWAS-Explorer
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Check runner behavior without SAS or credentials
+        if: runner.os != 'Windows'
+        run: |
+          export PIPELINE_PYTHON_BIN="$(python -c 'import sys; from pathlib import Path; print(Path(sys.executable).as_posix())')"
+          bash install/check_sas_runtime.sh
+      - name: Install minimal matching Cygwin Bash and Perl
+        if: runner.os == 'Windows'
+        shell: powershell
+        working-directory: .
+        run: |
+          $setup = Join-Path $env:RUNNER_TEMP 'setup-x86_64.exe'
+          $root = Join-Path $env:RUNNER_TEMP 'runtime-cygwin'
+          Invoke-WebRequest 'https://cygwin.com/setup-x86_64.exe' -OutFile $setup
+          $arguments = @('-q', '-B', '-n', '-N', '-d', '--no-write-registry', '-R', $root,
+            '-s', 'https://mirrors.kernel.org/sourceware/cygwin/', '-P', 'bash,perl,perl-Test-Simple')
+          $process = Start-Process -FilePath $setup -ArgumentList $arguments -WindowStyle Hidden -Wait -PassThru
+          if ($process.ExitCode -ne 0) { exit $process.ExitCode }
+      - name: Check Windows Cygwin and native Python boundaries
+        if: runner.os == 'Windows'
+        shell: powershell
+        working-directory: .
+        run: |
+          $root = Join-Path $env:RUNNER_TEMP 'runtime-cygwin'
+          $env:EXPLORER_RUNTIME_PROJECT = (& "$root\bin\cygpath.exe" -u "$env:GITHUB_WORKSPACE\MultiGWAS-Explorer").Trim()
+          $env:PIPELINE_PYTHON_BIN = ((Get-Command python).Source -replace '\\', '/')
+          & "$root\bin\bash.exe" --noprofile --norc -c 'export PATH=/usr/bin:$PATH; cd "$EXPLORER_RUNTIME_PROJECT" && bash install/check_sas_runtime.sh'
+          exit $LASTEXITCODE

@@ -132,12 +132,27 @@ use IO::Socket::INET;
 use IO::Select;
 use SAS_Source_Analysis;
 use SAS_Local_Home;
+use SAS_Java_Help;
 
 sub _runner_temp_dir {
     my $worker_temp_dir = $ENV{SAS_ODA_WORKER_TEMP_DIR} // '';
     return File::Spec->rel2abs($worker_temp_dir)
       if length($worker_temp_dir) && -d $worker_temp_dir;
     return getcwd();
+}
+
+sub normalize_local_macro_dir {
+    my ($requested) = @_;
+    $requested = './' unless defined($requested) && length($requested);
+    if (-d $requested && opendir(my $macro_dir_handle, $requested)) {
+        closedir($macro_dir_handle);
+        return ($requested, '');
+    }
+
+    my $cwd = getcwd();
+    die "Cannot determine the current working directory for macro discovery\n"
+      unless defined($cwd) && length($cwd);
+    return ($cwd, "WARNING: --macro-dir '$requested' is not reachable; using the current working directory '$cwd' instead.");
 }
 
 my $INLINE_PYTHON_SOURCE = <<'END_PYTHON';
@@ -433,7 +448,7 @@ def get_session(session_obj):
     global _LAST_SASPY_SUBPROCESS_ID
     if session_obj is None or not hasattr(session_obj, '_session'):
         session_obj = type('SessionWrapper', (), {})()
-        session_obj._session = _open_sas_session()
+        session_obj._session = open_session_with_diagnostics(_open_sas_session)
         configure_local_home(session_obj._session, os.environ.get('SAS_LOCAL_HOME_DIR', ''))
         session_obj._macros_loaded = False
         _LAST_SASPY_SUBPROCESS_ID = _saspy_subprocess_id(session_obj)
@@ -559,6 +574,46 @@ def _session_home_value(sess):
     if getattr(sess, '_pipeline_local_home', ''):
         return sess._pipeline_local_home
     cfg = getattr(getattr(sess, '_io', None), 'sascfg', None)
+    hosts = getattr(cfg, 'iomhost', ()) or ()
+    hosts = [hosts] if isinstance(hosts, str) else hosts
+    is_oda = any(str(host).lower().rstrip('.').endswith('.oda.sas.com') for host in hosts)
+    if not is_oda:
+        # A local Windows/STDIO session must not inherit an ODA account's
+        # /home/user destination from the client's auth file or SYSUSERID.
+        sess.submit(r"""
+%global _mg_homepath;
+%let _mg_homepath=;
+data _null_;
+  length _mg_path $4096;
+  array _mg_candidates[6] $4096 _temporary_;
+  if symexist('_USERHOME') then _mg_candidates[1]=symget('_USERHOME');
+  if fileref('HOME')=0 then _mg_candidates[2]=pathname('HOME');
+  if upcase(symget('SYSSCP'))='WIN' then do;
+    _mg_candidates[3]=sysget('USERPROFILE');
+    _mg_candidates[4]=cats(sysget('HOMEDRIVE'),sysget('HOMEPATH'));
+  end;
+  else _mg_candidates[3]=sysget('HOME');
+  _mg_candidates[6]=pathname('WORK');
+  do _mg_i=1 to dim(_mg_candidates);
+    _mg_path=_mg_candidates[_mg_i];
+    if not missing(_mg_path) then do;
+      _mg_rc=filename('mghome',strip(_mg_path));
+      _mg_did=dopen('mghome');
+      if _mg_did>0 then do;
+        _mg_rc=dclose(_mg_did);
+        call symputx('_mg_homepath',strip(_mg_path),'G');
+        _mg_rc=filename('HOME',strip(_mg_path));
+        leave;
+      end;
+    end;
+  end;
+  _mg_rc=filename('mghome');
+run;
+""")
+        detected = str(sess.symget('_mg_homepath') or '').strip()
+        if not detected:
+            raise RuntimeError('SAS did not provide an accessible HOME directory; configure dir4local_sas_home explicitly.')
+        return detected
     userid = str(getattr(cfg, 'omruser', '') or '').strip()
     authkey = str(getattr(cfg, 'authkey', '') or '').strip()
     if not userid:
@@ -1400,6 +1455,7 @@ def get_sas_home(session_obj):
 END_PYTHON
 ;
 $INLINE_PYTHON_SOURCE .= SAS_Local_Home::python_setup();
+$INLINE_PYTHON_SOURCE .= SAS_Java_Help::python_startup_diagnostics();
 
 our @EXPORT_OK = qw(new run_code run_file upload_file download_file);
 
@@ -1820,7 +1876,7 @@ def write_text_artifact(path, text):
         fh.write(text or '')
 def create_session(session_id):
     log_event(f"create_session start session_id={session_id}")
-    sess = open_sas_session()
+    sess = open_session_with_diagnostics(open_sas_session)
     session_macros_loaded[session_id] = False
     session_macro_bootstrap_warning[session_id] = False
     session_macro_bootstrap_meta[session_id] = {}
@@ -2028,6 +2084,46 @@ def session_home(sess):
     if getattr(sess, '_pipeline_local_home', ''):
         return sess._pipeline_local_home
     cfg = getattr(getattr(sess, '_io', None), 'sascfg', None)
+    hosts = getattr(cfg, 'iomhost', ()) or ()
+    hosts = [hosts] if isinstance(hosts, str) else hosts
+    is_oda = any(str(host).lower().rstrip('.').endswith('.oda.sas.com') for host in hosts)
+    if not is_oda:
+        # A local Windows/STDIO session must not inherit an ODA account's
+        # /home/user destination from the client's auth file or SYSUSERID.
+        sess.submit(r"""
+%global _mg_homepath;
+%let _mg_homepath=;
+data _null_;
+  length _mg_path $4096;
+  array _mg_candidates[6] $4096 _temporary_;
+  if symexist('_USERHOME') then _mg_candidates[1]=symget('_USERHOME');
+  if fileref('HOME')=0 then _mg_candidates[2]=pathname('HOME');
+  if upcase(symget('SYSSCP'))='WIN' then do;
+    _mg_candidates[3]=sysget('USERPROFILE');
+    _mg_candidates[4]=cats(sysget('HOMEDRIVE'),sysget('HOMEPATH'));
+  end;
+  else _mg_candidates[3]=sysget('HOME');
+  _mg_candidates[6]=pathname('WORK');
+  do _mg_i=1 to dim(_mg_candidates);
+    _mg_path=_mg_candidates[_mg_i];
+    if not missing(_mg_path) then do;
+      _mg_rc=filename('mghome',strip(_mg_path));
+      _mg_did=dopen('mghome');
+      if _mg_did>0 then do;
+        _mg_rc=dclose(_mg_did);
+        call symputx('_mg_homepath',strip(_mg_path),'G');
+        _mg_rc=filename('HOME',strip(_mg_path));
+        leave;
+      end;
+    end;
+  end;
+  _mg_rc=filename('mghome');
+run;
+""")
+        detected = str(sess.symget('_mg_homepath') or '').strip()
+        if not detected:
+            raise RuntimeError('SAS did not provide an accessible HOME directory; configure dir4local_sas_home explicitly.')
+        return detected
     userid = str(getattr(cfg, 'omruser', '') or '').strip()
     authkey = str(getattr(cfg, 'authkey', '') or '').strip()
     if not userid:
@@ -2256,6 +2352,14 @@ def with_retry(session_id, fn, retry_session_loss=True):
                 sessions[session_id] = sess
             return fn(sess)
         raise
+
+
+
+
+
+
+
+
 def handle_client(conn, addr):
     try:
         hdr = conn.recv(8)
@@ -2574,7 +2678,7 @@ def server_loop():
 if __name__ == '__main__':
     server_loop()
 END_SERVER_PY
-$SERVER_PY =~ s/^def handle_client/SAS_Local_Home::python_setup() . 'def handle_client'/me;
+$SERVER_PY =~ s/^def handle_client/SAS_Local_Home::python_setup() . SAS_Java_Help::python_startup_diagnostics() . 'def handle_client'/me;
 
 sub _session_server_source { return $SERVER_PY; }
 
@@ -2962,7 +3066,7 @@ sub _call_session_server {
     }
     close $sock;
     $resp->{last_progress} = $last_progress if ref($resp) eq 'HASH' && $last_progress && !exists $resp->{last_progress};
-    return $resp;
+    return SAS_Java_Help::decorate_result($resp);
 }
 
 my %_python_windows_path_cache;
@@ -2987,7 +3091,12 @@ sub _normalize_local_path_for_python {
     if (_python_uses_windows_paths($python_bin)) {
         return $path if $path =~ m{^[A-Za-z]:[\\/]} || $path =~ m{^\\\\};
         if ($^O eq 'cygwin' && $path =~ m{^/}) {
-            open my $convert, '-|', 'cygpath', '-am', $path
+            # A Windows-launched Cygwin Perl can inherit another Cygwin's
+            # cygpath (or Git's restricted variant) through PATH. Use the
+            # converter belonging to this interpreter and its mount table.
+            my $cygpath=File::Spec->catfile(File::Basename::dirname($^X),'cygpath.exe');
+            $cygpath='cygpath' unless -x $cygpath;
+            open my $convert, '-|', $cygpath, '-am', $path
               or die "Cannot convert path for Windows Python: $!\n";
             my $converted = <$convert> // '';
             close $convert or die "cygpath failed for $path\n";
@@ -3209,6 +3318,7 @@ END_NONPERSISTENT_PY
     unlink $json_path if defined $json_path && -e $json_path;
     unlink $py_path   if defined $py_path   && -e $py_path;
 
+    $result = SAS_Java_Help::decorate_result($result);
     _report_one_shot_connection_lifecycle($result, 'SAS code submission');
 
     if (($exit_code != 0 || $signal != 0) && (!ref($result) || ($result->{status} // '') ne 'ok')) {
@@ -3415,6 +3525,7 @@ END_NONPERSISTENT_ACTION_PY
     unlink $json_path if defined $json_path && -e $json_path;
     unlink $py_path   if defined $py_path   && -e $py_path;
 
+    $result = SAS_Java_Help::decorate_result($result);
     _report_one_shot_connection_lifecycle($result, $action);
 
     if (($exit_code != 0 || $signal != 0) && (!ref($result) || ($result->{status} // '') ne 'ok')) {
@@ -3431,13 +3542,16 @@ END_NONPERSISTENT_ACTION_PY
 
 sub new {
     my ($class, %args) = @_;
+    my ($local_macro_dir, $macro_dir_warning) =
+      normalize_local_macro_dir($args{local_macro_dir});
     my $requested_persistent = $args{persistent} // 0;
     my $session_id = $args{session_id};
     if (!defined($session_id) || !length($session_id)) {
         $session_id = join('_', 'oneshot', $$, int(time() * 1000), int(rand(1_000_000)));
     }
     my $self = {
-        local_macro_dir => $args{local_macro_dir} || "./",
+        local_macro_dir => $local_macro_dir,
+        macro_dir_warning => $macro_dir_warning,
         open_html => $args{open_html} // 1,
         _session => undef,
         _transfer_session => undef,
@@ -3446,6 +3560,7 @@ sub new {
         requested_persistent => $requested_persistent,
         _prewarm_create_msg => '',
         _session_server_ready => 0,
+        batch_dependencies => $args{batch_dependencies} // 0,
     };
     return bless $self, $class;
 }
@@ -3793,20 +3908,136 @@ sub _replace_dependency_path {
     return $code;
 }
 
+sub _local_include_graph {
+    my ($self,$code)=@_;
+    my (%nodes,%active,%names,@order,@root_edges);
+    my $resolve=sub {
+        my ($target,$base)=@_;
+        return '' unless SAS_Source_Analysis::is_local_file_candidate($target);
+        return '' if SAS_Source_Analysis::include_target_needs_runtime_resolution($target);
+        return '' if $target =~ m{^(?:~/|https?://)};
+        my @paths;
+        my $absolute=File::Spec->file_name_is_absolute($target) || $target =~ m{^[A-Za-z]:[\\/]};
+        push @paths,File::Spec->catfile($base,$target) if !$absolute && defined($base) && length($base);
+        push @paths,$target;
+        push @paths,File::Spec->catfile($self->{local_macro_dir},$target)
+          if !$absolute && defined($self->{local_macro_dir});
+        for my $path (@paths) {return abs_path($path) if -f $path;}
+        return '';
+    };
+    my $visit;
+    $visit=sub {
+        my ($path)=@_;
+        die "Cyclic local SAS include dependency: $path\n" if $active{$path};
+        return if exists $nodes{$path};
+        my $name=basename($path);
+        die "Two dependency uploads have the same remote basename: $name\n"
+          if exists($names{$name}) && $names{$name} ne $path;
+        die "Dependency basename contains SAS macro/control characters: $name\n" if $name =~ /[&%\r\n\x00]/;
+        $names{$name}=$path;
+        $active{$path}=1;
+        open my $fh,'<:raw',$path or die "Cannot read include dependency $path: $!\n";
+        my $text=do {local $/;<$fh>};close $fh;
+        my @edges;
+        for my $target (@{SAS_Source_Analysis::include_targets($text)}) {
+            my $child=$resolve->($target,dirname($path));
+            next unless length $child;
+            $visit->($child);
+            push @edges,[$target,$child];
+        }
+        $nodes{$path}={text=>$text,edges=>\@edges};
+        delete $active{$path};
+        push @order,$path;
+    };
+    for my $target (@{SAS_Source_Analysis::include_targets($code)}) {
+        my $path=$resolve->($target,$self->{_dependency_source_dir});
+        next unless length $path;
+        $visit->($path);
+        push @root_edges,[$target,$path];
+    }
+    return {nodes=>\%nodes,order=>\@order,root_edges=>\@root_edges,
+            nested=>scalar(grep {@{$nodes{$_}{edges}}} @order)
+                    || scalar(grep {!-f $_->[0]} @root_edges)};
+}
+
 sub _process_dependencies {
     my ($self, $code) = @_;
     my @logs;
+    push @logs, $self->{macro_dir_warning}
+      if defined($self->{macro_dir_warning}) && length($self->{macro_dir_warning});
     my %uploaded;
+    my @pending_uploads;
+    my %pending_names;
+    my $dependency_planning_error;
+    my %pending_tokens;
+    my $upload_dependency_file=sub {
+        my ($path,$options)=@_;
+        return $self->upload($path,$options) unless $self->{batch_dependencies};
+        my $name=basename($path);
+        if (exists($pending_names{$name}) && $pending_names{$name} ne $path) {
+            $dependency_planning_error="Two dependency uploads have the same remote basename: $name\n";
+            die $dependency_planning_error;
+        }
+        if ($name =~ /[&%\r\n\x00]/) {
+            $dependency_planning_error="Dependency basename contains SAS macro/control characters: $name\n";
+            die $dependency_planning_error;
+        }
+        $pending_names{$name}=$path;
+        # Resolve each destination from the transfer result itself. Guessing
+        # ODA HOME from an auth file is wrong when this runner targets local SAS.
+        my $token='__MCP4SAS_DEP_'.$$.'_'.scalar(@pending_uploads).'__';
+        $pending_tokens{$name}=$token;
+        push @pending_uploads,{local_path=>$path,skip_if_same=>1,%{$options||{}}};
+        return $token;
+    };
+    # A parent include must carry rewritten paths to its own local includes.
+    # Keep user files untouched and transfer the complete graph in one batch.
+    my $include_graph=$self->_local_include_graph($code);
+    my $include_stage;
+    my %prepared_include_destinations;
+    if ($include_graph->{nested}) {
+        my $home=$self->get_sas_home_path();
+        die "Cannot resolve SAS HOME for nested include dependencies: ".($home//'')."\n"
+          unless defined($home) && length($home) && $home !~ /^PYTHON ERROR:/;
+        $home =~ s{[\\/]+$}{};
+        my %remote=map {$_=>$home.'/'.basename($_)} @{$include_graph->{order}};
+        %prepared_include_destinations=map {$remote{$_}=>1} @{$include_graph->{order}};
+        $include_stage=File::Temp->newdir('sas_include_XXXXXX',DIR=>_runner_temp_dir());
+        for my $path (@{$include_graph->{order}}) {
+            my $node=$include_graph->{nodes}{$path};
+            my $text=$node->{text};
+            for my $edge (@{$node->{edges}}) {
+                $text=_replace_dependency_path($text,$edge->[0],$remote{$edge->[1]});
+            }
+            my $staged=File::Spec->catfile("$include_stage",basename($path));
+            open my $fh,'>:raw',$staged or die "Cannot stage include dependency $path: $!\n";
+            print {$fh} $text;close $fh or die "Cannot finish include dependency $path: $!\n";
+            my $destination=$upload_dependency_file->($staged,{skip_if_same=>0,progress_label=>'nested include: '.basename($path)});
+            die "Cannot upload nested include dependency $path\n" unless $destination && $destination !~ /^PYTHON ERROR/;
+            $uploaded{$path}=1;
+        }
+        for my $edge (@{$include_graph->{root_edges}}) {
+            $code=_replace_dependency_path($code,$edge->[0],$remote{$edge->[1]});
+        }
+        push @logs,'Prepared recursive local include graph: '.scalar(@{$include_graph->{order}}).' source files; original files unchanged.';
+    }
     my $scan_code = _dependency_scan_code($code);
     my $macro_code = SAS_Source_Analysis::macro_dependency_view($code);
     my $macro_autoload_enabled = _autoload_macros_enabled() ? 1 : 0;
     my %defined_in_code = map { lc($_) => 1 } ($macro_code =~ /%macro\s+([A-Za-z_]\w*)\b/ig);
+    if ($include_graph->{nested}) {
+        for my $path (@{$include_graph->{order}}) {
+            my $view=SAS_Source_Analysis::macro_dependency_view($include_graph->{nodes}{$path}{text});
+            $defined_in_code{lc $_}=1 for ($view =~ /%macro\s+([A-Za-z_]\w*)\b/ig);
+        }
+    }
 
     for my $path (@{SAS_Source_Analysis::include_targets($code)}) {
+        next if $prepared_include_destinations{$path};
         if (-e $path && !$uploaded{$path}++) {
             _warn_dependency_upload(kind => '%include target', path => $path);
             my $remote = eval {
-                $self->upload(
+                $upload_dependency_file->(
                     $path,
                     {
                         progress_label => '%include target: ' . basename($path),
@@ -3824,9 +4055,12 @@ sub _process_dependencies {
     my @potential_macros = ($macro_code =~ /%([A-Za-z_]\w*)\b(?!\s*:)/g);
     my $header_includes = "";
     my @unresolved_macro_names;
-    foreach my $m_name (@potential_macros) {
+    my %seen_macro_names;
+    while (@potential_macros) {
+        my $m_name=shift @potential_macros;
         next if _is_builtin_macro_name($m_name);
         next if $defined_in_code{lc $m_name};
+        next if $seen_macro_names{lc $m_name}++;
         if (lc($m_name) eq 'del_dir_recursive') {
             # The remote file also defines recursiveDelete. Load that file
             # explicitly, independent of the global bootstrap or local overlays.
@@ -3839,12 +4073,20 @@ sub _process_dependencies {
         }
         my $local_m_path = $self->_find_local_macro_file($m_name);
         if (defined $local_m_path && -e $local_m_path && !$uploaded{$local_m_path}++) {
+            # Follow helper macros referenced inside this local definition.
+            # Compile all discovered definitions before executing the caller;
+            # a parent macro being present does not make its helpers available.
+            open my $macro_source,'<',$local_m_path or die "Cannot read macro dependency $local_m_path: $!\n";
+            my $macro_text=do {local $/;<$macro_source>};close $macro_source;
+            my $view=SAS_Source_Analysis::macro_dependency_view($macro_text);
+            my %own=map {lc($_)=>1} ($view =~ /%macro\s+([A-Za-z_]\w*)\b/ig);
+            push @potential_macros,grep {!$own{lc $_}} ($view =~ /%([A-Za-z_]\w*)\b(?!\s*:)/g);
             my ($should_overlay, $overlay_reason) =
               (1, 'global macro autoload disabled; targeted local macro overlay required');
             if ($should_overlay) {
                 _warn_dependency_upload(kind => 'macro file', detail => "%$m_name", path => $local_m_path);
                 my $remote = eval {
-                    $self->upload(
+                    $upload_dependency_file->(
                         $local_m_path,
                         {
                             progress_label => "macro file for %$m_name: " . basename($local_m_path),
@@ -3901,7 +4143,7 @@ sub _process_dependencies {
         $detail =~ s/\s+$//;
         _warn_dependency_upload(kind => 'file dependency', detail => $detail, path => $path);
         my $remote = eval {
-            $self->upload(
+            $upload_dependency_file->(
                 $local_path,
                 {
                     progress_label => "file dependency ($detail): " . basename($local_path),
@@ -3928,6 +4170,24 @@ sub _process_dependencies {
         $upload_dependency->($cmd, $path);
     }
 
+    die $dependency_planning_error if $dependency_planning_error;
+    if (@pending_uploads) {
+        my $transferred=$self->transfer_many({uploads=>\@pending_uploads,archive_transfers=>1});
+        die "Dependency bulk upload failed: ".(ref($transferred)?'incomplete transfer result':($transferred // 'no result'))."\n"
+          unless ref($transferred) eq 'HASH' && ref($transferred->{uploads}) eq 'ARRAY'
+            && @{$transferred->{uploads}}==@pending_uploads;
+        my %resolved;
+        for my $entry (@{$transferred->{uploads}}) {
+            my $remote=$entry->{remote_path} // '';
+            my $name=basename($remote);
+            die "Unexpected dependency upload destination: $remote\n" unless $remote && exists($pending_tokens{$name}) && !$resolved{$name}++;
+            my $token=$pending_tokens{$name};
+            $header_includes=_replace_dependency_path($header_includes,$token,$remote);
+            $code=_replace_dependency_path($code,$token,$remote);
+            @logs=map {_replace_dependency_path($_,$token,$remote)} @logs;
+        }
+        push @logs,'Batched '.scalar(@pending_uploads).' local macro/input dependencies in one transfer request.';
+    }
     return ($header_includes . $code, join("\n", @logs));
 }
 
@@ -4103,6 +4363,7 @@ sub run_file {
     open my $fh, '<', $sas_file or die "Could not open file: $!";
     my $sas_code = do { local $/; <$fh> };
     close $fh;
+    local $self->{_dependency_source_dir}=dirname(abs_path($sas_file)||File::Spec->rel2abs($sas_file));
     return $self->run_code($sas_code);
 }
 
@@ -4355,7 +4616,8 @@ sub _configured_oda_remote_home {
 
 sub get_sas_home_path {
     my ($self) = @_;
-    my $configured_home = _configured_oda_remote_home();
+    my $profile=$ENV{SASPY_CFGNAME} // $ENV{SASPY_CONFIG_NAME} // 'oda';
+    my $configured_home = lc($profile) eq 'oda' ? _configured_oda_remote_home() : '';
     return $configured_home if length $configured_home;
     if ($self->{persistent} && $self->{session_id}) {
         my $resp = $self->_call_persistent_session_server(

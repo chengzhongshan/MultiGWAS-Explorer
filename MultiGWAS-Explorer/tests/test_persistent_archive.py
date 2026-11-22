@@ -1,4 +1,4 @@
-import sys,pathlib,tempfile,unittest,zipfile,os,re
+﻿import sys,pathlib,tempfile,unittest,zipfile,os,re
 from unittest.mock import patch
 sys.path.insert(0,str(pathlib.Path(__file__).resolve().parents[1]/'DiffGWASDeps'))
 import sas_archive_transfer as a
@@ -12,6 +12,32 @@ class Fake:
  def upload(self,*x,**k):self.uploads+=1;return {'Success':True}
  def download(self,*x,**k):self.downloads+=1;return {'Success':True}
 class Tests(unittest.TestCase):
+ def test_upload_discards_stale_pretransfer_metadata(self):
+  with tempfile.TemporaryDirectory() as td:
+   p=pathlib.Path(td)/'macro.sas';p.write_bytes(b'new source');s=Fake()
+   adapter=a.ArchiveSession(s,'/home/test',lambda path:{'exists':True,'size':10})
+   adapter.cache['/home/test/macro.sas']={'exists':True,'size':3}
+   remote,_=a.upload_file(str(p),adapter)
+   self.assertEqual(remote,'/home/test/macro.sas');self.assertEqual(s.uploads,1)
+ def test_upload_size_mismatch_has_one_private_copy_retry(self):
+  with tempfile.TemporaryDirectory() as td:
+   p=pathlib.Path(td)/'macro.sas';p.write_bytes(b'new source');s=Fake();staged=[]
+   def upload(source,remote,overwrite=True):
+    s.uploads+=1;self.assertEqual(remote,'/home/test/macro.sas')
+    self.assertEqual(pathlib.Path(source).read_bytes(),b'new source')
+    if source!=str(p):staged.append(source)
+    return {'Success':True}
+   s.upload=upload
+   with patch.object(a,'run_fileinfo',side_effect=[{'exists':True,'size':3},{'exists':True,'size':10}]):
+    a.upload_file(str(p),a.ArchiveSession(s,'/home/test',lambda path:{}))
+   self.assertEqual(s.uploads,2);self.assertEqual(len(staged),1)
+   self.assertFalse(pathlib.Path(staged[0]).exists())
+ def test_persistent_size_mismatch_stops_after_two_uploads(self):
+  with tempfile.TemporaryDirectory() as td:
+   p=pathlib.Path(td)/'macro.sas';p.write_bytes(b'new source');s=Fake()
+   adapter=a.ArchiveSession(s,'/home/test',lambda path:{'exists':True,'size':3})
+   with self.assertRaisesRegex(IOError,'expected 10 bytes, got 3'):a.upload_file(str(p),adapter)
+   self.assertEqual(s.uploads,2)
  def test_archive_flag(self):
   for x in [False,'false','0','off']:self.assertFalse(a._archive_transfer_enabled({'archive_transfers':x}))
   self.assertTrue(a._archive_transfer_enabled({}))
@@ -57,6 +83,22 @@ class Tests(unittest.TestCase):
  def test_incomplete_metadata_rejected(self):
   s=Fake();s.submit=lambda code:{'LOG':''};adapter=a.ArchiveSession(s,'/home/test',lambda p:{})
   with self.assertRaisesRegex(IOError,'Incomplete'):adapter.prime_fileinfo(['/remote/a'])
+ def test_missing_upload_metadata_batched_before_transfer(self):
+  s=Fake()
+  def submit(code):
+   s.code.append(code)
+   markers=re.findall(r'put "(MCPMETA_[^"|]+\|[0-9]+\|)"',code)
+   return {'LOG':'\n'.join(m+'0|.' for m in markers)}
+  s.submit=submit
+  adapter=a.ArchiveSession(s,'/home/test',lambda p:self.fail('new files must not use individual metadata RPCs'))
+  adapter.prime_fileinfo(['/home/test/a','/home/test/b'],details_for_existing=True)
+  self.assertEqual(len(s.code),1);self.assertFalse(adapter.fileinfo('/home/test/a')['exists'])
+ def test_existing_upload_retains_timestamp_validation(self):
+  s=Fake();calls=[]
+  def existing(path):calls.append(path);return {'exists':True,'size':3,'modified_epoch':1234}
+  adapter=a.ArchiveSession(s,'/home/test',existing)
+  adapter.prime_fileinfo(['/home/test/a'],details_for_existing=True)
+  self.assertEqual(calls,['/home/test/a']);self.assertEqual(adapter.fileinfo('/home/test/a')['modified_epoch'],1234)
  def test_explicit_no_archive(self):
   with tempfile.TemporaryDirectory() as td:
    p=pathlib.Path(td)/'x';p.write_bytes(b'abc');s=Fake()
