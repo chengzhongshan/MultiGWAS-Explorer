@@ -37,6 +37,7 @@ perl tests/test_macroparas_gtex.pl
 "${runtime_python}" tools/sync_macroparas_bundle.py --check
 "${runtime_python}" tests/test_macroquery_port_manifest.py
 "${runtime_python}" tests/test_efficient_sas_submit.py
+"${runtime_python}" tests/test_combined_remote_file_operations.py
 perl DiffGWASDeps/test_sas_oda_macro_dir_fallback.pl
 perl DiffGWASDeps/test_sas_oda_include_lookup.pl
 "${runtime_python}" - <<'PY'

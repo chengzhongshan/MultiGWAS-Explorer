@@ -70,7 +70,7 @@
     },
     {
       "path": "MCP4SAS_Use_Python/cli.py",
-      "sha256": "0680cd7ea92aca0dfbcfebbfcfce3b697cf67e57b22af997dbcd007e0f287e3a",
+      "sha256": "a42945c53e976f4d8185a4445e80675182b3bbe8c3229b74e6bb53e4dd3d9374",
       "upstream_path": "MCP4SAS_Use_Python/cli.py",
       "upstream_sha256": "27d24027363776ce40eebddbb112b29f2731f36d1fb050302e8f136679d7204d"
     },
@@ -148,7 +148,7 @@
     },
     {
       "path": "install/check_sas_runtime.sh",
-      "sha256": "1ca54f610d5222491ade27b64e1e432c972dec5373428a2f7e6b8675d12245ac",
+      "sha256": "54007fc10765f897d705ca46d96365b4a2578c2c618f1be640fdb027ce4523d1",
       "upstream_path": null,
       "upstream_sha256": null
     },
@@ -265,5 +265,12 @@
     "reason": "SASPy discovery uses its actual import root when system purelib does not exist; Docker includes the maintained macro bundle tool.",
     "source_baseline": "The top-level upstream_commit remains the original port baseline; current adapted file hashes above include this installation correction.",
     "upstream_commit": "3098227cda343e4fec1e0342afb8bd88c80b1118"
+  },
+  "live_acceptance_fix": {
+    "date": "2026-11-23",
+    "scope": "Combined Python file operations report the final state after deletion, matching Perl. Actual ODA execution and cleanup evidence: reports/LIVE_ODA_ACCEPTANCE_20261123.md.",
+    "upstream_baseline": "3098227cda343e4fec1e0342afb8bd88c80b1118",
+    "upstream_working_source_sha256": "0f6813044fb4ed9d9a8b408b10ab30c9ff97f553c8e828522c90b6546085311a",
+    "upstream_commit": "66774f8efe39d5c206799559b292a9deaccd6fba"
   }
 }
