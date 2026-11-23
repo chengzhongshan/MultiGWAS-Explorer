@@ -110,6 +110,8 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
+      - name: Check required runtime files survive Docker context filtering
+        run: bash MultiGWAS-Explorer/install/check_docker_context.sh
       - name: Build and test image
         run: |
           set -o pipefail
