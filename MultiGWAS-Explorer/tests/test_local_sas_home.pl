@@ -34,16 +34,19 @@ class Session:
     def __init__(self, host=None):
         self._io=type('IO',(),{'sascfg':type('Config',(),{'iomhost':host})()})()
         self.calls=[]
-    def submit(self, code):
+    def submit(self, code, results='html'):
+        assert results=='text', 'internal setup must not create an HTML round trip'
         self.calls.append(code)
         return {'LOG':'NOTE: configured'}
 s=Session()
+configure_local_templates(s)
 configure_local_home(s,sys.argv[1])
 assert s._pipeline_local_home==sys.argv[1].replace('\\','/')
-assert 'filename HOME ' in s.calls[0] and 'PIPELINE_SAS_HOME' in s.calls[0]
+assert 'filename HOME ' in s.calls[1] and 'PIPELINE_SAS_HOME' in s.calls[1]
 assert 'ods path (prepend) work.templat(update);' in s.calls[0]
+configure_local_templates(s)
 configure_local_home(s,sys.argv[1])
-assert len(s.calls)==1
+assert len(s.calls)==2, 'unchanged template and HOME setup must be cached'
 for bad in ['relative/missing', os.path.join(sys.argv[1],'does not exist')]:
     try: configure_local_home(s,bad)
     except ValueError: pass

@@ -29,6 +29,14 @@ for test in \
 done
 "${runtime_python}" tests/test_persistent_archive.py
 "${runtime_python}" tests/test_result_browser.py
+for test in test_cygwin_python_handoff test_macroparas_autoload test_macroparas_gtex test_macroparas_html; do
+  "${runtime_python}" "tests/${test}.py"
+done
+perl tests/test_macroparas_autoload.pl
+perl tests/test_macroparas_gtex.pl
+"${runtime_python}" tools/sync_macroparas_bundle.py --check
+"${runtime_python}" tests/test_macroquery_port_manifest.py
+"${runtime_python}" tests/test_efficient_sas_submit.py
 perl DiffGWASDeps/test_sas_oda_macro_dir_fallback.pl
 perl DiffGWASDeps/test_sas_oda_include_lookup.pl
 "${runtime_python}" - <<'PY'

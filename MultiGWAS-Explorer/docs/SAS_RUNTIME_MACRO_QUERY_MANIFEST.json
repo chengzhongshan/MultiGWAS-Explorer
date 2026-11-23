@@ -1,0 +1,264 @@
+{
+  "upstream_commit": "58c2fd4378b27b65e9d8d2c684d3b0c208790a66",
+  "hash_policy": "SHA-256 after CRLF-to-LF normalization",
+  "files": [
+    {
+      "path": "DiffGWASDeps/SAS_Local_Home.pm",
+      "sha256": "b4cb3e097ff4664ae34053ecfa4137e1e92c677a31d69346fee4e66ea3e2263f",
+      "upstream_path": "MCPDeps/SAS_Local_Home.pm",
+      "upstream_sha256": "b4cb3e097ff4664ae34053ecfa4137e1e92c677a31d69346fee4e66ea3e2263f"
+    },
+    {
+      "path": "DiffGWASDeps/SAS_ODA_Runner.pm",
+      "sha256": "c7823f1cbab3bb69e02ff9d9f299ea692165a4bde265bb04c87f9d3df14c208c",
+      "upstream_path": "MCPDeps/SAS_ODA_Runner.pm",
+      "upstream_sha256": "52ed56fee2bb82e71be69fb6c470436c9ef098bf1939dfa921920f8fc5e2e57c"
+    },
+    {
+      "path": "DiffGWASDeps/SAS_Submit.pm",
+      "sha256": "8c397f03f73512c46c63d9d89d9788f7ff72f1cbf36bea30218b475a0443c5e5",
+      "upstream_path": "MCPDeps/SAS_Submit.pm",
+      "upstream_sha256": "8c397f03f73512c46c63d9d89d9788f7ff72f1cbf36bea30218b475a0443c5e5"
+    },
+    {
+      "path": "DiffGWASDeps/importallmacros_ue.sas",
+      "sha256": "bf54f9f668a6cf66e4357e8316c1d199bc28435a5331b7b6867d8f29b35e66ef",
+      "upstream_path": "MCPDeps/importallmacros_ue.sas",
+      "upstream_sha256": "bf54f9f668a6cf66e4357e8316c1d199bc28435a5331b7b6867d8f29b35e66ef"
+    },
+    {
+      "path": "DiffGWASDeps/sas_oda_session_server.py",
+      "sha256": "5bbca8b90cecea5d189770c1f56f4d0608eff8ce7cb76e8f2b00b585c54c4fd7",
+      "upstream_path": "MCPDeps/sas_oda_session_server.py",
+      "upstream_sha256": "738d444c684658f212258f46cb093c9bb426010036b1fa690e84565a8e490718"
+    },
+    {
+      "path": "MCP4SAS_Use_Python/README.md",
+      "sha256": "45dfdb9e2be26ef71a5ee53fb29ea6f224d566f27fd69f11c4e52a9bbf238962",
+      "upstream_path": "MCP4SAS_Use_Python/README.md",
+      "upstream_sha256": "bf07e0bcedfc66a078c506412c8d292393f3220b8ec454f87d66b46d39265e80"
+    },
+    {
+      "path": "MCP4SAS_Use_Python/__init__.py",
+      "sha256": "b9688bf6b97b97eeea1c9fd39a33f0f88b9560dd3e675ecc02a71212440872b9",
+      "upstream_path": "MCP4SAS_Use_Python/__init__.py",
+      "upstream_sha256": "b9688bf6b97b97eeea1c9fd39a33f0f88b9560dd3e675ecc02a71212440872b9"
+    },
+    {
+      "path": "MCP4SAS_Use_Python/assets/directory_cleanup.sas",
+      "sha256": "212900b3e20fce01e2fbb3d419966a272d2cb8701f1cb72cb6753ce8a37409d3",
+      "upstream_path": "MCP4SAS_Use_Python/assets/directory_cleanup.sas",
+      "upstream_sha256": "212900b3e20fce01e2fbb3d419966a272d2cb8701f1cb72cb6753ce8a37409d3"
+    },
+    {
+      "path": "MCP4SAS_Use_Python/assets/targeted_macro.sas",
+      "sha256": "6bffa7210cc68e68d877f97fbe3fbf9879684a179407a53f4a42f4082a235be6",
+      "upstream_path": "MCP4SAS_Use_Python/assets/targeted_macro.sas",
+      "upstream_sha256": "6bffa7210cc68e68d877f97fbe3fbf9879684a179407a53f4a42f4082a235be6"
+    },
+    {
+      "path": "MCP4SAS_Use_Python/backend/sas_archive_transfer.py",
+      "sha256": "7602724c530b6e527945983fe02b6b05591537c7da8053250dd307b3877ed25f",
+      "upstream_path": "MCP4SAS_Use_Python/backend/sas_archive_transfer.py",
+      "upstream_sha256": "7602724c530b6e527945983fe02b6b05591537c7da8053250dd307b3877ed25f"
+    },
+    {
+      "path": "MCP4SAS_Use_Python/backend/session_backend.py",
+      "sha256": "2914108e2e3a852c6fe241de44a46fd11b95d499e0fd3c3c138e62e47885d34f",
+      "upstream_path": "MCP4SAS_Use_Python/backend/session_backend.py",
+      "upstream_sha256": "2914108e2e3a852c6fe241de44a46fd11b95d499e0fd3c3c138e62e47885d34f"
+    },
+    {
+      "path": "MCP4SAS_Use_Python/cli.py",
+      "sha256": "0680cd7ea92aca0dfbcfebbfcfce3b697cf67e57b22af997dbcd007e0f287e3a",
+      "upstream_path": "MCP4SAS_Use_Python/cli.py",
+      "upstream_sha256": "27d24027363776ce40eebddbb112b29f2731f36d1fb050302e8f136679d7204d"
+    },
+    {
+      "path": "MCP4SAS_Use_Python/dependencies.py",
+      "sha256": "d0c8c0992cf297b63ad1e8aa03a6371502eccfe599e9536eab49d42701544d60",
+      "upstream_path": "MCP4SAS_Use_Python/dependencies.py",
+      "upstream_sha256": "f499202d21e7ab6969a143f32a8f1239d81a722026f6ad8f0829c4b4406f8924"
+    },
+    {
+      "path": "MCP4SAS_Use_Python/diagnostics.py",
+      "sha256": "cb72f7fba17316544e2a255f5cc0fc120b8d77db3dc71c825572c7eeef7e4a1c",
+      "upstream_path": "MCP4SAS_Use_Python/diagnostics.py",
+      "upstream_sha256": "cb72f7fba17316544e2a255f5cc0fc120b8d77db3dc71c825572c7eeef7e4a1c"
+    },
+    {
+      "path": "MCP4SAS_Use_Python/java_help.py",
+      "sha256": "c4a693c65e660961d76acaf04c557bf85af2e771e81c6d96be541e3d7b7f62e0",
+      "upstream_path": "MCP4SAS_Use_Python/java_help.py",
+      "upstream_sha256": "c4a693c65e660961d76acaf04c557bf85af2e771e81c6d96be541e3d7b7f62e0"
+    },
+    {
+      "path": "MCP4SAS_Use_Python/local_home.py",
+      "sha256": "e1b57586d815a18982ced74f8117e1e09e59a2fd6184bbbde389cedf16e807b5",
+      "upstream_path": "MCP4SAS_Use_Python/local_home.py",
+      "upstream_sha256": "e1b57586d815a18982ced74f8117e1e09e59a2fd6184bbbde389cedf16e807b5"
+    },
+    {
+      "path": "MCP4SAS_Use_Python/remote_cleanup.py",
+      "sha256": "d3e79ad417f9655f28d5bbdcb0e8d06f2e63d0f7db6dab627aaa41bf89d18381",
+      "upstream_path": "MCP4SAS_Use_Python/remote_cleanup.py",
+      "upstream_sha256": "d3e79ad417f9655f28d5bbdcb0e8d06f2e63d0f7db6dab627aaa41bf89d18381"
+    },
+    {
+      "path": "MCP4SAS_Use_Python/runner.py",
+      "sha256": "73ccf801e1e40f1939a4b18ef23f8eb635d0c64e19fd666a5328c764c8b0bfc5",
+      "upstream_path": "MCP4SAS_Use_Python/runner.py",
+      "upstream_sha256": "73ccf801e1e40f1939a4b18ef23f8eb635d0c64e19fd666a5328c764c8b0bfc5"
+    },
+    {
+      "path": "MCP4SAS_Use_Python/source_analysis.py",
+      "sha256": "22cdc9c4b347628bf1645274965551e4acc590137e0f49d4aa0c38a4e67dacf4",
+      "upstream_path": "MCP4SAS_Use_Python/source_analysis.py",
+      "upstream_sha256": "22cdc9c4b347628bf1645274965551e4acc590137e0f49d4aa0c38a4e67dacf4"
+    },
+    {
+      "path": "MCP4SAS_Use_Python/tempfiles.py",
+      "sha256": "95d46e46da09813ae187281bcd3c423abc26588ac5c736756098e797be814438",
+      "upstream_path": "MCP4SAS_Use_Python/tempfiles.py",
+      "upstream_sha256": "95d46e46da09813ae187281bcd3c423abc26588ac5c736756098e797be814438"
+    },
+    {
+      "path": "MCP4SAS_Use_Python/transport.py",
+      "sha256": "4faf6faec3161dc215f901cc82fdb9e5741999e7d00252072904c9d97e1b5f7a",
+      "upstream_path": "MCP4SAS_Use_Python/transport.py",
+      "upstream_sha256": "4faf6faec3161dc215f901cc82fdb9e5741999e7d00252072904c9d97e1b5f7a"
+    },
+    {
+      "path": "MCP4SAS_Use_Python/windows_processes.py",
+      "sha256": "c5bf3125d97bdaddcbcce580cf802a6741cd9619966cd3fc1f8315691c9bdb57",
+      "upstream_path": "MCP4SAS_Use_Python/windows_processes.py",
+      "upstream_sha256": "c5bf3125d97bdaddcbcce580cf802a6741cd9619966cd3fc1f8315691c9bdb57"
+    },
+    {
+      "path": "docs/SAS_RUNTIME_PORT_MANIFEST.json",
+      "sha256": "9210f2e8f69ca553e63133f2c9401e7ccbdda919ad08032e22e657218f6e8498",
+      "upstream_path": null,
+      "upstream_sha256": null
+    },
+    {
+      "path": "examples/sas_macros/macroparas_portable.sas",
+      "sha256": "657fd368f28501e63810de7589033a98e13dcb609f2b1b78b7a00fdeddbfe723",
+      "upstream_path": "examples/sas_macros/macroparas_portable.sas",
+      "upstream_sha256": "657fd368f28501e63810de7589033a98e13dcb609f2b1b78b7a00fdeddbfe723"
+    },
+    {
+      "path": "install/check_sas_runtime.sh",
+      "sha256": "1ca54f610d5222491ade27b64e1e432c972dec5373428a2f7e6b8675d12245ac",
+      "upstream_path": null,
+      "upstream_sha256": null
+    },
+    {
+      "path": "run_sas_codes_or_files_in_ODA.py",
+      "sha256": "16554dd44fbc9332578934b4fa02b462ccd16f1babdfb765bd00e1e38a8533cf",
+      "upstream_path": "run_sas_codes_or_files_in_ODA.py",
+      "upstream_sha256": "16554dd44fbc9332578934b4fa02b462ccd16f1babdfb765bd00e1e38a8533cf"
+    },
+    {
+      "path": "run_sas_codes_or_script_in_ODA.pl",
+      "sha256": "62ba5ad25756d80108fe70107dcdd557f863a7b5d9998df276e596c365a8a3f0",
+      "upstream_path": "run_sas_codes_or_script_in_ODA.pl",
+      "upstream_sha256": "2889b04fac403f61f5db1012c5be7d107f09daab20cc49ac408a6afd2c228f53"
+    },
+    {
+      "path": "run_sas_codes_or_script_in_ODA.py",
+      "sha256": "16554dd44fbc9332578934b4fa02b462ccd16f1babdfb765bd00e1e38a8533cf",
+      "upstream_path": "run_sas_codes_or_script_in_ODA.py",
+      "upstream_sha256": "16554dd44fbc9332578934b4fa02b462ccd16f1babdfb765bd00e1e38a8533cf"
+    },
+    {
+      "path": "tests/macroparas_autoload_regression.sas",
+      "sha256": "6454a67dbe1a90b8c514550f2db85598f4781d97e9e5bad83ba0a0e8a3541b3c",
+      "upstream_path": "tests/macroparas_autoload_regression.sas",
+      "upstream_sha256": "6454a67dbe1a90b8c514550f2db85598f4781d97e9e5bad83ba0a0e8a3541b3c"
+    },
+    {
+      "path": "tests/macroparas_gtex_regression.sas",
+      "sha256": "be4c06faba9dea76dd62dcc6bc9c6ecc64f55d66d0535168b741b7e4239a5d0d",
+      "upstream_path": "tests/macroparas_gtex_regression.sas",
+      "upstream_sha256": "be4c06faba9dea76dd62dcc6bc9c6ecc64f55d66d0535168b741b7e4239a5d0d"
+    },
+    {
+      "path": "tests/macroparas_html_regression.sas",
+      "sha256": "be8794f6d64b6c96b2e0ea3ef533812857b2aa1563559daf064a81847fb03359",
+      "upstream_path": "tests/macroparas_html_regression.sas",
+      "upstream_sha256": "eeb2ef0439db2f58bf33891bf6e40c91de7a770c1ed0b4d0d4a277e78862e952"
+    },
+    {
+      "path": "tests/run_live_macro_query.py",
+      "sha256": "11f79534ed510c3bddf45d6313054d62ecdb87da375f5ae033ea200d9d06985b",
+      "upstream_path": null,
+      "upstream_sha256": null
+    },
+    {
+      "path": "tests/test_cygwin_python_handoff.py",
+      "sha256": "c5ed63904a44c6d85afab520a879990bc1f7b73b4be1bf7c54f21f59a1c9707a",
+      "upstream_path": "tests/test_cygwin_python_handoff.py",
+      "upstream_sha256": "c5ed63904a44c6d85afab520a879990bc1f7b73b4be1bf7c54f21f59a1c9707a"
+    },
+    {
+      "path": "tests/test_efficient_sas_submit.py",
+      "sha256": "dd4c0a176d719544a2dba93c76e6d706dfdf2e70cededfec0e51307fad4a1a54",
+      "upstream_path": null,
+      "upstream_sha256": null
+    },
+    {
+      "path": "tests/test_local_sas_home.pl",
+      "sha256": "e17b4e103590e28a1642b2cd43ced0a96ea5e49b179a4756e3d14906c89a12e1",
+      "upstream_path": "tests/test_local_sas_home.pl",
+      "upstream_sha256": "0161d571ebe0afad8ee90b4b9897ea5a170192422a5ec52f5147cdd42741bde0"
+    },
+    {
+      "path": "tests/test_macroparas_autoload.pl",
+      "sha256": "37650d37e9705855b3ea4ab063f6baec567cde6778a2447c009a751dd13ac4c0",
+      "upstream_path": "tests/test_macroparas_autoload.pl",
+      "upstream_sha256": "74ba7006d80c638fd23a7ec83a0869141ffb42f8e3e5f999505256cc3a944e78"
+    },
+    {
+      "path": "tests/test_macroparas_autoload.py",
+      "sha256": "9e4138f2995767203c14410ac405dd8d03ca615cc7f92d167402ac50099a8a4a",
+      "upstream_path": "tests/test_macroparas_autoload.py",
+      "upstream_sha256": "9e4138f2995767203c14410ac405dd8d03ca615cc7f92d167402ac50099a8a4a"
+    },
+    {
+      "path": "tests/test_macroparas_gtex.pl",
+      "sha256": "974108bc8cd93b9b96f36a27c9480471251568ce0ed8ef6fcb9ef40538e24cc6",
+      "upstream_path": "tests/test_macroparas_gtex.pl",
+      "upstream_sha256": "54cecb334fc1135d70ec59af30d28a0e893bc8422dfed7857bab9a0eac9fbe1e"
+    },
+    {
+      "path": "tests/test_macroparas_gtex.py",
+      "sha256": "6da7389689b9077ea8943d9fa76ee205f67a529c57d9fecc55fe0e535a1c74e9",
+      "upstream_path": "tests/test_macroparas_gtex.py",
+      "upstream_sha256": "6da7389689b9077ea8943d9fa76ee205f67a529c57d9fecc55fe0e535a1c74e9"
+    },
+    {
+      "path": "tests/test_macroparas_html.py",
+      "sha256": "b8ed043a3c0e8713640fe4a7075163b716b0cc71f31fc73ecba23e90111856f0",
+      "upstream_path": "tests/test_macroparas_html.py",
+      "upstream_sha256": "602e05abe3d5c778dedad564a1086ff088ecd6ca57a56c1a870e3401c7c2399f"
+    },
+    {
+      "path": "tests/test_macroquery_port_manifest.py",
+      "sha256": "5defe91ddc11f815b7643d0afa5e885279c75cbdd7aa43e6ea247b6286c8ea97",
+      "upstream_path": null,
+      "upstream_sha256": null
+    },
+    {
+      "path": "tests/test_sas_com_threading.pl",
+      "sha256": "5d75090f9aa2516eecc04528390dffd62dfadc4a1170ed4b225118fc7eaac97e",
+      "upstream_path": "tests/test_sas_com_threading.pl",
+      "upstream_sha256": "e42580a43f83f5895997965e3753b71c476d0e2142aa6382e60664bc97400add"
+    },
+    {
+      "path": "tools/sync_macroparas_bundle.py",
+      "sha256": "f34fee31e997295849a621c4636adfa24099669353c4339386fb76aa6b2df7ad",
+      "upstream_path": "tools/sync_macroparas_bundle.py",
+      "upstream_sha256": "5277e43f297c52ebaaa36eab498f7e49b932992bfd9d20192891cb2335de0e82"
+    }
+  ]
+}

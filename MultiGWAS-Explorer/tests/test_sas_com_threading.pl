@@ -4,6 +4,7 @@ use warnings;
 use FindBin qw($Bin);
 use lib "$Bin/../DiffGWASDeps";
 use SAS_ODA_Runner;
+use SAS_Submit;
 use Test::More;
 use File::Temp qw(tempdir);
 use File::Spec;
@@ -14,7 +15,7 @@ die 'Cannot find actual submit implementation' unless $submit;
 my $dir=tempdir(CLEANUP=>1);
 my $script=File::Spec->catfile($dir,'com_threads.py');
 open my $out,'>',$script or die $!;
-print {$out} "import threading, traceback, time\nSUBMIT_HEARTBEAT_SECONDS=20\n",$submit,<<'PY';
+print {$out} "import threading, traceback, time\nSUBMIT_HEARTBEAT_SECONDS=20\n",SAS_Submit::python_setup(),$submit,<<'PY';
 class Session:
     def __init__(self, module):
         self._io=type('IO',(),{'__module__':module})()

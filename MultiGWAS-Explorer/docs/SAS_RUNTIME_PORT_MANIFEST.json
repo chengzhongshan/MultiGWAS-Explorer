@@ -40,7 +40,7 @@
     },
     {
       "path": "DiffGWASDeps/SAS_Local_Home.pm",
-      "sha256": "8bda5ca5218c6623e93a1d01a6636d91ee50b0dbf03cd98d3127a6f346e18179",
+      "sha256": "b4cb3e097ff4664ae34053ecfa4137e1e92c677a31d69346fee4e66ea3e2263f",
       "upstream_path": "MCPDeps/SAS_Local_Home.pm",
       "upstream_sha256": "f14de20464e1e714de13c69938185e10a2020cbe39a97e9f8e45f28b8051bab3",
       "normalized_byte_identical": false,
@@ -72,7 +72,7 @@
     },
     {
       "path": "DiffGWASDeps/SAS_ODA_Runner.pm",
-      "sha256": "15ccb66cb68f47c6c5181a2cd3d878381a08c4e9b318430e8272ebf731c07875",
+      "sha256": "c7823f1cbab3bb69e02ff9d9f299ea692165a4bde265bb04c87f9d3df14c208c",
       "upstream_path": "MCPDeps/SAS_ODA_Runner.pm",
       "upstream_sha256": "fad024ecc27dcf77aed9b2a1f1b479292f190594624c3166720afaec75da2670",
       "normalized_byte_identical": false,
@@ -114,7 +114,7 @@
     },
     {
       "path": "DiffGWASDeps/sas_oda_session_server.py",
-      "sha256": "39af8d241ddc7b1effadf67746aedde3fa9ad95aff6990f0a5f1250928253da3",
+      "sha256": "5bbca8b90cecea5d189770c1f56f4d0608eff8ce7cb76e8f2b00b585c54c4fd7",
       "upstream_path": "MCPDeps/sas_oda_session_server.py",
       "upstream_sha256": "c38d85b1ad83f591108e40c812b0a145a7f9cdae1ad9239ea5c2a7564effe48d",
       "normalized_byte_identical": false,
@@ -138,7 +138,7 @@
     },
     {
       "path": "run_sas_codes_or_script_in_ODA.pl",
-      "sha256": "44a5852709932bcfc8c7f5e0c87867140b76f43ff9cecadaae88d6c56ae154ce",
+      "sha256": "62ba5ad25756d80108fe70107dcdd557f863a7b5d9998df276e596c365a8a3f0",
       "upstream_path": "run_sas_codes_or_files_in_ODA.pl",
       "upstream_sha256": "0ee256c0e9aa4a7fc00038c955377f76f860daf366d757361f41f0a18fbee954",
       "normalized_byte_identical": false,
@@ -270,6 +270,13 @@
       "repository": "https://github.com/chengzhongshan/MCP4SAS",
       "commit": "79ada136979f0e91694d3191e02191a421235abe",
       "scope": "Windows CRLF interpreter/package-path discovery; both submission and listing regression."
+    }
+  ],
+  "runtime_amendments": [
+    {
+      "upstream_commit": "58c2fd4378b27b65e9d8d2c684d3b0c208790a66",
+      "date": "2026-11-22",
+      "manifest": "docs/SAS_RUNTIME_MACRO_QUERY_MANIFEST.json"
     }
   ]
 }

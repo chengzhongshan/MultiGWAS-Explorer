@@ -1,5 +1,9 @@
 # SAS ODA runtime update from MCP4SAS
 
+For the subsequent portable macro query, Python CLI and submission performance
+fixes, see [the Nov22 update](SAS_RUNTIME_MACRO_QUERY_20261122.md). The execution
+counts and scope below describe the earlier port.
+
 The current MCP4SAS Perl runtime has been ported to MultiGWAS-Explorer. The
 source revision is `cd0caa928bd37da3a7720a136d6949c261cbb545`; the target started
 at `3a7a5fa1235dfbf80b11e2fbc01550e85291dc3d`. The

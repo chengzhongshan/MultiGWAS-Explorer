@@ -1,0 +1,340 @@
+{
+  "date": "2026-11-22",
+  "upstream_commit": "58c2fd4378b27b65e9d8d2c684d3b0c208790a66",
+  "baseline_explorer_commit": "8dd217b9ff065054df418fc62f7796369d89f23a",
+  "offline": {
+    "runtime_suite_passed": true,
+    "perl_test_plans": 36,
+    "perl_assertions": 620,
+    "python_unittest_counts": [
+      15,
+      11,
+      8,
+      5,
+      6,
+      5
+    ],
+    "cygwin_native_handoff": {
+      "tests": 8,
+      "actual_subprocess_test": true,
+      "SAS_executed_by_handoff_test": false
+    },
+    "existing_test_warning": "test_java_setup_help.pl retains its pre-existing lexical variable-shadowing warning; no runner failure.",
+    "regression_commands": [
+      {
+        "test": "install/check_sas_runtime.sh",
+        "exit_code": 0
+      },
+      {
+        "test": "tests/test_cygwin_python_handoff.py",
+        "exit_code": 0
+      },
+      {
+        "test": "tests/test_macroparas_autoload.py",
+        "exit_code": 0
+      },
+      {
+        "test": "tests/test_macroparas_gtex.py",
+        "exit_code": 0
+      },
+      {
+        "test": "tests/test_macroparas_html.py",
+        "exit_code": 0
+      },
+      {
+        "test": "tests/test_macroparas_autoload.pl",
+        "exit_code": 0
+      },
+      {
+        "test": "tests/test_macroparas_gtex.pl",
+        "exit_code": 0
+      },
+      {
+        "test": "tools/sync_macroparas_bundle.py",
+        "exit_code": 0
+      }
+    ]
+  },
+  "live": [
+    {
+      "target": "local-perl",
+      "submissions": [
+        {
+          "name": "fixture",
+          "exit_code": 0,
+          "elapsed_seconds": 25.587,
+          "log_sha256": "7a68f89e6edc4b15681135f822a7cdc5ab23f84d2b3533fa313fe6aab7ff8101",
+          "submitted_sha256": "dbb2c4751fa36dc83cdf52c4b5709f83fa7ff26e25e658157005c60ce374bc57",
+          "html_files": 1,
+          "staged_source_observed": false
+        },
+        {
+          "name": "seed-legacy",
+          "exit_code": 0,
+          "elapsed_seconds": 2.128,
+          "log_sha256": "96da0cd90a4a423001cf7fdef5538af156cc8da0e3d7c8e23de4686ae5c9b407",
+          "submitted_sha256": "80512b34c15341ca36c8f992cd518d3d24f3976d792fe162ca14d6be1f20b023",
+          "html_files": 0,
+          "staged_source_observed": false
+        },
+        {
+          "name": "query-fallback",
+          "exit_code": 0,
+          "elapsed_seconds": 3.288,
+          "log_sha256": "b659c21f070628b176593b1907c59ac91ccd4adf975c8e5665a9bc67f9207871",
+          "submitted_sha256": "ef68d38b6ef52051810443b7da5c6fae71b2bd0ef4e8c71e786ca6b65fa59721",
+          "html_files": 1,
+          "staged_source_observed": false
+        },
+        {
+          "name": "bundled-importer",
+          "exit_code": 0,
+          "elapsed_seconds": 5.34,
+          "log_sha256": "4886bff6ac78e8890842754e81c26523dc078255f57080c10afa882ffffbaeac",
+          "submitted_sha256": "d7870dccf3d8af434f817815e97564c059e8c46be0744fa6eb4df134923d8a63",
+          "html_files": 1,
+          "staged_source_observed": false
+        },
+        {
+          "name": "run-copied-fixtures",
+          "exit_code": 0,
+          "elapsed_seconds": 3.143,
+          "log_sha256": "f5743a5835892d846b881640e9af90d3e4a0fcc2f594ec53685bb7561d73f10d",
+          "submitted_sha256": "cd9fceb8da5dc217d4030f0036cdcf680c794627f3286777c5a5728486d21ae5",
+          "html_files": 0,
+          "staged_source_observed": false
+        }
+      ]
+    },
+    {
+      "target": "local-python",
+      "submissions": [
+        {
+          "name": "fixture",
+          "exit_code": 0,
+          "elapsed_seconds": 21.414,
+          "log_sha256": "633f4a2104b519f78f3f864bc0e48fa48e4a8553add0ef530fe7e892b8b77080",
+          "submitted_sha256": "01805dc6652b5fda59d131ca3a62985379ef3d6f55519706b7f3a4103d2280b6",
+          "html_files": 1,
+          "staged_source_observed": false
+        },
+        {
+          "name": "seed-legacy",
+          "exit_code": 0,
+          "elapsed_seconds": 1.322,
+          "log_sha256": "5b8a8606306b544915fc973f10ed706a5dfa953a72c3308f8209c5ea2a251507",
+          "submitted_sha256": "c79c5145f48fabca6a766a23f0433be369838b589e60645ed9039b4ff89d4450",
+          "html_files": 0,
+          "staged_source_observed": false
+        },
+        {
+          "name": "query-fallback",
+          "exit_code": 0,
+          "elapsed_seconds": 1.745,
+          "log_sha256": "7eb9a86bc07ba56f3561970a153b63cbcd7b7e777ab4ce1cde6338d45252b660",
+          "submitted_sha256": "74da88647819d8a05268b7ee6bbd28cac769bfb9d1b648014a7f966c244cc55d",
+          "html_files": 1,
+          "staged_source_observed": false
+        },
+        {
+          "name": "bundled-importer",
+          "exit_code": 0,
+          "elapsed_seconds": 2.934,
+          "log_sha256": "fb6c7c0da2a9e6a177bba5e056a5f02b54782de331d2733ba299a26025c956d5",
+          "submitted_sha256": "15a4248b4b995088b1b1b4763161cd1ae282de1751bef79059f4b9902c39c86e",
+          "html_files": 1,
+          "staged_source_observed": false
+        },
+        {
+          "name": "run-copied-fixtures",
+          "exit_code": 0,
+          "elapsed_seconds": 1.291,
+          "log_sha256": "eb89bbd43fa4eed3497b900b6fd296a8e1fbd7d9e7b3b7f40ba0f377daa356d6",
+          "submitted_sha256": "5782a8940db146df0c69643dfb2d4c7c5fea8145af79b7533b25b5ac6c28c098",
+          "html_files": 0,
+          "staged_source_observed": false
+        }
+      ]
+    },
+    {
+      "target": "oda-perl",
+      "submissions": [
+        {
+          "name": "fixture",
+          "exit_code": 0,
+          "elapsed_seconds": 19.463,
+          "log_sha256": "c7197e16327ed483c6cfafd8fffb7f9d9b1964654677f8bdf3044610cb0cf339",
+          "submitted_sha256": "4520be7cdf08071e4123f082f80182222de578a91510668a6325de7aaedb89ee",
+          "html_files": 1,
+          "staged_source_observed": false
+        },
+        {
+          "name": "seed-legacy",
+          "exit_code": 0,
+          "elapsed_seconds": 1.977,
+          "log_sha256": "5834d6a5f8cd3eb3b4b906c789f17c4b6bb91fd0d82d95464b6398b27effe359",
+          "submitted_sha256": "80512b34c15341ca36c8f992cd518d3d24f3976d792fe162ca14d6be1f20b023",
+          "html_files": 0,
+          "staged_source_observed": false
+        },
+        {
+          "name": "query-fallback",
+          "exit_code": 0,
+          "elapsed_seconds": 3.118,
+          "log_sha256": "add50695ac5baa2ef157c7f1eff65420e4ff376df1317b6ecee74ae39e346146",
+          "submitted_sha256": "ef68d38b6ef52051810443b7da5c6fae71b2bd0ef4e8c71e786ca6b65fa59721",
+          "html_files": 1,
+          "staged_source_observed": false
+        },
+        {
+          "name": "bundled-importer",
+          "exit_code": 0,
+          "elapsed_seconds": 8.177,
+          "log_sha256": "881922a4c8984c02932907e3a896882b85fd01731341b0426953c1e25b4c2f87",
+          "submitted_sha256": "9307cf8d2d00f17cf936a147c6c3005533d6de449929e4c14572092475b4f725",
+          "html_files": 1,
+          "staged_source_observed": false
+        },
+        {
+          "name": "run-copied-fixtures",
+          "exit_code": 0,
+          "elapsed_seconds": 2.006,
+          "log_sha256": "712485de3ef0fcf927464f21e0ecf311395a722d2836eabdf54c94e10433c84e",
+          "submitted_sha256": "cd9fceb8da5dc217d4030f0036cdcf680c794627f3286777c5a5728486d21ae5",
+          "html_files": 0,
+          "staged_source_observed": false
+        }
+      ]
+    },
+    {
+      "target": "oda-python",
+      "submissions": [
+        {
+          "name": "fixture",
+          "exit_code": 0,
+          "elapsed_seconds": 15.873,
+          "log_sha256": "c0c701fe40bb7c7056b0d7040836c79773d109bb247ead94d7823bbf961399ca",
+          "submitted_sha256": "a809cc482da38355a571406cba1f16b42cc5956ba764fe8599dd16c2cdf7dd51",
+          "html_files": 1,
+          "staged_source_observed": false
+        },
+        {
+          "name": "seed-legacy",
+          "exit_code": 0,
+          "elapsed_seconds": 1.724,
+          "log_sha256": "857c33588f0654b60ef449c67e607f69cc9e7a673e32ff5c861b762bc5a16b78",
+          "submitted_sha256": "c79c5145f48fabca6a766a23f0433be369838b589e60645ed9039b4ff89d4450",
+          "html_files": 0,
+          "staged_source_observed": false
+        },
+        {
+          "name": "query-fallback",
+          "exit_code": 0,
+          "elapsed_seconds": 1.61,
+          "log_sha256": "9dcc2e2ed177f29d978bdf68050a41eddae36361eb1e2575e7121392e50459b7",
+          "submitted_sha256": "74da88647819d8a05268b7ee6bbd28cac769bfb9d1b648014a7f966c244cc55d",
+          "html_files": 1,
+          "staged_source_observed": false
+        },
+        {
+          "name": "bundled-importer",
+          "exit_code": 0,
+          "elapsed_seconds": 5.681,
+          "log_sha256": "d7cadaa4a36db6b249e0c873f16e369d5505dad5425bdb0a0b01f12e84f30207",
+          "submitted_sha256": "8e67c2e21a370abed8710d000c35c16a3708e337100463ccd7fb5159a0699b24",
+          "html_files": 1,
+          "staged_source_observed": false
+        },
+        {
+          "name": "run-copied-fixtures",
+          "exit_code": 0,
+          "elapsed_seconds": 1.434,
+          "log_sha256": "7792daea5a312b5bfe19f38f4cccea27cf3b1d8a3719d0f381611d01befa7946",
+          "submitted_sha256": "5782a8940db146df0c69643dfb2d4c7c5fea8145af79b7533b25b5ac6c28c098",
+          "html_files": 0,
+          "staged_source_observed": false
+        }
+      ]
+    }
+  ],
+  "tracked_live_harness": [
+    {
+      "runner": "perl",
+      "profile": "oda",
+      "records": [
+        {
+          "name": "fixture",
+          "exit_code": 0,
+          "elapsed_seconds": 19.561
+        },
+        {
+          "name": "seed-legacy",
+          "exit_code": 0,
+          "elapsed_seconds": 1.989
+        },
+        {
+          "name": "query-fallback",
+          "exit_code": 0,
+          "elapsed_seconds": 3.156
+        },
+        {
+          "name": "bundled-importer",
+          "exit_code": 0,
+          "elapsed_seconds": 7.168
+        },
+        {
+          "name": "run-copied-fixtures",
+          "exit_code": 0,
+          "elapsed_seconds": 2.053
+        }
+      ]
+    },
+    {
+      "runner": "python",
+      "profile": "winlocal",
+      "records": [
+        {
+          "name": "fixture",
+          "exit_code": 0,
+          "elapsed_seconds": 21.49
+        },
+        {
+          "name": "seed-legacy",
+          "exit_code": 0,
+          "elapsed_seconds": 1.044
+        },
+        {
+          "name": "query-fallback",
+          "exit_code": 0,
+          "elapsed_seconds": 1.806
+        },
+        {
+          "name": "bundled-importer",
+          "exit_code": 0,
+          "elapsed_seconds": 2.709
+        },
+        {
+          "name": "run-copied-fixtures",
+          "exit_code": 0,
+          "elapsed_seconds": 1.216
+        }
+      ]
+    }
+  ],
+  "negative_test": {
+    "case": "ODA bulk importer against a minimal two-file preview fixture without library helper macros",
+    "observed": "Both runners returned failure and retained SAS missing-helper/include errors.",
+    "resolution": "Bulk importer integration uses the existing complete macro library; portable query tests independently use the minimal fixture.",
+    "remaining_requirement": "The original Linux bulk-import branch requires its enumeration/deletion helper sources."
+  },
+  "scope": {
+    "local_windows_sas": true,
+    "sas_oda": true,
+    "linux_sas_live": false,
+    "complete_gwas_pipeline_rerun": false,
+    "controlled_performance_comparison": false,
+    "token_or_cost_savings_measured": false,
+    "original_research_macros_modified": false
+  },
+  "evidence": "Full submitted SAS, logs, HTML and initial failing fixture diagnostics retained locally in SAS_Output_RandID_macroquery_port_20261122 and SAS_Output_RandID_macroquery_live_*; private settings and credentials excluded."
+}

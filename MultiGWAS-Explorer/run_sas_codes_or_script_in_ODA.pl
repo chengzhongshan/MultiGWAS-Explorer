@@ -1554,7 +1554,9 @@ my $local_profile = $ENV{SASPY_CFGNAME} || $ENV{SASPY_CONFIG_NAME} || 'oda';
 if (defined($dir4local_sas_home) || length($ENV{SAS_LOCAL_HOME_DIR} // '') ||
     $local_profile =~ /^(?:winlocal(?:_com)?|linuxlocal|local|stdio)$/i) {
     die "--dir4local_sas_home is for local SAS, not the oda profile\n" if lc($local_profile) eq 'oda';
-    my $home = defined($dir4local_sas_home) ? $dir4local_sas_home : ($ENV{SAS_LOCAL_HOME_DIR} || $output_dir);
+    my $home = defined($dir4local_sas_home) ? $dir4local_sas_home : ($ENV{SAS_LOCAL_HOME_DIR} ||
+        SAS_Local_Home::default_home(output_dir => $output_dir, persistent => $persistent,
+            session_id => $session_id, profile => $local_profile, cfgfile => $ENV{SASPY_CFGFILE}));
     die "Local SAS home must be nonempty and contain no control characters\n" if !length($home) || $home =~ /[\x00-\x1f]/;
     $home = File::Spec->rel2abs($home);
     make_path($home) unless -d $home;
@@ -2535,6 +2537,12 @@ sub build_include_debug_wrapper {
     };
 }
 
+sub valid_sas_home_path {
+    my ($path) = @_;
+    return defined($path) && $path !~ /^PYTHON ERROR:/
+      && $path =~ m{^(?:/|[A-Za-z]:[\\/]|\\\\)} ? 1 : 0;
+}
+
 sub summarize_sas_log_text {
     my ($text) = @_;
     return '' unless defined $text && length $text;
@@ -2906,7 +2914,7 @@ if ($file) {
     if (!$skip_execution_due_to_preflight && sas_submission_contains_include($file_text)) {
         $saw_explicit_include = 1;
         $remote_home_path = $runner->get_sas_home_path() unless length $remote_home_path;
-        $remote_home_path = '' unless defined $remote_home_path && $remote_home_path !~ /^PYTHON ERROR:/ && $remote_home_path =~ m{^/};
+        $remote_home_path = '' unless valid_sas_home_path($remote_home_path);
         if ($include_preflight_enabled) {
             print "Detected %include in SAS script. Running include preflight and refreshing matching remote include targets before executing the original SAS file.\n";
             $include_preflight = run_include_preflight(
@@ -2953,7 +2961,7 @@ if ($file) {
         my $base = basename($output_dir);
         $base =~ s/[^A-Za-z0-9_.-]+/_/g;
         $remote_home_path = $runner->get_sas_home_path() unless length $remote_home_path;
-        $remote_home_path = '' unless defined $remote_home_path && $remote_home_path !~ /^PYTHON ERROR:/ && $remote_home_path =~ m{^/};
+        $remote_home_path = '' unless valid_sas_home_path($remote_home_path);
         my $remote_log_path = ($remote_home_path || '/home') . "/include_debug_${base}.log";
         my $local_log_path = File::Spec->catfile($output_dir, 'include_debug_remote.log');
         $include_debug_ctx = build_include_debug_wrapper(
